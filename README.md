@@ -1,22 +1,29 @@
-Projekt: Nexus
-Der intelligente Gedanken-Workspace
-Elevator Pitch
-Die Vision:
-Nexus ist der digitale Workspace, der mitdenkt. Stell dir eine Kreuzung aus Obsidian's mächtigen Verlinkungen, Pinterest's visueller Pinwand und einem KI-Assistenten vor, der deine Gedanken versteht und verbindet.
-Das Problem:
-Unsere Gedanken, Ideen und Notizen sind überall verstreut - in verschiedenen Apps, auf Zetteln, in Chats. Selbst in guten Notiz-Apps verlieren wir den Überblick und verpassen Verbindungen zwischen unseren Ideen. Wertvolle Erkenntnisse verstauben digital, weil wir sie nicht wiederfinden oder nicht sehen, wie sie zusammenhängen.
-Die Lösung:
-Nexus bietet einen visuellen, KI-gestützten Workspace wo Nutzer:
+# Project Nexus
+*The Intelligent Knowledge Workspace*
 
-Gedanken als Karten auf einer unendlichen Leinwand platzieren (Text, Bilder, Links, Code)
-Markdown für strukturierte Notizen nutzen
-Die KI automatisch Verbindungen zwischen verwandten Ideen visualisieren lassen
-Ihre Notizen befragen: "Was weiß ich über X?"
-Nahtlos zwischen Mobile App (Quick Capture, eventuell mit Flutter?) und Web (Deep Work, eventuell mit Next.js) wechseln
+## 🚀 Elevator Pitch
 
-Der USP:
-Während andere Notiz-Apps nur speichern, versteht Nexus deine Inhalte. Die KI arbeitet im Hintergrund als dein persönlicher Wissens-Kurator - sie findet Muster, schlägt Verbindungen vor und hilft dir, das große Ganze zu sehen.
-Zielgruppe:
-Knowledge Worker, Studierende, Kreative - alle die mit Informationen arbeiten und deren Wert nicht im Sammeln, sondern im Verbinden von Ideen liegt.
+### The Vision
+Nexus is the digital workspace that thinks with you. Imagine a fusion of Obsidian's powerful linking capabilities, Pinterest's visual pinboard, and an AI assistant that understands and connects your thoughts.
 
-"Nexus - Wo deine Gedanken sich verbinden"
+### The Problem
+Our thoughts, ideas, and notes are scattered everywhere - across different apps, on sticky notes, in chats. Even in good note-taking apps, we lose overview and miss connections between our ideas. Valuable insights gather digital dust because we can't find them or see how they relate to each other.
+
+### The Solution
+Nexus provides a visual, AI-powered workspace where users can:
+
+- **Place thoughts as cards** on an infinite canvas (text, images, links, code)
+- **Use Markdown** for structured notes
+- **Let AI automatically visualize** connections between related ideas
+- **Query their notes**: "What do I know about X?"
+- **Seamlessly switch** between Mobile App (Quick Capture with Flutter) and Web (Deep Work with Next.js)
+
+### The Unique Value Proposition
+While other note-taking apps just store, Nexus understands your content. AI works in the background as your personal knowledge curator - finding patterns, suggesting connections, and helping you see the bigger picture.
+
+### Target Audience
+Knowledge workers, students, creatives - anyone who works with information and whose value lies not in collecting, but in connecting ideas.
+
+---
+
+**"Nexus - Where your thoughts connect"**

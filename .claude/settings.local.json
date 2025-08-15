@@ -14,7 +14,11 @@
       "mcp__linear-server__list_projects",
       "mcp__linear-server__update_issue",
       "Bash(git reset:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "mcp__linear__list_projects",
+      "mcp__linear__create_issue",
+      "mcp__linear__list_teams",
+      "mcp__linear__list_issues"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"
