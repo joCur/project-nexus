@@ -1,0 +1,97 @@
+# Project Nexus - Production Docker Compose Configuration
+# Use with: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up
+
+version: '3.8'
+
+services:
+  backend:
+    build:
+      target: production  # Use production stage
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - LOG_LEVEL=warn
+    volumes:
+      # Remove development volumes, only keep logs
+      - nexus_logs:/app/logs
+    command: ["node", "dist/index.js"]  # Production command
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    
+  postgres:
+    restart: always
+    environment:
+      # Production-specific settings
+      - POSTGRES_SHARED_PRELOAD_LIBRARIES=pg_stat_statements,auto_explain,pg_cron
+      - POSTGRES_MAX_CONNECTIONS=200
+      - POSTGRES_SHARED_BUFFERS=256MB
+      - POSTGRES_EFFECTIVE_CACHE_SIZE=8GB
+      - POSTGRES_WORK_MEM=8MB
+      - POSTGRES_MAINTENANCE_WORK_MEM=128MB
+    volumes:
+      # Only data persistence in production, no development mounts
+      - nexus_postgres_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    command: >
+      postgres 
+      -c log_statement=ddl
+      -c log_min_duration_statement=5000
+      -c shared_preload_libraries=pg_stat_statements,auto_explain
+      -c pg_stat_statements.track=top
+      -c auto_explain.log_min_duration=5000ms
+      -c auto_explain.log_analyze=true
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=32MB
+      -c max_wal_size=2GB
+      -c min_wal_size=160MB
+    
+  redis:
+    restart: always
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    volumes:
+      # Only data persistence in production
+      - nexus_redis_data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    command: >
+      redis-server 
+      --appendonly yes 
+      --appendfsync everysec 
+      --maxmemory 512mb 
+      --maxmemory-policy allkeys-lru
+      --tcp-keepalive 60
+      --timeout 300
+      --databases 16
+      ${REDIS_PASSWORD:+--requirepass $REDIS_PASSWORD}
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+
+  # Remove development tools in production
+  adminer:
+    profiles:
+      - development  # Only available in development
+      
+  redis-commander:
+    profiles:
+      - development  # Only available in development
