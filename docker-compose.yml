@@ -16,20 +16,24 @@ services:
     container_name: nexus-backend
     restart: unless-stopped
     ports:
-      - "${BACKEND_PORT:-3000}:3000"
+      - "${BACKEND_PORT:-3000}:${BACKEND_PORT:-3000}"
     environment:
       # Node.js Configuration
       - NODE_ENV=${NODE_ENV:-production}
-      - PORT=3000
+      - DOCKER_ENV=true
+      - BACKEND_PORT=${BACKEND_PORT:-3000}
       
       # Database Configuration
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-nexus}:${POSTGRES_PASSWORD:-nexus_secure_2024}@postgres:5432/${POSTGRES_DB:-nexus_db}
+      - POSTGRES_DB=${POSTGRES_DB:-nexus_db}
+      - POSTGRES_USER=${POSTGRES_USER:-nexus}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-nexus_secure_2024}
+      - POSTGRES_PORT=5432
       - DB_POOL_MIN=${DB_POOL_MIN:-2}
       - DB_POOL_MAX=${DB_POOL_MAX:-10}
       - DB_TIMEOUT=${DB_TIMEOUT:-30000}
       
       # Redis Configuration
-      - REDIS_URL=redis://redis:6379
+      - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD:-}
       - REDIS_DB=${REDIS_DB:-0}
       

@@ -18,7 +18,10 @@
       "mcp__linear__list_projects",
       "mcp__linear__create_issue",
       "mcp__linear__list_teams",
-      "mcp__linear__list_issues"
+      "mcp__linear__list_issues",
+      "Bash(docker network prune:*)",
+      "Bash(del verify-config.js)",
+      "Bash(rm:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"

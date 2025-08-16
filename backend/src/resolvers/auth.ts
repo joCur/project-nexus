@@ -1,0 +1,414 @@
+import { 
+  AuthenticationError, 
+  AuthorizationError, 
+  NotFoundError,
+  ValidationError 
+} from '@/utils/errors';
+import { securityLogger } from '@/utils/logger';
+import { GraphQLContext } from '@/types';
+import { UserService } from '@/services/user';
+import { Auth0Service } from '@/services/auth0';
+import { CacheService } from '@/services/cache';
+
+/**
+ * GraphQL resolvers for authentication operations
+ * Implements Auth0 integration and session management
+ */
+
+export const authResolvers = {
+  Query: {
+    /**
+     * Get current authenticated user
+     */
+    me: async (_: any, __: any, context: GraphQLContext) => {
+      if (!context.isAuthenticated || !context.user) {
+        return null;
+      }
+      return context.user;
+    },
+
+    /**
+     * Validate current session
+     */
+    validateSession: async (_: any, __: any, context: GraphQLContext) => {
+      if (!context.isAuthenticated || !context.user) {
+        return false;
+      }
+
+      // Check session validity with Auth0 service
+      const auth0Service = context.dataSources.auth0Service;
+      const isValid = await auth0Service.validateSession(context.user.id);
+      
+      if (!isValid) {
+        securityLogger.sessionEvent('expired', context.user.id, {
+          reason: 'validation_failed',
+        });
+      }
+
+      return isValid;
+    },
+
+    /**
+     * Get user permissions
+     */
+    getUserPermissions: async (
+      _: any, 
+      { userId }: { userId: string }, 
+      context: GraphQLContext
+    ) => {
+      // Only allow users to get their own permissions or admins to get any
+      if (!context.isAuthenticated) {
+        throw new AuthenticationError();
+      }
+
+      if (context.user?.id !== userId && !context.permissions.includes('admin:user_management')) {
+        throw new AuthorizationError(
+          'Cannot access other user permissions',
+          'INSUFFICIENT_PERMISSIONS',
+          'admin:user_management',
+          context.permissions
+        );
+      }
+
+      const auth0Service = context.dataSources.auth0Service;
+      return await auth0Service.getUserPermissions(userId);
+    },
+  },
+
+  Mutation: {
+    /**
+     * Sync user from Auth0 token and create session
+     */
+    syncUserFromAuth0: async (
+      _: any,
+      { auth0Token }: { auth0Token: string },
+      context: GraphQLContext
+    ) => {
+      const auth0Service = context.dataSources.auth0Service;
+
+      try {
+        // Validate Auth0 token
+        const auth0User = await auth0Service.validateAuth0Token(auth0Token);
+        if (!auth0User) {
+          throw new AuthenticationError('Invalid Auth0 token');
+        }
+
+        // Sync user to database
+        const user = await auth0Service.syncUserFromAuth0(auth0User);
+
+        // Create session
+        const sessionId = await auth0Service.createSession(user, auth0User);
+
+        // Calculate expiration time
+        const expiresAt = new Date(Date.now() + 4 * 60 * 60 * 1000); // 4 hours
+
+        securityLogger.authSuccess(user.id, auth0User.sub, {
+          sessionId,
+          email: user.email,
+          permissions: user.permissions,
+        });
+
+        return {
+          user,
+          sessionId,
+          expiresAt,
+          permissions: user.permissions,
+        };
+
+      } catch (error) {
+        securityLogger.authFailure('sync_from_auth0', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        throw error;
+      }
+    },
+
+    /**
+     * Refresh current session
+     */
+    refreshSession: async (_: any, __: any, context: GraphQLContext) => {
+      if (!context.isAuthenticated || !context.user) {
+        throw new AuthenticationError();
+      }
+
+      const auth0Service = context.dataSources.auth0Service;
+      const cacheService = context.dataSources.cacheService;
+
+      try {
+        // Validate current session
+        const isValid = await auth0Service.validateSession(context.user.id);
+        if (!isValid) {
+          throw new AuthenticationError('Session expired');
+        }
+
+        // Get current session data
+        const sessionData = await cacheService.get(`session:${context.user.id}`);
+        if (!sessionData) {
+          throw new AuthenticationError('Session not found');
+        }
+
+        const session = JSON.parse(sessionData);
+        session.lastActivity = new Date();
+
+        // Update session in cache
+        await cacheService.set(
+          `session:${context.user.id}`,
+          session,
+          4 * 60 * 60 * 1000 // 4 hours
+        );
+
+        securityLogger.sessionEvent('refreshed', context.user.id);
+
+        return session;
+
+      } catch (error) {
+        securityLogger.sessionEvent('expired', context.user.id, {
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        throw error;
+      }
+    },
+
+    /**
+     * Logout user and destroy session
+     */
+    logout: async (_: any, __: any, context: GraphQLContext) => {
+      if (!context.isAuthenticated || !context.user) {
+        return true; // Already logged out
+      }
+
+      const auth0Service = context.dataSources.auth0Service;
+
+      try {
+        await auth0Service.destroySession(context.user.id);
+        securityLogger.sessionEvent('destroyed', context.user.id, {
+          reason: 'user_logout',
+        });
+        return true;
+
+      } catch (error) {
+        securityLogger.sessionEvent('destroyed', context.user.id, {
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        return false;
+      }
+    },
+
+    /**
+     * Grant permissions to user (admin only)
+     */
+    grantPermissions: async (
+      _: any,
+      { userId, permissions }: { userId: string; permissions: string[] },
+      context: GraphQLContext
+    ) => {
+      if (!context.isAuthenticated) {
+        throw new AuthenticationError();
+      }
+
+      if (!context.permissions.includes('admin:user_management')) {
+        throw new AuthorizationError(
+          'Insufficient permissions to grant permissions',
+          'INSUFFICIENT_PERMISSIONS',
+          'admin:user_management',
+          context.permissions
+        );
+      }
+
+      const userService = context.dataSources.userService;
+
+      try {
+        const user = await userService.findById(userId);
+        if (!user) {
+          throw new NotFoundError('User', userId);
+        }
+
+        // Merge with existing permissions
+        const updatedPermissions = Array.from(new Set([...user.permissions, ...permissions]));
+
+        const updatedUser = await userService.update(userId, {
+          permissions: updatedPermissions,
+        });
+
+        securityLogger.authorizationFailure(context.user!.id, 'user_permissions', 'grant', {
+          targetUserId: userId,
+          grantedPermissions: permissions,
+        });
+
+        return updatedUser;
+
+      } catch (error) {
+        throw error;
+      }
+    },
+
+    /**
+     * Revoke permissions from user (admin only)
+     */
+    revokePermissions: async (
+      _: any,
+      { userId, permissions }: { userId: string; permissions: string[] },
+      context: GraphQLContext
+    ) => {
+      if (!context.isAuthenticated) {
+        throw new AuthenticationError();
+      }
+
+      if (!context.permissions.includes('admin:user_management')) {
+        throw new AuthorizationError(
+          'Insufficient permissions to revoke permissions',
+          'INSUFFICIENT_PERMISSIONS',
+          'admin:user_management',
+          context.permissions
+        );
+      }
+
+      const userService = context.dataSources.userService;
+
+      try {
+        const user = await userService.findById(userId);
+        if (!user) {
+          throw new NotFoundError('User', userId);
+        }
+
+        // Remove specified permissions
+        const updatedPermissions = user.permissions.filter(
+          permission => !permissions.includes(permission)
+        );
+
+        const updatedUser = await userService.update(userId, {
+          permissions: updatedPermissions,
+        });
+
+        securityLogger.authorizationFailure(context.user!.id, 'user_permissions', 'revoke', {
+          targetUserId: userId,
+          revokedPermissions: permissions,
+        });
+
+        return updatedUser;
+
+      } catch (error) {
+        throw error;
+      }
+    },
+
+    /**
+     * Assign role to user (admin only)
+     */
+    assignRole: async (
+      _: any,
+      { userId, role }: { userId: string; role: string },
+      context: GraphQLContext
+    ) => {
+      if (!context.isAuthenticated) {
+        throw new AuthenticationError();
+      }
+
+      if (!context.permissions.includes('admin:user_management')) {
+        throw new AuthorizationError(
+          'Insufficient permissions to assign roles',
+          'INSUFFICIENT_PERMISSIONS',
+          'admin:user_management',
+          context.permissions
+        );
+      }
+
+      const userService = context.dataSources.userService;
+
+      try {
+        const user = await userService.findById(userId);
+        if (!user) {
+          throw new NotFoundError('User', userId);
+        }
+
+        // Add role if not already present
+        const updatedRoles = user.roles.includes(role) 
+          ? user.roles 
+          : [...user.roles, role];
+
+        const updatedUser = await userService.update(userId, {
+          roles: updatedRoles,
+        });
+
+        securityLogger.authorizationFailure(context.user!.id, 'user_roles', 'assign', {
+          targetUserId: userId,
+          assignedRole: role,
+        });
+
+        return updatedUser;
+
+      } catch (error) {
+        throw error;
+      }
+    },
+
+    /**
+     * Remove role from user (admin only)
+     */
+    removeRole: async (
+      _: any,
+      { userId, role }: { userId: string; role: string },
+      context: GraphQLContext
+    ) => {
+      if (!context.isAuthenticated) {
+        throw new AuthenticationError();
+      }
+
+      if (!context.permissions.includes('admin:user_management')) {
+        throw new AuthorizationError(
+          'Insufficient permissions to remove roles',
+          'INSUFFICIENT_PERMISSIONS',
+          'admin:user_management',
+          context.permissions
+        );
+      }
+
+      const userService = context.dataSources.userService;
+
+      try {
+        const user = await userService.findById(userId);
+        if (!user) {
+          throw new NotFoundError('User', userId);
+        }
+
+        // Remove role
+        const updatedRoles = user.roles.filter(userRole => userRole !== role);
+
+        const updatedUser = await userService.update(userId, {
+          roles: updatedRoles,
+        });
+
+        securityLogger.authorizationFailure(context.user!.id, 'user_roles', 'remove', {
+          targetUserId: userId,
+          removedRole: role,
+        });
+
+        return updatedUser;
+
+      } catch (error) {
+        throw error;
+      }
+    },
+  },
+
+  // Custom scalar resolvers
+  DateTime: {
+    serialize: (value: Date) => value.toISOString(),
+    parseValue: (value: string) => new Date(value),
+    parseLiteral: (ast: any) => new Date(ast.value),
+  },
+
+  JSON: {
+    serialize: (value: any) => value,
+    parseValue: (value: any) => value,
+    parseLiteral: (ast: any) => JSON.parse(ast.value),
+  },
+
+  // User field resolvers
+  User: {
+    workspaces: async (parent: any, _: any, context: GraphQLContext) => {
+      const userService = context.dataSources.userService;
+      return await userService.getUserWorkspaces(parent.id);
+    },
+  },
+};

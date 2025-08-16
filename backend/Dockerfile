@@ -78,18 +78,18 @@ RUN mkdir -p /app/logs && chown backend:nodejs /app/logs
 # Switch to non-root user
 USER backend
 
-# Expose application port
-EXPOSE 3000
+# Expose application port (defaults to 3000, can be overridden by BACKEND_PORT)
+EXPOSE ${BACKEND_PORT:-3000}
 
-# Health check endpoint
+# Health check endpoint (uses BACKEND_PORT from environment)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:3000/health || exit 1
+    CMD curl -f http://localhost:${BACKEND_PORT:-3000}/health || exit 1
 
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]
 
 # Start the application
-CMD ["node", "dist/index.js"]
+CMD ["node", "dist/server.js"]
 
 # Metadata labels
 LABEL maintainer="Project Nexus Team"

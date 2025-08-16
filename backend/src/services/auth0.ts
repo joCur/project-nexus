@@ -1,0 +1,442 @@
+import jwt from 'jsonwebtoken';
+import jwksClient from 'jwks-rsa';
+import { auth0Config } from '@/config/environment';
+import { 
+  Auth0User, 
+  Auth0TokenPayload, 
+  User, 
+  CacheKeys,
+  SessionConfig 
+} from '@/types/auth';
+import {
+  AuthenticationError,
+  InvalidTokenError,
+  TokenExpiredError,
+  EmailNotVerifiedError,
+  Auth0ServiceError,
+  ErrorFactory,
+} from '@/utils/errors';
+import { securityLogger, performanceLogger, createContextLogger } from '@/utils/logger';
+import { CacheService } from './cache';
+import { UserService } from './user';
+
+/**
+ * Auth0 Integration Service
+ * Handles JWT validation, user synchronization, and Auth0 Management API operations
+ * Based on technical architecture specifications
+ */
+export class Auth0Service {
+  private readonly jwksClient: jwksClient.JwksClient;
+  private readonly logger = createContextLogger({ service: 'Auth0Service' });
+  private signingKeyCache = new Map<string, string>();
+
+  constructor(
+    private readonly cacheService: CacheService,
+    private readonly userService: UserService
+  ) {
+    // Initialize JWKS client for Auth0 public key retrieval
+    this.jwksClient = jwksClient({
+      jwksUri: auth0Config.jwksUri,
+      requestHeaders: {},
+      timeout: 30000,
+      cache: true,
+      cacheMaxEntries: 5,
+      cacheMaxAge: 10 * 60 * 1000, // 10 minutes
+      rateLimit: true,
+      jwksRequestsPerMinute: 10,
+    });
+  }
+
+  /**
+   * Validates Auth0 JWT token and returns decoded payload
+   * Implements comprehensive security validation as per specifications
+   */
+  async validateAuth0Token(token: string): Promise<Auth0User | null> {
+    const startTime = Date.now();
+
+    try {
+      // Decode token header to get key ID
+      const decoded = jwt.decode(token, { complete: true });
+      if (!decoded || typeof decoded === 'string' || !decoded.header?.kid) {
+        securityLogger.authFailure('Invalid token structure', { token: token.substring(0, 20) + '...' });
+        return null;
+      }
+
+      // Get signing key from Auth0 JWKS endpoint
+      const signingKey = await this.getSigningKey(decoded.header.kid);
+      if (!signingKey) {
+        securityLogger.authFailure('Failed to retrieve signing key', { kid: decoded.header.kid });
+        return null;
+      }
+
+      // Verify JWT with Auth0 public key
+      const payload = jwt.verify(token, signingKey, {
+        audience: auth0Config.audience,
+        issuer: auth0Config.issuer,
+        algorithms: auth0Config.algorithms as any,
+        clockTolerance: 60, // Allow 60 seconds clock skew
+      }) as unknown as Auth0TokenPayload;
+
+      // Validate email verification requirement
+      if (!payload.email_verified) {
+        securityLogger.authFailure('Email not verified', { 
+          auth0UserId: payload.sub,
+          email: payload.email 
+        });
+        throw new EmailNotVerifiedError();
+      }
+
+      // Map to Auth0User interface
+      const auth0User: Auth0User = {
+        sub: payload.sub as string,
+        email: payload.email as string,
+        email_verified: payload.email_verified as boolean,
+        name: payload.name as string,
+        nickname: payload.nickname as string,
+        picture: payload.picture as string,
+        updated_at: payload.updated_at as string,
+        iss: payload.iss,
+        aud: payload.aud,
+        iat: payload.iat,
+        exp: payload.exp,
+        scope: payload.scope,
+        
+        // Extract custom claims
+        'https://nexus.app/roles': payload['https://nexus.app/roles'] as string[] | undefined,
+        'https://nexus.app/permissions': payload['https://nexus.app/permissions'] as string[] | undefined,
+        'https://nexus.app/user_id': payload['https://nexus.app/user_id'] as string | undefined,
+      };
+
+      const duration = Date.now() - startTime;
+      performanceLogger.externalService('Auth0', 'token_validation', duration, true, {
+        auth0UserId: auth0User.sub,
+      });
+
+      securityLogger.authSuccess(
+        auth0User['https://nexus.app/user_id'] || 'unknown',
+        auth0User.sub,
+        { 
+          email: auth0User.email,
+          roles: auth0User['https://nexus.app/roles'],
+          tokenExp: new Date(auth0User.exp * 1000).toISOString(),
+        }
+      );
+
+      return auth0User;
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      performanceLogger.externalService('Auth0', 'token_validation', duration, false, {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+
+      if (error instanceof jwt.JsonWebTokenError) {
+        if (error.name === 'TokenExpiredError') {
+          securityLogger.authFailure('Token expired', { error: error.message });
+          throw new TokenExpiredError();
+        }
+        securityLogger.authFailure('Invalid token', { error: error.message });
+        throw new InvalidTokenError(error.message);
+      }
+
+      if (error instanceof EmailNotVerifiedError) {
+        throw error;
+      }
+
+      this.logger.error('Auth0 token validation failed', { 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+
+      throw new AuthenticationError('Token validation failed');
+    }
+  }
+
+  /**
+   * Synchronizes user data from Auth0 to local database
+   * Implements user sync strategy from technical specifications
+   */
+  async syncUserFromAuth0(auth0User: Auth0User): Promise<User> {
+    const startTime = Date.now();
+
+    try {
+      // Check if user exists in local database
+      let user = await this.userService.findByAuth0Id(auth0User.sub);
+
+      const userData = {
+        email: auth0User.email,
+        auth0UserId: auth0User.sub,
+        emailVerified: auth0User.email_verified,
+        displayName: auth0User.name || auth0User.nickname,
+        avatarUrl: auth0User.picture,
+        roles: auth0User['https://nexus.app/roles'] || [],
+        permissions: auth0User['https://nexus.app/permissions'] || [],
+        lastLogin: new Date(),
+      };
+
+      if (user) {
+        // Update existing user
+        user = await this.userService.update(user.id, {
+          ...userData,
+          lastLogin: new Date(),
+        });
+
+        this.logger.info('User synchronized from Auth0', {
+          userId: user.id,
+          auth0UserId: auth0User.sub,
+          action: 'update',
+        });
+      } else {
+        // Create new user
+        user = await this.userService.create(userData);
+
+        this.logger.info('New user created from Auth0', {
+          userId: user.id,
+          auth0UserId: auth0User.sub,
+          email: auth0User.email,
+          action: 'create',
+        });
+      }
+
+      // Cache user permissions for performance
+      if (user.permissions.length > 0) {
+        await this.cacheService.set(
+          CacheKeys.USER_PERMISSIONS(user.id),
+          user.permissions,
+          60 * 60 * 1000 // 1 hour cache
+        );
+      }
+
+      // Cache Auth0 user data
+      await this.cacheService.set(
+        CacheKeys.AUTH0_USER(auth0User.sub),
+        auth0User,
+        30 * 60 * 1000 // 30 minutes cache
+      );
+
+      const duration = Date.now() - startTime;
+      performanceLogger.dbQuery('user_sync', duration, {
+        auth0UserId: auth0User.sub,
+        userId: user.id,
+      });
+
+      return user;
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      performanceLogger.dbQuery('user_sync', duration, {
+        auth0UserId: auth0User.sub,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        success: false,
+      });
+
+      this.logger.error('Failed to sync user from Auth0', {
+        auth0UserId: auth0User.sub,
+        email: auth0User.email,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+
+      throw new Auth0ServiceError('user_sync', 'Failed to synchronize user data');
+    }
+  }
+
+  /**
+   * Creates a session for authenticated user
+   * Implements session management strategy from specifications
+   */
+  async createSession(user: User, auth0User: Auth0User): Promise<string> {
+    const sessionId = `session_${user.id}_${Date.now()}`;
+    const expiresAt = new Date(Date.now() + SessionConfig.ABSOLUTE_DURATION);
+
+    const sessionData = {
+      userId: user.id,
+      auth0UserId: auth0User.sub,
+      email: user.email,
+      permissions: user.permissions,
+      roles: user.roles,
+      createdAt: new Date(),
+      lastActivity: new Date(),
+      expiresAt,
+    };
+
+    // Store session in Redis with absolute expiration
+    await this.cacheService.set(
+      CacheKeys.USER_SESSION(user.id),
+      sessionData,
+      SessionConfig.ABSOLUTE_DURATION
+    );
+
+    securityLogger.sessionEvent('created', user.id, {
+      sessionId,
+      expiresAt: expiresAt.toISOString(),
+      auth0UserId: auth0User.sub,
+    });
+
+    return sessionId;
+  }
+
+  /**
+   * Validates and refreshes user session
+   */
+  async validateSession(userId: string): Promise<boolean> {
+    try {
+      const sessionData = await this.cacheService.get(CacheKeys.USER_SESSION(userId));
+      if (!sessionData) {
+        return false;
+      }
+
+      const session = JSON.parse(sessionData) as any;
+      const now = new Date();
+      const expiresAt = new Date(session.expiresAt);
+      const lastActivity = new Date(session.lastActivity);
+
+      // Check absolute expiration
+      if (now >= expiresAt) {
+        await this.destroySession(userId);
+        securityLogger.sessionEvent('expired', userId, { reason: 'absolute_timeout' });
+        return false;
+      }
+
+      // Check inactivity timeout
+      const inactivityLimit = new Date(lastActivity.getTime() + SessionConfig.INACTIVITY_DURATION);
+      if (now >= inactivityLimit) {
+        await this.destroySession(userId);
+        securityLogger.sessionEvent('expired', userId, { reason: 'inactivity_timeout' });
+        return false;
+      }
+
+      // Update last activity
+      session.lastActivity = now;
+      await this.cacheService.set(
+        CacheKeys.USER_SESSION(userId),
+        session,
+        SessionConfig.ABSOLUTE_DURATION
+      );
+
+      return true;
+
+    } catch (error) {
+      this.logger.error('Session validation failed', {
+        userId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Destroys user session
+   */
+  async destroySession(userId: string): Promise<void> {
+    await this.cacheService.del(CacheKeys.USER_SESSION(userId));
+    await this.cacheService.del(CacheKeys.USER_PERMISSIONS(userId));
+    securityLogger.sessionEvent('destroyed', userId);
+  }
+
+  /**
+   * Gets user permissions with caching
+   */
+  async getUserPermissions(userId: string): Promise<string[]> {
+    // Try cache first
+    const cached = await this.cacheService.get(CacheKeys.USER_PERMISSIONS(userId));
+    if (cached) {
+      return JSON.parse(cached) as string[];
+    }
+
+    // Get from database
+    const user = await this.userService.findById(userId);
+    if (!user) {
+      return [];
+    }
+
+    // Cache permissions
+    await this.cacheService.set(
+      CacheKeys.USER_PERMISSIONS(userId),
+      user.permissions,
+      60 * 60 * 1000 // 1 hour cache
+    );
+
+    return user.permissions;
+  }
+
+  /**
+   * Checks if user has specific permission
+   */
+  async checkPermission(userId: string, permission: string): Promise<boolean> {
+    const permissions = await this.getUserPermissions(userId);
+    return permissions.includes(permission);
+  }
+
+  /**
+   * Gets signing key from Auth0 JWKS endpoint with caching
+   */
+  private async getSigningKey(kid: string): Promise<string | null> {
+    try {
+      // Check memory cache first
+      if (this.signingKeyCache.has(kid)) {
+        return this.signingKeyCache.get(kid)!;
+      }
+
+      // Check Redis cache
+      const cacheKey = `${CacheKeys.JWKS()}_${kid}`;
+      const cached = await this.cacheService.get(cacheKey);
+      if (cached) {
+        const key = JSON.parse(cached) as string;
+        this.signingKeyCache.set(kid, key);
+        return key;
+      }
+
+      // Fetch from Auth0 JWKS endpoint
+      const key = await this.jwksClient.getSigningKey(kid);
+      const signingKey = key.getPublicKey();
+
+      // Cache in both memory and Redis
+      this.signingKeyCache.set(kid, signingKey);
+      await this.cacheService.set(
+        cacheKey,
+        signingKey,
+        60 * 60 * 1000 // 1 hour cache
+      );
+
+      return signingKey;
+
+    } catch (error) {
+      this.logger.error('Failed to get signing key', {
+        kid,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Health check for Auth0 connectivity
+   */
+  async healthCheck(): Promise<{ status: 'OK' | 'ERROR'; error?: string; responseTime: number }> {
+    const startTime = Date.now();
+
+    try {
+      // Test JWKS endpoint availability
+      const response = await fetch(auth0Config.jwksUri, {
+        method: 'GET',
+        // timeout: 5000, // Not supported in standard fetch
+      });
+
+      if (!response.ok) {
+        throw new Error(`JWKS endpoint returned ${response.status}`);
+      }
+
+      const responseTime = Date.now() - startTime;
+      return { status: 'OK', responseTime };
+
+    } catch (error) {
+      const responseTime = Date.now() - startTime;
+      return {
+        status: 'ERROR',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        responseTime,
+      };
+    }
+  }
+}
