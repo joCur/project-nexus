@@ -5,7 +5,7 @@ import { Permissions } from '@/hooks/use-auth';
 import { useAuth } from '@/hooks/use-auth';
 
 function WorkspaceContent() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -13,17 +13,25 @@ function WorkspaceContent() {
         <div className="py-6">
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold text-gray-900">Workspace</h1>
-            <div className="flex items-center space-x-2">
-              {user?.picture && (
-                <img
-                  src={user.picture}
-                  alt={user.name || user.email}
-                  className="h-8 w-8 rounded-full"
-                />
-              )}
-              <span className="text-sm text-gray-700">
-                {user?.name || user?.email}
-              </span>
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                {user?.picture && (
+                  <img
+                    src={user.picture}
+                    alt={user.name || user.email}
+                    className="h-8 w-8 rounded-full"
+                  />
+                )}
+                <span className="text-sm text-gray-700">
+                  {user?.name || user?.email}
+                </span>
+              </div>
+              <button
+                onClick={() => logout()}
+                className="bg-gray-300 text-gray-700 px-3 py-1 rounded-md text-sm font-medium hover:bg-gray-400"
+              >
+                Logout
+              </button>
             </div>
           </div>
 
