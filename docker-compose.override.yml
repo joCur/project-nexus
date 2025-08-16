@@ -6,7 +6,7 @@ version: '3.8'
 services:
   backend:
     build:
-      target: build  # Use build stage for development
+      target: development  # Use development stage for development
     environment:
       - NODE_ENV=development
       - LOG_LEVEL=debug
@@ -16,13 +16,10 @@ services:
       - ./backend/package.json:/app/package.json:ro
       - ./backend/tsconfig.json:/app/tsconfig.json:ro
       - ./backend/nodemon.json:/app/nodemon.json:ro
-    command: ["npm", "run", "dev"]  # Use development command with hot reload
     
   postgres:
     ports:
       - "5432:5432"  # Expose postgres port for development tools
-    environment:
-      - POSTGRES_PASSWORD=dev_password  # Simpler password for development
     
   redis:
     ports:

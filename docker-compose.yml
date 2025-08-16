@@ -6,13 +6,69 @@ version: '3.8'
 
 services:
   #######################
+  # Web Frontend Service
+  #######################
+  web:
+    build:
+      context: ./clients/web
+      dockerfile: Dockerfile
+      target: ${DOCKER_TARGET:-production}
+    container_name: nexus-web
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-3001}:3000"
+    environment:
+      # Node.js Configuration
+      - NODE_ENV=${NODE_ENV:-production}
+      - NEXT_TELEMETRY_DISABLED=1
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+      
+      # Auth0 Configuration
+      - AUTH0_SECRET=${AUTH0_SECRET:-your-auth0-secret-change-in-production}
+      - AUTH0_BASE_URL=${AUTH0_BASE_URL:-http://localhost:3001}
+      - AUTH0_DOMAIN=${AUTH0_DOMAIN}
+      - AUTH0_ISSUER_BASE_URL=${AUTH0_ISSUER_BASE_URL:-https://${AUTH0_DOMAIN}}
+      - AUTH0_CLIENT_ID=${AUTH0_CLIENT_ID}
+      - AUTH0_CLIENT_SECRET=${AUTH0_CLIENT_SECRET}
+      - AUTH0_AUDIENCE=${AUTH0_AUDIENCE:-}
+      
+      # API Configuration
+      - GRAPHQL_ENDPOINT=${GRAPHQL_ENDPOINT:-http://backend:3000/graphql}
+      - API_BASE_URL=${API_BASE_URL:-http://backend:3000}
+      
+    volumes:
+      # Development hot-reload (only in development)
+      - ./clients/web/app:/app/app:ro
+      - ./clients/web/components:/app/components:ro
+      - ./clients/web/hooks:/app/hooks:ro
+      - ./clients/web/lib:/app/lib:ro
+      - ./clients/web/styles:/app/styles:ro
+      - ./clients/web/types:/app/types:ro
+      - ./clients/web/package.json:/app/package.json:ro
+      - ./clients/web/next.config.js:/app/next.config.js:ro
+      - ./clients/web/tailwind.config.js:/app/tailwind.config.js:ro
+      - ./clients/web/tsconfig.json:/app/tsconfig.json:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - nexus-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  #######################
   # Backend API Service
   #######################
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-      target: ${DOCKER_TARGET:-production}
+      target: ${DOCKER_TARGET:-development}
     container_name: nexus-backend
     restart: unless-stopped
     ports:
@@ -41,7 +97,7 @@ services:
       - AUTH0_DOMAIN=${AUTH0_DOMAIN}
       - AUTH0_CLIENT_ID=${AUTH0_CLIENT_ID}
       - AUTH0_CLIENT_SECRET=${AUTH0_CLIENT_SECRET}
-      - AUTH0_AUDIENCE=${AUTH0_AUDIENCE:-https://api.nexus.app}
+      - AUTH0_AUDIENCE=${AUTH0_AUDIENCE:-}
       - AUTH0_MANAGEMENT_CLIENT_ID=${AUTH0_MANAGEMENT_CLIENT_ID}
       - AUTH0_MANAGEMENT_CLIENT_SECRET=${AUTH0_MANAGEMENT_CLIENT_SECRET}
       
@@ -51,7 +107,7 @@ services:
       
       # API Configuration
       - API_VERSION=${API_VERSION:-v1}
-      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3001,http://localhost:3000}
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3001,http://web:3000}
       - RATE_LIMIT_WINDOW=${RATE_LIMIT_WINDOW:-15}
       - RATE_LIMIT_MAX=${RATE_LIMIT_MAX:-100}
       
@@ -82,11 +138,11 @@ services:
     networks:
       - nexus-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health/ready"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 60s
 
   #######################
   # PostgreSQL Database with pgvector

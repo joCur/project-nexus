@@ -1,1 +1,2 @@
 - Any time you use Linear MCP to move a task to the backlog, if you are in a markdown file for feature documentation, remove it from the markdown file.
+- never start the docker compose yourself, always ask me to do it instead.
