@@ -35,7 +35,7 @@ const environmentSchema = z.object({
   AUTH0_DOMAIN: z.string().min(1, 'AUTH0_DOMAIN is required'),
   AUTH0_CLIENT_ID: z.string().min(1, 'AUTH0_CLIENT_ID is required'),
   AUTH0_CLIENT_SECRET: z.string().min(1, 'AUTH0_CLIENT_SECRET is required'),
-  AUTH0_AUDIENCE: z.string().default('https://api.nexus.app'),
+  AUTH0_AUDIENCE: z.string().default('https://api.nexus-app.de'),
   AUTH0_MANAGEMENT_CLIENT_ID: z.string().optional(),
   AUTH0_MANAGEMENT_CLIENT_SECRET: z.string().optional(),
   

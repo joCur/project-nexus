@@ -1,5 +1,7 @@
 import express from 'express';
-import { ApolloServer } from 'apollo-server-express';
+import { ApolloServer } from '@apollo/server';
+import { expressMiddleware } from '@apollo/server/express4';
+import { ApolloServerPluginLandingPageLocalDefault, ApolloServerPluginLandingPageProductionDefault } from '@apollo/server/plugin/landingPage/default';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { useServer } from 'graphql-ws/lib/use/ws';
@@ -213,33 +215,36 @@ class NexusBackendServer {
       // Create Apollo Server
       this.apolloServer = new ApolloServer({
         schema,
-        context: createGraphQLContext(
-          this.auth0Service,
-          this.userService,
-          this.cacheService
-        ),
         introspection: env.NODE_ENV === 'development',
-        // playground: env.NODE_ENV === 'development', // Not supported in Apollo Server 4
-        debug: env.NODE_ENV === 'development',
-        formatError: (error) => {
+        formatError: (formattedError, error) => {
           logger.error('GraphQL Error', {
-            message: error.message,
-            locations: error.locations,
-            path: error.path,
-            source: error.source?.body,
+            message: formattedError.message,
+            locations: formattedError.locations,
+            path: formattedError.path,
           });
 
           return {
-            message: error.message,
-            code: (error.extensions?.code as string) || 'INTERNAL_ERROR',
-            locations: error.locations,
-            path: error.path,
+            message: formattedError.message,
+            code: (formattedError.extensions?.code as string) || 'INTERNAL_ERROR',
+            locations: formattedError.locations,
+            path: formattedError.path,
             ...(env.NODE_ENV === 'development' && {
-              stack: error.stack,
+              extensions: formattedError.extensions,
             }),
           };
         },
         plugins: [
+          // Add landing page plugin based on environment
+          env.NODE_ENV === 'development'
+            ? ApolloServerPluginLandingPageLocalDefault({
+                embed: true,
+                includeCookies: true,
+              })
+            : ApolloServerPluginLandingPageProductionDefault({
+                embed: true,
+                graphRef: 'nexus-api@current',
+                includeCookies: false,
+              }),
           {
             requestDidStart() {
               return Promise.resolve({
@@ -261,12 +266,18 @@ class NexusBackendServer {
       // Start Apollo Server
       await this.apolloServer.start();
 
-      // Apply GraphQL middleware
-      this.apolloServer.applyMiddleware({ 
-        app: this.app, 
-        path: '/graphql',
-        cors: false, // Already handled by CORS middleware
-      });
+      // Apply GraphQL middleware using Apollo Server 4 syntax
+      this.app.use(
+        '/graphql',
+        express.json(),
+        expressMiddleware(this.apolloServer, {
+          context: createGraphQLContext(
+            this.auth0Service,
+            this.userService,
+            this.cacheService
+          ),
+        })
+      );
 
       // Setup WebSocket server for subscriptions
       this.httpServer = createServer(this.app);

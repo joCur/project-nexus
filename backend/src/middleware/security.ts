@@ -26,7 +26,7 @@ export const corsMiddleware = cors({
  * Configure Helmet for security headers
  */
 export const helmetMiddleware = helmet({
-  contentSecurityPolicy: {
+  contentSecurityPolicy: process.env.NODE_ENV === 'production' ? {
     directives: {
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
@@ -38,7 +38,7 @@ export const helmetMiddleware = helmet({
       mediaSrc: ["'self'"],
       frameSrc: ["'none'"],
     },
-  },
+  } : false, // Disable CSP in development for Apollo Studio
   crossOriginEmbedderPolicy: false, // Disable for GraphQL Playground
   hsts: {
     maxAge: 31536000,

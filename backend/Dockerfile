@@ -42,7 +42,6 @@ RUN npm ci --silent
 # Copy source code
 COPY src/ ./src/
 COPY tsconfig.json ./
-COPY .env.example ./
 
 # Build TypeScript application
 RUN npm run build
@@ -82,14 +81,58 @@ USER backend
 EXPOSE ${BACKEND_PORT:-3000}
 
 # Health check endpoint (uses BACKEND_PORT from environment)
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:${BACKEND_PORT:-3000}/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:3000/health/ready || exit 1
 
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]
 
 # Start the application
 CMD ["node", "dist/server.js"]
+
+#######################
+# Stage 4: Development
+#######################
+FROM node:18-alpine AS development
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies including development tools
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    libc6-compat \
+    curl \
+    && ln -sf python3 /usr/bin/python
+
+# Copy package files
+COPY package*.json ./
+
+# Install all dependencies including devDependencies
+RUN npm ci --silent
+
+# Copy source code and configuration files
+COPY src/ ./src/
+COPY tsconfig.json ./
+COPY nodemon.json ./
+
+# Create logs directory
+RUN mkdir -p /app/logs
+
+# Expose development port
+EXPOSE ${BACKEND_PORT:-3000}
+
+# Set development environment variables
+ENV NODE_ENV=development
+
+# Health check for development
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:3000/health/ready || exit 1
+
+# Start development server with hot reload
+CMD ["npm", "run", "dev"]
 
 # Metadata labels
 LABEL maintainer="Project Nexus Team"

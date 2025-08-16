@@ -102,9 +102,9 @@ export class Auth0Service {
         scope: payload.scope,
         
         // Extract custom claims
-        'https://nexus.app/roles': payload['https://nexus.app/roles'] as string[] | undefined,
-        'https://nexus.app/permissions': payload['https://nexus.app/permissions'] as string[] | undefined,
-        'https://nexus.app/user_id': payload['https://nexus.app/user_id'] as string | undefined,
+        'https://api.nexus-app.de/roles': payload['https://api.nexus-app.de/roles'] as string[] | undefined,
+        'https://api.nexus-app.de/permissions': payload['https://api.nexus-app.de/permissions'] as string[] | undefined,
+        'https://api.nexus-app.de/user_id': payload['https://api.nexus-app.de/user_id'] as string | undefined,
       };
 
       const duration = Date.now() - startTime;
@@ -113,11 +113,11 @@ export class Auth0Service {
       });
 
       securityLogger.authSuccess(
-        auth0User['https://nexus.app/user_id'] || 'unknown',
+        auth0User['https://api.nexus-app.de/user_id'] || 'unknown',
         auth0User.sub,
         { 
           email: auth0User.email,
-          roles: auth0User['https://nexus.app/roles'],
+          roles: auth0User['https://api.nexus-app.de/roles'],
           tokenExp: new Date(auth0User.exp * 1000).toISOString(),
         }
       );
@@ -169,8 +169,8 @@ export class Auth0Service {
         emailVerified: auth0User.email_verified,
         displayName: auth0User.name || auth0User.nickname,
         avatarUrl: auth0User.picture,
-        roles: auth0User['https://nexus.app/roles'] || [],
-        permissions: auth0User['https://nexus.app/permissions'] || [],
+        roles: auth0User['https://api.nexus-app.de/roles'] || [],
+        permissions: auth0User['https://api.nexus-app.de/permissions'] || [],
         lastLogin: new Date(),
       };
 

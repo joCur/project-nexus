@@ -18,9 +18,9 @@ export interface Auth0User {
   scope: string; // OAuth scopes
   
   // Custom claims (set via Auth0 Rules/Actions)
-  'https://nexus.app/roles'?: string[];
-  'https://nexus.app/permissions'?: string[];
-  'https://nexus.app/user_id'?: string; // Internal user ID
+  'https://api.nexus-app.de/roles'?: string[];
+  'https://api.nexus-app.de/permissions'?: string[];
+  'https://api.nexus-app.de/user_id'?: string; // Internal user ID
 }
 
 export interface User {
