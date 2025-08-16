@@ -18,14 +18,7 @@ This guide will walk you through setting up Auth0 for the Project Nexus backend 
    - **Signing Algorithm**: `RS256` (leave as default)
 4. Click **Create**
 
-## Step 3: Create a Machine-to-Machine Application
-
-1. After creating the API, Auth0 will automatically create a Machine-to-Machine application
-2. Navigate to **Applications > Applications**
-3. Find the application created for your API (usually named "Project Nexus API (Test Application)")
-4. Click on it to view details
-
-## Step 4: Create a Single Page Application (for frontend)
+## Step 3: Create a Single Page Application (for frontend)
 
 1. In **Applications**, click **"+ Create Application"**
 2. Configure:
@@ -54,30 +47,87 @@ This guide will walk you through setting up Auth0 for the Project Nexus backend 
    - **Allowed Origins (CORS)**: Same as Web Origins
 5. Save the changes
 
-## Step 5: Configure Auth0 Rules (Optional but Recommended)
+## Step 4: Configure Auth0 Actions (Optional but Recommended)
 
-1. Navigate to **Auth Pipeline > Rules**
-2. Create a new rule to add custom claims:
+Actions are Auth0's modern way to customize the authentication flow. Let's create an Action to add custom claims and enforce email verification:
+
+### Create a Login Action:
+
+1. Navigate to **Actions > Library** in Auth0 Dashboard
+2. Click **+ Build Custom Action**
+3. Select **Post-Login** trigger (this shows the flow: "user logged in" → "token issued")
+4. Configure the Action:
+   - **Name**: `Add Custom Claims`
+   - **Trigger**: `Post-Login`
+   - **Runtime**: `Node 18` (recommended)
+5. Click **Create**
+
+### Add the Action Code:
+
+Replace the default code with:
 
 ```javascript
-function addCustomClaims(user, context, callback) {
-  // Add custom claims to the ID token
-  const namespace = 'https://api.nexus.app/';
+/**
+ * Handler that will be called during the execution of a PostLogin flow.
+ * @param {Event} event - Details about the user and the context in which they are logging in.
+ * @param {PostLoginAPI} api - Interface whose methods can be used to change the behavior of the login.
+ */
+exports.onExecutePostLogin = async (event, api) => {
+  const namespace = 'https://api.nexus-app.de/';
   
-  context.idToken[namespace + 'roles'] = user.app_metadata?.roles || [];
-  context.idToken[namespace + 'permissions'] = user.app_metadata?.permissions || [];
-  context.idToken[namespace + 'workspace_id'] = user.app_metadata?.workspace_id || null;
-  
-  // Add email verification requirement
-  if (!user.email_verified) {
-    return callback(new UnauthorizedError('Please verify your email before logging in.'));
+  // Require email verification
+  if (!event.user.email_verified) {
+    api.access.deny('Please verify your email before logging in.');
+    return;
   }
   
-  callback(null, user, context);
-}
+  // Add custom claims to both ID and Access tokens
+  const claims = {
+    [`${namespace}roles`]: event.user.app_metadata?.roles || [],
+    [`${namespace}permissions`]: event.user.app_metadata?.permissions || [],
+    [`${namespace}workspace_id`]: event.user.app_metadata?.workspace_id || null,
+    [`${namespace}user_id`]: event.user.user_id,
+    [`${namespace}email`]: event.user.email
+  };
+  
+  // Add claims to tokens
+  Object.entries(claims).forEach(([key, value]) => {
+    api.idToken.setCustomClaim(key, value);
+    api.accessToken.setCustomClaim(key, value);
+  });
+  
+  console.log('Custom claims added for user:', event.user.email);
+};
 ```
 
-## Step 6: Enable Multi-Factor Authentication (Optional)
+### Deploy and Attach the Action:
+
+After writing your Action code:
+
+1. Click **Save Draft**
+2. Click **Deploy** 
+3. Once deployed, you should see an **"Add to flow"** or **"Use Action"** button
+4. Click it and select **Login Flow**
+5. The action will be automatically added to your login flow
+
+### Alternative Deployment Method:
+
+If you don't see the "Add to flow" button:
+1. After deploying, go back to **Actions > Library**
+2. Find your action in the list
+3. Look for a **three-dot menu (⋯)** next to your action
+4. Click it and select **"Add to Flow"** or **"Use in Flow"**
+5. Choose **Login** from the dropdown
+
+### Verify It's Working:
+
+To confirm your action is active:
+1. Go to **Monitoring > Logs** in Auth0 Dashboard
+2. Perform a test login
+3. You should see your console.log message in the logs
+4. Look for "Custom claims added for user: [email]"
+
+## Step 5: Enable Multi-Factor Authentication (Optional)
 
 1. Navigate to **Security > Multi-factor Auth**
 2. Enable the MFA methods you want to support:
@@ -86,23 +136,23 @@ function addCustomClaims(user, context, callback) {
    - Push via Guardian
 3. Configure MFA policies under **Policies**
 
-## Step 7: Set Up Environment Variables
+## Step 6: Set Up Environment Variables
 
-Create a `.env` file in the backend directory with the following Auth0 configuration:
+Edit the root `.env` file with your Auth0 configuration:
 
 ```bash
-# Auth0 Configuration
+# Auth0 Configuration (Required)
 AUTH0_DOMAIN=your-tenant.auth0.com
 AUTH0_CLIENT_ID=your-spa-client-id
 AUTH0_CLIENT_SECRET=your-spa-client-secret
-AUTH0_AUDIENCE=https://api.nexus.app
+AUTH0_AUDIENCE=https://api.nexus-app.de
 
-# Optional: Management API credentials (for user management)
-AUTH0_MANAGEMENT_CLIENT_ID=your-m2m-client-id
-AUTH0_MANAGEMENT_CLIENT_SECRET=your-m2m-client-secret
+# Management API credentials (Leave empty - not needed for basic auth)
+AUTH0_MANAGEMENT_CLIENT_ID=
+AUTH0_MANAGEMENT_CLIENT_SECRET=
 ```
 
-## Step 8: Configure User Database (Optional)
+## Step 7: Configure User Database (Optional)
 
 If you want to use Auth0's user database:
 
@@ -115,7 +165,7 @@ If you want to use Auth0's user database:
    - Require numbers
    - Require special characters
 
-## Step 9: Test the Configuration
+## Step 8: Test the Configuration
 
 1. Copy the `.env.example` to `.env`:
    ```bash
@@ -137,7 +187,7 @@ If you want to use Auth0's user database:
 
 5. The Auth0 health check should show "OK" if configured correctly
 
-## Step 10: Get a Test Token
+## Step 9: Get a Test Token
 
 To test authentication, you can get a test token:
 
@@ -155,8 +205,7 @@ To test authentication, you can get a test token:
 - **API Audience**: `https://api.nexus.app`
 - **SPA Client ID**: From your SPA application
 - **SPA Client Secret**: From your SPA application (keep secure!)
-- **M2M Client ID**: From your M2M application
-- **M2M Client Secret**: From your M2M application (keep secure!)
+- **Management API**: Not needed for basic authentication (can add later if needed)
 - **JWKS URI**: `https://your-tenant.auth0.com/.well-known/jwks.json`
 
 ## Security Best Practices
