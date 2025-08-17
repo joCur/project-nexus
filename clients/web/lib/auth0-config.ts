@@ -151,4 +151,4 @@ export const AUTH0_AUDIENCE = process.env.AUTH0_AUDIENCE || 'https://api.nexus-a
 /**
  * GraphQL endpoint for user synchronization
  */
-export const GRAPHQL_ENDPOINT = process.env.GRAPHQL_ENDPOINT || 'http://localhost:4000/graphql';
+export const GRAPHQL_ENDPOINT = process.env.GRAPHQL_ENDPOINT || 'http://localhost:3000/graphql';

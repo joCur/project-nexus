@@ -15,6 +15,9 @@
     "lint:fix": "eslint src/**/*.ts --fix",
     "migrate": "knex migrate:latest",
     "migrate:rollback": "knex migrate:rollback",
+    "migrate:status": "knex migrate:status",
+    "migrate:container": "npm run migrate:wait && npm run migrate",
+    "migrate:wait": "node -e \"const{Client}=require('pg');const c=new Client({host:process.env.DOCKER_ENV?'postgres':'localhost',port:5432,database:process.env.POSTGRES_DB||'nexus_db',user:process.env.POSTGRES_USER||'nexus',password:process.env.POSTGRES_PASSWORD||'nexus_secure_2024'});async function w(){let r=0;while(r<30){try{await c.connect();await c.query('SELECT 1');console.log('Database ready');c.end();return}catch(e){console.log(`Waiting for database... (${r+1}/30)`);await new Promise(res=>setTimeout(res,2000));r++}}throw new Error('Database not ready after 60s')}w().catch(e=>{console.error(e.message);process.exit(1)})\"",
     "seed": "knex seed:run",
     "db:reset": "knex migrate:rollback --all && knex migrate:latest && knex seed:run"
   },

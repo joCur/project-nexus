@@ -37,6 +37,35 @@ export function createAuthMiddleware(
     req.permissions = [];
 
     try {
+      // Development mode: Check for X-User-Sub header
+      if (process.env.NODE_ENV === 'development' && req.headers['x-user-sub']) {
+        const auth0UserId = req.headers['x-user-sub'] as string;
+        const email = req.headers['x-user-email'] as string;
+        
+        // Create a mock user for development
+        const user = await userService.findByAuth0Id(auth0UserId) || 
+          await userService.create({
+            auth0UserId,
+            email: email || 'dev@example.com',
+            emailVerified: true,
+            displayName: 'Development User',
+            roles: [],
+            permissions: []
+          });
+
+        req.user = user;
+        req.permissions = user.permissions || [];
+        req.isAuthenticated = true;
+        
+        console.log('Development mode authentication:', {
+          userId: user.id,
+          auth0UserId,
+          email
+        });
+        
+        return next();
+      }
+
       // Extract token from Authorization header
       const authHeader = req.headers.authorization;
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -173,7 +202,10 @@ export function requireRole(role: string) {
 export function createGraphQLContext(
   auth0Service: Auth0Service,
   userService: UserService,
-  cacheService: CacheService
+  cacheService: CacheService,
+  userProfileService: import('@/services/userProfile').UserProfileService,
+  onboardingService: import('@/services/onboarding').OnboardingService,
+  workspaceService: import('@/services/workspace').WorkspaceService
 ) {
   return async ({ req, res }: { req: AuthenticatedRequest; res: Response }) => {
     // Get user from request (set by auth middleware)
@@ -193,6 +225,9 @@ export function createGraphQLContext(
         auth0Service,
         userService,
         cacheService,
+        userProfileService,
+        onboardingService,
+        workspaceService,
       },
     };
   };

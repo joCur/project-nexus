@@ -138,6 +138,7 @@ export const OnboardingFlow: React.FC = () => {
           <ProfileSetupStep
             userProfile={state.userProfile}
             onUpdateProfile={updateProfile}
+            onProgressUpdate={updateTutorialProgress}
             onNext={nextStep}
           />
         );

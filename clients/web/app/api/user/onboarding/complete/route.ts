@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@auth0/nextjs-auth0';
+import { getSession, getAccessToken } from '@auth0/nextjs-auth0';
 
 /**
  * Complete onboarding and save final user profile
@@ -27,76 +27,112 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Log for development
+    // For development, we'll handle access token gracefully
+    let accessToken: string | undefined;
+    try {
+      const tokenResult = await getAccessToken();
+      accessToken = tokenResult.accessToken;
+    } catch (error) {
+      console.warn('Failed to get access token, using development mode:', error);
+    }
+
+    // Call backend GraphQL API for complete onboarding workflow
+    const graphqlQuery = `
+      mutation CompleteOnboardingWorkflow($input: OnboardingWorkflowCompleteInput!) {
+        completeOnboardingWorkflow(input: $input) {
+          success
+          profile {
+            id
+            fullName
+            displayName
+            timezone
+            role
+            preferences
+          }
+          onboarding {
+            id
+            completed
+            completedAt
+            finalStep
+            tutorialProgress
+          }
+          workspace {
+            id
+            name
+            privacy
+            isDefault
+          }
+        }
+      }
+    `;
+
+    const graphqlVariables = {
+      input: {
+        userProfile: {
+          fullName: userProfile.fullName,
+          displayName: userProfile.displayName,
+          timezone: userProfile.timezone,
+          ...(userProfile.role && { role: userProfile.role.toUpperCase() }),
+          preferences: {
+            ...userProfile.preferences,
+            ...(userProfile.preferences?.privacy && { 
+              privacy: userProfile.preferences.privacy.toUpperCase() 
+            }),
+          },
+        },
+        tutorialProgress: tutorialProgress || {},
+      },
+    };
+
+    const backendResponse = await fetch(`${process.env.API_BASE_URL || 'http://backend:3000'}/graphql`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(accessToken && { 'Authorization': `Bearer ${accessToken}` }),
+        // Add user context for development
+        'X-User-Sub': session.user.sub,
+        'X-User-Email': session.user.email || '',
+      },
+      body: JSON.stringify({
+        query: graphqlQuery,
+        variables: graphqlVariables,
+      }),
+    });
+
+    if (!backendResponse.ok) {
+      throw new Error(`Backend API error: ${backendResponse.status}`);
+    }
+
+    const result = await backendResponse.json();
+
+    if (result.errors) {
+      console.error('GraphQL errors:', result.errors);
+      throw new Error('GraphQL query failed');
+    }
+
+    const workflowResult = result.data.completeOnboardingWorkflow;
+
     console.log('Onboarding completed:', {
       userId: session.user.sub,
       completedAt,
       userProfile,
-      tutorialProgress
+      tutorialProgress,
+      result: workflowResult,
     });
 
-    // TODO: Implement actual database storage
-    // Example database operations:
-    
-    // 1. Save user profile
-    // await prisma.userProfile.upsert({
-    //   where: { userId: session.user.sub },
-    //   update: {
-    //     fullName: userProfile.fullName,
-    //     displayName: userProfile.displayName,
-    //     timezone: userProfile.timezone,
-    //     role: userProfile.role,
-    //     preferences: userProfile.preferences,
-    //     updatedAt: new Date(),
-    //   },
-    //   create: {
-    //     userId: session.user.sub,
-    //     fullName: userProfile.fullName,
-    //     displayName: userProfile.displayName,
-    //     timezone: userProfile.timezone,
-    //     role: userProfile.role,
-    //     preferences: userProfile.preferences,
-    //     createdAt: new Date(),
-    //   }
-    // });
-
-    // 2. Mark onboarding as complete
-    // await prisma.userOnboarding.upsert({
-    //   where: { userId: session.user.sub },
-    //   update: {
-    //     completed: true,
-    //     completedAt: new Date(completedAt),
-    //     finalStep: 3,
-    //     tutorialProgress,
-    //   },
-    //   create: {
-    //     userId: session.user.sub,
-    //     completed: true,
-    //     completedAt: new Date(completedAt),
-    //     finalStep: 3,
-    //     tutorialProgress,
-    //   }
-    // });
-
-    // 3. Create default workspace
-    // await prisma.workspace.create({
-    //   data: {
-    //     userId: session.user.sub,
-    //     name: userProfile.preferences.workspaceName,
-    //     privacy: userProfile.preferences.privacy,
-    //     isDefault: true,
-    //     createdAt: new Date(),
-    //   }
-    // });
-
     return NextResponse.json({
-      success: true,
+      success: workflowResult.success,
       message: 'Onboarding completed successfully',
       userProfile: {
-        fullName: userProfile.fullName,
-        displayName: userProfile.displayName,
-        workspaceName: userProfile.preferences.workspaceName,
-      }
+        fullName: workflowResult.profile.fullName,
+        displayName: workflowResult.profile.displayName,
+        workspaceName: workflowResult.workspace.name,
+      },
+      data: {
+        profile: workflowResult.profile,
+        onboarding: workflowResult.onboarding,
+        workspace: workflowResult.workspace,
+      },
     });
 
   } catch (error) {

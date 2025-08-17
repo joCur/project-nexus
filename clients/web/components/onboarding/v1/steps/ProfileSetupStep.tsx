@@ -19,6 +19,7 @@ interface UserProfile {
 interface ProfileSetupStepProps {
   userProfile: Partial<UserProfile>;
   onUpdateProfile: (updates: Partial<UserProfile>) => void;
+  onProgressUpdate?: (progress: any) => void;
   onNext: () => void;
 }
 
@@ -33,6 +34,7 @@ const ROLE_OPTIONS = [
 export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
   userProfile,
   onUpdateProfile,
+  onProgressUpdate,
   onNext,
 }) => {
   const [formData, setFormData] = useState({
@@ -93,6 +95,9 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
         notifications: formData.notifications,
       },
     });
+
+    // Mark profile setup as completed
+    onProgressUpdate?.({ profileSetup: true });
 
     onNext();
   };

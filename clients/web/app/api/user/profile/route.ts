@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@auth0/nextjs-auth0';
+import { getSession, getAccessToken } from '@auth0/nextjs-auth0';
 
 /**
  * Get user profile
@@ -16,22 +16,65 @@ export async function GET() {
       );
     }
 
-    // TODO: Fetch from database
-    // const userProfile = await prisma.userProfile.findUnique({
-    //   where: { userId: session.user.sub }
-    // });
+    // Get Auth0 access token for backend API calls
+    const { accessToken } = await getAccessToken();
 
-    // For now, return basic info from Auth0
+    // Call backend GraphQL API
+    const graphqlQuery = `
+      query MyProfile {
+        myProfile {
+          id
+          fullName
+          displayName
+          timezone
+          role
+          preferences
+          createdAt
+          updatedAt
+        }
+      }
+    `;
+
+    const backendResponse = await fetch(`${process.env.API_BASE_URL || 'http://backend:3000'}/graphql`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        query: graphqlQuery,
+      }),
+    });
+
+    if (!backendResponse.ok) {
+      throw new Error(`Backend API error: ${backendResponse.status}`);
+    }
+
+    const result = await backendResponse.json();
+
+    if (result.errors) {
+      console.error('GraphQL errors:', result.errors);
+      // If profile doesn't exist, return basic Auth0 info
+      if (result.errors.some((error: any) => error.message.includes('not found'))) {
+        return NextResponse.json({
+          userId: session.user.sub,
+          email: session.user.email,
+          name: session.user.name,
+          picture: session.user.picture,
+          profile: null,
+        });
+      }
+      throw new Error('GraphQL query failed');
+    }
+
+    const profile = result.data.myProfile;
+
     return NextResponse.json({
       userId: session.user.sub,
       email: session.user.email,
       name: session.user.name,
       picture: session.user.picture,
-      // TODO: Add database fields when implemented
-      // fullName: userProfile?.fullName,
-      // displayName: userProfile?.displayName,
-      // role: userProfile?.role,
-      // preferences: userProfile?.preferences,
+      profile,
     });
 
   } catch (error) {
@@ -69,48 +112,69 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Log for development
-    console.log('User profile updated:', {
-      userId: session.user.sub,
-      fullName,
-      displayName,
-      timezone,
-      role,
-      preferences
+    // Get Auth0 access token for backend API calls
+    const { accessToken } = await getAccessToken();
+
+    // Call backend GraphQL API
+    const graphqlQuery = `
+      mutation UpdateMyProfile($input: UserProfileUpdateInput!) {
+        updateMyProfile(input: $input) {
+          id
+          fullName
+          displayName
+          timezone
+          role
+          preferences
+          updatedAt
+        }
+      }
+    `;
+
+    const graphqlVariables = {
+      input: {
+        fullName,
+        displayName,
+        timezone,
+        role: role?.toUpperCase(),
+        preferences: preferences || {},
+      },
+    };
+
+    const backendResponse = await fetch(`${process.env.API_BASE_URL || 'http://backend:3000'}/graphql`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        query: graphqlQuery,
+        variables: graphqlVariables,
+      }),
     });
 
-    // TODO: Save to database
-    // const userProfile = await prisma.userProfile.upsert({
-    //   where: { userId: session.user.sub },
-    //   update: {
-    //     fullName,
-    //     displayName,
-    //     timezone,
-    //     role,
-    //     preferences,
-    //     updatedAt: new Date(),
-    //   },
-    //   create: {
-    //     userId: session.user.sub,
-    //     fullName,
-    //     displayName,
-    //     timezone,
-    //     role,
-    //     preferences,
-    //     createdAt: new Date(),
-    //   }
-    // });
+    if (!backendResponse.ok) {
+      throw new Error(`Backend API error: ${backendResponse.status}`);
+    }
+
+    const result = await backendResponse.json();
+
+    if (result.errors) {
+      console.error('GraphQL errors:', result.errors);
+      throw new Error('GraphQL query failed');
+    }
+
+    const profile = result.data.updateMyProfile;
+
+    console.log('User profile updated:', {
+      userId: session.user.sub,
+      profileId: profile.id,
+      fullName: profile.fullName,
+    });
 
     return NextResponse.json({
       success: true,
       message: 'Profile updated successfully',
-      profile: {
-        fullName,
-        displayName,
-        timezone,
-        role,
-        preferences
-      }
+      profile,
     });
 
   } catch (error) {
