@@ -1,2 +1,3 @@
 - Any time you use Linear MCP to move a task to the backlog, if you are in a markdown file for feature documentation, remove it from the markdown file.
 - never start the docker compose yourself, always ask me to do it instead.
+- the .env file for every service can be found on the root level because they will be set through docker compose. Always use docker compose to start up the application.

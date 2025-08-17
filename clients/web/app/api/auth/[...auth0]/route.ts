@@ -94,7 +94,7 @@ export const GET = handleAuth({
   login: handleLogin({
     authorizationParams: {
       prompt: 'login', // Force fresh login every time
-      max_age: '0'     // Don't use cached authentication
+      max_age: 0       // Don't use cached authentication
     }
   })
 });

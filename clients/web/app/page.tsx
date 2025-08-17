@@ -2,9 +2,19 @@
 
 import { useAuth } from '@/hooks/use-auth';
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 
 export default function HomePage() {
   const { user, isLoading, login, logout } = useAuth();
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
+
+  // Check if user has completed onboarding
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const onboardingCompleted = localStorage.getItem('nexus-onboarding-completed');
+      setHasCompletedOnboarding(!!onboardingCompleted);
+    }
+  }, []);
 
   if (isLoading) {
     return (
@@ -38,10 +48,10 @@ export default function HomePage() {
                   </span>
                 </div>
                 <Link
-                  href="/workspace"
+                  href={hasCompletedOnboarding ? "/workspace" : "/onboarding"}
                   className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-primary-700"
                 >
-                  Workspace
+                  {hasCompletedOnboarding ? "Workspace" : "Setup"}
                 </Link>
                 <button
                   onClick={() => logout()}
@@ -52,7 +62,7 @@ export default function HomePage() {
               </>
             ) : (
               <button
-                onClick={() => login({ returnTo: '/workspace' })}
+                onClick={() => login({ returnTo: hasCompletedOnboarding ? '/workspace' : '/onboarding' })}
                 className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-primary-700"
               >
                 Sign In
@@ -73,14 +83,14 @@ export default function HomePage() {
             <div className="mt-5 max-w-md mx-auto sm:flex sm:justify-center md:mt-8">
               {user ? (
                 <Link
-                  href="/workspace"
+                  href={hasCompletedOnboarding ? "/workspace" : "/onboarding"}
                   className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 md:py-4 md:text-lg md:px-10"
                 >
-                  Open Workspace
+                  {hasCompletedOnboarding ? "Open Workspace" : "Complete Setup"}
                 </Link>
               ) : (
                 <button
-                  onClick={() => login({ returnTo: '/workspace' })}
+                  onClick={() => login({ returnTo: hasCompletedOnboarding ? '/workspace' : '/onboarding' })}
                   className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 md:py-4 md:text-lg md:px-10"
                 >
                   Get Started

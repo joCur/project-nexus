@@ -3,9 +3,39 @@
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { Permissions } from '@/hooks/use-auth';
 import { useAuth } from '@/hooks/use-auth';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 function WorkspaceContent() {
   const { user, logout } = useAuth();
+  const router = useRouter();
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
+  const [isCheckingOnboarding, setIsCheckingOnboarding] = useState(true);
+
+  // Check onboarding status and redirect if needed
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const onboardingCompleted = localStorage.getItem('nexus-onboarding-completed');
+      
+      if (!onboardingCompleted) {
+        // Redirect to onboarding if not completed
+        router.push('/onboarding');
+        return;
+      }
+      
+      setHasCompletedOnboarding(true);
+      setIsCheckingOnboarding(false);
+    }
+  }, [router]);
+
+  // Show loading while checking onboarding status
+  if (isCheckingOnboarding) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
