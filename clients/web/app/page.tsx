@@ -1,22 +1,14 @@
 'use client';
 
 import { useAuth } from '@/hooks/use-auth';
+import { useOnboardingStatus } from '@/hooks/use-onboarding-status';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
 
 export default function HomePage() {
   const { user, isLoading, login, logout } = useAuth();
-  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
+  const { status: onboardingStatus, isLoading: onboardingLoading } = useOnboardingStatus();
 
-  // Check if user has completed onboarding
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const onboardingCompleted = localStorage.getItem('nexus-onboarding-completed');
-      setHasCompletedOnboarding(!!onboardingCompleted);
-    }
-  }, []);
-
-  if (isLoading) {
+  if (isLoading || onboardingLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
@@ -48,10 +40,10 @@ export default function HomePage() {
                   </span>
                 </div>
                 <Link
-                  href={hasCompletedOnboarding ? "/workspace" : "/onboarding"}
+                  href={onboardingStatus?.isComplete ? "/workspace" : "/onboarding"}
                   className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-primary-700"
                 >
-                  {hasCompletedOnboarding ? "Workspace" : "Setup"}
+                  {onboardingStatus?.isComplete ? "Workspace" : "Setup"}
                 </Link>
                 <button
                   onClick={() => logout()}
@@ -62,7 +54,7 @@ export default function HomePage() {
               </>
             ) : (
               <button
-                onClick={() => login({ returnTo: hasCompletedOnboarding ? '/workspace' : '/onboarding' })}
+                onClick={() => login({ returnTo: onboardingStatus?.isComplete ? '/workspace' : '/onboarding' })}
                 className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-primary-700"
               >
                 Sign In
@@ -83,14 +75,14 @@ export default function HomePage() {
             <div className="mt-5 max-w-md mx-auto sm:flex sm:justify-center md:mt-8">
               {user ? (
                 <Link
-                  href={hasCompletedOnboarding ? "/workspace" : "/onboarding"}
+                  href={onboardingStatus?.isComplete ? "/workspace" : "/onboarding"}
                   className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 md:py-4 md:text-lg md:px-10"
                 >
-                  {hasCompletedOnboarding ? "Open Workspace" : "Complete Setup"}
+                  {onboardingStatus?.isComplete ? "Open Workspace" : "Complete Setup"}
                 </Link>
               ) : (
                 <button
-                  onClick={() => login({ returnTo: hasCompletedOnboarding ? '/workspace' : '/onboarding' })}
+                  onClick={() => login({ returnTo: onboardingStatus?.isComplete ? '/workspace' : '/onboarding' })}
                   className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 md:py-4 md:text-lg md:px-10"
                 >
                   Get Started

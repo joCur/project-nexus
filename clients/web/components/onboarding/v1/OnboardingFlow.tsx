@@ -115,13 +115,6 @@ export const OnboardingFlow: React.FC = () => {
         }),
       });
 
-      // Mark completion in localStorage as backup
-      localStorage.setItem('nexus-onboarding-completed', JSON.stringify({
-        completedAt: new Date().toISOString(),
-        version: 'v1-simple',
-        userProfile: state.userProfile,
-      }));
-
       // Redirect to workspace
       router.push('/workspace');
     } catch (error) {
