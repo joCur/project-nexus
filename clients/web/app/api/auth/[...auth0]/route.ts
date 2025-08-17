@@ -98,7 +98,7 @@ export const GET = handleAuth({
     }
   }),
   callback: handleCallback({
-    afterCallback: async (req, session) => {
+    afterCallback: async (req: any, session: any) => {
       // Sync user to backend database after successful authentication
       if (session.user) {
         await syncUserToDatabase(session.user);
