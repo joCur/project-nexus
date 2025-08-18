@@ -96,8 +96,20 @@ export function createAuthMiddleware(
       req.permissions = user.permissions;
       req.isAuthenticated = true;
 
-      // Update last activity
-      await userService.updateLastLogin(user.id);
+      // Update last activity (non-critical operation)
+      try {
+        await userService.updateLastLogin(user.id);
+      } catch (updateError) {
+        // Log error but don't fail authentication
+        securityLogger.authFailure(
+          `Failed to update last login: ${updateError instanceof Error ? updateError.message : 'Unknown error'}`,
+          {
+            userId: user.id,
+            userAgent: req.headers['user-agent'],
+            ip: req.ip,
+          }
+        );
+      }
 
       securityLogger.authSuccess(user.id, auth0Payload.sub, {
         userAgent: req.headers['user-agent'],
@@ -149,7 +161,10 @@ export function requirePermission(permission: string) {
       throw new AuthenticationError();
     }
 
-    if (!req.permissions.includes(permission)) {
+    // Check if user has super_admin role - allows bypassing permission checks
+    const isAdmin = req.user?.roles.includes('super_admin');
+    
+    if (!isAdmin && !req.permissions.includes(permission)) {
       securityLogger.authorizationFailure(req.user!.id, 'permission', permission, {
         userPermissions: req.permissions,
         path: req.path,
@@ -256,7 +271,11 @@ export const authDirectives = {
     }
 
     const permission = info.directive.arguments.permission.value;
-    if (!context.permissions.includes(permission)) {
+    
+    // Check if user has super_admin role - allows bypassing permission checks
+    const isAdmin = context.user?.roles.includes('super_admin');
+    
+    if (!isAdmin && !context.permissions.includes(permission)) {
       securityLogger.authorizationFailure(
         context.user?.id || 'unknown',
         'graphql_permission',
