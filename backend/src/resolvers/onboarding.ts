@@ -72,7 +72,7 @@ export const onboardingResolvers = {
       // Users can only check their own onboarding unless they have admin permissions
       if (context.user?.id !== userId && !context.permissions.includes('admin:user_management')) {
         throw new AuthorizationError(
-          'Cannot check other user onboarding status',
+          undefined, // Use default "Insufficient permissions" message
           'INSUFFICIENT_PERMISSIONS',
           'admin:user_management',
           context.permissions
@@ -180,7 +180,7 @@ export const onboardingResolvers = {
       // Users can only reset their own onboarding unless they have admin permissions
       if (context.user?.id !== userId && !context.permissions.includes('admin:user_management')) {
         throw new AuthorizationError(
-          'Cannot reset other user onboarding',
+          undefined, // Use default "Insufficient permissions" message
           'INSUFFICIENT_PERMISSIONS',
           'admin:user_management',
           context.permissions

@@ -198,21 +198,30 @@ export class Auth0Service {
         });
       }
 
-      // Cache user permissions for performance
-      if (user.permissions.length > 0) {
-        await this.cacheService.set(
-          CacheKeys.USER_PERMISSIONS(user.id),
-          user.permissions,
-          60 * 60 * 1000 // 1 hour cache
-        );
-      }
+      // Cache user permissions for performance (handle cache errors gracefully)
+      try {
+        if (user.permissions.length > 0) {
+          await this.cacheService.set(
+            CacheKeys.USER_PERMISSIONS(user.id),
+            user.permissions,
+            60 * 60 * 1000 // 1 hour cache
+          );
+        }
 
-      // Cache Auth0 user data
-      await this.cacheService.set(
-        CacheKeys.AUTH0_USER(auth0User.sub),
-        auth0User,
-        30 * 60 * 1000 // 30 minutes cache
-      );
+        // Cache Auth0 user data
+        await this.cacheService.set(
+          CacheKeys.AUTH0_USER(auth0User.sub),
+          auth0User,
+          30 * 60 * 1000 // 30 minutes cache
+        );
+      } catch (cacheError) {
+        // Log cache error but don't fail the entire operation
+        this.logger.error('Failed to cache user data', {
+          userId: user.id,
+          auth0UserId: auth0User.sub,
+          error: cacheError instanceof Error ? cacheError.message : 'Unknown cache error',
+        });
+      }
 
       const duration = Date.now() - startTime;
       performanceLogger.dbQuery('user_sync', duration, {
@@ -260,12 +269,21 @@ export class Auth0Service {
       expiresAt,
     };
 
-    // Store session in Redis with absolute expiration
-    await this.cacheService.set(
-      CacheKeys.USER_SESSION(user.id),
-      sessionData,
-      SessionConfig.ABSOLUTE_DURATION
-    );
+    try {
+      // Store session in Redis with absolute expiration
+      await this.cacheService.set(
+        CacheKeys.USER_SESSION(user.id),
+        sessionData,
+        SessionConfig.ABSOLUTE_DURATION
+      );
+    } catch (error) {
+      // Log error but don't throw - session creation should still return a sessionId
+      this.logger.error('Failed to store session in cache', {
+        userId: user.id,
+        sessionId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
 
     securityLogger.sessionEvent('created', user.id, {
       sessionId,
@@ -329,9 +347,19 @@ export class Auth0Service {
    * Destroys user session
    */
   async destroySession(userId: string): Promise<void> {
-    await this.cacheService.del(CacheKeys.USER_SESSION(userId));
-    await this.cacheService.del(CacheKeys.USER_PERMISSIONS(userId));
-    securityLogger.sessionEvent('destroyed', userId);
+    try {
+      await this.cacheService.del(CacheKeys.USER_SESSION(userId));
+      await this.cacheService.del(CacheKeys.USER_PERMISSIONS(userId));
+      securityLogger.sessionEvent('destroyed', userId);
+    } catch (error) {
+      // Log error but don't throw - session destruction should always succeed
+      this.logger.error('Failed to destroy session in cache', {
+        userId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      // Still log the session event even if cache operations fail
+      securityLogger.sessionEvent('destroyed', userId);
+    }
   }
 
   /**

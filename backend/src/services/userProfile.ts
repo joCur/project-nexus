@@ -38,7 +38,7 @@ export interface UserProfile {
   fullName: string;
   displayName?: string;
   timezone?: string;
-  role?: 'student' | 'researcher' | 'creative' | 'business' | 'other';
+  role?: 'STUDENT' | 'RESEARCHER' | 'CREATIVE' | 'BUSINESS' | 'OTHER';
   preferences: Record<string, any>;
   createdAt: Date;
   updatedAt: Date;
@@ -151,6 +151,15 @@ export class UserProfileService {
     } catch (error) {
       if (error instanceof z.ZodError) {
         throw new ValidationError(error.errors[0]?.message || 'Validation failed');
+      }
+
+      // Handle PostgreSQL constraint violations (e.g., concurrent creation)
+      if (error instanceof Error && (error as any).code === '23505') {
+        // Check if profile was created by another process
+        const existingProfile = await this.getProfileByUserId(input.userId);
+        if (existingProfile) {
+          throw new ValidationError('User profile already exists');
+        }
       }
 
       logger.error('Failed to create user profile', {
