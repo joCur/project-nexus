@@ -36,7 +36,7 @@ import {
 // Mock logger
 jest.mock('@/utils/logger');
 
-describe.skip('Authentication Middleware - Complex edge case tests for middleware behavior', () => {
+describe('Authentication Middleware', () => {
   let mockAuth0Service: jest.Mocked<Auth0Service>;
   let mockUserService: jest.Mocked<UserService>;
   let mockCacheService: jest.Mocked<CacheService>;

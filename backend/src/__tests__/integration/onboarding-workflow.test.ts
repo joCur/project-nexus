@@ -51,7 +51,7 @@ describe('OnboardingWorkflowService Integration', () => {
     fullName: 'John Doe',
     displayName: 'Johnny',
     timezone: 'UTC',
-    role: 'creative' as const,
+    role: 'CREATIVE' as const,
     preferences: {
       workspaceName: 'Creative Workspace',
       privacy: 'PRIVATE',

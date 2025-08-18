@@ -219,39 +219,42 @@ export class MockAuth0ManagementClient {
  * Mock fetch for Auth0 JWKS endpoint
  */
 export function createMockFetch(scenario: 'valid' | 'network_error' | 'invalid_json' | 'not_found' = 'valid') {
-  return jest.fn().mockImplementation((url: string) => {
+  return jest.fn().mockImplementation(async (url: string) => {
+    // Add a small delay to simulate network response time
+    await new Promise(resolve => setTimeout(resolve, 10));
+    
     if (url.includes('/.well-known/jwks.json')) {
       switch (scenario) {
         case 'valid':
-          return Promise.resolve({
+          return {
             ok: true,
             status: 200,
             json: () => Promise.resolve(mockJwksResponses.valid),
-          });
+          };
         
         case 'network_error':
-          return Promise.reject(new Error('Network error'));
+          throw new Error('Network error');
         
         case 'invalid_json':
-          return Promise.resolve({
+          return {
             ok: true,
             status: 200,
             json: () => Promise.reject(new Error('Invalid JSON')),
-          });
+          };
         
         case 'not_found':
-          return Promise.resolve({
+          return {
             ok: false,
             status: 404,
             json: () => Promise.resolve({ error: 'Not found' }),
-          });
+          };
         
         default:
-          return Promise.reject(new Error('Unknown scenario'));
+          throw new Error('Unknown scenario');
       }
     }
     
-    return Promise.reject(new Error('Unknown URL'));
+    throw new Error('Unknown URL');
   });
 }
 

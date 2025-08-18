@@ -21,7 +21,7 @@ jest.mock('@/utils/logger', () => ({
   }),
 }));
 
-describe.skip('UserProfileService - Minor expectation mismatches in database mocking', () => {
+describe('UserProfileService', () => {
   let userProfileService: UserProfileService;
   const mockDatabase = database as jest.Mocked<typeof database>;
   const typedMockKnex = knex as jest.MockedFunction<typeof knex>;
@@ -52,7 +52,7 @@ describe.skip('UserProfileService - Minor expectation mismatches in database moc
     fullName: 'John Doe',
     displayName: 'Johnny',
     timezone: 'UTC',
-    role: 'student',
+    role: 'STUDENT', // Service converts to uppercase for enum consistency
     preferences: {
       workspaceName: 'My Workspace',
       privacy: 'PRIVATE',
@@ -63,9 +63,11 @@ describe.skip('UserProfileService - Minor expectation mismatches in database moc
   };
 
   beforeEach(() => {
-    // Setup knex mock
+    // Setup knex mock - createMockKnex() returns a jest function that returns a query builder
     const mockKnex = createMockKnex();
-    (knex as any) = mockKnex;
+    
+    // Mock the knex function to return a query builder when called with table name
+    typedMockKnex.mockImplementation(mockKnex);
     
     userProfileService = new UserProfileService();
     jest.clearAllMocks();
@@ -498,6 +500,11 @@ describe.skip('UserProfileService - Minor expectation mismatches in database moc
         getProfileCallCount++;
         return getProfileCallCount === 1 ? null : expectedProfile;
       });
+
+      // Mock database.query to throw a constraint error (simulating concurrent creation)
+      const constraintError = new Error('duplicate key value violates unique constraint');
+      (constraintError as any).code = '23505'; // PostgreSQL unique violation error code
+      mockDatabase.query.mockRejectedValue(constraintError);
 
       const createInput = {
         userId: testUserId,

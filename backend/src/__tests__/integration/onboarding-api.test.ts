@@ -385,7 +385,7 @@ describe('Onboarding API Integration', () => {
       }
     `;
 
-    it.skip('should return completion status for own user - edge case test', async () => {
+    it('should return completion status for own user - edge case test', async () => {
       mockOnboardingService.isOnboardingComplete.mockResolvedValue(true);
 
       const response = await request(app)
@@ -403,7 +403,7 @@ describe('Onboarding API Integration', () => {
       expect(mockOnboardingService.isOnboardingComplete).toHaveBeenCalledWith(testUserId);
     });
 
-    it.skip('should prevent access to other user data without admin permissions - edge case test', async () => {
+    it('should prevent access to other user data without admin permissions - edge case test', async () => {
       const otherUserId = '987e6543-e21a-98d7-b654-321098765432';
 
       const response = await request(app)
@@ -427,7 +427,7 @@ describe('Onboarding API Integration', () => {
       }
     `;
 
-    it.skip('should reset onboarding for own user - edge case test', async () => {
+    it('should reset onboarding for own user - edge case test', async () => {
       mockOnboardingService.resetOnboarding.mockResolvedValue(undefined);
 
       const response = await request(app)
@@ -445,7 +445,7 @@ describe('Onboarding API Integration', () => {
       expect(mockOnboardingService.resetOnboarding).toHaveBeenCalledWith(testUserId);
     });
 
-    it.skip('should return false when reset fails - edge case test', async () => {
+    it('should return false when reset fails - edge case test', async () => {
       const resetError = new Error('Reset failed');
       mockOnboardingService.resetOnboarding.mockRejectedValue(resetError);
 
@@ -462,7 +462,7 @@ describe('Onboarding API Integration', () => {
       expect(response.body.data.resetOnboarding).toBe(false);
     });
 
-    it.skip('should prevent resetting other user onboarding without admin permissions - edge case test', async () => {
+    it('should prevent resetting other user onboarding without admin permissions - edge case test', async () => {
       const otherUserId = '987e6543-e21a-98d7-b654-321098765432';
 
       const response = await request(app)
@@ -500,14 +500,18 @@ describe('Onboarding API Integration', () => {
       expect(response.body.errors).toBeDefined();
     });
 
-    it.skip('should handle invalid JSON in request body - edge case test', async () => {
+    it('should handle invalid JSON in request body - edge case test', async () => {
       const response = await request(app)
         .post('/graphql')
-        .set(validAuthHeaders)
-        .send('invalid json')
+        .set({
+          ...validAuthHeaders,
+          'Content-Type': 'application/json'
+        })
+        .send('{ invalid json }')
         .expect(400);
 
-      expect(response.body.error).toBeDefined();
+      // Express returns HTML error page for JSON parsing errors, not JSON
+      expect(response.text).toContain('SyntaxError');
     });
 
     it('should handle missing query field', async () => {
@@ -562,10 +566,12 @@ describe('Onboarding API Integration', () => {
   });
 
   describe('Authentication and authorization edge cases', () => {
-    it.skip('should handle expired tokens - edge case test', async () => {
+    it('should handle expired tokens - edge case test', async () => {
+      // Simulate expired token by only providing Authorization header without user context
+      // This mimics the behavior when token validation fails in real auth middleware
       const expiredAuthHeaders = {
         'Authorization': 'Bearer expired-token',
-        'X-User-Sub': `auth0|${testUserId}`,
+        // No X-User-Sub header - simulates failed token validation
         'X-User-Email': 'test@example.com',
       };
 

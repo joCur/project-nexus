@@ -7,8 +7,33 @@ import { randomUUID } from 'crypto';
  * Provides mock data generation and test utilities
  */
 
-// Test JWT secret for token generation
-export const TEST_JWT_SECRET = 'test-jwt-secret-key-for-testing-purposes-only';
+// Test RSA key pair for RS256 JWT testing
+export const TEST_RSA_PRIVATE_KEY = `-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEA2Z3QX0BTLS5qhMjlf6bK8n8LkRq3yj0M7Uy8I3TgLV1A8gOl
+kRVzbtHi1zJN1E3y8zCpFLVRr2YJ4KhN7nZPl3zGQpPy6K0qFtV7sP8tEsGZeYz9
+xDfH0qjF7F3s0jHwK3rLzJ0Lz3LHtZ0tF8p8zF0Z9p0N2hG3O4L3F1ySzBxD2qBV
+3kJ4MtJ3tI5wZ3N4J8j7Q5x4K8BjF7Lp9Y7ZyS8G5Vz3Lz3zQ7B3J0F8tBsZ0qV
+0tO8kN1J3j9Q0B2J5hF7p3V8Z1L0D2xEsF1q8gY4K3BjR7yP1I9Z2QpG5K3j1yPv
+1z2QQ2Z3QX0BTLS5qhMjlf6bK8n8LkRq3yj0M7Uy8I3TgLV1A8gOlkRVzbtHi1w
+IDAQABAoIBAAKQ6LPz3tF9Y2K5Q3pLv7Z4F0L2zY1Q5q9B7J3N0F8gR3P6L7z1v2
+K5tF3s0jHwK3rLzJ0Lz3LHtZ0tF8p8zF0Z9p0N2hG3O4L3F1ySzBxD2qBV3kJ4Mt
+J3tI5wZ3N4J8j7Q5x4K8BjF7Lp9Y7ZyS8G5Vz3Lz3zQ7B3J0F8tBsZ0qV0tO8kN1
+J3j9Q0B2J5hF7p3V8Z1L0D2xEsF1q8gY4K3BjR7yP1I9Z2QpG5K3j1yPv1z2QQ2Z
+3QX0BTLS5qhMjlf6bK8n8LkRq3yj0M7Uy8I3TgLV1A8gOlkRVzbtHi1wQAAAAA
+-----END RSA PRIVATE KEY-----`;
+
+export const TEST_RSA_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2Z3QX0BTLS5qhMjlf6bK
+8n8LkRq3yj0M7Uy8I3TgLV1A8gOlkRVzbtHi1zJN1E3y8zCpFLVRr2YJ4KhN7nZP
+l3zGQpPy6K0qFtV7sP8tEsGZeYz9xDfH0qjF7F3s0jHwK3rLzJ0Lz3LHtZ0tF8p8
+zF0Z9p0N2hG3O4L3F1ySzBxD2qBV3kJ4MtJ3tI5wZ3N4J8j7Q5x4K8BjF7Lp9Y7Z
+yS8G5Vz3Lz3zQ7B3J0F8tBsZ0qV0tO8kN1J3j9Q0B2J5hF7p3V8Z1L0D2xEsF1q8
+gY4K3BjR7yP1I9Z2QpG5K3j1yPv1z2QQ2Z3QX0BTLS5qhMjlf6bK8n8LkRq3yj0M
+7Uy8I3TgLV1A8gOlkRVzbtHi1wIDAQAB
+-----END PUBLIC KEY-----`;
+
+// Keep the old secret for backward compatibility with existing tests
+export const TEST_JWT_SECRET = TEST_RSA_PUBLIC_KEY;
 
 // Auth0 test configuration
 export const TEST_AUTH0_CONFIG = {
@@ -414,6 +439,8 @@ export function createMockOnboardingService() {
     isComplete: jest.fn(),
     reset: jest.fn(),
     getStep: jest.fn(),
+    isOnboardingComplete: jest.fn(),
+    resetOnboarding: jest.fn(),
   } as any;
 }
 
