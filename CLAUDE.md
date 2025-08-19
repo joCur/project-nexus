@@ -106,6 +106,117 @@ docker-compose logs      # View logs
 **Current Task:**
 - Implementing the basic onboarding flow described in `design-documentation/features/onboarding/v1-simple-onboarding.md`
 
+## Linear Ticket Workflow
+
+When working on tickets from Linear, follow this comprehensive workflow to ensure proper tracking and delivery:
+
+### 1. Ticket Selection and Setup
+```bash
+# Find the next ticket in backlog
+# Linear Team: "Project Nexus" (prefix: NEX)
+# Always work on the highest priority ticket unless specified otherwise
+```
+
+### 2. Branch Creation and Ticket Updates
+```bash
+# Create feature branch with NEX ticket number
+git checkout -b feature/nex-[NUMBER]-[descriptive-name]
+
+# Example: git checkout -b feature/nex-91-create-canvas-state-management-system
+```
+
+**Linear ticket management:**
+- Update ticket status to **"In Progress"** when starting work
+- Add initial comment with implementation plan and progress tracking
+- Always update ticket state and properties throughout development
+
+### 3. Implementation Process
+- Create TodoWrite list for complex tasks to track progress
+- Follow acceptance criteria exactly as specified in Linear ticket
+- Implement features incrementally with meaningful commits
+- Add progress comments to Linear ticket showing current status
+- Write tests for critical functionality (aim for comprehensive coverage)
+
+### 4. Code Quality Standards
+```bash
+# Always run before committing
+npm run type-check     # TypeScript compilation check
+npm run lint           # ESLint validation
+npm test               # Run test suite
+```
+
+### 5. Commit and PR Creation
+```bash
+# Commit with clear reference to ticket
+git add -A
+git commit -m "feat: implement [feature description] (NEX-[NUMBER])
+
+[Detailed commit message with:]
+- Clear description of changes
+- Technical implementation details
+- Features completed
+- Any breaking changes or dependencies"
+
+# Push and create PR
+git push -u origin feature/nex-[NUMBER]-[descriptive-name]
+gh pr create --title "feat: implement [feature] (NEX-[NUMBER])" --body "[comprehensive PR description]"
+```
+
+### 6. PR and Ticket Finalization
+**Linear ticket workflow:**
+- Move ticket to **"In Review"** when PR is created
+- Add PR link to Linear ticket
+- Update ticket to **"Done"** only AFTER PR is merged
+- Add final comment with implementation summary
+
+**PR requirements:**
+- Comprehensive description with summary, technical details, and test plan
+- Link to Linear ticket (NEX-[NUMBER])
+- Clear acceptance criteria completion checklist
+- Ready for review and approval
+
+### 7. Merge and Completion
+```bash
+# After PR approval, merge to main
+gh pr merge [NUMBER] --squash --delete-branch
+```
+
+**Post-merge:**
+- Update Linear ticket to "Done" with completion summary
+- Document any follow-up tasks or dependencies
+- Archive feature branch (deleted automatically with --delete-branch)
+
+### Example Complete Workflow
+```bash
+# 1. Create branch
+git checkout -b feature/nex-91-create-canvas-state-management-system
+
+# 2. Update Linear (via MCP)
+# - Status: "In Progress"
+# - Comment: Implementation plan
+
+# 3. Implement with commits
+git commit -m "feat: implement canvas state management system (NEX-91)"
+
+# 4. Quality checks
+npm run type-check && npm run lint && npm test
+
+# 5. Push and PR
+git push -u origin feature/nex-91-create-canvas-state-management-system
+gh pr create --title "feat: implement canvas state management system (NEX-91)"
+
+# 6. Update Linear
+# - Status: "In Review" 
+# - Add PR link
+
+# 7. Merge after approval
+gh pr merge 19 --squash --delete-branch
+
+# 8. Complete Linear ticket
+# - Status: "Done"
+# - Final summary comment
+```
+
 ## Important Development Guidelines
 
 - **Docker**: Never start docker-compose yourself - always ask the user to do it
@@ -113,6 +224,7 @@ docker-compose logs      # View logs
 - **Testing**: Always write tests before implementing a new feature; when updating existing code always run the tests to check if anything broke.
 - **Linear Integration**: When using Linear MCP to move tasks to backlog, remove them from markdown feature documentation files
 - **Code Style**: Follow existing patterns, use TypeScript strictly, maintain test coverage
+- **Linear Workflow**: Always update ticket state and properties throughout development process
 
 ## File Structure Highlights
 
