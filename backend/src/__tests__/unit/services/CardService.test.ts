@@ -1,7 +1,7 @@
 import { CardService } from '@/services/CardService';
 import { CardValidator } from '@/validators/CardValidators';
 import { CardMapper, CardGeometry } from '@/utils/CardUtils';
-import { database } from '@/database/connection';
+import { database, knex } from '@/database/connection';
 import { 
   CardType, 
   CardStatus, 
@@ -13,7 +13,38 @@ import {
 import { NotFoundError, ValidationError } from '@/utils/errors';
 
 // Mock dependencies
-jest.mock('@/database/connection');
+jest.mock('@/database/connection', () => {
+  const mockQueryBuilder = {
+    insert: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    whereIn: jest.fn().mockReturnThis(),
+    whereILike: jest.fn().mockReturnThis(),
+    orWhereILike: jest.fn().mockReturnThis(),
+    whereRaw: jest.fn().mockReturnThis(),
+    update: jest.fn().mockReturnThis(),
+    returning: jest.fn().mockReturnThis(),
+    first: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis(),
+    limit: jest.fn().mockReturnThis(),
+    offset: jest.fn().mockReturnThis(),
+    count: jest.fn().mockReturnThis(),
+    clone: jest.fn().mockReturnThis(),
+    toString: jest.fn().mockReturnValue('SELECT * FROM cards'),
+  };
+
+  const mockKnex = jest.fn(() => mockQueryBuilder);
+  
+  const mockDatabase = {
+    query: jest.fn(),
+    transaction: jest.fn(),
+  };
+
+  return {
+    database: mockDatabase,
+    knex: mockKnex,
+  };
+});
+
 jest.mock('@/validators/CardValidators');
 jest.mock('@/utils/CardUtils');
 jest.mock('@/utils/logger', () => ({
@@ -35,11 +66,9 @@ describe('CardService', () => {
     jest.clearAllMocks();
     
     // Setup database mocks
-    mockQuery = jest.fn();
-    mockTransaction = jest.fn();
     mockDatabase = database as jest.Mocked<typeof database>;
-    mockDatabase.query = mockQuery;
-    mockDatabase.transaction = mockTransaction;
+    mockQuery = mockDatabase.query as jest.Mock;
+    mockTransaction = mockDatabase.transaction as jest.Mock;
 
     cardService = new CardService();
   });
@@ -113,7 +142,7 @@ describe('CardService', () => {
       expect(CardValidator.sanitizeContent).toHaveBeenCalledWith('Test content', CardType.TEXT);
       expect(mockQuery).toHaveBeenCalledWith(
         expect.objectContaining({
-          _method: 'insert'
+          insert: expect.any(Function)
         }),
         'card_create'
       );
@@ -167,7 +196,7 @@ describe('CardService', () => {
 
       expect(mockQuery).toHaveBeenCalledWith(
         expect.objectContaining({
-          _method: 'first'
+          first: expect.any(Function)
         }),
         'card_get'
       );
@@ -236,7 +265,7 @@ describe('CardService', () => {
       expect(cardService.getCard).toHaveBeenCalledWith('card-1');
       expect(mockQuery).toHaveBeenCalledWith(
         expect.objectContaining({
-          _method: 'update'
+          update: expect.any(Function)
         }),
         'card_update'
       );
@@ -279,7 +308,7 @@ describe('CardService', () => {
       expect(cardService.getCard).toHaveBeenCalledWith('card-1');
       expect(mockQuery).toHaveBeenCalledWith(
         expect.objectContaining({
-          _method: 'update'
+          update: expect.any(Function)
         }),
         'card_delete'
       );
@@ -321,21 +350,16 @@ describe('CardService', () => {
     beforeEach(() => {
       (CardValidator.validateBatchPositionUpdates as jest.Mock).mockReturnValue(mockUpdates);
       
-      const mockTrx = {
-        [jest.fn().name]: jest.fn().mockReturnThis(),
+      const mockTrx = jest.fn(() => ({
         where: jest.fn().mockReturnThis(),
-        first: jest.fn(),
+        first: jest.fn().mockImplementation(() => {
+          return Promise.resolve(mockExistingCards[0]); // Return first existing card for simplicity
+        }),
         update: jest.fn().mockReturnThis(),
-        returning: jest.fn()
-      };
-
-      mockTrx.first.mockImplementation((cardId) => {
-        return mockExistingCards.find(card => card.id === cardId);
-      });
-
-      mockTrx.returning.mockImplementation(() => {
-        return mockUpdatedCards;
-      });
+        returning: jest.fn().mockImplementation(() => {
+          return Promise.resolve(mockUpdatedCards);
+        })
+      }));
 
       mockTransaction.mockImplementation(async (callback) => {
         return await callback(mockTrx);
@@ -410,7 +434,7 @@ describe('CardService', () => {
 
       expect(mockQuery).toHaveBeenCalledWith(
         expect.objectContaining({
-          _method: 'count'
+          count: expect.any(Function)
         }),
         'cards_count'
       );
@@ -440,7 +464,7 @@ describe('CardService', () => {
       expect(result[0].title).toBe('Test Card');
       expect(mockQuery).toHaveBeenCalledWith(
         expect.objectContaining({
-          _method: 'limit'
+          limit: expect.any(Function)
         }),
         'cards_search'
       );
@@ -451,7 +475,7 @@ describe('CardService', () => {
 
       expect(mockQuery).toHaveBeenCalledWith(
         expect.objectContaining({
-          _method: 'limit'
+          limit: expect.any(Function)
         }),
         'cards_search'
       );
@@ -484,7 +508,7 @@ describe('CardService', () => {
       expect(result[0].isDirty).toBe(false);
       expect(mockQuery).toHaveBeenCalledWith(
         expect.objectContaining({
-          _method: 'update'
+          update: expect.any(Function)
         }),
         'cards_auto_save'
       );
@@ -516,7 +540,7 @@ describe('CardService', () => {
       expect(result[0].isDirty).toBe(true);
       expect(mockQuery).toHaveBeenCalledWith(
         expect.objectContaining({
-          _method: 'orderBy'
+          orderBy: expect.any(Function)
         }),
         'cards_get_dirty'
       );
