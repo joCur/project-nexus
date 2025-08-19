@@ -140,3 +140,4 @@ clients/web/
 - [Product Manager Documentation](./project-documentation/product-manager-output.md)
 - [Technical Architecture](./project-documentation/technical-architecture.md)
 - [Testing Guide](./TESTING.md)
+- Always update the state and other required properties, while working on a ticket from Linear.
