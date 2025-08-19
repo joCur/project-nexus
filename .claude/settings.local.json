@@ -48,7 +48,8 @@
       "mcp__linear-server__list_issue_labels",
       "mcp__linear-server__create_comment",
       "Bash(gh pr view:*)",
-      "mcp__linear-server__get_issue"
+      "mcp__linear-server__get_issue",
+      "mcp__linear-server__create_comment"
     ],
     "deny": [],
     "defaultMode": "acceptEdits",
