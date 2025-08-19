@@ -1,25 +1,27 @@
 ---
 title: User Onboarding Experience Design
-description: Progressive first-time user journey with intelligent disclosure and value demonstration
+description: Simple user profile setup and workspace introduction for v1 release
 feature: onboarding
-last-updated: 2025-08-15
-version: 1.0.0
+last-updated: 2025-08-17
+version: 1.0.0 (v2 advanced design archived)
 related-files:
-  - ./user-journey.md
-  - ./screen-states.md
-  - ./interactions.md
-  - ../infinite-canvas/README.md
+  - ./v2-advanced-onboarding.md
+  - ./v1-simple-onboarding.md
 dependencies:
   - Authentication system
-  - Tutorial system
-  - Sample content generation
-status: approved
+  - Basic workspace functionality
+  - Backend user profile storage
+status: redesigned-for-v1
 ---
 
 # User Onboarding Experience Design
 
-## Feature Overview
-The onboarding experience introduces new users to Project Nexus's unique value proposition through progressive disclosure, hands-on learning, and immediate value demonstration, ensuring high user activation and long-term engagement.
+## Current Status: Redesigned for v1 Reality
+
+**Important**: The original elaborate 6-step onboarding design has been archived as `v2-advanced-onboarding.md`. The current implementation focuses on realistic v1 capabilities.
+
+## v1 Feature Overview
+The simplified onboarding experience focuses on essential user profile setup and workspace introduction, setting realistic expectations for the basic workspace functionality available in the initial release.
 
 ## User Experience Analysis
 

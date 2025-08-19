@@ -149,6 +149,14 @@ export const authResolvers = {
 
         const session = JSON.parse(sessionData);
         session.lastActivity = new Date();
+        
+        // Ensure dates are properly converted from strings to Date objects
+        if (typeof session.expiresAt === 'string') {
+          session.expiresAt = new Date(session.expiresAt);
+        }
+        if (typeof session.createdAt === 'string') {
+          session.createdAt = new Date(session.createdAt);
+        }
 
         // Update session in cache
         await cacheService.set(

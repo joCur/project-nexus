@@ -369,7 +369,10 @@ describe('Authentication Middleware', () => {
       const contextFactory = createGraphQLContext(
         mockAuth0Service,
         mockUserService,
-        mockCacheService
+        mockCacheService,
+        {} as any, // userProfileService
+        {} as any, // onboardingService
+        {} as any  // workspaceService
       );
 
       mockReq.user = USER_FIXTURES.STANDARD_USER;
@@ -395,7 +398,10 @@ describe('Authentication Middleware', () => {
       const contextFactory = createGraphQLContext(
         mockAuth0Service,
         mockUserService,
-        mockCacheService
+        mockCacheService,
+        {} as any, // userProfileService
+        {} as any, // onboardingService
+        {} as any  // workspaceService
       );
 
       mockReq.isAuthenticated = false;

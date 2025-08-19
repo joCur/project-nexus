@@ -8,6 +8,11 @@ on:
     branches: [main]
   workflow_dispatch:  # Allow manual trigger
 
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
 env:
   NODE_VERSION: '22'
   DOCKER_BUILDKIT: 1
@@ -67,6 +72,8 @@ jobs:
       
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
+        continue-on-error: true
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         with:
           sarif_file: 'trivy-results.sarif'
       
@@ -129,12 +136,16 @@ jobs:
         working-directory: backend
         env:
           NODE_ENV: test
+          POSTGRES_DB: nexus_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test_password
           DATABASE_URL: postgresql://postgres:test_password@localhost:5432/nexus_test
           REDIS_URL: redis://localhost:6379
           AUTH0_DOMAIN: test.auth0.com
           AUTH0_CLIENT_ID: test_client_id
-          AUTH0_CLIENT_SECRET: test_secret
-          JWT_SECRET: test_jwt_secret
+          AUTH0_CLIENT_SECRET: test_client_secret_for_testing_purposes
+          JWT_SECRET: test_jwt_secret_for_unit_tests_minimum_32_chars_required_by_validation
+          SESSION_SECRET: test_session_secret_for_testing_minimum_32_chars_required_validation
         run: npm test
       
       - name: Install frontend dependencies

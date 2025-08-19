@@ -39,9 +39,17 @@
       "mcp__playwright__browser_click",
       "mcp__playwright__browser_network_requests",
       "mcp__playwright__browser_wait_for",
-      "mcp__playwright__browser_evaluate"
+      "mcp__playwright__browser_evaluate",
+      "Bash(git checkout:*)",
+      "Bash(curl:*)",
+      "Bash(npm run lint)",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" run list --branch feature/basic-onboarding --limit 3)",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" run view 17067316812 --log)"
     ],
     "deny": [],
-    "defaultMode": "acceptEdits"
+    "defaultMode": "acceptEdits",
+    "additionalDirectories": [
+      "C:\\c\\Users\\curth\\Documents\\git\\project-nexus"
+    ]
   }
 }

@@ -7,8 +7,9 @@ import { randomUUID } from 'crypto';
  * Provides mock data generation and test utilities
  */
 
-// Test JWT secret for token generation
-export const TEST_JWT_SECRET = 'test-jwt-secret-key-for-testing-purposes-only';
+// Test secret for JWT mocking - NOT A REAL SECRET
+// This is only used for testing purposes where we mock JWT verification
+export const TEST_JWT_SECRET = 'test-jwt-secret-for-unit-tests-only-not-real';
 
 // Auth0 test configuration
 export const TEST_AUTH0_CONFIG = {
@@ -211,6 +212,144 @@ export function createMockDatabaseQuery() {
 }
 
 /**
+ * Create a comprehensive mock Knex query builder
+ */
+export function createMockKnexQueryBuilder() {
+  const mockQueryBuilder = {
+    select: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    whereIn: jest.fn().mockReturnThis(),
+    whereNotIn: jest.fn().mockReturnThis(),
+    whereNull: jest.fn().mockReturnThis(),
+    whereNotNull: jest.fn().mockReturnThis(),
+    whereBetween: jest.fn().mockReturnThis(),
+    whereExists: jest.fn().mockReturnThis(),
+    whereRaw: jest.fn().mockReturnThis(),
+    orWhere: jest.fn().mockReturnThis(),
+    andWhere: jest.fn().mockReturnThis(),
+    join: jest.fn().mockReturnThis(),
+    leftJoin: jest.fn().mockReturnThis(),
+    rightJoin: jest.fn().mockReturnThis(),
+    innerJoin: jest.fn().mockReturnThis(),
+    fullOuterJoin: jest.fn().mockReturnThis(),
+    crossJoin: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis(),
+    groupBy: jest.fn().mockReturnThis(),
+    having: jest.fn().mockReturnThis(),
+    limit: jest.fn().mockReturnThis(),
+    offset: jest.fn().mockReturnThis(),
+    insert: jest.fn().mockReturnThis(),
+    update: jest.fn().mockReturnThis(),
+    delete: jest.fn().mockReturnThis(),
+    del: jest.fn().mockReturnThis(),
+    returning: jest.fn().mockReturnThis(),
+    first: jest.fn().mockReturnThis(),
+    count: jest.fn().mockReturnThis(),
+    countDistinct: jest.fn().mockReturnThis(),
+    min: jest.fn().mockReturnThis(),
+    max: jest.fn().mockReturnThis(),
+    sum: jest.fn().mockReturnThis(),
+    avg: jest.fn().mockReturnThis(),
+    distinct: jest.fn().mockReturnThis(),
+    clone: jest.fn().mockReturnThis(),
+    clearSelect: jest.fn().mockReturnThis(),
+    clearWhere: jest.fn().mockReturnThis(),
+    clearOrder: jest.fn().mockReturnThis(),
+    clearHaving: jest.fn().mockReturnThis(),
+    clearCounters: jest.fn().mockReturnThis(),
+    toString: jest.fn().mockReturnValue('mock-query-string'),
+    toSQL: jest.fn().mockReturnValue({ sql: 'mock-query', bindings: [] }),
+    debug: jest.fn().mockReturnThis(),
+    connection: jest.fn().mockReturnThis(),
+    options: jest.fn().mockReturnThis(),
+    columnInfo: jest.fn().mockReturnThis(),
+    with: jest.fn().mockReturnThis(),
+    withRecursive: jest.fn().mockReturnThis(),
+    forUpdate: jest.fn().mockReturnThis(),
+    forShare: jest.fn().mockReturnThis(),
+    skipLocked: jest.fn().mockReturnThis(),
+    noWait: jest.fn().mockReturnThis(),
+    union: jest.fn().mockReturnThis(),
+    unionAll: jest.fn().mockReturnThis(),
+    intersect: jest.fn().mockReturnThis(),
+    except: jest.fn().mockReturnThis(),
+    as: jest.fn().mockReturnThis(),
+    columns: jest.fn().mockReturnThis(),
+    column: jest.fn().mockReturnThis(),
+    from: jest.fn().mockReturnThis(),
+    into: jest.fn().mockReturnThis(),
+    table: jest.fn().mockReturnThis(),
+    modify: jest.fn().mockReturnThis(),
+    queryContext: jest.fn().mockReturnThis(),
+    range: jest.fn().mockReturnThis(),
+    onConflict: jest.fn().mockReturnThis(),
+    ignore: jest.fn().mockReturnThis(),
+    merge: jest.fn().mockReturnThis(),
+    upsert: jest.fn().mockReturnThis(),
+    truncate: jest.fn().mockReturnThis(),
+    pluck: jest.fn().mockReturnThis(),
+    jsonExtract: jest.fn().mockReturnThis(),
+    jsonSet: jest.fn().mockReturnThis(),
+    jsonInsert: jest.fn().mockReturnThis(),
+    jsonRemove: jest.fn().mockReturnThis(),
+    // Add transaction support
+    transacting: jest.fn().mockReturnThis(),
+    // Add promise-like methods
+    then: jest.fn(),
+    catch: jest.fn(),
+    finally: jest.fn(),
+  };
+
+  // Make it behave like a promise for async operations
+  Object.setPrototypeOf(mockQueryBuilder, Promise.prototype);
+
+  return mockQueryBuilder;
+}
+
+/**
+ * Create mock knex function that returns a mock query builder
+ */
+export function createMockKnex() {
+  const mockKnex: any = jest.fn(() => createMockKnexQueryBuilder());
+  
+  // Add knex static methods
+  mockKnex.raw = jest.fn().mockReturnValue(createMockKnexQueryBuilder());
+  mockKnex.ref = jest.fn();
+  mockKnex.transaction = jest.fn();
+  mockKnex.schema = {
+    createTable: jest.fn().mockReturnValue(Promise.resolve()),
+    dropTable: jest.fn().mockReturnValue(Promise.resolve()),
+    alterTable: jest.fn().mockReturnValue(Promise.resolve()),
+    hasTable: jest.fn().mockReturnValue(Promise.resolve(true)),
+    hasColumn: jest.fn().mockReturnValue(Promise.resolve(true)),
+    renameTable: jest.fn().mockReturnValue(Promise.resolve()),
+    dropTableIfExists: jest.fn().mockReturnValue(Promise.resolve()),
+  };
+  mockKnex.migrate = {
+    latest: jest.fn().mockReturnValue(Promise.resolve()),
+    rollback: jest.fn().mockReturnValue(Promise.resolve()),
+    status: jest.fn().mockReturnValue(Promise.resolve()),
+    currentVersion: jest.fn().mockReturnValue(Promise.resolve()),
+  };
+  mockKnex.seed = {
+    run: jest.fn().mockReturnValue(Promise.resolve()),
+  };
+  mockKnex.destroy = jest.fn().mockReturnValue(Promise.resolve());
+  mockKnex.client = {
+    pool: {
+      numUsed: jest.fn().mockReturnValue(0),
+      numFree: jest.fn().mockReturnValue(10),
+      numPendingAcquires: jest.fn().mockReturnValue(0),
+      min: 2,
+      max: 10,
+      on: jest.fn(),
+    },
+  };
+
+  return mockKnex;
+}
+
+/**
  * Create mock cache service
  */
 export function createMockCacheService() {
@@ -266,6 +405,52 @@ export function createMockJwksClient() {
 }
 
 /**
+ * Create mock onboarding service
+ */
+export function createMockOnboardingService() {
+  return {
+    updateProgress: jest.fn(),
+    getProgress: jest.fn(),
+    completeOnboarding: jest.fn(),
+    isComplete: jest.fn(),
+    reset: jest.fn(),
+    getStep: jest.fn(),
+    isOnboardingComplete: jest.fn(),
+    resetOnboarding: jest.fn(),
+  } as any;
+}
+
+/**
+ * Create mock user profile service
+ */
+export function createMockUserProfileService() {
+  return {
+    getProfileByUserId: jest.fn(),
+    createProfile: jest.fn(),
+    updateProfile: jest.fn(),
+    upsertProfile: jest.fn(),
+    deleteProfile: jest.fn(),
+  } as any;
+}
+
+/**
+ * Create mock workspace service
+ */
+export function createMockWorkspaceService() {
+  return {
+    getWorkspaceById: jest.fn(),
+    createWorkspace: jest.fn(),
+    updateWorkspace: jest.fn(),
+    deleteWorkspace: jest.fn(),
+    listWorkspaces: jest.fn(),
+    addMember: jest.fn(),
+    removeMember: jest.fn(),
+    updateMemberRole: jest.fn(),
+    getMembers: jest.fn(),
+  } as any;
+}
+
+/**
  * Create mock Auth0 service
  */
 export function createMockAuth0Service() {
@@ -277,6 +462,8 @@ export function createMockAuth0Service() {
     invalidateSession: jest.fn(),
     refreshSession: jest.fn(),
     getActiveSessionsForUser: jest.fn(),
+    getUserPermissions: jest.fn(),
+    destroySession: jest.fn(),
     healthCheck: jest.fn(),
   } as any;
 }
@@ -344,3 +531,76 @@ export const ERROR_SCENARIOS = {
   JWT_MALFORMED: new jwt.JsonWebTokenError('jwt malformed'),
   JWT_INVALID_SIGNATURE: new jwt.JsonWebTokenError('invalid signature'),
 };
+
+/**
+ * Create test Express app with GraphQL endpoint
+ */
+// Global mock services that can be accessed by tests
+export let testMockServices: any = {};
+
+export async function createTestApp() {
+  const express = require('express');
+  const { ApolloServer } = require('@apollo/server');
+  const { expressMiddleware } = require('@apollo/server/express4');
+  
+  const app = express();
+  app.use(express.json());
+  
+  // Create mock services that can be accessed globally
+  testMockServices = {
+    onboardingService: createMockOnboardingService(),
+    userProfileService: createMockUserProfileService(),
+    workspaceService: createMockWorkspaceService(),
+    auth0Service: createMockAuth0Service(),
+    userService: createMockUserService(),
+    cacheService: createMockCacheService(),
+  };
+  
+  // Import actual schema and resolvers
+  const { typeDefs } = require('@/graphql/typeDefs');
+  const { resolvers } = require('@/resolvers');
+  
+  // Mock authentication middleware
+  app.use('/graphql', (req, res, next) => {
+    const auth = req.headers.authorization;
+    const userSub = req.headers['x-user-sub'];
+    const userEmail = req.headers['x-user-email'];
+    const userPermissions = req.headers['x-user-permissions'];
+    
+    if (auth && userSub) {
+      req.isAuthenticated = true;
+      req.user = {
+        id: userSub.replace('auth0|', ''),
+        email: userEmail,
+        sub: userSub,
+      };
+      req.permissions = userPermissions ? userPermissions.split(',') : ['user:read', 'user:update'];
+    } else {
+      req.isAuthenticated = false;
+      req.user = null;
+      req.permissions = [];
+    }
+    
+    next();
+  });
+  
+  // Create Apollo Server
+  const server = new ApolloServer({
+    typeDefs,
+    resolvers,
+  });
+  
+  await server.start();
+  
+  // GraphQL endpoint
+  app.use('/graphql', expressMiddleware(server, {
+    context: async ({ req }) => ({
+      isAuthenticated: req.isAuthenticated,
+      user: req.user,
+      permissions: req.permissions,
+      dataSources: testMockServices,
+    }),
+  }));
+  
+  return app;
+}

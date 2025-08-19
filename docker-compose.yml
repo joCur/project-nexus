@@ -39,16 +39,19 @@ services:
       
     volumes:
       # Development hot-reload (only in development)
-      - ./clients/web/app:/app/app:ro
-      - ./clients/web/components:/app/components:ro
-      - ./clients/web/hooks:/app/hooks:ro
-      - ./clients/web/lib:/app/lib:ro
-      - ./clients/web/styles:/app/styles:ro
-      - ./clients/web/types:/app/types:ro
+      - ./clients/web/app:/app/app
+      - ./clients/web/components:/app/components
+      - ./clients/web/hooks:/app/hooks
+      - ./clients/web/lib:/app/lib
+      - ./clients/web/styles:/app/styles
+      - ./clients/web/types:/app/types
       - ./clients/web/package.json:/app/package.json:ro
       - ./clients/web/next.config.js:/app/next.config.js:ro
       - ./clients/web/tailwind.config.js:/app/tailwind.config.js:ro
       - ./clients/web/tsconfig.json:/app/tsconfig.json:ro
+      # Next.js build cache and node_modules for hot reload
+      - /app/.next
+      - /app/node_modules
     depends_on:
       backend:
         condition: service_healthy

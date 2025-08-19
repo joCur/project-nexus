@@ -2,6 +2,12 @@
 const path = require('path');
 const dotenv = require('dotenv');
 
+// Register ts-node for TypeScript support
+require('ts-node').register({
+  project: path.join(__dirname, 'tsconfig.json'),
+  require: ['tsconfig-paths/register']
+});
+
 // Load environment variables from root directory .env file
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
@@ -30,9 +36,11 @@ module.exports = {
     migrations: {
       directory: path.join(__dirname, 'src', 'database', 'migrations'),
       tableName: 'knex_migrations',
+      extension: 'ts',
     },
     seeds: {
       directory: path.join(__dirname, 'src', 'database', 'seeds'),
+      extension: 'ts',
     },
   },
 
@@ -74,9 +82,11 @@ module.exports = {
     migrations: {
       directory: path.join(__dirname, 'src', 'database', 'migrations'),
       tableName: 'knex_migrations',
+      extension: 'ts',
     },
     seeds: {
       directory: path.join(__dirname, 'src', 'database', 'seeds'),
+      extension: 'ts',
     },
   },
 };

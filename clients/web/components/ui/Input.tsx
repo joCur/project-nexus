@@ -16,7 +16,7 @@ export type InputState = 'default' | 'error' | 'success' | 'warning';
 /**
  * Input component props extending native input attributes
  */
-export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'> {
   size?: InputSize;
   state?: InputState;
   label?: string;

@@ -95,16 +95,24 @@ export function useAuth(): UseAuthReturn {
     if (!user) return null;
 
     return {
-      ...user,
-      // Ensure required fields are present
+      // Spread user but handle null values
       sub: user.sub!,
       email: user.email!,
       email_verified: user.email_verified ?? false,
+      name: user.name ?? undefined,
+      nickname: user.nickname ?? undefined,
+      picture: user.picture ?? undefined,
+      updated_at: user.updated_at ?? undefined,
+      org_id: user.org_id ?? undefined,
       
-      // Extract custom claims
-      roles: user['https://api.nexus-app.de/roles'] || [],
-      permissions: user['https://api.nexus-app.de/permissions'] || [],
-      internalUserId: user['https://api.nexus-app.de/user_id'],
+      // Extract custom claims (ensure they're arrays)
+      roles: Array.isArray(user['https://api.nexus-app.de/roles']) 
+        ? user['https://api.nexus-app.de/roles'] 
+        : [],
+      permissions: Array.isArray(user['https://api.nexus-app.de/permissions'])
+        ? user['https://api.nexus-app.de/permissions']
+        : [],
+      internalUserId: user['https://api.nexus-app.de/user_id'] as string | undefined,
     };
   }, [user]);
 

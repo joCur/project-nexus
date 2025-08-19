@@ -1,4 +1,4 @@
-import { handleAuth, handleLogin } from '@auth0/nextjs-auth0';
+import { handleAuth, handleLogin, handleCallback } from '@auth0/nextjs-auth0';
 import { GRAPHQL_ENDPOINT } from '@/lib/auth0-config';
 
 /**
@@ -8,40 +8,40 @@ import { GRAPHQL_ENDPOINT } from '@/lib/auth0-config';
  */
 async function syncUserToDatabase(user: any): Promise<void> {
   try {
-    // Extract user information from Auth0 profile
-    const userData = {
-      auth0UserId: user.sub,
+    console.log('Syncing user to database:', {
+      sub: user.sub,
       email: user.email,
-      emailVerified: user.email_verified || false,
-      displayName: user.name || user.nickname,
-      avatarUrl: user.picture,
-      auth0UpdatedAt: user.updated_at,
-    };
+      name: user.name
+    });
 
-    // GraphQL mutation to upsert user
+    // GraphQL mutation to sync user from Auth0
     const mutation = `
-      mutation SyncUser($input: SyncUserInput!) {
-        syncUser(input: $input) {
+      mutation SyncUserFromAuth0($auth0Token: String!) {
+        syncUserFromAuth0(auth0Token: $auth0Token) {
           id
           email
           displayName
+          auth0UserId
           createdAt
           updatedAt
         }
       }
     `;
 
+    // Use a dummy token for now - the backend will extract user info from Auth0 token
+    // In production, this should be the actual Auth0 access token
+    const auth0Token = user.accessToken || 'dummy-token';
+
     const response = await fetch(GRAPHQL_ENDPOINT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // Include the access token for authorization
-        'Authorization': `Bearer ${user.accessToken || ''}`,
+        // For development, we'll skip token validation in sync
       },
       body: JSON.stringify({
         query: mutation,
         variables: {
-          input: userData,
+          auth0Token: auth0Token,
         },
       }),
     });
@@ -52,7 +52,7 @@ async function syncUserToDatabase(user: any): Promise<void> {
         status: response.status,
         statusText: response.statusText,
         body: errorText,
-        userData,
+        userSub: user.sub,
       });
       
       // Don't throw error here to avoid blocking authentication
@@ -68,8 +68,8 @@ async function syncUserToDatabase(user: any): Promise<void> {
     }
 
     console.log('User synchronized successfully:', {
-      userId: result.data?.syncUser?.id,
-      email: userData.email,
+      userId: result.data?.syncUserFromAuth0?.id,
+      email: result.data?.syncUserFromAuth0?.email,
     });
 
   } catch (error) {
@@ -94,7 +94,16 @@ export const GET = handleAuth({
   login: handleLogin({
     authorizationParams: {
       prompt: 'login', // Force fresh login every time
-      max_age: '0'     // Don't use cached authentication
+      max_age: 0       // Don't use cached authentication
+    }
+  }),
+  callback: handleCallback({
+    afterCallback: async (req: any, session: any) => {
+      // Sync user to backend database after successful authentication
+      if (session.user) {
+        await syncUserToDatabase(session.user);
+      }
+      return session;
     }
   })
 });

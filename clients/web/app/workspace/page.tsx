@@ -3,9 +3,36 @@
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { Permissions } from '@/hooks/use-auth';
 import { useAuth } from '@/hooks/use-auth';
+import { useOnboardingStatus } from '@/hooks/use-onboarding-status';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 function WorkspaceContent() {
   const { user, logout } = useAuth();
+  const router = useRouter();
+  const { status: onboardingStatus, isLoading: onboardingLoading } = useOnboardingStatus();
+
+  // Check onboarding status and redirect if needed
+  useEffect(() => {
+    if (!onboardingLoading && onboardingStatus && !onboardingStatus.isComplete) {
+      // Redirect to onboarding if not completed
+      router.push('/onboarding');
+    }
+  }, [onboardingLoading, onboardingStatus, router]);
+
+  // Show loading while checking onboarding status
+  if (onboardingLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
+
+  // Don't render workspace content if onboarding is not complete
+  if (!onboardingStatus?.isComplete) {
+    return null; // The useEffect will handle redirection
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

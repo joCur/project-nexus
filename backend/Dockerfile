@@ -71,6 +71,10 @@ COPY --from=dependencies --chown=backend:nodejs /app/node_modules ./node_modules
 COPY --from=build --chown=backend:nodejs /app/dist ./dist
 COPY --from=build --chown=backend:nodejs /app/package*.json ./
 
+# Copy knex configuration and migration source for production migrations
+COPY --from=build --chown=backend:nodejs /app/knexfile.js ./
+COPY --from=build --chown=backend:nodejs /app/src/database ./src/database
+
 # Create logs directory
 RUN mkdir -p /app/logs && chown backend:nodejs /app/logs
 
@@ -87,8 +91,8 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]
 
-# Start the application
-CMD ["node", "dist/server.js"]
+# Start the application with migrations
+CMD ["sh", "-c", "npm run migrate:container && node dist/server.js"]
 
 #######################
 # Stage 4: Development
@@ -117,6 +121,7 @@ RUN npm ci --silent
 COPY src/ ./src/
 COPY tsconfig.json ./
 COPY nodemon.json ./
+COPY knexfile.js ./
 
 # Create logs directory
 RUN mkdir -p /app/logs
@@ -131,8 +136,8 @@ ENV NODE_ENV=development
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:3000/health/ready || exit 1
 
-# Start development server with hot reload
-CMD ["npm", "run", "dev"]
+# Start development server with migrations and hot reload
+CMD ["sh", "-c", "npm run migrate:container && npm run dev"]
 
 # Metadata labels
 LABEL maintainer="Project Nexus Team"

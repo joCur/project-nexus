@@ -20,6 +20,9 @@ import { resolvers } from '@/resolvers';
 import { CacheService } from '@/services/cache';
 import { UserService } from '@/services/user';
 import { Auth0Service } from '@/services/auth0';
+import { UserProfileService } from '@/services/userProfile';
+import { OnboardingService } from '@/services/onboarding';
+import { WorkspaceService } from '@/services/workspace';
 
 // Middleware
 import { applySecurityMiddleware } from '@/middleware/security';
@@ -47,6 +50,9 @@ class NexusBackendServer {
   private cacheService: CacheService;
   private userService: UserService;
   private auth0Service: Auth0Service;
+  private userProfileService: UserProfileService;
+  private onboardingService: OnboardingService;
+  private workspaceService: WorkspaceService;
 
   constructor() {
     this.app = express();
@@ -55,6 +61,9 @@ class NexusBackendServer {
     this.cacheService = new CacheService();
     this.userService = new UserService();
     this.auth0Service = new Auth0Service(this.cacheService, this.userService);
+    this.userProfileService = new UserProfileService();
+    this.onboardingService = new OnboardingService();
+    this.workspaceService = new WorkspaceService();
     
     // Setup process error handlers
     setupProcessErrorHandlers();
@@ -274,7 +283,10 @@ class NexusBackendServer {
           context: createGraphQLContext(
             this.auth0Service,
             this.userService,
-            this.cacheService
+            this.cacheService,
+            this.userProfileService,
+            this.onboardingService,
+            this.workspaceService
           ),
         })
       );

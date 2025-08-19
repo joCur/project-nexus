@@ -37,6 +37,35 @@ export function createAuthMiddleware(
     req.permissions = [];
 
     try {
+      // Development mode: Check for X-User-Sub header
+      if (process.env.NODE_ENV === 'development' && req.headers['x-user-sub']) {
+        const auth0UserId = req.headers['x-user-sub'] as string;
+        const email = req.headers['x-user-email'] as string;
+        
+        // Create a mock user for development
+        const user = await userService.findByAuth0Id(auth0UserId) || 
+          await userService.create({
+            auth0UserId,
+            email: email || 'dev@example.com',
+            emailVerified: true,
+            displayName: 'Development User',
+            roles: [],
+            permissions: []
+          });
+
+        req.user = user;
+        req.permissions = user.permissions || [];
+        req.isAuthenticated = true;
+        
+        console.log('Development mode authentication:', {
+          userId: user.id,
+          auth0UserId,
+          email
+        });
+        
+        return next();
+      }
+
       // Extract token from Authorization header
       const authHeader = req.headers.authorization;
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -67,8 +96,20 @@ export function createAuthMiddleware(
       req.permissions = user.permissions;
       req.isAuthenticated = true;
 
-      // Update last activity
-      await userService.updateLastLogin(user.id);
+      // Update last activity (non-critical operation)
+      try {
+        await userService.updateLastLogin(user.id);
+      } catch (updateError) {
+        // Log error but don't fail authentication
+        securityLogger.authFailure(
+          `Failed to update last login: ${updateError instanceof Error ? updateError.message : 'Unknown error'}`,
+          {
+            userId: user.id,
+            userAgent: req.headers['user-agent'],
+            ip: req.ip,
+          }
+        );
+      }
 
       securityLogger.authSuccess(user.id, auth0Payload.sub, {
         userAgent: req.headers['user-agent'],
@@ -120,7 +161,10 @@ export function requirePermission(permission: string) {
       throw new AuthenticationError();
     }
 
-    if (!req.permissions.includes(permission)) {
+    // Check if user has super_admin role - allows bypassing permission checks
+    const isAdmin = req.user?.roles.includes('super_admin');
+    
+    if (!isAdmin && !req.permissions.includes(permission)) {
       securityLogger.authorizationFailure(req.user!.id, 'permission', permission, {
         userPermissions: req.permissions,
         path: req.path,
@@ -173,7 +217,10 @@ export function requireRole(role: string) {
 export function createGraphQLContext(
   auth0Service: Auth0Service,
   userService: UserService,
-  cacheService: CacheService
+  cacheService: CacheService,
+  userProfileService: import('@/services/userProfile').UserProfileService,
+  onboardingService: import('@/services/onboarding').OnboardingService,
+  workspaceService: import('@/services/workspace').WorkspaceService
 ) {
   return async ({ req, res }: { req: AuthenticatedRequest; res: Response }) => {
     // Get user from request (set by auth middleware)
@@ -193,6 +240,9 @@ export function createGraphQLContext(
         auth0Service,
         userService,
         cacheService,
+        userProfileService,
+        onboardingService,
+        workspaceService,
       },
     };
   };
@@ -221,7 +271,11 @@ export const authDirectives = {
     }
 
     const permission = info.directive.arguments.permission.value;
-    if (!context.permissions.includes(permission)) {
+    
+    // Check if user has super_admin role - allows bypassing permission checks
+    const isAdmin = context.user?.roles.includes('super_admin');
+    
+    if (!isAdmin && !context.permissions.includes(permission)) {
       securityLogger.authorizationFailure(
         context.user?.id || 'unknown',
         'graphql_permission',

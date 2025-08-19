@@ -8,6 +8,7 @@ import {
 import {
   createMockUser,
   createMockDatabaseQuery,
+  createMockKnex,
   ERROR_SCENARIOS,
 } from '../../utils/test-helpers';
 import {
@@ -15,16 +16,34 @@ import {
 } from '../../utils/test-fixtures';
 
 // Mock database connection
-jest.mock('@/database/connection');
-jest.mock('@/utils/logger');
+jest.mock('@/database/connection', () => ({
+  database: {
+    query: jest.fn(),
+  },
+  knex: jest.fn(),
+}));
+jest.mock('@/utils/logger', () => ({
+  createContextLogger: () => ({
+    info: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+    debug: jest.fn(),
+  }),
+}));
 
 describe('UserService', () => {
   let userService: UserService;
   let mockDatabaseQuery: jest.MockedFunction<any>;
+  const mockDatabase = database as jest.Mocked<typeof database>;
+  const typedMockKnex = knex as jest.MockedFunction<typeof knex>;
 
   beforeEach(() => {
     mockDatabaseQuery = createMockDatabaseQuery();
-    (database.query as jest.Mock) = mockDatabaseQuery;
+    mockDatabase.query = mockDatabaseQuery;
+    
+    // Setup knex mock
+    const mockKnex = createMockKnex();
+    (knex as any) = mockKnex;
 
     userService = new UserService();
   });

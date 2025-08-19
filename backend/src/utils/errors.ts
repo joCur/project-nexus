@@ -154,6 +154,12 @@ export class ForeignKeyConstraintError extends DatabaseError {
   }
 }
 
+export class TransactionError extends DatabaseError {
+  constructor(message: string = 'Database transaction failed') {
+    super(message, 'TRANSACTION_ERROR');
+  }
+}
+
 /**
  * Resource-related errors
  */
