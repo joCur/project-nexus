@@ -85,7 +85,7 @@ describe('OnboardingFlow', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    global.fetch.mockClear();
+    (global.fetch as jest.Mock).mockClear();
     
     mockUseRouter.mockReturnValue({
       push: mockPush,
@@ -289,7 +289,7 @@ describe('OnboardingFlow', () => {
 
     it('should redirect to workspace even if completion API fails', async () => {
       let apiCallCount = 0;
-      global.fetch.mockImplementation(() => {
+      (global.fetch as jest.Mock).mockImplementation(() => {
         apiCallCount++;
         if (apiCallCount === 2) {
           // Fail the completion API call
@@ -370,7 +370,7 @@ describe('OnboardingFlow', () => {
       fireEvent.click(screen.getByText('Complete Profile'));
 
       await waitFor(() => {
-        const fetchCall = global.fetch.mock.calls[0];
+        const fetchCall = (global.fetch as jest.Mock).mock.calls[0];
         const requestBody = JSON.parse(fetchCall[1].body);
 
         expect(requestBody.userProfile.fullName).toBe('Test User');

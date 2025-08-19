@@ -39,7 +39,7 @@ describe('useOnboardingStatus', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    global.fetch.mockClear();
+    (global.fetch as jest.Mock).mockClear();
     
     // Default mock setup
     mockUseAuth.mockReturnValue({
@@ -97,7 +97,7 @@ describe('useOnboardingStatus', () => {
 
   it('should handle 401 unauthorized gracefully', async () => {
     global.mockFetch({}, false);
-    global.fetch.mockImplementation(() =>
+    (global.fetch as jest.Mock).mockImplementation(() =>
       Promise.resolve({
         ok: false,
         status: 401,
@@ -116,7 +116,7 @@ describe('useOnboardingStatus', () => {
   });
 
   it('should handle HTTP errors with error state', async () => {
-    global.fetch.mockImplementation(() =>
+    (global.fetch as jest.Mock).mockImplementation(() =>
       Promise.resolve({
         ok: false,
         status: 500,
@@ -158,7 +158,7 @@ describe('useOnboardingStatus', () => {
   });
 
   it('should handle malformed JSON responses', async () => {
-    global.fetch.mockImplementation(() =>
+    (global.fetch as jest.Mock).mockImplementation(() =>
       Promise.resolve({
         ok: true,
         status: 200,
@@ -341,7 +341,7 @@ describe('useOnboardingStatus', () => {
       resolvePromise = resolve;
     });
 
-    global.fetch.mockImplementation(() => pendingPromise);
+    (global.fetch as jest.Mock).mockImplementation(() => pendingPromise);
 
     const { result } = renderHook(() => useOnboardingStatus());
 
@@ -415,7 +415,7 @@ describe('useOnboardingStatus', () => {
       rejectPromise = reject;
     });
 
-    global.fetch.mockImplementation(() => timeoutPromise);
+    (global.fetch as jest.Mock).mockImplementation(() => timeoutPromise);
 
     const { result } = renderHook(() => useOnboardingStatus());
 
