@@ -204,7 +204,10 @@ describe('useOnboardingStatus', () => {
     await result.current.refetch();
 
     expect(global.fetch).toHaveBeenCalledTimes(2);
-    expect(result.current.status).toEqual(updatedStatus);
+    
+    await waitFor(() => {
+      expect(result.current.status).toEqual(updatedStatus);
+    });
   });
 
   it('should not fetch when auth is loading', () => {
@@ -320,6 +323,15 @@ describe('useOnboardingStatus', () => {
     global.mockFetch(mockOnboardingStatus);
 
     const { result } = renderHook(() => useOnboardingStatus());
+
+    // Wait for initial fetch to complete
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    // Clear fetch calls from initial load
+    (global.fetch as jest.Mock).mockClear();
+    global.mockFetch(mockOnboardingStatus);
 
     // Trigger multiple refetch calls rapidly
     const promises = [

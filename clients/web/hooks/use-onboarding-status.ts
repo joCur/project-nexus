@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from './use-auth';
 
 interface OnboardingStatus {
@@ -37,60 +37,80 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
   const [status, setStatus] = useState<OnboardingStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isFetching, setIsFetching] = useState(false);
+  const currentFetchPromiseRef = useRef<Promise<void> | null>(null);
 
-  const fetchStatus = async () => {
+  const fetchStatus = useCallback(async () => {
     if (!user) {
       setStatus(null);
       setIsLoading(false);
       return;
     }
 
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      const response = await fetch('/api/user/onboarding/status', {
-        method: 'GET',
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          setStatus(null);
-          return;
-        }
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      setStatus(data);
-
-    } catch (err) {
-      console.error('Failed to fetch onboarding status:', err);
-      setError(err instanceof Error ? err.message : 'Unknown error');
-      
-      // Provide safe defaults on error
-      setStatus({
-        isComplete: false,
-        currentStep: 1,
-        hasProfile: false,
-        hasWorkspace: false,
-      });
-    } finally {
-      setIsLoading(false);
+    // If there's already a request in progress, wait for it to complete
+    if (currentFetchPromiseRef.current) {
+      await currentFetchPromiseRef.current;
+      return;
     }
-  };
+
+    const fetchPromise = (async () => {
+      try {
+        setIsFetching(true);
+        setIsLoading(true);
+        setError(null);
+
+        const response = await fetch('/api/user/onboarding/status', {
+          method: 'GET',
+          credentials: 'include',
+        });
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            setStatus(null);
+            return;
+          }
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        setStatus(data);
+
+      } catch (err) {
+        console.error('Failed to fetch onboarding status:', err);
+        setError(err instanceof Error ? err.message : 'Unknown error');
+        
+        // Provide safe defaults on error
+        setStatus({
+          isComplete: false,
+          currentStep: 1,
+          hasProfile: false,
+          hasWorkspace: false,
+        });
+      } finally {
+        setIsLoading(false);
+        setIsFetching(false);
+        currentFetchPromiseRef.current = null;
+      }
+    })();
+
+    currentFetchPromiseRef.current = fetchPromise;
+    await fetchPromise;
+  }, [user]);
+
+  const refetch = useCallback(async () => {
+    return fetchStatus();
+  }, [fetchStatus]);
 
   useEffect(() => {
     if (!authLoading) {
       fetchStatus();
     }
-  }, [user, authLoading]);
+  }, [fetchStatus, authLoading]);
 
   return {
     status,
     isLoading: isLoading || authLoading,
     error,
-    refetch: fetchStatus,
+    refetch,
   };
 }

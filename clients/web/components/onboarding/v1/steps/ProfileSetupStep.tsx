@@ -48,18 +48,22 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [hasManuallyEditedDisplayName, setHasManuallyEditedDisplayName] = useState(!!userProfile.displayName);
+  const [hasManuallyEditedWorkspaceName, setHasManuallyEditedWorkspaceName] = useState(!!userProfile.preferences?.workspaceName);
 
   // Auto-generate display name and workspace name
   useEffect(() => {
-    if (formData.fullName && !userProfile.displayName) {
-      const firstName = formData.fullName.split(' ')[0];
-      setFormData(prev => ({
-        ...prev,
-        displayName: firstName,
-        workspaceName: `${firstName}'s Workspace`,
-      }));
+    if (formData.fullName.trim() && !hasManuallyEditedDisplayName) {
+      const firstName = formData.fullName.trim().split(' ')[0];
+      if (firstName) {
+        setFormData(prev => ({
+          ...prev,
+          displayName: firstName,
+          workspaceName: hasManuallyEditedWorkspaceName ? prev.workspaceName : `${firstName}'s Workspace`,
+        }));
+      }
     }
-  }, [formData.fullName, userProfile.displayName]);
+  }, [formData.fullName, hasManuallyEditedDisplayName, hasManuallyEditedWorkspaceName]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -107,6 +111,14 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
     // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+    
+    // Track manual edits
+    if (field === 'displayName') {
+      setHasManuallyEditedDisplayName(true);
+    }
+    if (field === 'workspaceName') {
+      setHasManuallyEditedWorkspaceName(true);
     }
   };
 
@@ -227,10 +239,11 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
 
         {/* Privacy Setting */}
         <div>
-          <label className="block text-sm font-medium text-text-primary mb-2">
+          <label htmlFor="privacy" className="block text-sm font-medium text-text-primary mb-2">
             Workspace Privacy
           </label>
           <select
+            id="privacy"
             value={formData.privacy}
             onChange={(e) => updateField('privacy', e.target.value)}
             className="w-full px-4 py-3 border border-border-default rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"

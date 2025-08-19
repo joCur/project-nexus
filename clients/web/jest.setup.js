@@ -1,19 +1,22 @@
 import '@testing-library/jest-dom';
 
+// Create reusable router mock
+const mockRouter = {
+  push: jest.fn(),
+  replace: jest.fn(),
+  prefetch: jest.fn(),
+  back: jest.fn(),
+  forward: jest.fn(),
+  refresh: jest.fn(),
+  pathname: '/',
+  query: {},
+  asPath: '/',
+};
+
 // Mock Next.js router
 jest.mock('next/navigation', () => ({
   useRouter() {
-    return {
-      push: jest.fn(),
-      replace: jest.fn(),
-      prefetch: jest.fn(),
-      back: jest.fn(),
-      forward: jest.fn(),
-      refresh: jest.fn(),
-      pathname: '/',
-      query: {},
-      asPath: '/',
-    };
+    return mockRouter;
   },
   useSearchParams() {
     return new URLSearchParams();
@@ -22,6 +25,9 @@ jest.mock('next/navigation', () => ({
     return '/';
   },
 }));
+
+// Make router mock available globally
+global.mockRouter = mockRouter;
 
 // Mock Auth0 NextJS SDK
 jest.mock('@auth0/nextjs-auth0/client', () => ({
@@ -34,7 +40,10 @@ jest.mock('@auth0/nextjs-auth0/client', () => ({
 }));
 
 // Mock fetch globally with proper typing
-global.fetch = jest.fn(() =>
+global.fetch = jest.fn();
+
+// Initialize with default implementation
+global.fetch.mockImplementation(() =>
   Promise.resolve({
     ok: true,
     status: 200,
@@ -44,14 +53,9 @@ global.fetch = jest.fn(() =>
   })
 );
 
-// Add mock methods to fetch
-global.fetch.mockClear = jest.fn();
-global.fetch.mockImplementation = jest.fn();
-global.fetch.mock = { calls: [], results: [] };
-
 // Setup fetch mock helper
 global.mockFetch = (response, ok = true) => {
-  global.fetch = jest.fn(() =>
+  global.fetch.mockImplementation(() =>
     Promise.resolve({
       ok,
       status: ok ? 200 : 400,
@@ -160,17 +164,3 @@ global.testHelpers = {
   },
 };
 
-// Declare global types for TypeScript
-declare global {
-  function restoreConsole(): void;
-  function mockConsole(): void;
-  function mockFetch(response: any, ok?: boolean): void;
-  function mockFetchError(error: any): void;
-  var testHelpers: {
-    mockAuthUser: (user?: any, isLoading?: boolean, error?: any) => void;
-    mockOnboardingStatusResponse: (status: any) => void;
-    testUser: any;
-    defaultOnboardingStatus: any;
-    completeOnboardingStatus: any;
-  };
-}

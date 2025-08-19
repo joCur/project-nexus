@@ -75,34 +75,7 @@ export const OnboardingFlow: React.FC = () => {
     }));
   }, []);
 
-  const nextStep = useCallback(async () => {
-    const currentStep = state.currentStep;
-    
-    // Save step completion to backend
-    try {
-      await fetch('/api/user/onboarding', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          step: currentStep,
-          completedAt: new Date().toISOString(),
-          tutorialProgress: state.tutorialProgress,
-          userProfile: state.userProfile,
-        }),
-      });
-    } catch (error) {
-      console.error('Failed to save onboarding progress:', error);
-      // Continue anyway - we'll retry on next step
-    }
-
-    if (currentStep < TOTAL_STEPS) {
-      setState(prev => ({ ...prev, currentStep: prev.currentStep + 1 }));
-    } else {
-      await completeOnboarding();
-    }
-  }, [state]);
-
-  const completeOnboarding = useCallback(async () => {
+  const completeOnboarding = useCallback(async (currentState: OnboardingState) => {
     try {
       // Save final profile and mark onboarding complete
       await fetch('/api/user/onboarding/complete', {
@@ -110,8 +83,8 @@ export const OnboardingFlow: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           completedAt: new Date().toISOString(),
-          userProfile: state.userProfile,
-          tutorialProgress: state.tutorialProgress,
+          userProfile: currentState.userProfile,
+          tutorialProgress: currentState.tutorialProgress,
         }),
       });
 
@@ -122,7 +95,43 @@ export const OnboardingFlow: React.FC = () => {
       // Still redirect - user can update profile later
       router.push('/workspace');
     }
-  }, [state, router]);
+  }, [router]);
+
+  const nextStep = useCallback(async () => {
+    // Use functional setState to get the most current state
+    setState(prev => {
+      const currentStep = prev.currentStep;
+      
+      // Save step completion to backend (async, don't block UI)
+      (async () => {
+        try {
+          await fetch('/api/user/onboarding', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              step: currentStep,
+              completedAt: new Date().toISOString(),
+              tutorialProgress: prev.tutorialProgress,
+              userProfile: prev.userProfile,
+            }),
+          });
+        } catch (error) {
+          console.error('Failed to save onboarding progress:', error);
+          // Continue anyway - we'll retry on next step
+        }
+      })();
+
+      if (currentStep < TOTAL_STEPS) {
+        return { ...prev, currentStep: prev.currentStep + 1 };
+      } else {
+        // Complete onboarding asynchronously
+        (async () => {
+          await completeOnboarding(prev);
+        })();
+        return prev;
+      }
+    });
+  }, [completeOnboarding]);
 
   const renderCurrentStep = () => {
     switch (state.currentStep) {
@@ -148,7 +157,7 @@ export const OnboardingFlow: React.FC = () => {
         return (
           <WelcomeStep
             userProfile={state.userProfile}
-            onComplete={completeOnboarding}
+            onComplete={() => completeOnboarding(state)}
           />
         );
       default:

@@ -7,8 +7,6 @@ jest.mock('@auth0/nextjs-auth0/client', () => ({
   useUser: jest.fn(),
 }));
 
-// Mock Next.js router
-jest.mock('next/navigation');
 
 // Mock utils
 jest.mock('@/lib/utils', () => ({
@@ -17,17 +15,7 @@ jest.mock('@/lib/utils', () => ({
 
 describe('useAuth', () => {
   const mockUseUser = require('@auth0/nextjs-auth0/client').useUser;
-  const mockUseRouter = useRouter as jest.MockedFunction<typeof useRouter>;
   const mockAnnounceToScreenReader = require('@/lib/utils').announceToScreenReader;
-  
-  const mockRouter = {
-    push: jest.fn(),
-    replace: jest.fn(),
-    refresh: jest.fn(),
-    back: jest.fn(),
-    forward: jest.fn(),
-    prefetch: jest.fn(),
-  };
 
   const mockAuth0User = {
     sub: 'auth0|test-user-id',
@@ -42,7 +30,14 @@ describe('useAuth', () => {
   };
 
   const expectedExtendedUser = {
-    ...mockAuth0User,
+    sub: 'auth0|test-user-id',
+    email: 'test@example.com',
+    email_verified: true,
+    name: 'Test User',
+    nickname: undefined,
+    picture: 'https://example.com/avatar.jpg',
+    updated_at: '2023-01-01T00:00:00Z',
+    org_id: undefined,
     roles: ['user', 'premium'],
     permissions: ['read:cards', 'write:cards', 'read:workspaces'],
     internalUserId: 'internal-user-id-123',
@@ -50,7 +45,6 @@ describe('useAuth', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseRouter.mockReturnValue(mockRouter);
     
     // Default Auth0 user state
     mockUseUser.mockReturnValue({
@@ -358,7 +352,7 @@ describe('useAuth', () => {
         }),
       });
 
-      expect(mockRouter.refresh).toHaveBeenCalled();
+      expect(global.mockRouter.refresh).toHaveBeenCalled();
       expect(mockAnnounceToScreenReader).toHaveBeenCalledWith('Refreshing user data', 'polite');
       expect(mockAnnounceToScreenReader).toHaveBeenCalledWith('User data refreshed successfully', 'polite');
     });
@@ -480,10 +474,6 @@ describe('useAuthState', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    require('next/navigation').useRouter.mockReturnValue({
-      push: jest.fn(),
-      refresh: jest.fn(),
-    });
 
     mockUseUser.mockReturnValue({
       user: {
@@ -516,10 +506,6 @@ describe('useRequireAuth', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    require('next/navigation').useRouter.mockReturnValue({
-      push: jest.fn(),
-      refresh: jest.fn(),
-    });
 
     delete (window as any).location;
     window.location = { href: '' } as any;

@@ -58,7 +58,8 @@ describe('ProfileSetupStep', () => {
       expect(screen.getByDisplayValue('John Doe')).toBeInTheDocument();
       expect(screen.getByDisplayValue('Johnny')).toBeInTheDocument();
       expect(screen.getByDisplayValue('Creative Space')).toBeInTheDocument();
-      expect(screen.getByDisplayValue('team')).toBeInTheDocument();
+      const privacySelect = screen.getByLabelText('Workspace Privacy');
+      expect(privacySelect).toHaveValue('team');
       expect(screen.getByRole('radio', { name: /Creative/ })).toBeChecked();
       expect(screen.getByRole('checkbox')).not.toBeChecked();
     });
@@ -153,7 +154,7 @@ describe('ProfileSetupStep', () => {
       const privacySelect = screen.getByLabelText('Workspace Privacy');
       await user.selectOptions(privacySelect, 'team');
 
-      expect(screen.getByDisplayValue('team')).toBeInTheDocument();
+      expect(privacySelect).toHaveValue('team');
     });
 
     it('should handle notifications checkbox', async () => {
@@ -257,7 +258,9 @@ describe('ProfileSetupStep', () => {
       const notificationsCheckbox = screen.getByRole('checkbox');
 
       await user.type(fullNameInput, 'John Doe');
+      await user.clear(displayNameInput);
       await user.type(displayNameInput, 'Johnny');
+      await user.clear(workspaceNameInput);
       await user.type(workspaceNameInput, 'My Creative Space');
       await user.click(creativeRole);
       await user.selectOptions(privacySelect, 'team');
@@ -290,6 +293,7 @@ describe('ProfileSetupStep', () => {
       const workspaceNameInput = screen.getByLabelText('Workspace Name *');
 
       await user.type(fullNameInput, 'Minimal User');
+      await user.clear(workspaceNameInput);
       await user.type(workspaceNameInput, 'Minimal Workspace');
 
       const submitButton = screen.getByRole('button', { name: /Continue to Workspace Setup/ });
@@ -437,13 +441,13 @@ describe('ProfileSetupStep', () => {
 
   describe('Edge Cases', () => {
     it('should handle very long names gracefully', async () => {
-      const user = userEvent.setup();
       render(<ProfileSetupStep {...defaultProps} />);
 
       const veryLongName = 'A'.repeat(1000);
       const fullNameInput = screen.getByLabelText('Full Name *');
       
-      await user.type(fullNameInput, veryLongName);
+      // Use fireEvent.change for performance with very long strings
+      fireEvent.change(fullNameInput, { target: { value: veryLongName } });
       expect(fullNameInput).toHaveValue(veryLongName);
     });
 
@@ -463,11 +467,15 @@ describe('ProfileSetupStep', () => {
       render(<ProfileSetupStep {...defaultProps} />);
 
       const fullNameInput = screen.getByLabelText('Full Name *');
+      const displayNameInput = screen.getByLabelText('Display Name');
+      const workspaceNameInput = screen.getByLabelText('Workspace Name *');
+      
       await user.type(fullNameInput, 'Madonna');
 
       await waitFor(() => {
-        expect(screen.getByDisplayValue('Madonna')).toBeInTheDocument();
-        expect(screen.getByDisplayValue("Madonna's Workspace")).toBeInTheDocument();
+        expect(fullNameInput).toHaveValue('Madonna');
+        expect(displayNameInput).toHaveValue('Madonna');
+        expect(workspaceNameInput).toHaveValue("Madonna's Workspace");
       });
     });
 

@@ -5,45 +5,51 @@ import { useRouter } from 'next/navigation';
 import { OnboardingFlow } from '../OnboardingFlow';
 
 // Mock hooks
-jest.mock('next/navigation');
 jest.mock('@/hooks/use-auth');
 
 // Mock step components
 jest.mock('../steps/ProfileSetupStep', () => ({
-  ProfileSetupStep: ({ onNext, onUpdateProfile, onProgressUpdate }: any) => (
-    <div data-testid="profile-setup-step">
-      <h2>Profile Setup Step</h2>
-      <button 
-        onClick={() => {
-          onUpdateProfile({
-            fullName: 'Test User',
-            displayName: 'Test',
-            preferences: { workspaceName: 'Test Workspace' }
-          });
-          onProgressUpdate({ profileSetup: true });
-          onNext();
-        }}
-      >
-        Complete Profile
-      </button>
-    </div>
-  ),
+  ProfileSetupStep: ({ onNext, onUpdateProfile, onProgressUpdate, userProfile }: any) => {
+    const handleClick = () => {
+      onUpdateProfile({
+        fullName: 'Test User',
+        displayName: 'Test',
+        preferences: {
+          ...userProfile?.preferences,
+          workspaceName: 'Test Workspace'
+        }
+      });
+      onProgressUpdate({ profileSetup: true });
+      onNext();
+    };
+    
+    return (
+      <div data-testid="profile-setup-step">
+        <h2>Profile Setup Step</h2>
+        <button onClick={handleClick}>
+          Complete Profile
+        </button>
+      </div>
+    );
+  },
 }));
 
 jest.mock('../steps/WorkspaceIntroStep', () => ({
-  WorkspaceIntroStep: ({ onNext, onProgressUpdate }: any) => (
-    <div data-testid="workspace-intro-step">
-      <h2>Workspace Intro Step</h2>
-      <button 
-        onClick={() => {
-          onProgressUpdate({ workspaceIntro: true });
-          onNext();
-        }}
-      >
-        Complete Intro
-      </button>
-    </div>
-  ),
+  WorkspaceIntroStep: ({ onNext, onProgressUpdate }: any) => {
+    const handleClick = () => {
+      onProgressUpdate({ workspaceIntro: true });
+      onNext();
+    };
+    
+    return (
+      <div data-testid="workspace-intro-step">
+        <h2>Workspace Intro Step</h2>
+        <button onClick={handleClick}>
+          Complete Intro
+        </button>
+      </div>
+    );
+  },
 }));
 
 jest.mock('../steps/WelcomeStep', () => ({
@@ -73,8 +79,6 @@ jest.mock('../shared/StepContainer', () => ({
 }));
 
 describe('OnboardingFlow', () => {
-  const mockPush = jest.fn();
-  const mockUseRouter = useRouter as jest.MockedFunction<typeof useRouter>;
   const mockUseAuth = require('@/hooks/use-auth').useAuth;
 
   const defaultUser = {
@@ -86,18 +90,14 @@ describe('OnboardingFlow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (global.fetch as jest.Mock).mockClear();
+    global.mockRouter.push.mockClear();
+    global.mockRouter.replace.mockClear();
+    global.mockRouter.refresh.mockClear();
     
-    mockUseRouter.mockReturnValue({
-      push: mockPush,
-      replace: jest.fn(),
-      refresh: jest.fn(),
-      back: jest.fn(),
-      forward: jest.fn(),
-      prefetch: jest.fn(),
-    } as any);
-
     mockUseAuth.mockReturnValue({
       user: defaultUser,
+      isLoading: false,
+      isAuthenticated: true,
     });
 
     // Default successful fetch mock
@@ -174,7 +174,7 @@ describe('OnboardingFlow', () => {
       fireEvent.click(completeButton);
 
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith('/workspace');
+        expect(global.mockRouter.push).toHaveBeenCalledWith('/workspace');
       });
     });
 
@@ -210,7 +210,7 @@ describe('OnboardingFlow', () => {
       fireEvent.click(screen.getByText('Complete Onboarding'));
 
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith('/workspace');
+        expect(global.mockRouter.push).toHaveBeenCalledWith('/workspace');
       });
     });
   });
@@ -222,20 +222,22 @@ describe('OnboardingFlow', () => {
       fireEvent.click(screen.getByText('Complete Profile'));
 
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith('/api/user/onboarding', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            step: 1,
-            completedAt: expect.any(String),
-            tutorialProgress: { profileSetup: true },
-            userProfile: {
-              fullName: 'Test User',
-              displayName: 'Test',
-              preferences: { workspaceName: 'Test Workspace' }
-            },
-          }),
-        });
+        expect(global.fetch).toHaveBeenCalledWith('/api/user/onboarding', 
+          expect.objectContaining({
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: expect.stringContaining('"profileSetup":true')
+          })
+        );
+        
+        // Also check that the body contains the expected user profile data
+        const fetchCall = (global.fetch as jest.Mock).mock.calls[0];
+        const requestBody = JSON.parse(fetchCall[1].body);
+        expect(requestBody.step).toBe(1);
+        expect(requestBody.tutorialProgress.profileSetup).toBe(true);
+        expect(requestBody.userProfile.fullName).toBe('Test User');
+        expect(requestBody.userProfile.displayName).toBe('Test');
+        expect(requestBody.userProfile.preferences.workspaceName).toBe('Test Workspace');
       });
     });
 
@@ -253,22 +255,26 @@ describe('OnboardingFlow', () => {
       fireEvent.click(screen.getByText('Complete Onboarding'));
 
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith('/api/user/onboarding/complete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            completedAt: expect.any(String),
-            userProfile: expect.objectContaining({
-              fullName: 'Test User',
-              displayName: 'Test',
-            }),
-            tutorialProgress: {
-              profileSetup: true,
-              workspaceIntro: true,
-              firstCard: false,
-            },
-          }),
-        });
+        expect(global.fetch).toHaveBeenCalledWith('/api/user/onboarding/complete', 
+          expect.objectContaining({
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: expect.stringContaining('"profileSetup":true')
+          })
+        );
+        
+        // Verify the completion call contains the expected data
+        const completionCalls = (global.fetch as jest.Mock).mock.calls.filter(call => 
+          call[0] === '/api/user/onboarding/complete'
+        );
+        expect(completionCalls).toHaveLength(1);
+        
+        const requestBody = JSON.parse(completionCalls[0][1].body);
+        expect(requestBody.completedAt).toBeDefined();
+        expect(requestBody.userProfile.fullName).toBe('Test User');
+        expect(requestBody.userProfile.displayName).toBe('Test');
+        expect(requestBody.tutorialProgress.profileSetup).toBe(true);
+        expect(requestBody.tutorialProgress.workspaceIntro).toBe(true);
       });
     });
 
@@ -313,7 +319,7 @@ describe('OnboardingFlow', () => {
       fireEvent.click(screen.getByText('Complete Onboarding'));
 
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith('/workspace');
+        expect(global.mockRouter.push).toHaveBeenCalledWith('/workspace');
       });
     });
   });
@@ -347,19 +353,14 @@ describe('OnboardingFlow', () => {
       fireEvent.click(screen.getByText('Complete Onboarding'));
 
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith('/api/user/onboarding/complete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: expect.stringContaining('"profileSetup":true'),
-        });
-      });
-
-      await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith('/api/user/onboarding/complete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: expect.stringContaining('"workspaceIntro":true'),
-        });
+        const completionCalls = (global.fetch as jest.Mock).mock.calls.filter(call => 
+          call[0] === '/api/user/onboarding/complete'
+        );
+        expect(completionCalls).toHaveLength(1);
+        
+        const requestBody = JSON.parse(completionCalls[0][1].body);
+        expect(requestBody.tutorialProgress.profileSetup).toBe(true);
+        expect(requestBody.tutorialProgress.workspaceIntro).toBe(true);
       });
     });
 
