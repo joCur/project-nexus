@@ -101,10 +101,14 @@ export function useAuth(): UseAuthReturn {
       email: user.email!,
       email_verified: user.email_verified ?? false,
       
-      // Extract custom claims
-      roles: user['https://api.nexus-app.de/roles'] || [],
-      permissions: user['https://api.nexus-app.de/permissions'] || [],
-      internalUserId: user['https://api.nexus-app.de/user_id'],
+      // Extract custom claims (ensure they're arrays)
+      roles: Array.isArray(user['https://api.nexus-app.de/roles']) 
+        ? user['https://api.nexus-app.de/roles'] 
+        : [],
+      permissions: Array.isArray(user['https://api.nexus-app.de/permissions'])
+        ? user['https://api.nexus-app.de/permissions']
+        : [],
+      internalUserId: user['https://api.nexus-app.de/user_id'] as string | undefined,
     };
   }, [user]);
 

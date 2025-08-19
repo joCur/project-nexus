@@ -1,4 +1,4 @@
-import { UserProvider, ConfigParameters } from '@auth0/nextjs-auth0/client';
+import { UserProvider } from '@auth0/nextjs-auth0/client';
 
 /**
  * Auth0 Configuration for Project Nexus
@@ -40,7 +40,7 @@ if (process.env.NODE_ENV === 'development') {
  * Auth0 session configuration
  * Implements 4-hour session duration and secure cookie settings
  */
-export const auth0Config: ConfigParameters = {
+export const auth0Config = {
   secret: process.env.AUTH0_SECRET!,
   baseURL: process.env.AUTH0_BASE_URL!,
   issuerBaseURL: process.env.AUTH0_ISSUER_BASE_URL!,

@@ -33,12 +33,25 @@ jest.mock('@auth0/nextjs-auth0/client', () => ({
   UserProvider: ({ children }) => children,
 }));
 
-// Mock fetch globally
-global.fetch = jest.fn();
+// Mock fetch globally with proper typing
+global.fetch = jest.fn(() =>
+  Promise.resolve({
+    ok: true,
+    status: 200,
+    statusText: 'OK',
+    json: () => Promise.resolve({}),
+    text: () => Promise.resolve(''),
+  })
+);
+
+// Add mock methods to fetch
+global.fetch.mockClear = jest.fn();
+global.fetch.mockImplementation = jest.fn();
+global.fetch.mock = { calls: [], results: [] };
 
 // Setup fetch mock helper
 global.mockFetch = (response, ok = true) => {
-  global.fetch.mockImplementation(() =>
+  global.fetch = jest.fn(() =>
     Promise.resolve({
       ok,
       status: ok ? 200 : 400,
