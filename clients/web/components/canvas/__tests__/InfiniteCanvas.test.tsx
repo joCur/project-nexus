@@ -18,14 +18,14 @@ jest.mock('@/hooks/useCanvasEvents', () => ({
 
 // Mock Konva components
 jest.mock('react-konva', () => ({
-  Stage: ({ children, ...props }: any) => (
+  Stage: ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) => (
     <div data-testid="konva-stage" {...props}>
       {children}
     </div>
   ),
-  Layer: ({ children }: any) => <div data-testid="konva-layer">{children}</div>,
-  Rect: ({ ...props }: any) => <div data-testid="konva-rect" {...props} />,
-  Line: ({ ...props }: any) => <div data-testid="konva-line" {...props} />,
+  Layer: ({ children }: { children?: React.ReactNode }) => <div data-testid="konva-layer">{children}</div>,
+  Rect: ({ ...props }: { [key: string]: unknown }) => <div data-testid="konva-rect" {...props} />,
+  Line: ({ ...props }: { [key: string]: unknown }) => <div data-testid="konva-line" {...props} />,
 }));
 
 describe('InfiniteCanvas', () => {

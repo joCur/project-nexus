@@ -96,26 +96,26 @@ describe('useCanvasEvents', () => {
       
       // Test ArrowUp
       act(() => {
-        keydownHandler({ key: 'ArrowUp', preventDefault } as KeyboardEvent);
+        keydownHandler({ key: 'ArrowUp', preventDefault } as unknown as KeyboardEvent);
       });
       expect(preventDefault).toHaveBeenCalled();
       expect(mockSetPanOffset).toHaveBeenCalledWith({ x: 0, y: 20 });
       
       // Test ArrowDown
       act(() => {
-        keydownHandler({ key: 'ArrowDown', preventDefault } as KeyboardEvent);
+        keydownHandler({ key: 'ArrowDown', preventDefault } as unknown as KeyboardEvent);
       });
       expect(mockSetPanOffset).toHaveBeenCalledWith({ x: 0, y: -20 });
       
       // Test ArrowLeft
       act(() => {
-        keydownHandler({ key: 'ArrowLeft', preventDefault } as KeyboardEvent);
+        keydownHandler({ key: 'ArrowLeft', preventDefault } as unknown as KeyboardEvent);
       });
       expect(mockSetPanOffset).toHaveBeenCalledWith({ x: 20, y: 0 });
       
       // Test ArrowRight
       act(() => {
-        keydownHandler({ key: 'ArrowRight', preventDefault } as KeyboardEvent);
+        keydownHandler({ key: 'ArrowRight', preventDefault } as unknown as KeyboardEvent);
       });
       expect(mockSetPanOffset).toHaveBeenCalledWith({ x: -20, y: 0 });
     });
@@ -125,14 +125,14 @@ describe('useCanvasEvents', () => {
       
       // Test + key
       act(() => {
-        keydownHandler({ key: '+', preventDefault } as KeyboardEvent);
+        keydownHandler({ key: '+', preventDefault } as unknown as KeyboardEvent);
       });
       expect(preventDefault).toHaveBeenCalled();
       expect(mockSetZoom).toHaveBeenCalledWith(1.1);
       
       // Test = key (shift + = gives +)
       act(() => {
-        keydownHandler({ key: '=', preventDefault } as KeyboardEvent);
+        keydownHandler({ key: '=', preventDefault } as unknown as KeyboardEvent);
       });
       expect(mockSetZoom).toHaveBeenCalledWith(1.1);
     });
@@ -142,14 +142,14 @@ describe('useCanvasEvents', () => {
       
       // Test - key
       act(() => {
-        keydownHandler({ key: '-', preventDefault } as KeyboardEvent);
+        keydownHandler({ key: '-', preventDefault } as unknown as KeyboardEvent);
       });
       expect(preventDefault).toHaveBeenCalled();
       expect(mockSetZoom).toHaveBeenCalledWith(0.9);
       
       // Test _ key (shift + - gives _)
       act(() => {
-        keydownHandler({ key: '_', preventDefault } as KeyboardEvent);
+        keydownHandler({ key: '_', preventDefault } as unknown as KeyboardEvent);
       });
       expect(mockSetZoom).toHaveBeenCalledWith(0.9);
     });
@@ -174,7 +174,7 @@ describe('useCanvasEvents', () => {
       addEventListenerSpy.mockRestore();
       
       act(() => {
-        keyHandler({ key: '+', preventDefault } as KeyboardEvent);
+        keyHandler({ key: '+', preventDefault } as unknown as KeyboardEvent);
       });
       expect(mockSetZoom).toHaveBeenCalledWith(4); // Should clamp to max
     });
@@ -184,7 +184,7 @@ describe('useCanvasEvents', () => {
       
       // Test Ctrl+0
       act(() => {
-        keydownHandler({ key: '0', ctrlKey: true, preventDefault } as KeyboardEvent);
+        keydownHandler({ key: '0', ctrlKey: true, preventDefault } as unknown as KeyboardEvent);
       });
       expect(preventDefault).toHaveBeenCalled();
       expect(mockSetZoom).toHaveBeenCalledWith(1);
@@ -192,7 +192,7 @@ describe('useCanvasEvents', () => {
       
       // Test Cmd+0 (metaKey)
       act(() => {
-        keydownHandler({ key: '0', metaKey: true, preventDefault } as KeyboardEvent);
+        keydownHandler({ key: '0', metaKey: true, preventDefault } as unknown as KeyboardEvent);
       });
       expect(mockSetZoom).toHaveBeenCalledWith(1);
       expect(mockSetPanOffset).toHaveBeenCalledWith({ x: 0, y: 0 });
@@ -202,7 +202,7 @@ describe('useCanvasEvents', () => {
       const preventDefault = jest.fn();
       
       act(() => {
-        keydownHandler({ key: 'Home', preventDefault } as KeyboardEvent);
+        keydownHandler({ key: 'Home', preventDefault } as unknown as KeyboardEvent);
       });
       expect(preventDefault).toHaveBeenCalled();
       expect(mockSetZoom).toHaveBeenCalledWith(1);
@@ -214,7 +214,7 @@ describe('useCanvasEvents', () => {
       const preventDefault = jest.fn();
       
       act(() => {
-        keydownHandler({ key: 'ArrowUp', preventDefault } as KeyboardEvent);
+        keydownHandler({ key: 'ArrowUp', preventDefault } as unknown as KeyboardEvent);
       });
       
       expect(preventDefault).not.toHaveBeenCalled();
@@ -225,7 +225,7 @@ describe('useCanvasEvents', () => {
       const preventDefault = jest.fn();
       
       act(() => {
-        keydownHandler({ key: '0', ctrlKey: false, metaKey: false, preventDefault } as KeyboardEvent);
+        keydownHandler({ key: '0', ctrlKey: false, metaKey: false, preventDefault } as unknown as KeyboardEvent);
       });
       
       expect(preventDefault).not.toHaveBeenCalled();
@@ -251,7 +251,7 @@ describe('useCanvasEvents', () => {
       const touches = [touch1, touch2];
       
       act(() => {
-        touchStartHandler({ touches } as TouchEvent);
+        touchStartHandler({ touches } as unknown as TouchEvent);
       });
       
       // Should store initial pinch distance and zoom
@@ -270,7 +270,7 @@ describe('useCanvasEvents', () => {
       const preventDefault = jest.fn();
       
       act(() => {
-        touchMoveHandler({ touches, preventDefault } as TouchEvent);
+        touchMoveHandler({ touches, preventDefault } as unknown as TouchEvent);
       });
       
       expect(preventDefault).toHaveBeenCalled();
@@ -292,7 +292,7 @@ describe('useCanvasEvents', () => {
       const preventDefault = jest.fn();
       
       act(() => {
-        touchMoveHandler({ touches, preventDefault } as TouchEvent);
+        touchMoveHandler({ touches, preventDefault } as unknown as TouchEvent);
       });
       
       expect(mockSetZoom).toHaveBeenCalledWith(4); // Clamped to maximum
@@ -304,7 +304,7 @@ describe('useCanvasEvents', () => {
       const smallTouches = [smallTouch1, smallTouch2];
       
       act(() => {
-        touchMoveHandler({ touches: smallTouches, preventDefault } as TouchEvent);
+        touchMoveHandler({ touches: smallTouches, preventDefault } as unknown as TouchEvent);
       });
       
       expect(mockSetZoom).toHaveBeenCalledWith(0.25); // Clamped to minimum
@@ -315,7 +315,7 @@ describe('useCanvasEvents', () => {
       const touches = [touch1];
       
       act(() => {
-        touchStartHandler({ touches } as TouchEvent);
+        touchStartHandler({ touches } as unknown as TouchEvent);
       });
       
       expect((mockElement as any)._initialPinchDistance).toBeUndefined();
@@ -328,7 +328,7 @@ describe('useCanvasEvents', () => {
       const preventDefault = jest.fn();
       
       act(() => {
-        touchMoveHandler({ touches, preventDefault } as TouchEvent);
+        touchMoveHandler({ touches, preventDefault } as unknown as TouchEvent);
       });
       
       expect(mockSetZoom).not.toHaveBeenCalled();
@@ -336,10 +336,10 @@ describe('useCanvasEvents', () => {
   });
 
   it('handles null container ref gracefully', () => {
-    containerRef.current = null;
+    const nullRef = { current: null } as RefObject<HTMLDivElement>;
     
     expect(() => {
-      renderHook(() => useCanvasEvents(containerRef));
+      renderHook(() => useCanvasEvents(nullRef));
     }).not.toThrow();
   });
 

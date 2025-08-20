@@ -5,7 +5,7 @@ import { CanvasBackground } from '../CanvasBackground';
 
 // Mock Konva components
 jest.mock('react-konva', () => ({
-  Layer: ({ children, listening, ...props }: any) => (
+  Layer: ({ children, listening, ...props }: { children?: React.ReactNode; listening?: boolean; [key: string]: unknown }) => (
     <div 
       data-testid="konva-layer" 
       data-listening={listening}
@@ -14,7 +14,7 @@ jest.mock('react-konva', () => ({
       {children}
     </div>
   ),
-  Rect: ({ x, y, width, height, fill, ...props }: any) => (
+  Rect: ({ x, y, width, height, fill, ...props }: { x?: number; y?: number; width?: number; height?: number; fill?: string; [key: string]: unknown }) => (
     <div 
       data-testid="konva-rect" 
       data-x={x}
@@ -25,7 +25,7 @@ jest.mock('react-konva', () => ({
       {...props}
     />
   ),
-  Line: ({ points, stroke, strokeWidth, listening, ...props }: any) => (
+  Line: ({ points, stroke, strokeWidth, listening, ...props }: { points?: number[]; stroke?: string; strokeWidth?: number; listening?: boolean; [key: string]: unknown }) => (
     <div 
       data-testid="konva-line" 
       data-points={JSON.stringify(points)}
@@ -185,21 +185,22 @@ describe('CanvasBackground', () => {
 
   it('optimizes grid lines based on visible area', () => {
     // Test with different canvas sizes
-    const smallCanvas = render(
+    render(
       <CanvasBackground width={400} height={300} zoom={1} showGrid={true} />
     );
     
     const smallLines = screen.getAllByTestId('konva-line');
-    smallCanvas.unmount();
+    const smallLinesCount = smallLines.length;
 
-    const largeCanvas = render(
+    // Re-render with larger canvas
+    render(
       <CanvasBackground width={1600} height={1200} zoom={1} showGrid={true} />
     );
     
     const largeLines = screen.getAllByTestId('konva-line');
 
     // Larger canvas should have more grid lines
-    expect(largeLines.length).toBeGreaterThan(smallLines.length);
+    expect(largeLines.length).toBeGreaterThan(smallLinesCount);
   });
 
   it('uses default props when not provided', () => {

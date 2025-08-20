@@ -67,9 +67,9 @@ describe('useCanvasSize', () => {
   });
 
   it('returns default size initially', () => {
-    containerRef.current = null;
+    const nullRef = { current: null } as RefObject<HTMLDivElement>;
     
-    const { result } = renderHook(() => useCanvasSize(containerRef));
+    const { result } = renderHook(() => useCanvasSize(nullRef));
     
     expect(result.current).toEqual({
       width: 800,
@@ -78,8 +78,8 @@ describe('useCanvasSize', () => {
   });
 
   it('returns element size when container is available', () => {
-    mockElement.clientWidth = 1200;
-    mockElement.clientHeight = 900;
+    Object.defineProperty(mockElement, 'clientWidth', { value: 1200, writable: true });
+    Object.defineProperty(mockElement, 'clientHeight', { value: 900, writable: true });
     
     const { result } = renderHook(() => useCanvasSize(containerRef));
     
@@ -107,8 +107,8 @@ describe('useCanvasSize', () => {
     
     // Change element size
     act(() => {
-      mockElement.clientWidth = 1600;
-      mockElement.clientHeight = 1200;
+      Object.defineProperty(mockElement, 'clientWidth', { value: 1600, writable: true });
+      Object.defineProperty(mockElement, 'clientHeight', { value: 1200, writable: true });
       resizeObserver.trigger();
     });
     
@@ -119,8 +119,8 @@ describe('useCanvasSize', () => {
   });
 
   it('uses fallback values when element dimensions are 0', () => {
-    mockElement.clientWidth = 0;
-    mockElement.clientHeight = 0;
+    Object.defineProperty(mockElement, 'clientWidth', { value: 0, writable: true });
+    Object.defineProperty(mockElement, 'clientHeight', { value: 0, writable: true });
     
     const { result } = renderHook(() => useCanvasSize(containerRef));
     
@@ -141,8 +141,8 @@ describe('useCanvasSize', () => {
     
     // Change element properties and trigger resize
     act(() => {
-      mockElement.clientWidth = 1000;
-      mockElement.clientHeight = 750;
+      Object.defineProperty(mockElement, 'clientWidth', { value: 1000, writable: true });
+      Object.defineProperty(mockElement, 'clientHeight', { value: 750, writable: true });
       resizeObserver.trigger();
     });
     
@@ -200,8 +200,8 @@ describe('useCanvasSize', () => {
     
     // Change element size and trigger window resize
     act(() => {
-      mockElement.clientWidth = 1400;
-      mockElement.clientHeight = 1050;
+      Object.defineProperty(mockElement, 'clientWidth', { value: 1400, writable: true });
+      Object.defineProperty(mockElement, 'clientHeight', { value: 1050, writable: true });
       
       // Trigger resize event
       const resizeEvent = new Event('resize');
@@ -218,9 +218,9 @@ describe('useCanvasSize', () => {
   });
 
   it('handles null container ref gracefully', () => {
-    containerRef.current = null;
+    const nullRef = { current: null } as RefObject<HTMLDivElement>;
     
-    const { result } = renderHook(() => useCanvasSize(containerRef));
+    const { result } = renderHook(() => useCanvasSize(nullRef));
     
     expect(result.current).toEqual({
       width: 800,
@@ -229,9 +229,9 @@ describe('useCanvasSize', () => {
   });
 
   it('updates when container ref becomes available', () => {
-    containerRef.current = null;
+    const dynamicRef = { current: null } as RefObject<HTMLDivElement>;
     
-    const { result, rerender } = renderHook(() => useCanvasSize(containerRef));
+    const { result, rerender } = renderHook(() => useCanvasSize(dynamicRef));
     
     // Initially returns default
     expect(result.current).toEqual({
@@ -240,7 +240,7 @@ describe('useCanvasSize', () => {
     });
     
     // Set container ref
-    containerRef.current = mockElement;
+    (dynamicRef as any).current = mockElement;
     
     rerender();
     
@@ -252,8 +252,8 @@ describe('useCanvasSize', () => {
 
   it('preserves size when element has clientWidth/clientHeight properties', () => {
     // Test with fractional dimensions
-    mockElement.clientWidth = 1024.5;
-    mockElement.clientHeight = 768.3;
+    Object.defineProperty(mockElement, 'clientWidth', { value: 1024.5, writable: true });
+    Object.defineProperty(mockElement, 'clientHeight', { value: 768.3, writable: true });
     
     const { result } = renderHook(() => useCanvasSize(containerRef));
     

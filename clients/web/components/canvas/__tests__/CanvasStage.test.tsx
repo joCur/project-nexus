@@ -3,7 +3,6 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { CanvasStage } from '../CanvasStage';
 import { useCanvasStore } from '@/stores/canvasStore';
-import Konva from 'konva';
 
 // Mock the store
 jest.mock('@/stores/canvasStore');
@@ -11,7 +10,14 @@ jest.mock('@/stores/canvasStore');
 // Mock Konva
 jest.mock('konva');
 jest.mock('react-konva', () => ({
-  Stage: React.forwardRef(({ children, onWheel, onDragEnd, onContextMenu, ...props }: any, ref: any) => (
+  Stage: React.forwardRef<HTMLDivElement, {
+    children?: React.ReactNode;
+    onWheel?: React.WheelEventHandler;
+    onDragEnd?: React.DragEventHandler;
+    onContextMenu?: React.MouseEventHandler;
+    [key: string]: unknown;
+  }>(function MockStage({ children, onWheel, onDragEnd, onContextMenu, ...props }, ref) {
+    return (
     <div 
       ref={ref}
       data-testid="konva-stage" 
@@ -22,7 +28,8 @@ jest.mock('react-konva', () => ({
     >
       {children}
     </div>
-  )),
+    );
+  }),
 }));
 
 describe('CanvasStage', () => {
