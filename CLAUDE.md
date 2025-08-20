@@ -95,17 +95,6 @@ docker-compose logs      # View logs
 - Enum case conversion handling (frontend uppercase, backend lowercase)
 - Cross-platform consistency validation
 
-## Current Implementation Status
-
-**Completed:**
-- Authentication flow with Auth0 integration
-- Basic onboarding system with backend API integration
-- Database schema with user profiles, workspaces, and onboarding tracking
-- Comprehensive test suite for onboarding features
-
-**Current Task:**
-- Implementing the basic onboarding flow described in `design-documentation/features/onboarding/v1-simple-onboarding.md`
-
 ## Linear Ticket Workflow
 
 When working on tickets from Linear, follow this comprehensive workflow to ensure proper tracking and delivery:
@@ -134,7 +123,7 @@ git checkout -b feature/nex-[NUMBER]-[descriptive-name]
 - Create TodoWrite list for complex tasks to track progress
 - Follow acceptance criteria exactly as specified in Linear ticket
 - Implement features incrementally with meaningful commits
-- Add progress comments to Linear ticket showing current status
+- Add progress comment to Linear ticket showing current status and update it through the implementation process
 - Write tests for critical functionality (aim for comprehensive coverage)
 
 ### 4. Code Quality Standards
