@@ -1,4 +1,3 @@
-import { UserProvider } from '@auth0/nextjs-auth0/client';
 
 /**
  * Auth0 Configuration for Project Nexus

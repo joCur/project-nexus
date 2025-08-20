@@ -2,6 +2,7 @@ import { useUser, UserProfile } from '@auth0/nextjs-auth0/client';
 import { useRouter } from 'next/navigation';
 import { useCallback, useMemo, useEffect } from 'react';
 import { announceToScreenReader } from '@/lib/utils';
+import { navigationUtils } from '@/lib/navigation';
 
 /**
  * Extended user interface with custom claims from Auth0
@@ -143,8 +144,8 @@ export function useAuth(): UseAuthReturn {
 
       const loginUrl = `/api/auth/login${params.toString() ? `?${params.toString()}` : ''}`;
       
-      // Use window.location for Auth0 redirect
-      window.location.href = loginUrl;
+      // Use navigation utility for Auth0 redirect
+      navigationUtils.navigateToUrl(loginUrl);
     } catch (error) {
       console.error('Login error:', error);
       announceToScreenReader('Login failed. Please try again.', 'assertive');
@@ -171,8 +172,8 @@ export function useAuth(): UseAuthReturn {
 
       const logoutUrl = `/api/auth/logout${params.toString() ? `?${params.toString()}` : ''}`;
       
-      // Use window.location for Auth0 redirect
-      window.location.href = logoutUrl;
+      // Use navigation utility for Auth0 redirect
+      navigationUtils.navigateToUrl(logoutUrl);
     } catch (error) {
       console.error('Logout error:', error);
       announceToScreenReader('Logout failed. Please try again.', 'assertive');

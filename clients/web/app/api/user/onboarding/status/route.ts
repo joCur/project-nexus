@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getSession, getAccessToken } from '@auth0/nextjs-auth0';
 
 /**
  * Get user's onboarding status from backend
  * GET /api/user/onboarding/status
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const session = await getSession();
     
