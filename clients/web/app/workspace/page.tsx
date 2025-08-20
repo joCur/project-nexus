@@ -1,7 +1,6 @@
 'use client';
 
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { Permissions } from '@/hooks/use-auth';
 import { useAuth } from '@/hooks/use-auth';
 import { useOnboardingStatus } from '@/hooks/use-onboarding-status';
 import { useRouter } from 'next/navigation';

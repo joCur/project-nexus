@@ -1,6 +1,6 @@
 'use client';
 
-import React, { forwardRef, useState, useId } from 'react';
+import React, { forwardRef, useId } from 'react';
 import { cn } from '@/lib/utils';
 
 /**
@@ -135,7 +135,6 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     // Container styling for icons
     const hasLeftIcon = leftIcon || isLoading;
     const hasRightIcon = rightIcon;
-    const hasIcons = hasLeftIcon || hasRightIcon;
 
     const iconPadding = {
       small: hasLeftIcon ? 'pl-9' : hasRightIcon ? 'pr-9' : '',

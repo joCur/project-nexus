@@ -12,11 +12,30 @@ jest.mock('konva');
 jest.mock('react-konva', () => ({
   Stage: React.forwardRef<HTMLDivElement, {
     children?: React.ReactNode;
-    onWheel?: React.WheelEventHandler;
-    onDragEnd?: React.DragEventHandler;
-    onContextMenu?: React.MouseEventHandler;
-    [key: string]: unknown;
-  }>(function MockStage({ children, onWheel, onDragEnd, onContextMenu, ...props }, ref) {
+    onWheel?: React.WheelEventHandler<HTMLDivElement>;
+    onDragEnd?: React.DragEventHandler<HTMLDivElement>;
+    onContextMenu?: React.MouseEventHandler<HTMLDivElement>;
+    width?: number;
+    height?: number;
+    draggable?: boolean;
+    scaleX?: number;
+    scaleY?: number;
+    x?: number;
+    y?: number;
+  }>(function MockStage({ 
+    children, 
+    onWheel, 
+    onDragEnd, 
+    onContextMenu, 
+    width,
+    height,
+    draggable,
+    scaleX,
+    scaleY,
+    x,
+    y,
+    ...otherProps 
+  }, ref) {
     return (
     <div 
       ref={ref}
@@ -24,7 +43,14 @@ jest.mock('react-konva', () => ({
       onWheel={onWheel}
       onDragEnd={onDragEnd}
       onContextMenu={onContextMenu}
-      {...props}
+      data-width={width}
+      data-height={height}
+      draggable={draggable}
+      data-scale-x={scaleX}
+      data-scale-y={scaleY}
+      data-x={x}
+      data-y={y}
+      {...otherProps}
     >
       {children}
     </div>
@@ -57,8 +83,8 @@ describe('CanvasStage', () => {
     
     const stage = screen.getByTestId('konva-stage');
     expect(stage).toBeInTheDocument();
-    expect(stage).toHaveAttribute('width', '800');
-    expect(stage).toHaveAttribute('height', '600');
+    expect(stage).toHaveAttribute('data-width', '800');
+    expect(stage).toHaveAttribute('data-height', '600');
     expect(stage).toHaveAttribute('draggable', 'true');
   });
 
@@ -134,8 +160,8 @@ describe('CanvasStage', () => {
     render(<CanvasStage {...customProps} />);
     
     const stage = screen.getByTestId('konva-stage');
-    expect(stage).toHaveAttribute('scaleX', '2');
-    expect(stage).toHaveAttribute('scaleY', '2');
+    expect(stage).toHaveAttribute('data-scale-x', '2');
+    expect(stage).toHaveAttribute('data-scale-y', '2');
   });
 
   it('applies position transformation correctly', () => {
@@ -147,8 +173,8 @@ describe('CanvasStage', () => {
     render(<CanvasStage {...customProps} />);
     
     const stage = screen.getByTestId('konva-stage');
-    expect(stage).toHaveAttribute('x', '100');
-    expect(stage).toHaveAttribute('y', '50');
+    expect(stage).toHaveAttribute('data-x', '100');
+    expect(stage).toHaveAttribute('data-y', '50');
   });
 
   it('has proper event handlers attached', () => {
