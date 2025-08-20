@@ -88,6 +88,11 @@ global.console = {
   error: jest.fn(),
 };
 
+// Helper to reset location (for backward compatibility)
+global.resetLocation = () => {
+  // No-op since we're not mocking location globally anymore
+};
+
 // Helper to restore console for specific tests
 global.restoreConsole = () => {
   global.console = originalConsole;

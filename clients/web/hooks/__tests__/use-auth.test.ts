@@ -13,9 +13,18 @@ jest.mock('@/lib/utils', () => ({
   announceToScreenReader: jest.fn(),
 }));
 
+// Mock navigation utils
+jest.mock('@/lib/navigation', () => ({
+  navigationUtils: {
+    navigateToUrl: jest.fn(),
+    getCurrentUrl: jest.fn(() => ''),
+  },
+}));
+
 describe('useAuth', () => {
   const mockUseUser = require('@auth0/nextjs-auth0/client').useUser;
   const mockAnnounceToScreenReader = require('@/lib/utils').announceToScreenReader;
+  const mockNavigateToUrl = require('@/lib/navigation').navigationUtils.navigateToUrl;
 
   const mockAuth0User = {
     sub: 'auth0|test-user-id',
@@ -53,9 +62,8 @@ describe('useAuth', () => {
       isLoading: false,
     });
 
-    // Mock window.location
-    delete (window as any).location;
-    window.location = { href: '' } as any;
+    // Reset navigation mock
+    mockNavigateToUrl.mockClear();
   });
 
   describe('Authentication State', () => {
@@ -161,7 +169,7 @@ describe('useAuth', () => {
         await result.current.login();
       });
 
-      expect(window.location.href).toBe('/api/auth/login');
+      expect(mockNavigateToUrl).toHaveBeenCalledWith('/api/auth/login');
       expect(mockAnnounceToScreenReader).toHaveBeenCalledWith('Redirecting to login page', 'polite');
     });
 
@@ -172,7 +180,7 @@ describe('useAuth', () => {
         await result.current.login({ returnTo: '/workspace' });
       });
 
-      expect(window.location.href).toBe('/api/auth/login?returnTo=%2Fworkspace');
+      expect(mockNavigateToUrl).toHaveBeenCalledWith('/api/auth/login?returnTo=%2Fworkspace');
     });
 
     it('should handle login with all options', async () => {
@@ -187,20 +195,15 @@ describe('useAuth', () => {
         });
       });
 
-      expect(window.location.href).toBe(
+      expect(mockNavigateToUrl).toHaveBeenCalledWith(
         '/api/auth/login?returnTo=%2Fworkspace&organization=org-123&invitation=inv-456&screen_hint=signup'
       );
     });
 
     it('should handle login errors', async () => {
-      // Mock window.location to throw error
-      Object.defineProperty(window, 'location', {
-        value: {
-          set href(url: string) {
-            throw new Error('Navigation failed');
-          },
-        },
-        writable: true,
+      // Mock navigation utility to throw error
+      mockNavigateToUrl.mockImplementationOnce(() => {
+        throw new Error('Navigation failed');
       });
 
       const { result } = renderHook(() => useAuth());
@@ -218,7 +221,7 @@ describe('useAuth', () => {
         await result.current.logout();
       });
 
-      expect(window.location.href).toBe('/api/auth/logout');
+      expect(mockNavigateToUrl).toHaveBeenCalledWith('/api/auth/logout');
       expect(mockAnnounceToScreenReader).toHaveBeenCalledWith('Logging out and redirecting', 'polite');
     });
 
@@ -232,17 +235,13 @@ describe('useAuth', () => {
         });
       });
 
-      expect(window.location.href).toBe('/api/auth/logout?returnTo=%2Fgoodbye&federated=true');
+      expect(mockNavigateToUrl).toHaveBeenCalledWith('/api/auth/logout?returnTo=%2Fgoodbye&federated=true');
     });
 
     it('should handle logout errors', async () => {
-      Object.defineProperty(window, 'location', {
-        value: {
-          set href(url: string) {
-            throw new Error('Logout failed');
-          },
-        },
-        writable: true,
+      // Mock navigation utility to throw error
+      mockNavigateToUrl.mockImplementationOnce(() => {
+        throw new Error('Logout failed');
       });
 
       const { result } = renderHook(() => useAuth());
@@ -503,12 +502,13 @@ describe('useAuthState', () => {
 
 describe('useRequireAuth', () => {
   const mockUseUser = require('@auth0/nextjs-auth0/client').useUser;
+  const mockNavigateToUrl = require('@/lib/navigation').navigationUtils.navigateToUrl;
 
   beforeEach(() => {
     jest.clearAllMocks();
 
-    delete (window as any).location;
-    window.location = { href: '' } as any;
+    // Reset navigation mock
+    mockNavigateToUrl.mockClear();
   });
 
   it('should return user when authenticated', () => {
@@ -540,7 +540,7 @@ describe('useRequireAuth', () => {
     const { result } = renderHook(() => useRequireAuth('/custom-redirect'));
 
     expect(result.current).toBeNull();
-    expect(window.location.href).toBe('/api/auth/login?returnTo=%2Fcustom-redirect');
+    expect(mockNavigateToUrl).toHaveBeenCalledWith('/api/auth/login?returnTo=%2Fcustom-redirect');
   });
 
   it('should not redirect while loading', () => {
@@ -553,7 +553,7 @@ describe('useRequireAuth', () => {
     const { result } = renderHook(() => useRequireAuth());
 
     expect(result.current).toBeNull();
-    expect(window.location.href).toBe('');
+    expect(mockNavigateToUrl).not.toHaveBeenCalled();
   });
 
   it('should use default redirect path', () => {
@@ -565,7 +565,7 @@ describe('useRequireAuth', () => {
 
     renderHook(() => useRequireAuth());
 
-    expect(window.location.href).toBe('/api/auth/login?returnTo=%2Fworkspace');
+    expect(mockNavigateToUrl).toHaveBeenCalledWith('/api/auth/login?returnTo=%2Fworkspace');
   });
 });
 
