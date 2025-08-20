@@ -20,49 +20,6 @@ Project Nexus is an AI-powered visual knowledge workspace that transforms scatte
 - Frontend: Next.js 14, TypeScript, Tailwind CSS, Konva.js (canvas), Zustand (state)
 - Infrastructure: Docker Compose for local development
 
-## Development Commands
-
-### Backend (`cd backend`)
-```bash
-npm run dev              # Start development server with hot reload
-npm run build            # Build TypeScript to dist/
-npm run start            # Start production server
-npm test                 # Run Jest tests
-npm run test:watch       # Run tests in watch mode
-npm run test:coverage    # Run tests with coverage report
-npm run lint             # ESLint check
-npm run lint:fix         # ESLint auto-fix
-
-# Database commands
-npm run migrate          # Run database migrations
-npm run migrate:rollback # Rollback last migration
-npm run migrate:status   # Check migration status
-npm run seed             # Run database seeds
-npm run db:reset         # Reset database (rollback all, migrate, seed)
-```
-
-### Frontend (`cd clients/web`)
-```bash
-npm run dev              # Start Next.js development server
-npm run build            # Build for production
-npm run start            # Start production server
-npm test                 # Run Jest tests
-npm run test:watch       # Run tests in watch mode
-npm run test:coverage    # Run tests with coverage
-npm run lint             # Next.js ESLint check
-npm run lint:fix         # Auto-fix linting issues
-npm run type-check       # TypeScript type checking
-```
-
-### Docker Environment (Root Directory)
-```bash
-# Never start docker-compose yourself - always ask the user
-# These are reference commands:
-docker-compose up -d     # Start all services
-docker-compose down      # Stop all services
-docker-compose logs      # View logs
-```
-
 ## Testing
 
 **Backend Testing:**
@@ -214,25 +171,7 @@ gh pr merge 19 --squash --delete-branch
 - **Linear Integration**: When using Linear MCP to move tasks to backlog, remove them from markdown feature documentation files
 - **Code Style**: Follow existing patterns, use TypeScript strictly, maintain test coverage
 - **Linear Workflow**: Always update ticket state and properties throughout development process
-
-## File Structure Highlights
-
-```
-backend/src/
-├── services/           # Business logic layer
-├── resolvers/          # GraphQL resolvers
-├── middleware/         # Express middleware
-├── database/           # Migrations and seeds
-├── __tests__/          # Test suites
-└── types/              # TypeScript type definitions
-
-clients/web/
-├── app/                # Next.js app directory
-├── components/         # React components
-├── hooks/              # Custom React hooks
-├── lib/                # Utility functions
-└── __tests__/          # Frontend tests
-```
+- **Agent Usage**: Try to always use the correct sub agent, when working on a process e.g. using the senior backend agent when working on the backend
 
 ## Documentation References
 
@@ -241,4 +180,3 @@ clients/web/
 - [Product Manager Documentation](./project-documentation/product-manager-output.md)
 - [Technical Architecture](./project-documentation/technical-architecture.md)
 - [Testing Guide](./TESTING.md)
-- Always update the state and other required properties, while working on a ticket from Linear.

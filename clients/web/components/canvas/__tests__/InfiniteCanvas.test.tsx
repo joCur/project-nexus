@@ -83,7 +83,7 @@ describe('InfiniteCanvas', () => {
 
   it('renders debug info when debug prop is true', () => {
     render(<InfiniteCanvas debug={true} />);
-    expect(screen.getByText(/Size: 800x600/)).toBeInTheDocument();
+    expect(screen.getByText(/Size: 800×600px/)).toBeInTheDocument();
     expect(screen.getByText(/Zoom: 100%/)).toBeInTheDocument();
     expect(screen.getByText(/Position: \(0, 0\)/)).toBeInTheDocument();
   });
@@ -123,5 +123,111 @@ describe('InfiniteCanvas', () => {
     
     expect(screen.getByText(/Zoom: 200%/)).toBeInTheDocument();
     expect(screen.getByText(/Position: \(100, 50\)/)).toBeInTheDocument();
+  });
+
+  // Accessibility Tests
+  describe('Accessibility', () => {
+    it('has proper ARIA attributes', () => {
+      render(<InfiniteCanvas />);
+      const canvas = screen.getByTestId('infinite-canvas');
+      
+      expect(canvas).toHaveAttribute('role', 'application');
+      expect(canvas).toHaveAttribute('aria-label', 'Interactive infinite canvas workspace');
+      expect(canvas).toHaveAttribute('aria-describedby', 'canvas-instructions canvas-status');
+      expect(canvas).toHaveAttribute('aria-roledescription', 'Interactive infinite canvas for visual knowledge workspace');
+      expect(canvas).toHaveAttribute('tabIndex', '0');
+    });
+
+    it('has custom ARIA label and description', () => {
+      render(
+        <InfiniteCanvas 
+          ariaLabel="Custom canvas label" 
+          ariaDescription="Custom canvas description" 
+        />
+      );
+      const canvas = screen.getByTestId('infinite-canvas');
+      
+      expect(canvas).toHaveAttribute('aria-label', 'Custom canvas label');
+    });
+
+    it('renders screen reader instructions', () => {
+      render(<InfiniteCanvas />);
+      
+      const instructionsContainer = document.querySelector('#canvas-instructions');
+      expect(instructionsContainer).toBeInTheDocument();
+      expect(instructionsContainer).toHaveClass('sr-only');
+      
+      // Check that instructions content is present
+      expect(screen.getByText(/Use arrow keys to pan, plus and minus keys to zoom/)).toBeInTheDocument();
+    });
+
+    it('has live region for announcements', () => {
+      render(<InfiniteCanvas />);
+      
+      const statusElement = document.querySelector('#canvas-status');
+      expect(statusElement).toBeInTheDocument();
+      expect(statusElement).toHaveAttribute('role', 'status');
+      expect(statusElement).toHaveAttribute('aria-live', 'polite');
+      expect(statusElement).toHaveAttribute('aria-atomic', 'true');
+      expect(statusElement).toHaveClass('sr-only');
+    });
+
+    it('displays current zoom level in instructions', () => {
+      render(<InfiniteCanvas />);
+      
+      expect(screen.getByText(/Current zoom level: 100 percent/)).toBeInTheDocument();
+      expect(screen.getByText(/Zoom range: 25% to 400%/)).toBeInTheDocument();
+    });
+
+    it('updates zoom level announcement when zoom changes', async () => {
+      const { rerender } = render(<InfiniteCanvas />);
+      
+      // Update zoom level
+      const updatedStore = {
+        ...mockStore,
+        viewport: {
+          ...mockStore.viewport,
+          zoom: 1.5,
+        },
+      };
+      
+      (useCanvasStore as unknown as jest.Mock).mockReturnValue(updatedStore);
+      rerender(<InfiniteCanvas />);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/Current zoom level: 150 percent/)).toBeInTheDocument();
+      });
+    });
+
+    it('has proper focus styles applied via Tailwind classes', () => {
+      render(<InfiniteCanvas />);
+      const canvas = screen.getByTestId('infinite-canvas');
+      
+      expect(canvas).toHaveClass('focus:outline-none', 'focus:ring-2', 'focus:ring-border-focus', 'focus:ring-offset-2');
+    });
+  });
+
+  // Design System Integration Tests
+  describe('Design System Integration', () => {
+    it('uses design system color tokens', () => {
+      render(<InfiniteCanvas />);
+      const canvas = screen.getByTestId('infinite-canvas');
+      
+      // Uses bg-canvas-base from design tokens
+      expect(canvas).toHaveClass('bg-canvas-base');
+    });
+
+    it('debug info uses design system colors', () => {
+      render(<InfiniteCanvas debug={true} />);
+      const debugInfo = screen.getByLabelText('Canvas debug information');
+      
+      expect(debugInfo).toHaveClass('bg-neutral-800', 'text-neutral-50', 'border-neutral-700');
+    });
+
+    it('shows zoom range from design tokens in debug mode', () => {
+      render(<InfiniteCanvas debug={true} />);
+      
+      expect(screen.getByText(/range: 25%-400%/)).toBeInTheDocument();
+    });
   });
 });

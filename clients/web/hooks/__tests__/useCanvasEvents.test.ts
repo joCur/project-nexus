@@ -6,6 +6,21 @@ import { RefObject } from 'react';
 // Mock the canvas store
 jest.mock('@/stores/canvasStore');
 
+// Mock window.matchMedia for accessibility features
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  value: jest.fn().mockImplementation(query => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: jest.fn(), // deprecated
+    removeListener: jest.fn(), // deprecated
+    addEventListener: jest.fn(),
+    removeEventListener: jest.fn(),
+    dispatchEvent: jest.fn(),
+  })),
+});
+
 describe('useCanvasEvents', () => {
   let mockElement: HTMLDivElement;
   let containerRef: RefObject<HTMLDivElement>;
@@ -20,6 +35,7 @@ describe('useCanvasEvents', () => {
       contains: jest.fn(),
       addEventListener: jest.fn(),
       removeEventListener: jest.fn(),
+      querySelector: jest.fn().mockReturnValue(null), // Mock for accessibility elements
     } as unknown as HTMLDivElement;
 
     // Create ref

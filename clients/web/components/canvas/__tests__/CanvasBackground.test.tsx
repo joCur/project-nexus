@@ -61,7 +61,7 @@ describe('CanvasBackground', () => {
     expect(rect).toHaveAttribute('data-y', '-600');
     expect(rect).toHaveAttribute('data-width', '1600');
     expect(rect).toHaveAttribute('data-height', '1200');
-    expect(rect).toHaveAttribute('data-fill', '#F9FAFB');
+    expect(rect).toHaveAttribute('data-fill', '#f9fafb');
   });
 
   it('renders background rect with custom background color', () => {
@@ -79,7 +79,7 @@ describe('CanvasBackground', () => {
     
     // Check that lines have correct properties
     lines.forEach(line => {
-      expect(line).toHaveAttribute('data-stroke', '#E5E7EB');
+      expect(line).toHaveAttribute('data-stroke', '#e5e7eb');
       expect(line).toHaveAttribute('data-stroke-width', '1');
       expect(line).toHaveAttribute('data-listening', 'false');
     });
@@ -212,10 +212,108 @@ describe('CanvasBackground', () => {
     
     // Should use default colors
     const rect = screen.getByTestId('konva-rect');
-    expect(rect).toHaveAttribute('data-fill', '#F9FAFB');
+    expect(rect).toHaveAttribute('data-fill', '#f9fafb');
     
     lines.forEach(line => {
-      expect(line).toHaveAttribute('data-stroke', '#E5E7EB');
+      expect(line).toHaveAttribute('data-stroke', '#e5e7eb');
+    });
+  });
+
+  // Design System Integration Tests
+  describe('Design System Integration', () => {
+    it('uses design token colors by default', () => {
+      render(<CanvasBackground {...defaultProps} showGrid={true} />);
+      
+      const rect = screen.getByTestId('konva-rect');
+      const lines = screen.getAllByTestId('konva-line');
+      
+      // Verify design token usage
+      expect(rect).toHaveAttribute('data-fill', '#f9fafb'); // semantic.canvas-base
+      lines.forEach(line => {
+        expect(line).toHaveAttribute('data-stroke', '#e5e7eb'); // semantic.border-default
+      });
+    });
+
+    it('enforces zoom range from design tokens', () => {
+      // Test below minimum zoom (0.25)
+      render(<CanvasBackground {...defaultProps} zoom={0.2} showGrid={true} />);
+      let lines = screen.queryAllByTestId('konva-line');
+      expect(lines).toHaveLength(0);
+
+      // Test above maximum zoom (4.0)
+      render(<CanvasBackground {...defaultProps} zoom={4.1} showGrid={true} />);
+      lines = screen.queryAllByTestId('konva-line');
+      expect(lines).toHaveLength(0);
+
+      // Test at exact limits
+      render(<CanvasBackground {...defaultProps} zoom={0.25} showGrid={true} />);
+      lines = screen.getAllByTestId('konva-line');
+      expect(lines.length).toBeGreaterThan(0);
+
+      render(<CanvasBackground {...defaultProps} zoom={4.0} showGrid={true} />);
+      lines = screen.getAllByTestId('konva-line');
+      expect(lines.length).toBeGreaterThan(0);
+    });
+
+    it('has proper layer naming for debugging', () => {
+      render(<CanvasBackground {...defaultProps} />);
+      
+      const layer = screen.getByTestId('konva-layer');
+      expect(layer).toHaveAttribute('name', 'canvas-background');
+    });
+
+    it('has semantic names for Konva elements', () => {
+      render(<CanvasBackground {...defaultProps} showGrid={true} />);
+      
+      const rect = screen.getByTestId('konva-rect');
+      expect(rect).toHaveAttribute('name', 'canvas-background-rect');
+      
+      const lines = screen.getAllByTestId('konva-line');
+      lines.forEach((line) => {
+        const name = line.getAttribute('name');
+        expect(name).toMatch(/^grid-(vertical|horizontal)-\d+$/);
+      });
+    });
+
+    it('has performance optimizations enabled', () => {
+      render(<CanvasBackground {...defaultProps} showGrid={true} />);
+      
+      const lines = screen.getAllByTestId('konva-line');
+      lines.forEach(line => {
+        // perfectDrawEnabled is passed to Konva but may not appear as DOM attribute
+        expect(line).toHaveAttribute('data-listening', 'false');
+        expect(line).toHaveAttribute('data-testid', 'konva-line');
+      });
+    });
+  });
+
+  // Accessibility Tests  
+  describe('Accessibility', () => {
+    it('has non-interactive elements properly configured', () => {
+      render(<CanvasBackground {...defaultProps} showGrid={true} />);
+      
+      const layer = screen.getByTestId('konva-layer');
+      const lines = screen.getAllByTestId('konva-line');
+      
+      expect(layer).toHaveAttribute('data-listening', 'false');
+      lines.forEach(line => {
+        expect(line).toHaveAttribute('data-listening', 'false');
+      });
+    });
+
+    it('maintains proper contrast ratios with design tokens', () => {
+      // This test verifies that we're using colors from the design system
+      // that have been verified for WCAG compliance
+      render(<CanvasBackground {...defaultProps} showGrid={true} />);
+      
+      const rect = screen.getByTestId('konva-rect');
+      const lines = screen.getAllByTestId('konva-line');
+      
+      // Verify we're using the semantic colors that have verified contrast
+      expect(rect).toHaveAttribute('data-fill', '#f9fafb');
+      lines.forEach(line => {
+        expect(line).toHaveAttribute('data-stroke', '#e5e7eb');
+      });
     });
   });
 });
