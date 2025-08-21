@@ -1,63 +1,106 @@
 /**
  * Canvas Store Type Definitions
  * 
- * Types and interfaces for the canvas viewport and interaction state management.
+ * Comprehensive types and interfaces for the infinite canvas system including
+ * viewport management, interaction state, grid systems, and performance optimizations.
  */
 
-import type { Position, Dimensions, Bounds, Color } from './common.types';
+import type { Color, EntityId } from './common.types';
+
+// ============================================================================
+// CORE CANVAS TYPES
+// ============================================================================
+
+/**
+ * Canvas position coordinates
+ */
+export interface CanvasPosition {
+  x: number;
+  y: number;
+}
+
+/**
+ * Screen position coordinates
+ */
+export interface ScreenPosition {
+  x: number;
+  y: number;
+}
+
+/**
+ * Canvas bounds for viewport calculations
+ */
+export interface CanvasBounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+/**
+ * Zoom level with constraints (0.25x to 4.0x)
+ * @minimum 0.25
+ * @maximum 4.0
+ */
+export type ZoomLevel = number;
+
+// ============================================================================
+// VIEWPORT AND STATE TYPES
+// ============================================================================
 
 /**
  * Viewport state for canvas navigation
  */
 export interface ViewportState {
-  /** Current zoom level (1.0 = 100%) */
-  zoom: number;
-  /** Minimum zoom level */
-  minZoom: number;
-  /** Maximum zoom level */
-  maxZoom: number;
-  /** Current pan position */
-  panOffset: Position;
-  /** Canvas center position */
-  center: Position;
-  /** Viewport bounds in canvas coordinates */
-  bounds: Bounds;
+  position: CanvasPosition;
+  zoom: ZoomLevel;
+  bounds: CanvasBounds;
+  isDirty: boolean;
 }
 
 /**
  * Canvas configuration settings
  */
 export interface CanvasConfig {
-  /** Canvas background color */
-  backgroundColor: Color;
-  /** Grid visibility */
-  showGrid: boolean;
-  /** Grid size in canvas units */
-  gridSize: number;
-  /** Grid color */
-  gridColor: Color;
-  /** Snap to grid enabled */
-  snapToGrid: boolean;
-  /** Performance mode for large canvases */
-  performanceMode: boolean;
+  grid: {
+    enabled: boolean;
+    size: number;
+    color: Color;
+    opacity: number;
+  };
+  zoom: {
+    min: ZoomLevel;
+    max: ZoomLevel;
+    step: number;
+  };
+  performance: {
+    enableCulling: boolean;
+    enableVirtualization: boolean;
+    maxVisibleCards: number;
+  };
 }
 
 /**
  * Canvas interaction state
  */
 export interface CanvasInteraction {
-  /** Whether user is currently panning */
-  isPanning: boolean;
-  /** Whether user is currently selecting */
-  isSelecting: boolean;
-  /** Selection rectangle */
-  selectionRect?: Bounds;
-  /** Last interaction position */
-  lastInteractionPosition: Position;
+  mode: 'select' | 'pan' | 'drag' | 'resize' | 'connect';
+  isActive: boolean;
+  startPosition?: CanvasPosition;
+  currentPosition?: CanvasPosition;
+  selection: {
+    selectedIds: Set<EntityId>;
+    bounds?: CanvasBounds;
+  };
+  lastInteractionTime: number;
 }
 
+// ============================================================================
+// CANVAS STORE INTERFACE
+// ============================================================================
+
 /**
- * Canvas store state interface
+ * Canvas store state
  */
 export interface CanvasState {
   viewport: ViewportState;
@@ -67,38 +110,59 @@ export interface CanvasState {
 }
 
 /**
- * Canvas store actions interface
+ * Canvas store actions
  */
 export interface CanvasActions {
-  // Viewport management
-  setZoom: (zoom: number) => void;
-  zoomIn: (factor?: number) => void;
-  zoomOut: (factor?: number) => void;
-  resetZoom: () => void;
-  setPanOffset: (offset: Position) => void;
-  panBy: (delta: Position) => void;
-  centerOn: (position: Position) => void;
-  fitToContent: () => void;
+  // Viewport actions
+  setZoom: (zoom: ZoomLevel) => void;
+  setPosition: (position: CanvasPosition) => void;
+  panBy: (offset: CanvasPosition) => void;
+  zoomToFit: () => void;
+  centerView: () => void;
   
-  // Configuration
+  // Configuration actions
   updateConfig: (config: Partial<CanvasConfig>) => void;
   toggleGrid: () => void;
-  toggleSnapToGrid: () => void;
   
-  // Interaction
-  startPanning: (position: Position) => void;
-  updatePanning: (position: Position) => void;
-  endPanning: () => void;
-  startSelection: (position: Position) => void;
-  updateSelection: (position: Position) => void;
-  endSelection: () => void;
+  // Interaction actions
+  setInteractionMode: (mode: CanvasInteraction['mode']) => void;
+  startInteraction: (position: CanvasPosition) => void;
+  updateInteraction: (position: CanvasPosition) => void;
+  endInteraction: () => void;
   
-  // Initialization
-  initialize: (canvasDimensions: Dimensions) => void;
+  // Selection actions
+  selectCard: (cardId: EntityId) => void;
+  selectMultiple: (cardIds: EntityId[]) => void;
+  clearSelection: () => void;
+  
+  // Utility actions
   reset: () => void;
 }
 
 /**
- * Combined canvas store type
+ * Complete canvas store interface
  */
 export interface CanvasStore extends CanvasState, CanvasActions {}
+
+// ============================================================================
+// COORDINATE TRANSFORMATION TYPES
+// ============================================================================
+
+/**
+ * Coordinate transformation functions
+ */
+export interface CoordinateTransform {
+  canvasToScreen: (position: CanvasPosition) => ScreenPosition;
+  screenToCanvas: (position: ScreenPosition) => CanvasPosition;
+  scaleToViewport: (bounds: CanvasBounds) => CanvasBounds;
+}
+
+/**
+ * Canvas measurement utilities
+ */
+export interface CanvasMeasurements {
+  distance: (from: CanvasPosition, to: CanvasPosition) => number;
+  angle: (from: CanvasPosition, to: CanvasPosition) => number;
+  containsPoint: (bounds: CanvasBounds, point: CanvasPosition) => boolean;
+  intersectsBounds: (bounds1: CanvasBounds, bounds2: CanvasBounds) => boolean;
+}

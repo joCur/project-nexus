@@ -31,16 +31,26 @@ jest.mock('react-konva', () => ({
 describe('InfiniteCanvas', () => {
   const mockStore = {
     viewport: {
+      position: { x: 0, y: 0 },
       zoom: 1,
-      panOffset: { x: 0, y: 0 },
-      minZoom: 0.25,
-      maxZoom: 4,
-      center: { x: 400, y: 300 },
-      bounds: { x: 0, y: 0, width: 800, height: 600 },
+      bounds: { minX: 0, minY: 0, maxX: 800, maxY: 600 },
+      isDirty: false,
     },
-    initialize: jest.fn(),
+    config: {
+      grid: { enabled: true, size: 20, color: '#e5e7eb', opacity: 0.3 },
+      zoom: { min: 0.25, max: 4.0, step: 0.1 },
+      performance: { enableCulling: true, enableVirtualization: true, maxVisibleCards: 1000 },
+    },
+    interaction: {
+      mode: 'select' as const,
+      isActive: false,
+      selection: { selectedIds: new Set() },
+      lastInteractionTime: Date.now(),
+    },
+    isInitialized: true,
     setZoom: jest.fn(),
-    setPanOffset: jest.fn(),
+    setPosition: jest.fn(),
+    reset: jest.fn(),
   };
 
   beforeEach(() => {
@@ -93,15 +103,12 @@ describe('InfiniteCanvas', () => {
     expect(screen.queryByText(/Size:/)).not.toBeInTheDocument();
   });
 
-  it('initializes canvas dimensions on mount', async () => {
+  it('renders canvas with proper dimensions', async () => {
     render(<InfiniteCanvas />);
     
-    await waitFor(() => {
-      expect(mockStore.initialize).toHaveBeenCalledWith({
-        width: 800,
-        height: 600,
-      });
-    });
+    const stage = screen.getByTestId('konva-stage');
+    expect(stage).toHaveAttribute('width', '800');
+    expect(stage).toHaveAttribute('height', '600');
   });
 
   it('updates when viewport changes', () => {
@@ -113,7 +120,7 @@ describe('InfiniteCanvas', () => {
       viewport: {
         ...mockStore.viewport,
         zoom: 2,
-        panOffset: { x: 100, y: 50 },
+        position: { x: 100, y: 50 },
       },
     };
     

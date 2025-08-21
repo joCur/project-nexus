@@ -10,72 +10,116 @@ import { devtools, persist } from 'zustand/middleware';
 import type {
   ConnectionStore,
   Connection,
-  ConnectionType,
   ConnectionStyle,
-  ConnectionRenderState,
-  ConnectionFilters,
+  ConnectionInteraction,
+  ConnectionState,
+  ConnectionId
 } from '@/types/connection.types';
+import { ConnectionType, createConnectionId } from '@/types/connection.types';
 import type { Position, EntityId } from '@/types/common.types';
+import type { CanvasPosition } from '@/types/canvas.types';
 
 /**
- * Generate a unique ID for connections
+ * Generate a unique connection ID
  */
-const generateId = (): EntityId => {
-  return `conn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+const generateConnectionId = (): ConnectionId => {
+  return createConnectionId();
 };
 
 /**
  * Default connection style by type
  */
 const DEFAULT_STYLES: Record<ConnectionType, ConnectionStyle> = {
-  manual: {
+  [ConnectionType.MANUAL]: {
     color: '#6b7280',
     width: 2,
     opacity: 1,
-    animated: false,
+    curve: 'curved',
+    showArrow: true,
+    showLabel: false,
   },
-  'ai-suggested': {
+  [ConnectionType.AI_SUGGESTED]: {
     color: '#8b5cf6',
     width: 2,
-    dashPattern: [5, 5],
+    dashArray: '5,5',
     opacity: 0.7,
-    animated: true,
+    curve: 'curved',
+    showArrow: true,
+    showLabel: false,
   },
-  related: {
-    color: '#3b82f6',
-    width: 1.5,
-    dashPattern: [3, 3],
-    opacity: 0.8,
-    animated: false,
-  },
-  sequential: {
+  [ConnectionType.AI_GENERATED]: {
     color: '#10b981',
     width: 2,
+    opacity: 0.8,
+    curve: 'curved',
+    showArrow: true,
+    showLabel: false,
+  },
+  [ConnectionType.REFERENCE]: {
+    color: '#f59e0b',
+    width: 1.5,
+    dashArray: '3,3',
+    opacity: 0.8,
+    curve: 'straight',
+    showArrow: true,
+    showLabel: false,
+  },
+  [ConnectionType.DEPENDENCY]: {
+    color: '#ef4444',
+    width: 2,
     opacity: 1,
-    animated: false,
+    curve: 'straight',
+    showArrow: true,
+    showLabel: true,
+  },
+  [ConnectionType.SIMILARITY]: {
+    color: '#06b6d4',
+    width: 1.5,
+    opacity: 0.8,
+    curve: 'curved',
+    showArrow: false,
+    showLabel: false,
+  },
+  [ConnectionType.RELATED]: {
+    color: '#6b7280',
+    width: 1.5,
+    opacity: 0.8,
+    curve: 'curved',
+    showArrow: false,
+    showLabel: false,
   },
 };
 
 /**
  * Default connection filters
  */
-const DEFAULT_FILTERS: ConnectionFilters = {
+const DEFAULT_FILTERS = {
+  types: new Set(Object.values(ConnectionType)),
+  minConfidence: 0.0,
+  showAI: true,
   showManual: true,
-  showAISuggested: true,
-  showRelated: true,
-  showSequential: true,
-  minStrength: 0,
 };
 
 /**
- * Default render state
+ * Default interaction state
  */
-const DEFAULT_RENDER_STATE: ConnectionRenderState = {
-  hoveredId: undefined,
+const DEFAULT_INTERACTION: ConnectionInteraction = {
   isCreating: false,
-  createSource: undefined,
-  createTarget: undefined,
-  previewConnection: undefined,
+  sourceCardId: undefined,
+  currentPosition: undefined,
+  hoveredConnectionId: undefined,
+  selectedConnectionIds: new Set(),
+};
+
+/**
+ * Helper function to check if cards are connected
+ */
+const areCardsConnected = (connections: Map<ConnectionId, Connection>, sourceCardId: EntityId, targetCardId: EntityId): boolean => {
+  return Array.from(connections.values()).some(
+    (conn) =>
+      (conn.sourceCardId === sourceCardId && conn.targetCardId === targetCardId) ||
+      (conn.sourceCardId === targetCardId && conn.targetCardId === sourceCardId)
+  );
 };
 
 /**
@@ -87,29 +131,31 @@ export const useConnectionStore = create<ConnectionStore>()(
       (set, get) => ({
         // State
         connections: new Map(),
-        renderState: DEFAULT_RENDER_STATE,
-        selectedIds: new Set(),
+        suggestions: [],
+        interaction: DEFAULT_INTERACTION,
         filters: DEFAULT_FILTERS,
 
         // CRUD operations
-        createConnection: (sourceId: EntityId, targetId: EntityId, type: ConnectionType) => {
+        createConnection: (sourceCardId: EntityId, targetCardId: EntityId, type: ConnectionType, metadata?: Record<string, any>) => {
           // Prevent self-connections
-          if (sourceId === targetId) return '';
+          if (sourceCardId === targetCardId) return '' as ConnectionId;
           
           // Check if connection already exists
-          if (get().areCardsConnected(sourceId, targetId)) return '';
+          if (areCardsConnected(get().connections, sourceCardId, targetCardId)) return '' as ConnectionId;
           
+          const now = new Date().toISOString();
           const newConnection: Connection = {
-            id: generateId(),
-            sourceId,
-            targetId,
+            id: generateConnectionId(),
+            sourceCardId,
+            targetCardId,
             type,
+            confidence: type === ConnectionType.AI_SUGGESTED || type === ConnectionType.AI_GENERATED ? 0.5 : 1.0,
             style: DEFAULT_STYLES[type],
-            strength: type === 'ai-suggested' ? 0.5 : 1.0,
-            isSelected: false,
+            metadata: metadata || {},
+            createdAt: now,
+            updatedAt: now,
+            createdBy: 'user' as EntityId, // TODO: Get from auth context
             isVisible: true,
-            createdAt: new Date().toISOString(),
-            metadata: {},
           };
           
           set((state) => {
@@ -124,7 +170,7 @@ export const useConnectionStore = create<ConnectionStore>()(
           return newConnection.id;
         },
 
-        updateConnection: (id: EntityId, updates: Partial<Connection>) => {
+        updateConnection: (id: ConnectionId, updates: Partial<Connection>) => {
           set((state) => {
             const connection = state.connections.get(id);
             if (!connection) return state;
@@ -143,25 +189,28 @@ export const useConnectionStore = create<ConnectionStore>()(
           });
         },
 
-        deleteConnection: (id: EntityId) => {
+        deleteConnection: (id: ConnectionId) => {
           set((state) => {
             const newConnections = new Map(state.connections);
             newConnections.delete(id);
             
-            const newSelectedIds = new Set(state.selectedIds);
+            const newSelectedIds = new Set(state.interaction.selectedConnectionIds);
             newSelectedIds.delete(id);
             
             return {
               connections: newConnections,
-              selectedIds: newSelectedIds,
+              interaction: {
+                ...state.interaction,
+                selectedConnectionIds: newSelectedIds,
+              },
             };
           });
         },
 
-        deleteConnections: (ids: EntityId[]) => {
+        deleteConnections: (ids: ConnectionId[]) => {
           set((state) => {
             const newConnections = new Map(state.connections);
-            const newSelectedIds = new Set(state.selectedIds);
+            const newSelectedIds = new Set(state.interaction.selectedConnectionIds);
             
             ids.forEach((id) => {
               newConnections.delete(id);
@@ -170,199 +219,185 @@ export const useConnectionStore = create<ConnectionStore>()(
             
             return {
               connections: newConnections,
-              selectedIds: newSelectedIds,
-            };
-          });
-        },
-
-        // Selection management
-        selectConnection: (id: EntityId, addToSelection: boolean = false) => {
-          set((state) => {
-            const newSelectedIds = addToSelection
-              ? new Set(state.selectedIds)
-              : new Set<EntityId>();
-            
-            newSelectedIds.add(id);
-            
-            // Update the connection's selected state
-            const connection = state.connections.get(id);
-            if (connection) {
-              const newConnections = new Map(state.connections);
-              newConnections.set(id, { ...connection, isSelected: true });
-              
-              // Deselect others if not adding to selection
-              if (!addToSelection) {
-                state.selectedIds.forEach((otherId) => {
-                  if (otherId !== id) {
-                    const otherConn = newConnections.get(otherId);
-                    if (otherConn) {
-                      newConnections.set(otherId, { ...otherConn, isSelected: false });
-                    }
-                  }
-                });
-              }
-              
-              return {
-                connections: newConnections,
-                selectedIds: newSelectedIds,
-              };
-            }
-            
-            return {
-              selectedIds: newSelectedIds,
-            };
-          });
-        },
-
-        clearSelection: () => {
-          set((state) => {
-            const newConnections = new Map(state.connections);
-            
-            state.selectedIds.forEach((id) => {
-              const connection = newConnections.get(id);
-              if (connection) {
-                newConnections.set(id, { ...connection, isSelected: false });
-              }
-            });
-            
-            return {
-              connections: newConnections,
-              selectedIds: new Set(),
-            };
-          });
-        },
-
-        // Interactive creation
-        startCreatingConnection: (sourceId: EntityId) => {
-          set({
-            renderState: {
-              ...DEFAULT_RENDER_STATE,
-              isCreating: true,
-              createSource: sourceId,
-            },
-          });
-        },
-
-        updateConnectionPreview: (targetPosition: Position) => {
-          set((state) => ({
-            renderState: {
-              ...state.renderState,
-              createTarget: targetPosition,
-            },
-          }));
-        },
-
-        finishCreatingConnection: (targetId: EntityId) => {
-          const { createSource } = get().renderState;
-          
-          if (!createSource || createSource === targetId) {
-            get().cancelCreatingConnection();
-            return null;
-          }
-          
-          const newId = get().createConnection(createSource, targetId, 'manual');
-          
-          set({
-            renderState: DEFAULT_RENDER_STATE,
-          });
-          
-          return newId || null;
-        },
-
-        cancelCreatingConnection: () => {
-          set({
-            renderState: DEFAULT_RENDER_STATE,
-          });
-        },
-
-        // Connection queries
-        getConnection: (id: EntityId) => get().connections.get(id),
-
-        getConnections: () => Array.from(get().connections.values()),
-
-        getConnectionsForCard: (cardId: EntityId) => {
-          return Array.from(get().connections.values()).filter(
-            (conn) => conn.sourceId === cardId || conn.targetId === cardId
-          );
-        },
-
-        getSelectedConnections: () => {
-          const { selectedIds, connections } = get();
-          return Array.from(selectedIds)
-            .map((id) => connections.get(id))
-            .filter((conn): conn is Connection => conn !== undefined);
-        },
-
-        // Filtering and visibility
-        updateFilters: (filters: Partial<ConnectionFilters>) => {
-          set((state) => ({
-            filters: {
-              ...state.filters,
-              ...filters,
-            },
-          }));
-        },
-
-        toggleConnectionType: (type: ConnectionType) => {
-          set((state) => {
-            const filterKey = `show${type.charAt(0).toUpperCase()}${type.slice(1).replace('-', '')}` as keyof ConnectionFilters;
-            
-            return {
-              filters: {
-                ...state.filters,
-                [filterKey]: !state.filters[filterKey],
+              interaction: {
+                ...state.interaction,
+                selectedConnectionIds: newSelectedIds,
               },
             };
           });
         },
 
-        // Style management
-        updateConnectionStyle: (id: EntityId, style: Partial<ConnectionStyle>) => {
-          const connection = get().connections.get(id);
-          if (!connection) return;
-          
-          get().updateConnection(id, {
-            style: { ...connection.style, ...style },
+        // Selection management
+        selectConnection: (id: ConnectionId) => {
+          set((state) => {
+            const newSelectedIds = new Set(state.interaction.selectedConnectionIds);
+            newSelectedIds.add(id);
+            
+            return {
+              interaction: {
+                ...state.interaction,
+                selectedConnectionIds: newSelectedIds,
+              },
+            };
           });
         },
 
-        // Utility
-        areCardsConnected: (sourceId: EntityId, targetId: EntityId) => {
-          return Array.from(get().connections.values()).some(
-            (conn) =>
-              (conn.sourceId === sourceId && conn.targetId === targetId) ||
-              (conn.sourceId === targetId && conn.targetId === sourceId)
+        selectMultiple: (ids: ConnectionId[]) => {
+          set((state) => ({
+            interaction: {
+              ...state.interaction,
+              selectedConnectionIds: new Set(ids),
+            },
+          }));
+        },
+        
+        clearSelection: () => {
+          set((state) => ({
+            interaction: {
+              ...state.interaction,
+              selectedConnectionIds: new Set(),
+            },
+          }));
+        },
+
+        // Suggestion management
+        acceptSuggestion: (suggestionId: string) => {
+          // Stub implementation
+          return '' as ConnectionId;
+        },
+        
+        rejectSuggestion: (suggestionId: string) => {
+          // Stub implementation
+        },
+        
+        clearSuggestions: () => {
+          set({ suggestions: [] });
+        },
+        
+        // Interaction management
+        startConnectionCreation: (sourceCardId: EntityId, position: CanvasPosition) => {
+          set((state) => ({
+            interaction: {
+              ...state.interaction,
+              isCreating: true,
+              sourceCardId,
+              currentPosition: position,
+            },
+          }));
+        },
+
+        updateConnectionCreation: (position: CanvasPosition) => {
+          set((state) => ({
+            interaction: {
+              ...state.interaction,
+              currentPosition: position,
+            },
+          }));
+        },
+
+        endConnectionCreation: (targetCardId?: EntityId) => {
+          const { sourceCardId } = get().interaction;
+          
+          if (!sourceCardId || !targetCardId || sourceCardId === targetCardId) {
+            set((state) => ({
+              interaction: {
+                ...state.interaction,
+                isCreating: false,
+                sourceCardId: undefined,
+                currentPosition: undefined,
+              },
+            }));
+            return null;
+          }
+          
+          const newId = get().createConnection(sourceCardId, targetCardId, ConnectionType.MANUAL);
+          
+          set((state) => ({
+            interaction: {
+              ...state.interaction,
+              isCreating: false,
+              sourceCardId: undefined,
+              currentPosition: undefined,
+            },
+          }));
+          
+          return newId;
+        },
+
+        // Filtering and visibility
+        setTypeFilter: (types: Set<ConnectionType>) => {
+          set((state) => ({
+            filters: {
+              ...state.filters,
+              types,
+            },
+          }));
+        },
+        
+        setConfidenceFilter: (minConfidence: number) => {
+          set((state) => ({
+            filters: {
+              ...state.filters,
+              minConfidence,
+            },
+          }));
+        },
+        
+        toggleConnectionVisibility: (id: ConnectionId) => {
+          const connection = get().connections.get(id);
+          if (connection) {
+            get().updateConnection(id, { isVisible: !connection.isVisible });
+          }
+        },
+
+        // Utility methods
+        getConnection: (id: ConnectionId) => get().connections.get(id),
+
+        getConnections: (cardId?: EntityId) => {
+          if (cardId) {
+            return Array.from(get().connections.values()).filter(
+              (conn) => conn.sourceCardId === cardId || conn.targetCardId === cardId
+            );
+          }
+          return Array.from(get().connections.values());
+        },
+
+        getConnectionsByType: (type: ConnectionType) => {
+          return Array.from(get().connections.values()).filter(
+            (conn) => conn.type === type
           );
         },
 
-        findShortestPath: (sourceId: EntityId, targetId: EntityId) => {
+
+
+        findShortestPath: (sourceCardId: EntityId, targetCardId: EntityId) => {
           // Simple BFS implementation for finding shortest path
           const connections = get().connections;
           const adjacencyMap = new Map<EntityId, Set<EntityId>>();
           
           // Build adjacency map
           connections.forEach((conn) => {
-            if (!adjacencyMap.has(conn.sourceId)) {
-              adjacencyMap.set(conn.sourceId, new Set());
+            if (!adjacencyMap.has(conn.sourceCardId)) {
+              adjacencyMap.set(conn.sourceCardId, new Set());
             }
-            if (!adjacencyMap.has(conn.targetId)) {
-              adjacencyMap.set(conn.targetId, new Set());
+            if (!adjacencyMap.has(conn.targetCardId)) {
+              adjacencyMap.set(conn.targetCardId, new Set());
             }
-            adjacencyMap.get(conn.sourceId)?.add(conn.targetId);
-            adjacencyMap.get(conn.targetId)?.add(conn.sourceId);
+            adjacencyMap.get(conn.sourceCardId)?.add(conn.targetCardId);
+            adjacencyMap.get(conn.targetCardId)?.add(conn.sourceCardId);
           });
           
           // BFS to find shortest path
           const queue: Array<{ id: EntityId; path: EntityId[] }> = [
-            { id: sourceId, path: [sourceId] },
+            { id: sourceCardId, path: [sourceCardId] },
           ];
-          const visited = new Set<EntityId>([sourceId]);
+          const visited = new Set<EntityId>([sourceCardId]);
           
           while (queue.length > 0) {
             const current = queue.shift();
             if (!current) continue;
             
-            if (current.id === targetId) {
+            if (current.id === targetCardId) {
               return current.path;
             }
             
@@ -405,30 +440,29 @@ export const useConnectionStore = create<ConnectionStore>()(
 // Selectors for common use cases
 export const connectionSelectors = {
   getAllConnections: (state: ConnectionStore) => Array.from(state.connections.values()),
-  getConnectionById: (id: EntityId) => (state: ConnectionStore) => state.connections.get(id),
+  getConnectionById: (id: ConnectionId) => (state: ConnectionStore) => state.connections.get(id),
   getVisibleConnections: (state: ConnectionStore) => {
     const { filters } = state;
     return Array.from(state.connections.values()).filter((conn) => {
       // Check type filter
-      const typeFilterMap: Record<ConnectionType, keyof ConnectionFilters> = {
-        manual: 'showManual',
-        'ai-suggested': 'showAISuggested',
-        related: 'showRelated',
-        sequential: 'showSequential',
-      };
+      if (!filters.types.has(conn.type)) return false;
       
-      if (!filters[typeFilterMap[conn.type]]) return false;
-      
-      // Check strength filter for AI connections
-      if (conn.type === 'ai-suggested' && conn.strength < filters.minStrength) {
+      // Check confidence filter for AI connections
+      if ((conn.type === ConnectionType.AI_SUGGESTED || conn.type === ConnectionType.AI_GENERATED) && 
+          conn.confidence < filters.minConfidence) {
         return false;
       }
       
       return conn.isVisible;
     });
   },
-  getSelectedConnections: (state: ConnectionStore) => state.getSelectedConnections(),
-  isCreatingConnection: (state: ConnectionStore) => state.renderState.isCreating,
+  getSelectedConnections: (state: ConnectionStore) => {
+    const { selectedConnectionIds } = state.interaction;
+    return Array.from(selectedConnectionIds)
+      .map(id => state.connections.get(id))
+      .filter((conn): conn is Connection => conn !== undefined);
+  },
+  isCreatingConnection: (state: ConnectionStore) => state.interaction.isCreating,
   getConnectionsForCard: (cardId: EntityId) => (state: ConnectionStore) => 
-    state.getConnectionsForCard(cardId),
+    state.getConnections(cardId),
 };

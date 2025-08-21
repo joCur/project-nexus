@@ -60,7 +60,7 @@ jest.mock('react-konva', () => ({
 
 describe('CanvasStage', () => {
   const mockSetZoom = jest.fn();
-  const mockSetPanOffset = jest.fn();
+  const mockSetPosition = jest.fn();
   
   const defaultProps = {
     width: 800,
@@ -74,7 +74,7 @@ describe('CanvasStage', () => {
     jest.clearAllMocks();
     (useCanvasStore as unknown as jest.Mock).mockReturnValue({
       setZoom: mockSetZoom,
-      setPanOffset: mockSetPanOffset,
+      setPosition: mockSetPosition,
     });
   });
 
@@ -135,7 +135,7 @@ describe('CanvasStage', () => {
     // Simulate drag end event
     fireEvent.dragEnd(stage, dragEvent);
     
-    expect(mockSetPanOffset).toHaveBeenCalledWith({
+    expect(mockSetPosition).toHaveBeenCalledWith({
       x: 100,
       y: 50,
     });

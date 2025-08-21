@@ -1,4 +1,4 @@
-import { useEffect, RefObject, useCallback, useState } from 'react';
+import { useEffect, RefObject, useCallback } from 'react';
 import { useCanvasStore } from '@/stores/canvasStore';
 
 /**
@@ -15,11 +15,10 @@ import { useCanvasStore } from '@/stores/canvasStore';
  * @param containerRef - Reference to the canvas container element
  */
 export const useCanvasEvents = (containerRef: RefObject<HTMLDivElement>) => {
-  const { viewport, setZoom, setPanOffset } = useCanvasStore();
-  const { zoom, panOffset } = viewport;
+  const { viewport, setZoom, setPosition } = useCanvasStore();
+  const { zoom, position } = viewport;
   
-  // Accessibility state for announcements
-  const [lastKeyAction, setLastKeyAction] = useState<string>('');
+  // Accessibility state for announcements (handled via DOM updates)
   
   // Design token constants
   const ZOOM_MIN = 0.25;
@@ -44,31 +43,27 @@ export const useCanvasEvents = (containerRef: RefObject<HTMLDivElement>) => {
       // Pan with arrow keys (WCAG compliant navigation)
       case 'ArrowUp':
         e.preventDefault();
-        const newPanUp = { x: panOffset.x, y: panOffset.y + panSpeed };
-        setPanOffset(newPanUp);
+        const newPanUp = { x: position.x, y: position.y + panSpeed };
+        setPosition(newPanUp);
         actionAnnouncement = 'Moved canvas up';
-        setLastKeyAction(actionAnnouncement);
         break;
       case 'ArrowDown':
         e.preventDefault();
-        const newPanDown = { x: panOffset.x, y: panOffset.y - panSpeed };
-        setPanOffset(newPanDown);
+        const newPanDown = { x: position.x, y: position.y - panSpeed };
+        setPosition(newPanDown);
         actionAnnouncement = 'Moved canvas down';
-        setLastKeyAction(actionAnnouncement);
         break;
       case 'ArrowLeft':
         e.preventDefault();
-        const newPanLeft = { x: panOffset.x + panSpeed, y: panOffset.y };
-        setPanOffset(newPanLeft);
+        const newPanLeft = { x: position.x + panSpeed, y: position.y };
+        setPosition(newPanLeft);
         actionAnnouncement = 'Moved canvas left';
-        setLastKeyAction(actionAnnouncement);
         break;
       case 'ArrowRight':
         e.preventDefault();
-        const newPanRight = { x: panOffset.x - panSpeed, y: panOffset.y };
-        setPanOffset(newPanRight);
+        const newPanRight = { x: position.x - panSpeed, y: position.y };
+        setPosition(newPanRight);
         actionAnnouncement = 'Moved canvas right';
-        setLastKeyAction(actionAnnouncement);
         break;
       
       // Zoom with + and - keys (design token limits enforced)
@@ -79,10 +74,8 @@ export const useCanvasEvents = (containerRef: RefObject<HTMLDivElement>) => {
         if (newZoomIn !== zoom) {
           setZoom(newZoomIn);
           actionAnnouncement = `Zoomed in to ${(newZoomIn * 100).toFixed(0)} percent`;
-          setLastKeyAction(actionAnnouncement);
-        } else {
-          setLastKeyAction('Maximum zoom level reached');
-        }
+          } else {
+          }
         break;
       case '-':
       case '_':
@@ -91,10 +84,8 @@ export const useCanvasEvents = (containerRef: RefObject<HTMLDivElement>) => {
         if (newZoomOut !== zoom) {
           setZoom(newZoomOut);
           actionAnnouncement = `Zoomed out to ${(newZoomOut * 100).toFixed(0)} percent`;
-          setLastKeyAction(actionAnnouncement);
-        } else {
-          setLastKeyAction('Minimum zoom level reached');
-        }
+          } else {
+          }
         break;
       
       // Reset zoom and position with Ctrl/Cmd + 0
@@ -102,34 +93,30 @@ export const useCanvasEvents = (containerRef: RefObject<HTMLDivElement>) => {
         if (e.ctrlKey || e.metaKey) {
           e.preventDefault();
           setZoom(1);
-          setPanOffset({ x: 0, y: 0 });
+          setPosition({ x: 0, y: 0 });
           actionAnnouncement = 'Reset canvas to center at 100 percent zoom';
-          setLastKeyAction(actionAnnouncement);
-        }
+          }
         break;
       
       // Home key to fit content and reset position
       case 'Home':
         e.preventDefault();
         setZoom(1);
-        setPanOffset({ x: 0, y: 0 });
+        setPosition({ x: 0, y: 0 });
         actionAnnouncement = 'Reset canvas to home position';
-        setLastKeyAction(actionAnnouncement);
         break;
         
       // Space key to center canvas (common accessibility pattern)
       case ' ':
         e.preventDefault();
-        setPanOffset({ x: 0, y: 0 });
+        setPosition({ x: 0, y: 0 });
         actionAnnouncement = 'Centered canvas position';
-        setLastKeyAction(actionAnnouncement);
         break;
         
       // Escape key to clear selection (future-proofing for cards)
       case 'Escape':
         e.preventDefault();
         actionAnnouncement = 'Cleared selection';
-        setLastKeyAction(actionAnnouncement);
         break;
     }
     
@@ -140,7 +127,7 @@ export const useCanvasEvents = (containerRef: RefObject<HTMLDivElement>) => {
         statusElement.textContent = actionAnnouncement;
       }
     }
-  }, [zoom, panOffset, setZoom, setPanOffset, containerRef, ZOOM_MIN, ZOOM_MAX]);
+  }, [zoom, position, setZoom, setPosition, containerRef, ZOOM_MIN, ZOOM_MAX]);
 
   // Handle touch events for mobile with accessibility compliance
   const handleTouchStart = useCallback((e: TouchEvent) => {
