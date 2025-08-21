@@ -8,7 +8,6 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import type { CanvasStore, ViewportState, CanvasConfig, CanvasInteraction, CanvasPosition, ZoomLevel } from '@/types/canvas.types';
-import type { Position, Dimensions, Bounds } from '@/types/common.types';
 
 /**
  * Default viewport state

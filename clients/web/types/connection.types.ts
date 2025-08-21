@@ -5,7 +5,7 @@
  * including manual connections and AI-generated suggestions.
  */
 
-import type { Position, Color, EntityId, Timestamp } from './common.types';
+import type { Color, EntityId, Timestamp } from './common.types';
 import type { CanvasPosition } from './canvas.types';
 
 // ============================================================================

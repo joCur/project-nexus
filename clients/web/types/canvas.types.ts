@@ -5,7 +5,7 @@
  * viewport management, interaction state, grid systems, and performance optimizations.
  */
 
-import type { Position, Dimensions, Bounds, Color, EntityId } from './common.types';
+import type { Color, EntityId } from './common.types';
 
 // ============================================================================
 // CORE CANVAS TYPES

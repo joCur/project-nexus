@@ -291,7 +291,7 @@ export interface CanvasEventSystem {
   on(type: ViewportEventType, handler: ViewportEventHandler, options?: EventListenerOptions): void;
   
   // Remove listeners
-  off(type: string, handler: Function): void;
+  off(type: string, handler: (...args: any[]) => void): void;
   
   // Emit events
   emit(event: BaseCanvasEvent): void;
