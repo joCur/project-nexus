@@ -106,6 +106,10 @@ module.exports = {
         'connection-strong': '#8b5cf6',
         'connection-medium': '#a78bfa',
         'connection-weak': '#c4b5fd',
+        
+        // AI gradient colors
+        'ai-gradient-start': '#8b5cf6',
+        'ai-gradient-end': '#7c3aed',
       },
       fontFamily: {
         sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
@@ -189,6 +193,13 @@ module.exports = {
         'slide-up': 'slideUp 300ms ease-out',
         'bounce-gentle': 'bounceGentle 2s infinite',
         'spin-slow': 'spin 2s linear infinite',
+        // Canvas-specific animations
+        'canvas-card-enter': 'canvasCardEnter 400ms ease-out',
+        'canvas-card-exit': 'canvasCardExit 200ms ease-in',
+        'canvas-connection-draw': 'canvasConnectionDraw 600ms ease-out',
+        'canvas-ai-pulse': 'canvasAiPulse 2000ms ease-in-out infinite',
+        'canvas-zoom': 'canvasZoom 300ms ease-out',
+        'canvas-pan': 'canvasPan 150ms ease-out',
       },
       keyframes: {
         fadeIn: {
@@ -202,6 +213,31 @@ module.exports = {
         bounceGentle: {
           '0%, 100%': { transform: 'translateY(0)' },
           '50%': { transform: 'translateY(-5px)' },
+        },
+        // Canvas-specific keyframes
+        canvasCardEnter: {
+          '0%': { opacity: '0', transform: 'scale(0.8)' },
+          '100%': { opacity: '1', transform: 'scale(1)' },
+        },
+        canvasCardExit: {
+          '0%': { opacity: '1', transform: 'scale(1)' },
+          '100%': { opacity: '0', transform: 'scale(0.8)' },
+        },
+        canvasConnectionDraw: {
+          '0%': { strokeDashoffset: '100%' },
+          '100%': { strokeDashoffset: '0%' },
+        },
+        canvasAiPulse: {
+          '0%, 100%': { opacity: '0.5' },
+          '50%': { opacity: '1' },
+        },
+        canvasZoom: {
+          '0%': { transform: 'var(--zoom-from, scale(1))' },
+          '100%': { transform: 'var(--zoom-to, scale(1))' },
+        },
+        canvasPan: {
+          '0%': { transform: 'var(--pan-from, translate(0, 0))' },
+          '100%': { transform: 'var(--pan-to, translate(0, 0))' },
         },
       },
       // Accessibility and design system specific configurations
@@ -219,6 +255,68 @@ module.exports = {
       },
       ringColor: {
         DEFAULT: '#2563eb',
+      },
+      
+      // Canvas-specific utilities
+      // Canvas card sizing - extending existing width/height
+      width: {
+        ...{
+          'canvas-card-min': '200px',
+          'canvas-card-default': '300px',
+          'canvas-card-max': '600px',
+        }
+      },
+      height: {
+        ...{
+          'canvas-card-min': '120px',
+          'canvas-card-default': '200px',
+          'canvas-card-max': '400px',
+        }
+      },
+      
+      // Canvas zoom levels - extending existing scale
+      scale: {
+        ...{
+          '25': '0.25',
+          '35': '0.35',
+          '45': '0.45',
+          '55': '0.55',
+          '65': '0.65',
+          '85': '0.85',
+          '175': '1.75',
+          '200': '2.0',
+          '225': '2.25',
+          '250': '2.5',
+          '275': '2.75',
+          '300': '3.0',
+          '325': '3.25',
+          '350': '3.5',
+          '375': '3.75',
+          '400': '4.0',
+        }
+      },
+      
+      // Connection stroke widths
+      strokeWidth: {
+        'connection-thin': '1',
+        'connection-medium': '2',
+        'connection-thick': '3',
+      },
+      
+      // Animation durations for canvas - extending existing animationDuration  
+      animationDuration: {
+        '100': '100ms',
+        '150': '150ms',
+        '200': '200ms',
+        '400': '400ms',
+        '600': '600ms',
+        '2000': '2000ms',
+      },
+      
+      // Custom timing functions - extending existing animationTimingFunction
+      animationTimingFunction: {
+        'spring': 'cubic-bezier(0.68, -0.55, 0.265, 1.55)',
+        'ease-out-back': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
       },
     },
   },
