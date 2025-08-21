@@ -36,7 +36,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
   onPanChange,
 }) => {
   const stageRef = useRef<Konva.Stage>(null);
-  const { setZoom, setPanOffset } = useCanvasStore();
+  const { setZoom, setPosition } = useCanvasStore();
   
   // Constants from design tokens
   const ZOOM_MIN = 0.25; // 25% minimum zoom
@@ -76,11 +76,11 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
     };
     
     setZoom(newScale);
-    setPanOffset(newPos);
+    setPosition(newPos);
     
     // Notify parent components for accessibility announcements
     onZoomChange?.(newScale);
-  }, [scale.x, position, setZoom, setPanOffset, onZoomChange, ZOOM_MIN, ZOOM_MAX, ZOOM_STEP]);
+  }, [scale.x, position, setZoom, setPosition, onZoomChange, ZOOM_MIN, ZOOM_MAX, ZOOM_STEP]);
   
   // Handle drag events for panning with accessibility notifications
   const handleDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
@@ -90,11 +90,11 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
       y: stage.y(),
     };
     
-    setPanOffset(newPosition);
+    setPosition(newPosition);
     
     // Notify parent components for accessibility announcements
     onPanChange?.(newPosition);
-  }, [setPanOffset, onPanChange]);
+  }, [setPosition, onPanChange]);
   
   // Prevent default context menu for better UX
   const handleContextMenu = useCallback((e: Konva.KonvaEventObject<PointerEvent>) => {

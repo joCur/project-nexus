@@ -7,41 +7,51 @@
 
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import type { CanvasStore, ViewportState, CanvasConfig, CanvasInteraction } from '@/types/canvas.types';
+import type { CanvasStore, ViewportState, CanvasConfig, CanvasInteraction, CanvasPosition, ZoomLevel } from '@/types/canvas.types';
 import type { Position, Dimensions, Bounds } from '@/types/common.types';
 
 /**
  * Default viewport state
  */
 const DEFAULT_VIEWPORT: ViewportState = {
+  position: { x: 0, y: 0 },
   zoom: 1.0,
-  minZoom: 0.1,
-  maxZoom: 5.0,
-  panOffset: { x: 0, y: 0 },
-  center: { x: 0, y: 0 },
-  bounds: { x: 0, y: 0, width: 0, height: 0 },
+  bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+  isDirty: false,
 };
 
 /**
  * Default canvas configuration
  */
 const DEFAULT_CONFIG: CanvasConfig = {
-  backgroundColor: '#f9fafb',
-  showGrid: true,
-  gridSize: 20,
-  gridColor: '#e5e7eb',
-  snapToGrid: false,
-  performanceMode: false,
+  grid: {
+    enabled: true,
+    size: 20,
+    color: '#e5e7eb',
+    opacity: 0.3,
+  },
+  zoom: {
+    min: 0.25,
+    max: 4.0,
+    step: 0.1,
+  },
+  performance: {
+    enableCulling: true,
+    enableVirtualization: true,
+    maxVisibleCards: 1000,
+  },
 };
 
 /**
  * Default interaction state
  */
 const DEFAULT_INTERACTION: CanvasInteraction = {
-  isPanning: false,
-  isSelecting: false,
-  selectionRect: undefined,
-  lastInteractionPosition: { x: 0, y: 0 },
+  mode: 'select',
+  isActive: false,
+  selection: {
+    selectedIds: new Set(),
+  },
+  lastInteractionTime: Date.now(),
 };
 
 /**
@@ -57,66 +67,46 @@ export const useCanvasStore = create<CanvasStore>()(
         interaction: DEFAULT_INTERACTION,
         isInitialized: false,
 
-        // Viewport management actions
-        setZoom: (zoom: number) => {
-          const { minZoom, maxZoom } = get().viewport;
-          const clampedZoom = Math.max(minZoom, Math.min(maxZoom, zoom));
+        // Viewport actions
+        setZoom: (zoom: ZoomLevel) => {
+          const { config } = get();
+          const clampedZoom = Math.max(config.zoom.min, Math.min(config.zoom.max, zoom));
           
           set((state) => ({
             viewport: {
               ...state.viewport,
               zoom: clampedZoom,
+              isDirty: true,
             },
           }));
         },
 
-        zoomIn: (factor: number = 1.2) => {
-          const currentZoom = get().viewport.zoom;
-          get().setZoom(currentZoom * factor);
-        },
-
-        zoomOut: (factor: number = 1.2) => {
-          const currentZoom = get().viewport.zoom;
-          get().setZoom(currentZoom / factor);
-        },
-
-        resetZoom: () => {
-          get().setZoom(1.0);
-        },
-
-        setPanOffset: (offset: Position) => {
+        setPosition: (position: CanvasPosition) => {
           set((state) => ({
             viewport: {
               ...state.viewport,
-              panOffset: offset,
+              position,
+              isDirty: true,
             },
           }));
         },
 
-        panBy: (delta: Position) => {
-          const currentOffset = get().viewport.panOffset;
-          get().setPanOffset({
-            x: currentOffset.x + delta.x,
-            y: currentOffset.y + delta.y,
+        panBy: (offset: CanvasPosition) => {
+          const currentPosition = get().viewport.position;
+          get().setPosition({
+            x: currentPosition.x + offset.x,
+            y: currentPosition.y + offset.y,
           });
         },
 
-        centerOn: (position: Position) => {
-          const { bounds } = get().viewport;
-          const centerX = bounds.width / 2;
-          const centerY = bounds.height / 2;
-          
-          get().setPanOffset({
-            x: centerX - position.x,
-            y: centerY - position.y,
-          });
+        zoomToFit: () => {
+          // Reset to default view
+          get().setPosition({ x: 0, y: 0 });
+          get().setZoom(1.0);
         },
 
-        fitToContent: () => {
-          // This will be implemented when cardStore is available
-          // For now, just reset to default
-          get().setPanOffset({ x: 0, y: 0 });
-          get().resetZoom();
+        centerView: () => {
+          get().setPosition({ x: 0, y: 0 });
         },
 
         // Configuration actions
@@ -133,125 +123,90 @@ export const useCanvasStore = create<CanvasStore>()(
           set((state) => ({
             config: {
               ...state.config,
-              showGrid: !state.config.showGrid,
-            },
-          }));
-        },
-
-        toggleSnapToGrid: () => {
-          set((state) => ({
-            config: {
-              ...state.config,
-              snapToGrid: !state.config.snapToGrid,
+              grid: {
+                ...state.config.grid,
+                enabled: !state.config.grid.enabled,
+              },
             },
           }));
         },
 
         // Interaction actions
-        startPanning: (position: Position) => {
+        setInteractionMode: (mode: CanvasInteraction['mode']) => {
           set((state) => ({
             interaction: {
               ...state.interaction,
-              isPanning: true,
-              lastInteractionPosition: position,
+              mode,
+              lastInteractionTime: Date.now(),
             },
           }));
         },
 
-        updatePanning: (position: Position) => {
-          const { isPanning, lastInteractionPosition } = get().interaction;
-          
-          if (!isPanning) return;
-
-          const delta = {
-            x: position.x - lastInteractionPosition.x,
-            y: position.y - lastInteractionPosition.y,
-          };
-
-          get().panBy(delta);
-          
+        startInteraction: (position: CanvasPosition) => {
           set((state) => ({
             interaction: {
               ...state.interaction,
-              lastInteractionPosition: position,
+              isActive: true,
+              startPosition: position,
+              currentPosition: position,
+              lastInteractionTime: Date.now(),
             },
           }));
         },
 
-        endPanning: () => {
+        updateInteraction: (position: CanvasPosition) => {
           set((state) => ({
             interaction: {
               ...state.interaction,
-              isPanning: false,
+              currentPosition: position,
+              lastInteractionTime: Date.now(),
             },
           }));
         },
 
-        startSelection: (position: Position) => {
+        endInteraction: () => {
           set((state) => ({
             interaction: {
               ...state.interaction,
-              isSelecting: true,
-              selectionRect: {
-                x: position.x,
-                y: position.y,
-                width: 0,
-                height: 0,
-              },
-              lastInteractionPosition: position,
+              isActive: false,
+              startPosition: undefined,
+              currentPosition: undefined,
+              lastInteractionTime: Date.now(),
             },
           }));
         },
 
-        updateSelection: (position: Position) => {
-          const { isSelecting, selectionRect } = get().interaction;
-          
-          if (!isSelecting || !selectionRect) return;
-
-          const width = position.x - selectionRect.x;
-          const height = position.y - selectionRect.y;
-          
+        // Selection actions
+        selectCard: (cardId: import('@/types/common.types').EntityId) => {
           set((state) => ({
             interaction: {
               ...state.interaction,
-              selectionRect: {
-                x: selectionRect.x,
-                y: selectionRect.y,
-                width,
-                height,
-              },
-              lastInteractionPosition: position,
-            },
-          }));
-        },
-
-        endSelection: () => {
-          set((state) => ({
-            interaction: {
-              ...state.interaction,
-              isSelecting: false,
-              selectionRect: undefined,
-            },
-          }));
-        },
-
-        // Initialization actions
-        initialize: (canvasDimensions: Dimensions) => {
-          set((state) => ({
-            viewport: {
-              ...state.viewport,
-              bounds: {
-                x: 0,
-                y: 0,
-                width: canvasDimensions.width,
-                height: canvasDimensions.height,
-              },
-              center: {
-                x: canvasDimensions.width / 2,
-                y: canvasDimensions.height / 2,
+              selection: {
+                selectedIds: new Set([cardId]),
               },
             },
-            isInitialized: true,
+          }));
+        },
+
+        selectMultiple: (cardIds: import('@/types/common.types').EntityId[]) => {
+          set((state) => ({
+            interaction: {
+              ...state.interaction,
+              selection: {
+                selectedIds: new Set(cardIds),
+              },
+            },
+          }));
+        },
+
+        clearSelection: () => {
+          set((state) => ({
+            interaction: {
+              ...state.interaction,
+              selection: {
+                selectedIds: new Set(),
+              },
+            },
           }));
         },
 
@@ -269,8 +224,9 @@ export const useCanvasStore = create<CanvasStore>()(
         // Only persist viewport and config, not interaction state
         partialize: (state) => ({
           viewport: {
+            position: state.viewport.position,
             zoom: state.viewport.zoom,
-            panOffset: state.viewport.panOffset,
+            bounds: state.viewport.bounds,
           },
           config: state.config,
         }),
@@ -288,9 +244,9 @@ export const canvasSelectors = {
   getConfig: (state: CanvasStore) => state.config,
   getInteraction: (state: CanvasStore) => state.interaction,
   getZoom: (state: CanvasStore) => state.viewport.zoom,
-  getPanOffset: (state: CanvasStore) => state.viewport.panOffset,
-  isGridVisible: (state: CanvasStore) => state.config.showGrid,
-  isSnapToGridEnabled: (state: CanvasStore) => state.config.snapToGrid,
-  isPanning: (state: CanvasStore) => state.interaction.isPanning,
-  isSelecting: (state: CanvasStore) => state.interaction.isSelecting,
+  getPosition: (state: CanvasStore) => state.viewport.position,
+  isGridVisible: (state: CanvasStore) => state.config.grid.enabled,
+  isInteractionActive: (state: CanvasStore) => state.interaction.isActive,
+  getSelectedCards: (state: CanvasStore) => Array.from(state.interaction.selection.selectedIds),
+  getInteractionMode: (state: CanvasStore) => state.interaction.mode,
 };

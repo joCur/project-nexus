@@ -43,8 +43,8 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const { width, height } = useCanvasSize(containerRef);
-  const { viewport, initialize } = useCanvasStore();
-  const { zoom, panOffset } = viewport;
+  const { viewport } = useCanvasStore();
+  const { zoom, position } = viewport;
   
   // Accessibility state for screen reader announcements
   const [announcement, setAnnouncement] = useState<string>('');
@@ -70,9 +70,10 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
   // Initialize canvas dimensions
   useEffect(() => {
     if (width > 0 && height > 0) {
-      initialize({ width, height });
+      // Canvas is now initialized through store defaults
+      // No explicit initialization needed
     }
-  }, [width, height, initialize]);
+  }, [width, height]);
 
   // Announce zoom changes for screen readers (throttled)
   useEffect(() => {
@@ -88,9 +89,9 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
 
   useEffect(() => {
     if (debug) {
-      console.log('Canvas initialized:', { width, height, zoom, panOffset });
+      console.log('Canvas initialized:', { width, height, zoom, position });
     }
-  }, [width, height, zoom, panOffset, debug]);
+  }, [width, height, zoom, position, debug]);
 
   return (
     <div
@@ -126,7 +127,7 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
         width={width}
         height={height}
         scale={{ x: zoom, y: zoom }}
-        position={panOffset}
+        position={{ x: position.x, y: position.y }}
       >
         <CanvasBackground
           width={width}
@@ -147,7 +148,7 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
           <div className="font-medium mb-1">Canvas Debug Info</div>
           <div>Size: {width}×{height}px</div>
           <div>Zoom: {(zoom * 100).toFixed(0)}% (range: 25%-400%)</div>
-          <div>Position: ({panOffset.x.toFixed(0)}, {panOffset.y.toFixed(0)})</div>
+          <div>Position: ({position.x.toFixed(0)}, {position.y.toFixed(0)})</div>
           <div className="text-neutral-300 text-xs mt-1">
             Grid: {showGrid ? 'enabled' : 'disabled'}
           </div>
