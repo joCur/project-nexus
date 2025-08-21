@@ -1,9 +1,14 @@
 {
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "playwright",
     "context7",
     "semgrep",
     "linear"
   ],
-  "enableAllProjectMcpServers": true
+  "permissions": {
+    "allow": [
+      "Bash(gh pr list:*)"
+    ]
+  }
 }
