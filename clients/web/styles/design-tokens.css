@@ -29,7 +29,7 @@
   --color-secondary-400: #c084fc;
   --color-secondary-500: #a855f7;
   --color-secondary-600: #9333ea;
-  --color-secondary-700: #7c2d12;
+  --color-secondary-700: #7c3aed;
   --color-secondary-800: #6b21a8;
   --color-secondary-900: #581c87;
   
@@ -257,6 +257,56 @@
   --z-index-40: 40;
   --z-index-50: 50;
   --z-index-auto: auto;
+  
+  /* Canvas Tokens */
+  
+  /* Canvas Card Sizing */
+  --canvas-card-min-width: 200px;
+  --canvas-card-max-width: 600px;
+  --canvas-card-min-height: 120px;
+  --canvas-card-max-height: 400px;
+  --canvas-card-default-width: 300px;
+  --canvas-card-default-height: 200px;
+  
+  /* Canvas Connection Styles */
+  --canvas-connection-stroke-thin: 1px;
+  --canvas-connection-stroke-medium: 2px;
+  --canvas-connection-stroke-thick: 3px;
+  --canvas-connection-dash-solid: none;
+  --canvas-connection-dash-dashed: 5, 5;
+  --canvas-connection-dash-dotted: 2, 2;
+  
+  /* Canvas Zoom Constraints */
+  --canvas-zoom-min: 0.25;
+  --canvas-zoom-max: 4.0;
+  --canvas-zoom-default: 1.0;
+  --canvas-zoom-step: 0.1;
+  
+  /* AI Processing Colors and Durations */
+  --ai-processing-duration: 2000ms;
+  --ai-gradient-start: #8b5cf6;
+  --ai-gradient-end: #7c3aed;
+  --ai-confidence-high: 0.9;
+  --ai-confidence-medium: 0.7;
+  --ai-confidence-low: 0.5;
+  
+  /* Canvas Animation Durations */
+  --canvas-card-enter-duration: 400ms;
+  --canvas-card-exit-duration: 200ms;
+  --canvas-connection-draw-duration: 600ms;
+  --canvas-zoom-duration: 300ms;
+  --canvas-pan-duration: 150ms;
+  
+  /* Canvas Animation Timing Functions */
+  --canvas-ease-out: cubic-bezier(0.0, 0, 0.2, 1);
+  --canvas-ease-in-out: cubic-bezier(0.4, 0, 0.6, 1);
+  --canvas-spring: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  
+  /* Canvas Grid Variables */
+  --canvas-grid-size: 20px;
+  --canvas-grid-color: rgba(0, 0, 0, 0.1);
+  --canvas-grid-major-color: rgba(0, 0, 0, 0.2);
+  --canvas-grid-major-interval: 5;
 }
 
 /* High Contrast Mode Support */

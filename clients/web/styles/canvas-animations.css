@@ -1,0 +1,346 @@
+/**
+ * Canvas Animation CSS
+ * High-performance animations for Project Nexus canvas elements
+ * 
+ * All animations use GPU-accelerated properties (transform, opacity)
+ * for 60fps performance and respect prefers-reduced-motion settings.
+ */
+
+/* Canvas Card Animations */
+@keyframes canvas-card-enter {
+  0% {
+    opacity: 0;
+    transform: scale(0.8) translateZ(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateZ(0);
+  }
+}
+
+@keyframes canvas-card-exit {
+  0% {
+    opacity: 1;
+    transform: scale(1) translateZ(0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.8) translateZ(0);
+  }
+}
+
+@keyframes canvas-card-hover {
+  0% {
+    transform: translateY(0) translateZ(0);
+  }
+  100% {
+    transform: translateY(-2px) translateZ(0);
+  }
+}
+
+/* Canvas Connection Animations */
+@keyframes canvas-connection-draw {
+  0% {
+    stroke-dashoffset: 100%;
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0%;
+    opacity: 1;
+  }
+}
+
+@keyframes canvas-connection-flow {
+  0% {
+    stroke-dashoffset: 100%;
+  }
+  100% {
+    stroke-dashoffset: 0%;
+  }
+}
+
+@keyframes canvas-connection-pulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* AI Processing Animations */
+@keyframes canvas-ai-pulse {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(1) translateZ(0);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05) translateZ(0);
+  }
+}
+
+@keyframes canvas-ai-processing {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes canvas-ai-thinking {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  33% {
+    opacity: 1;
+  }
+  66% {
+    opacity: 0.6;
+  }
+}
+
+/* Canvas Navigation Animations */
+@keyframes canvas-zoom {
+  0% {
+    transform: var(--zoom-from, scale(1)) translateZ(0);
+  }
+  100% {
+    transform: var(--zoom-to, scale(1)) translateZ(0);
+  }
+}
+
+@keyframes canvas-pan {
+  0% {
+    transform: var(--pan-from, translate(0, 0)) translateZ(0);
+  }
+  100% {
+    transform: var(--pan-to, translate(0, 0)) translateZ(0);
+  }
+}
+
+@keyframes canvas-focus {
+  0% {
+    transform: scale(1) translateZ(0);
+  }
+  50% {
+    transform: scale(1.02) translateZ(0);
+  }
+  100% {
+    transform: scale(1) translateZ(0);
+  }
+}
+
+/* Canvas Selection Animations */
+@keyframes canvas-select {
+  0% {
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4);
+  }
+  100% {
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.4);
+  }
+}
+
+@keyframes canvas-multi-select {
+  0% {
+    box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.4);
+  }
+  100% {
+    box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.4);
+  }
+}
+
+/* Canvas Grid Animations */
+@keyframes canvas-grid-fade-in {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0.1;
+  }
+}
+
+/* Canvas Loading States */
+@keyframes canvas-skeleton-pulse {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes canvas-shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+/* Animation Classes */
+.canvas-card-enter {
+  animation: canvas-card-enter var(--canvas-card-enter-duration, 400ms) var(--canvas-ease-out, cubic-bezier(0.0, 0, 0.2, 1));
+}
+
+.canvas-card-exit {
+  animation: canvas-card-exit var(--canvas-card-exit-duration, 200ms) ease-in;
+}
+
+.canvas-card-hover {
+  transition: transform 150ms var(--canvas-ease-out, cubic-bezier(0.0, 0, 0.2, 1));
+}
+
+.canvas-card-hover:hover {
+  transform: translateY(-2px) translateZ(0);
+}
+
+.canvas-connection-draw {
+  animation: canvas-connection-draw var(--canvas-connection-draw-duration, 600ms) var(--canvas-ease-out, cubic-bezier(0.0, 0, 0.2, 1));
+}
+
+.canvas-connection-flow {
+  animation: canvas-connection-flow 2s linear infinite;
+}
+
+.canvas-ai-pulse {
+  animation: canvas-ai-pulse var(--ai-processing-duration, 2000ms) ease-in-out infinite;
+}
+
+.canvas-ai-processing {
+  background: linear-gradient(
+    45deg,
+    transparent,
+    var(--ai-gradient-start, #8b5cf6),
+    var(--ai-gradient-end, #7c3aed),
+    transparent
+  );
+  background-size: 200% 200%;
+  animation: canvas-ai-processing 2s ease infinite;
+}
+
+.canvas-zoom {
+  animation: canvas-zoom var(--canvas-zoom-duration, 300ms) var(--canvas-ease-out, cubic-bezier(0.0, 0, 0.2, 1));
+}
+
+.canvas-pan {
+  animation: canvas-pan var(--canvas-pan-duration, 150ms) var(--canvas-ease-out, cubic-bezier(0.0, 0, 0.2, 1));
+}
+
+.canvas-focus {
+  animation: canvas-focus 300ms var(--canvas-ease-out, cubic-bezier(0.0, 0, 0.2, 1));
+}
+
+.canvas-select {
+  animation: canvas-select 150ms var(--canvas-ease-out, cubic-bezier(0.0, 0, 0.2, 1)) forwards;
+}
+
+.canvas-multi-select {
+  animation: canvas-multi-select 150ms var(--canvas-ease-out, cubic-bezier(0.0, 0, 0.2, 1)) forwards;
+}
+
+.canvas-skeleton-pulse {
+  animation: canvas-skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+.canvas-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.4) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 200px 100%;
+  animation: canvas-shimmer 1.5s infinite;
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  
+  .canvas-card-enter,
+  .canvas-card-exit,
+  .canvas-connection-draw,
+  .canvas-ai-pulse,
+  .canvas-ai-processing,
+  .canvas-zoom,
+  .canvas-pan,
+  .canvas-focus,
+  .canvas-select,
+  .canvas-multi-select,
+  .canvas-skeleton-pulse,
+  .canvas-shimmer {
+    animation: none !important;
+    transition: none !important;
+  }
+  
+  .canvas-card-hover:hover {
+    transform: none !important;
+  }
+}
+
+/* High Performance Optimizations */
+.canvas-card-enter,
+.canvas-card-exit,
+.canvas-card-hover,
+.canvas-zoom,
+.canvas-pan,
+.canvas-focus,
+.canvas-ai-pulse {
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  perspective: 1000px;
+  transform-style: preserve-3d;
+}
+
+/* Remove will-change after animations complete */
+.canvas-animation-complete {
+  will-change: auto;
+}
+
+/* Connection-specific optimizations */
+.canvas-connection-draw,
+.canvas-connection-flow,
+.canvas-connection-pulse {
+  will-change: stroke-dashoffset, opacity;
+}
+
+/* Grid optimization */
+.canvas-grid-fade-in {
+  will-change: opacity;
+}
+
+/* AI processing optimizations */
+.canvas-ai-processing {
+  will-change: background-position;
+}
+
+.canvas-shimmer {
+  will-change: background-position;
+}
+
+/* Performance hints for canvas elements */
+.canvas-element {
+  contain: layout style paint;
+  transform: translateZ(0);
+}
+
+.canvas-layer {
+  isolation: isolate;
+  contain: layout style paint;
+}
