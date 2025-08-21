@@ -25,7 +25,7 @@ describe('useCanvasEvents', () => {
   let mockElement: HTMLDivElement;
   let containerRef: RefObject<HTMLDivElement>;
   let mockSetZoom: jest.Mock;
-  let mockSetPanOffset: jest.Mock;
+  let mockSetPosition: jest.Mock;
   let mockStore: any;
 
   beforeEach(() => {
@@ -43,15 +43,15 @@ describe('useCanvasEvents', () => {
 
     // Mock store functions
     mockSetZoom = jest.fn();
-    mockSetPanOffset = jest.fn();
+    mockSetPosition = jest.fn();
 
     mockStore = {
       viewport: {
         zoom: 1,
-        panOffset: { x: 0, y: 0 },
+        position: { x: 0, y: 0 },
       },
       setZoom: mockSetZoom,
-      setPanOffset: mockSetPanOffset,
+      setPosition: mockSetPosition,
     };
 
     (useCanvasStore as unknown as jest.Mock).mockReturnValue(mockStore);
@@ -115,25 +115,25 @@ describe('useCanvasEvents', () => {
         keydownHandler({ key: 'ArrowUp', preventDefault } as unknown as KeyboardEvent);
       });
       expect(preventDefault).toHaveBeenCalled();
-      expect(mockSetPanOffset).toHaveBeenCalledWith({ x: 0, y: 20 });
+      expect(mockSetPosition).toHaveBeenCalledWith({ x: 0, y: 20 });
       
       // Test ArrowDown
       act(() => {
         keydownHandler({ key: 'ArrowDown', preventDefault } as unknown as KeyboardEvent);
       });
-      expect(mockSetPanOffset).toHaveBeenCalledWith({ x: 0, y: -20 });
+      expect(mockSetPosition).toHaveBeenCalledWith({ x: 0, y: -20 });
       
       // Test ArrowLeft
       act(() => {
         keydownHandler({ key: 'ArrowLeft', preventDefault } as unknown as KeyboardEvent);
       });
-      expect(mockSetPanOffset).toHaveBeenCalledWith({ x: 20, y: 0 });
+      expect(mockSetPosition).toHaveBeenCalledWith({ x: 20, y: 0 });
       
       // Test ArrowRight
       act(() => {
         keydownHandler({ key: 'ArrowRight', preventDefault } as unknown as KeyboardEvent);
       });
-      expect(mockSetPanOffset).toHaveBeenCalledWith({ x: -20, y: 0 });
+      expect(mockSetPosition).toHaveBeenCalledWith({ x: -20, y: 0 });
     });
 
     it('handles zoom in with + and = keys', () => {
@@ -204,14 +204,14 @@ describe('useCanvasEvents', () => {
       });
       expect(preventDefault).toHaveBeenCalled();
       expect(mockSetZoom).toHaveBeenCalledWith(1);
-      expect(mockSetPanOffset).toHaveBeenCalledWith({ x: 0, y: 0 });
+      expect(mockSetPosition).toHaveBeenCalledWith({ x: 0, y: 0 });
       
       // Test Cmd+0 (metaKey)
       act(() => {
         keydownHandler({ key: '0', metaKey: true, preventDefault } as unknown as KeyboardEvent);
       });
       expect(mockSetZoom).toHaveBeenCalledWith(1);
-      expect(mockSetPanOffset).toHaveBeenCalledWith({ x: 0, y: 0 });
+      expect(mockSetPosition).toHaveBeenCalledWith({ x: 0, y: 0 });
     });
 
     it('handles Home key reset', () => {
@@ -222,7 +222,7 @@ describe('useCanvasEvents', () => {
       });
       expect(preventDefault).toHaveBeenCalled();
       expect(mockSetZoom).toHaveBeenCalledWith(1);
-      expect(mockSetPanOffset).toHaveBeenCalledWith({ x: 0, y: 0 });
+      expect(mockSetPosition).toHaveBeenCalledWith({ x: 0, y: 0 });
     });
 
     it('ignores events when canvas is not focused', () => {
@@ -234,7 +234,7 @@ describe('useCanvasEvents', () => {
       });
       
       expect(preventDefault).not.toHaveBeenCalled();
-      expect(mockSetPanOffset).not.toHaveBeenCalled();
+      expect(mockSetPosition).not.toHaveBeenCalled();
     });
 
     it('ignores 0 key without modifier keys', () => {
