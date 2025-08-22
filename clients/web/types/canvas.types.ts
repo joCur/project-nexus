@@ -12,11 +12,12 @@ import type { Color, EntityId } from './common.types';
 // ============================================================================
 
 /**
- * Canvas position coordinates
+ * Canvas position coordinates with optional z-axis for layering
  */
 export interface CanvasPosition {
   x: number;
   y: number;
+  z?: number;
 }
 
 /**

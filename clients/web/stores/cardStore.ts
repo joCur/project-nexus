@@ -125,10 +125,12 @@ const createNewCard = (params: CreateCardParams): Card => {
   return {
     id: generateCardId(),
     content,
-    position: params.position,
+    position: {
+      ...params.position,
+      z: params.position.z ?? Date.now(), // Use position.z for layering
+    },
     dimensions: params.dimensions || DEFAULT_DIMENSIONS[params.type],
     style: { ...DEFAULT_STYLE, ...params.style },
-    zIndex: Date.now(),
     isSelected: false,
     isLocked: false,
     isHidden: false,
@@ -407,14 +409,36 @@ export const useCardStore = create<CardStore>()(
         },
 
         bringToFront: (id: CardId) => {
-          get().updateCard({ id, updates: { zIndex: Date.now() } });
+          const card = get().cards.get(id);
+          if (!card) return;
+          
+          get().updateCard({ 
+            id, 
+            updates: { 
+              position: {
+                ...card.position,
+                z: Date.now()
+              }
+            }
+          });
         },
 
         sendToBack: (id: CardId) => {
-          const minZIndex = Math.min(
-            ...Array.from(get().cards.values()).map((c) => c.zIndex)
+          const card = get().cards.get(id);
+          if (!card) return;
+          
+          const minZ = Math.min(
+            ...Array.from(get().cards.values()).map((c) => c.position.z ?? 0)
           );
-          get().updateCard({ id, updates: { zIndex: minZIndex - 1 } });
+          get().updateCard({ 
+            id, 
+            updates: { 
+              position: {
+                ...card.position,
+                z: minZ - 1
+              }
+            }
+          });
         },
 
         // Drag operations
