@@ -23,6 +23,7 @@ export const canvasTypeDefs = gql`
   type Position {
     x: Float!
     y: Float!
+    z: Float!
   }
 
   # Card dimensions (aligns with frontend Dimensions)
@@ -92,7 +93,6 @@ export const canvasTypeDefs = gql`
     # Canvas positioning (aligns with frontend)
     position: Position!
     dimensions: Dimensions!
-    zIndex: Int!
     
     # Visual styling
     style: CardStyle!
@@ -193,6 +193,7 @@ export const canvasTypeDefs = gql`
   input PositionInput {
     x: Float!
     y: Float!
+    z: Float!
   }
 
   # Dimensions input
@@ -245,7 +246,6 @@ export const canvasTypeDefs = gql`
     metadata: JSON
     status: CardStatus
     priority: CardPriority
-    zIndex: Int
   }
 
   # Batch position update for performance

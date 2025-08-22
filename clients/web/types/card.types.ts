@@ -180,14 +180,12 @@ interface BaseCard {
   id: CardId;
   /** Card content with discriminated union */
   content: CardContent;
-  /** Canvas position */
+  /** Canvas position (z component is used for layering) */
   position: CanvasPosition;
   /** Card dimensions */
   dimensions: Dimensions;
   /** Visual styling */
   style: CardStyle;
-  /** Z-index for layering */
-  zIndex: number;
   /** Selection state */
   isSelected: boolean;
   /** Locked state prevents editing */
