@@ -283,8 +283,8 @@ export class CardValidator {
    */
   static sanitizeContent(content: string, type: CardType): string {
     switch (type) {
-      case 'TEXT':
-      case 'CODE':
+      case CardType.TEXT:
+      case CardType.CODE:
         // Basic HTML entity encoding to prevent XSS
         return content
           .replace(/&/g, '&amp;')
@@ -293,9 +293,9 @@ export class CardValidator {
           .replace(/"/g, '&quot;')
           .replace(/'/g, '&#x27;');
       
-      case 'LINK':
-      case 'IMAGE':
-      case 'FILE':
+      case CardType.LINK:
+      case CardType.IMAGE:
+      case CardType.FILE:
         // For URLs, ensure they're properly encoded
         try {
           const url = new URL(content);
@@ -304,7 +304,7 @@ export class CardValidator {
           return content; // Return as-is if not a valid URL
         }
       
-      case 'DRAWING':
+      case CardType.DRAWING:
         // For drawing data, ensure it's valid JSON
         try {
           return JSON.stringify(JSON.parse(content));
