@@ -1,11 +1,13 @@
 import { gql } from 'apollo-server-express';
+import { canvasTypeDefs } from './canvasTypeDefs';
 
 /**
- * GraphQL type definitions for Project Nexus authentication system
+ * GraphQL type definitions for Project Nexus
+ * Combines authentication system and canvas functionality
  * Based on technical architecture specifications
  */
 
-export const typeDefs = gql`
+export const authTypeDefs = gql`
   # Scalar types
   scalar DateTime
   scalar JSON
@@ -376,3 +378,9 @@ export const typeDefs = gql`
     adminMutation: String @requireRole(role: SUPER_ADMIN)
   }
 `;
+
+/**
+ * Combined type definitions for the complete GraphQL schema
+ * Merges authentication and canvas type definitions
+ */
+export const typeDefs = [authTypeDefs, canvasTypeDefs];
