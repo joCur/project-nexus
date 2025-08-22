@@ -8,12 +8,15 @@ import {
   DbCard, 
   CardType, 
   CardStatus, 
+  CardPriority,
+  CardAnimation,
   CardPosition, 
   CardDimensions,
   ConflictResolution,
   CardConflict,
   UpdateCardInput,
-  ConflictStrategy
+  ConflictStrategy,
+  DEFAULT_CARD_STYLE
 } from '@/types/CardTypes';
 import { createHash } from 'crypto';
 
@@ -25,6 +28,10 @@ export class CardMapper {
    * Map database card record to Card interface
    */
   static mapDbCardToCard(dbCard: DbCard): Card {
+    const defaultAnimation: CardAnimation = {
+      isAnimating: false,
+    };
+
     return {
       id: dbCard.id,
       workspaceId: dbCard.workspace_id,
@@ -34,7 +41,7 @@ export class CardMapper {
       position: {
         x: dbCard.position_x,
         y: dbCard.position_y,
-        z: dbCard.position_z,
+        z: dbCard.z_index,
       },
       dimensions: {
         width: dbCard.width,
@@ -42,6 +49,8 @@ export class CardMapper {
       },
       metadata: this.parseJsonSafely(dbCard.metadata, {}),
       status: dbCard.status as CardStatus,
+      priority: dbCard.priority as CardPriority,
+      style: this.parseJsonSafely(dbCard.style, DEFAULT_CARD_STYLE),
       version: dbCard.version,
       createdAt: new Date(dbCard.created_at),
       updatedAt: new Date(dbCard.updated_at),
@@ -50,6 +59,12 @@ export class CardMapper {
       tags: this.parseJsonSafely(dbCard.tags, []),
       lastSavedAt: dbCard.last_saved_at ? new Date(dbCard.last_saved_at) : undefined,
       isDirty: dbCard.is_dirty,
+      isLocked: dbCard.is_locked,
+      isHidden: dbCard.is_hidden,
+      isMinimized: dbCard.is_minimized,
+      isSelected: dbCard.is_selected,
+      rotation: dbCard.rotation,
+      animation: this.parseJsonSafely(dbCard.animation, defaultAnimation),
       embeddings: dbCard.embedding,
       analysisResults: dbCard.analysis_results ? this.parseJsonSafely(dbCard.analysis_results, undefined) : undefined,
     };
@@ -67,17 +82,25 @@ export class CardMapper {
       content: card.content,
       position_x: card.position.x,
       position_y: card.position.y,
-      position_z: card.position.z,
+      z_index: card.position.z,
       width: card.dimensions.width,
       height: card.dimensions.height,
       metadata: JSON.stringify(card.metadata),
       status: card.status,
+      priority: card.priority,
+      style: JSON.stringify(card.style),
       version: card.version,
       created_by: card.createdBy,
       last_modified_by: card.lastModifiedBy,
       tags: JSON.stringify(card.tags),
       last_saved_at: card.lastSavedAt,
       is_dirty: card.isDirty,
+      is_locked: card.isLocked,
+      is_hidden: card.isHidden,
+      is_minimized: card.isMinimized,
+      is_selected: card.isSelected,
+      rotation: card.rotation,
+      animation: JSON.stringify(card.animation),
       embedding: card.embeddings,
       embedding_model: card.embeddings ? 'text-embedding-ada-002' : undefined,
       embedding_created_at: card.embeddings ? new Date() : undefined,
