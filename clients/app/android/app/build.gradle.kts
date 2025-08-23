@@ -31,7 +31,7 @@ android {
         
         // Auth0 configuration  
         manifestPlaceholders["auth0Domain"] = "your-tenant.auth0.com"
-        manifestPlaceholders["auth0Scheme"] = "dev.curth.nexusmobile"
+        manifestPlaceholders["appAuthRedirectScheme"] = "dev.curth.nexusmobile"
     }
 
     buildTypes {

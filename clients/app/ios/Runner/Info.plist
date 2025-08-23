@@ -50,11 +50,13 @@
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>dev.curth.nexusmobile</string>
+			<string>auth0</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>dev.curth.nexusmobile</string>
+				<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 			</array>
 		</dict>
 	</array>
