@@ -57,12 +57,12 @@ class AppEnvironment {
       case Environment.development:
         return const String.fromEnvironment(
           'AUTH0_DOMAIN',
-          defaultValue: 'your-tenant.auth0.com',
+          defaultValue: 'auth.nexus-app.de',
         );
       case Environment.production:
         return const String.fromEnvironment(
           'AUTH0_DOMAIN',
-          defaultValue: 'your-tenant.auth0.com',
+          defaultValue: 'auth.nexus-app.de',
         );
     }
   }
