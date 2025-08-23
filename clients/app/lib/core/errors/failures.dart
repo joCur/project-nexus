@@ -47,3 +47,25 @@ class ValidationFailure extends Failure {
   @override
   String toString() => 'ValidationFailure(message: $message)';
 }
+
+class AuthFailure extends Failure {
+  const AuthFailure({
+    required this.message,
+    required this.code,
+  });
+
+  final String message;
+  final String code;
+
+  factory AuthFailure.loginFailed(String message) =>
+      AuthFailure(message: 'Login failed: $message', code: 'login_failed');
+
+  factory AuthFailure.loginCancelled() =>
+      const AuthFailure(message: 'Login was cancelled by user', code: 'login_cancelled');
+
+  factory AuthFailure.logoutFailed(String message) =>
+      AuthFailure(message: 'Logout failed: $message', code: 'logout_failed');
+
+  @override
+  String toString() => 'AuthFailure($code): $message';
+}

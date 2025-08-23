@@ -50,4 +50,72 @@ class AppEnvironment {
         return const Duration(seconds: 30);
     }
   }
+
+  // Auth0 Configuration
+  static String get auth0Domain {
+    switch (_environment) {
+      case Environment.development:
+        return const String.fromEnvironment(
+          'AUTH0_DOMAIN',
+          defaultValue: 'your-tenant.auth0.com',
+        );
+      case Environment.production:
+        return const String.fromEnvironment(
+          'AUTH0_DOMAIN',
+          defaultValue: 'your-tenant.auth0.com',
+        );
+    }
+  }
+
+  static String get auth0ClientId {
+    switch (_environment) {
+      case Environment.development:
+        return const String.fromEnvironment(
+          'AUTH0_CLIENT_ID',
+          defaultValue: 'your-auth0-client-id',
+        );
+      case Environment.production:
+        return const String.fromEnvironment(
+          'AUTH0_CLIENT_ID',
+          defaultValue: 'your-auth0-client-id',
+        );
+    }
+  }
+
+  static String get auth0Audience {
+    switch (_environment) {
+      case Environment.development:
+        return const String.fromEnvironment(
+          'AUTH0_AUDIENCE',
+          defaultValue: 'https://api.nexus.app',
+        );
+      case Environment.production:
+        return const String.fromEnvironment(
+          'AUTH0_AUDIENCE',
+          defaultValue: 'https://api.nexus.app',
+        );
+    }
+  }
+
+  static String get auth0RedirectUri {
+    switch (_environment) {
+      case Environment.development:
+        return 'com.nexus.mobile.dev://login-callback';
+      case Environment.production:
+        return 'com.nexus.mobile://login-callback';
+    }
+  }
+
+  static String get auth0LogoutUri {
+    switch (_environment) {
+      case Environment.development:
+        return 'com.nexus.mobile.dev://logout-callback';
+      case Environment.production:
+        return 'com.nexus.mobile://logout-callback';
+    }
+  }
+
+  // Development mode authentication
+  static bool get enableDevelopmentAuth => isDevelopment && 
+    const bool.fromEnvironment('ENABLE_DEV_AUTH', defaultValue: true);
 }

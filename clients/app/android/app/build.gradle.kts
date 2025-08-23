@@ -28,6 +28,10 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        
+        // Auth0 configuration
+        manifestPlaceholders["auth0Domain"] = "your-tenant.auth0.com"
+        manifestPlaceholders["auth0Scheme"] = "${applicationId}.auth0"
     }
 
     buildTypes {

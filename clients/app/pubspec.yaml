@@ -37,7 +37,13 @@ dependencies:
   go_router: ^16.2.0
   json_annotation: ^4.8.1
   path_provider: ^2.1.2
+  riverpod_annotation: ^2.3.5
   shared_preferences: ^2.2.2
+  
+  # Auth0 and Security
+  auth0_flutter: ^1.7.2
+  flutter_secure_storage: ^9.2.2
+  crypto: ^3.0.3
 
 dev_dependencies:
   flutter_test:
