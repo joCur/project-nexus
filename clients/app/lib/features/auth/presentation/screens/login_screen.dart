@@ -174,8 +174,14 @@ class LoginScreen extends ConsumerWidget {
   }
 
   void _handleLogin(BuildContext context, WidgetRef ref) async {
+    // Read the notifier before async operation
+    final authNotifier = ref.read(authNotifierProvider.notifier);
+    
     // Perform login
-    await ref.read(authNotifierProvider.notifier).login();
+    await authNotifier.login();
+    
+    // Check if widget is still mounted before using context or ref
+    if (!context.mounted) return;
     
     // After successful login, the router will automatically redirect
     // based on auth state and redirect_to parameter
