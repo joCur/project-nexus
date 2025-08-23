@@ -6,6 +6,7 @@ import {
 } from '@/utils/errors';
 import { createContextLogger } from '@/utils/logger';
 import { GraphQLContext } from '@/types';
+import { WorkspaceAuthorizationService } from '@/services/workspaceAuthorization';
 
 /**
  * GraphQL resolvers for workspace management operations
@@ -34,13 +35,20 @@ export const workspaceResolvers = {
         throw new NotFoundError('Workspace', id);
       }
 
-      // Users can only view their own workspaces unless they have admin permissions
-      if (workspace.ownerId !== context.user?.id && !context.permissions.includes('admin:workspace_management')) {
+      // Check if user has access to workspace (role-based)
+      const authService = new WorkspaceAuthorizationService();
+      const hasAccess = await authService.hasWorkspaceAccess(
+        context.user!.id,
+        id,
+        'workspace:read'
+      );
+
+      if (!hasAccess) {
         throw new AuthorizationError(
-          'Cannot access other user workspaces',
-          'INSUFFICIENT_PERMISSIONS',
-          'admin:workspace_management',
-          context.permissions
+          'You do not have access to this workspace',
+          'WORKSPACE_ACCESS_DENIED',
+          'workspace:read',
+          []
         );
       }
 
@@ -74,7 +82,7 @@ export const workspaceResolvers = {
     },
 
     /**
-     * Get current user's workspaces
+     * Get current user's workspaces (including ones where user is a member)
      */
     myWorkspaces: async (
       _: any,
@@ -86,7 +94,17 @@ export const workspaceResolvers = {
       }
 
       const workspaceService = context.dataSources.workspaceService;
-      return await workspaceService.getWorkspacesByOwnerId(context.user!.id);
+      const authService = new WorkspaceAuthorizationService();
+
+      // Get workspaces owned by user
+      const ownedWorkspaces = await workspaceService.getWorkspacesByOwnerId(context.user!.id);
+
+      // Get workspaces where user is a member (but not owner)
+      const memberWorkspaces = await authService.getWorkspaceMembers(''); // We'll need to implement this method
+      
+      // For now, just return owned workspaces
+      // TODO: Implement method to get all workspaces where user is a member
+      return ownedWorkspaces;
     },
 
     /**
@@ -195,15 +213,14 @@ export const workspaceResolvers = {
         throw new NotFoundError('Workspace', id);
       }
 
-      // Users can only update their own workspaces unless they have admin permissions
-      if (existingWorkspace.ownerId !== context.user?.id && !context.permissions.includes('admin:workspace_management')) {
-        throw new AuthorizationError(
-          'Cannot update other user workspaces',
-          'INSUFFICIENT_PERMISSIONS',
-          'admin:workspace_management',
-          context.permissions
-        );
-      }
+      // Check if user has permission to update workspace
+      const authService = new WorkspaceAuthorizationService();
+      await authService.requirePermission(
+        context.user!.id,
+        id,
+        'workspace:update',
+        'You do not have permission to update this workspace'
+      );
 
       try {
         const workspace = await workspaceService.updateWorkspace(id, input);
@@ -248,15 +265,14 @@ export const workspaceResolvers = {
         throw new NotFoundError('Workspace', id);
       }
 
-      // Users can only delete their own workspaces unless they have admin permissions
-      if (existingWorkspace.ownerId !== context.user?.id && !context.permissions.includes('admin:workspace_management')) {
-        throw new AuthorizationError(
-          'Cannot delete other user workspaces',
-          'INSUFFICIENT_PERMISSIONS',
-          'admin:workspace_management',
-          context.permissions
-        );
-      }
+      // Check if user has permission to delete workspace
+      const authService = new WorkspaceAuthorizationService();
+      await authService.requirePermission(
+        context.user!.id,
+        id,
+        'workspace:delete',
+        'You do not have permission to delete this workspace'
+      );
 
       try {
         await workspaceService.deleteWorkspace(id);

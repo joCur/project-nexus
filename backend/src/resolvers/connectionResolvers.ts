@@ -679,12 +679,14 @@ export const connectionResolvers = {
         
         // Validate workspace access for all affected workspaces
         const authService = new WorkspaceAuthorizationService();
-        await authService.requireMultipleWorkspacePermissions(
-          context.user!.id,
-          workspaceIds,
-          'connection:delete',
-          'Cannot delete connections in workspaces you do not have access to'
-        );
+        for (const workspaceId of workspaceIds) {
+          await authService.requirePermission(
+            context.user!.id,
+            workspaceId,
+            'connection:delete',
+            `Cannot delete connections in workspace ${workspaceId}`
+          );
+        }
 
         const result = await connectionService.batchDeleteConnections(connectionIds, context.user!.id);
 

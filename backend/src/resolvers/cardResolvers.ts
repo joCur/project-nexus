@@ -21,6 +21,7 @@ import {
   pubSub 
 } from '@/services/subscriptionService';
 import { withFilter } from 'graphql-subscriptions';
+import { WorkspaceAuthorizationService } from '@/services/workspaceAuthorization';
 
 /**
  * GraphQL resolvers for card management operations
@@ -53,16 +54,20 @@ export const cardResolvers = {
           return null;
         }
 
-        // Authorization check - users can only access cards in their workspaces
-        const workspaceService = context.dataSources.workspaceService;
-        const workspace = await workspaceService.getWorkspaceById(card.workspaceId);
+        // Authorization check - users can only access cards in workspaces they have access to
+        const authService = new WorkspaceAuthorizationService();
+        const hasAccess = await authService.hasWorkspaceAccess(
+          context.user!.id,
+          card.workspaceId,
+          'card:read'
+        );
         
-        if (!workspace || workspace.ownerId !== context.user?.id) {
+        if (!hasAccess) {
           throw new AuthorizationError(
-            'Cannot access cards in other user workspaces',
-            'INSUFFICIENT_PERMISSIONS',
-            'workspace:card_access',
-            context.permissions
+            'Cannot access cards in workspaces you do not have access to',
+            'WORKSPACE_ACCESS_DENIED',
+            'card:read',
+            []
           );
         }
 
@@ -106,18 +111,14 @@ export const cardResolvers = {
       }
 
       try {
-        // Authorization check - users can only access their own workspaces
-        const workspaceService = context.dataSources.workspaceService;
-        const workspace = await workspaceService.getWorkspaceById(workspaceId);
-        
-        if (!workspace || workspace.ownerId !== context.user?.id) {
-          throw new AuthorizationError(
-            'Cannot access cards in other user workspaces',
-            'INSUFFICIENT_PERMISSIONS',
-            'workspace:card_access',
-            context.permissions
-          );
-        }
+        // Authorization check - verify workspace access
+        const authService = new WorkspaceAuthorizationService();
+        await authService.requirePermission(
+          context.user!.id,
+          workspaceId,
+          'card:read',
+          'Cannot access cards in this workspace'
+        );
 
         const cardService = new CardService();
         const page = pagination?.page || 1;
@@ -184,18 +185,14 @@ export const cardResolvers = {
       }
 
       try {
-        // Authorization check - users can only search their own workspaces
-        const workspaceService = context.dataSources.workspaceService;
-        const workspace = await workspaceService.getWorkspaceById(workspaceId);
-        
-        if (!workspace || workspace.ownerId !== context.user?.id) {
-          throw new AuthorizationError(
-            'Cannot search cards in other user workspaces',
-            'INSUFFICIENT_PERMISSIONS',
-            'workspace:card_access',
-            context.permissions
-          );
-        }
+        // Authorization check - verify workspace access
+        const authService = new WorkspaceAuthorizationService();
+        await authService.requirePermission(
+          context.user!.id,
+          workspaceId,
+          'card:read',
+          'Cannot search cards in this workspace'
+        );
 
         const cardService = new CardService();
         const searchLimit = Math.min(limit, 50); // Cap search results
@@ -241,18 +238,14 @@ export const cardResolvers = {
       }
 
       try {
-        // Authorization check
-        const workspaceService = context.dataSources.workspaceService;
-        const workspace = await workspaceService.getWorkspaceById(workspaceId);
-        
-        if (!workspace || workspace.ownerId !== context.user?.id) {
-          throw new AuthorizationError(
-            'Cannot access cards in other user workspaces',
-            'INSUFFICIENT_PERMISSIONS',
-            'workspace:card_access',
-            context.permissions
-          );
-        }
+        // Authorization check - verify workspace access
+        const authService = new WorkspaceAuthorizationService();
+        await authService.requirePermission(
+          context.user!.id,
+          workspaceId,
+          'card:read',
+          'Cannot access cards in this workspace'
+        );
 
         const cardService = new CardService();
         const filter: CardFilter = {
@@ -297,18 +290,14 @@ export const cardResolvers = {
       }
 
       try {
-        // Authorization check - users can only create cards in their own workspaces
-        const workspaceService = context.dataSources.workspaceService;
-        const workspace = await workspaceService.getWorkspaceById(input.workspaceId);
-        
-        if (!workspace || workspace.ownerId !== context.user?.id) {
-          throw new AuthorizationError(
-            'Cannot create cards in other user workspaces',
-            'INSUFFICIENT_PERMISSIONS',
-            'workspace:card_create',
-            context.permissions
-          );
-        }
+        // Authorization check - verify workspace access for card creation
+        const authService = new WorkspaceAuthorizationService();
+        await authService.requirePermission(
+          context.user!.id,
+          input.workspaceId,
+          'card:create',
+          'Cannot create cards in this workspace'
+        );
 
         const cardService = new CardService();
         const card = await cardService.createCard(input, context.user!.id);
@@ -361,18 +350,14 @@ export const cardResolvers = {
           throw new NotFoundError('Card', id);
         }
 
-        // Authorization check - users can only update cards in their own workspaces
-        const workspaceService = context.dataSources.workspaceService;
-        const workspace = await workspaceService.getWorkspaceById(existingCard.workspaceId);
-        
-        if (!workspace || workspace.ownerId !== context.user?.id) {
-          throw new AuthorizationError(
-            'Cannot update cards in other user workspaces',
-            'INSUFFICIENT_PERMISSIONS',
-            'workspace:card_update',
-            context.permissions
-          );
-        }
+        // Authorization check - verify workspace access for card updates
+        const authService = new WorkspaceAuthorizationService();
+        await authService.requirePermission(
+          context.user!.id,
+          existingCard.workspaceId,
+          'card:update',
+          'Cannot update cards in this workspace'
+        );
 
         const updatedCard = await cardService.updateCard(id, input, context.user!.id);
 
@@ -425,18 +410,14 @@ export const cardResolvers = {
           throw new NotFoundError('Card', id);
         }
 
-        // Authorization check - users can only delete cards in their own workspaces
-        const workspaceService = context.dataSources.workspaceService;
-        const workspace = await workspaceService.getWorkspaceById(existingCard.workspaceId);
-        
-        if (!workspace || workspace.ownerId !== context.user?.id) {
-          throw new AuthorizationError(
-            'Cannot delete cards in other user workspaces',
-            'INSUFFICIENT_PERMISSIONS',
-            'workspace:card_delete',
-            context.permissions
-          );
-        }
+        // Authorization check - verify workspace access for card deletion
+        const authService = new WorkspaceAuthorizationService();
+        await authService.requirePermission(
+          context.user!.id,
+          existingCard.workspaceId,
+          'card:delete',
+          'Cannot delete cards in this workspace'
+        );
 
         const success = await cardService.deleteCard(id, context.user!.id);
 
@@ -490,17 +471,14 @@ export const cardResolvers = {
         const workspaceIds = [...new Set(cards.map(card => card.workspaceId))];
         
         // Check authorization for all workspaces
-        const workspaceService = context.dataSources.workspaceService;
+        const authService = new WorkspaceAuthorizationService();
         for (const workspaceId of workspaceIds) {
-          const workspace = await workspaceService.getWorkspaceById(workspaceId);
-          if (!workspace || workspace.ownerId !== context.user?.id) {
-            throw new AuthorizationError(
-              'Cannot update cards in other user workspaces',
-              'INSUFFICIENT_PERMISSIONS',
-              'workspace:card_update',
-              context.permissions
-            );
-          }
+          await authService.requirePermission(
+            context.user!.id,
+            workspaceId,
+            'card:update',
+            'Cannot update cards in this workspace'
+          );
         }
 
         const result = await cardService.batchUpdatePositions(updates);
@@ -560,18 +538,14 @@ export const cardResolvers = {
           throw new NotFoundError('Card', id);
         }
 
-        // Authorization check
-        const workspaceService = context.dataSources.workspaceService;
-        const workspace = await workspaceService.getWorkspaceById(originalCard.workspaceId);
-        
-        if (!workspace || workspace.ownerId !== context.user?.id) {
-          throw new AuthorizationError(
-            'Cannot duplicate cards in other user workspaces',
-            'INSUFFICIENT_PERMISSIONS',
-            'workspace:card_create',
-            context.permissions
-          );
-        }
+        // Authorization check - verify workspace access for card creation
+        const authService = new WorkspaceAuthorizationService();
+        await authService.requirePermission(
+          context.user!.id,
+          originalCard.workspaceId,
+          'card:create',
+          'Cannot duplicate cards in this workspace'
+        );
 
         // Create duplicate with offset position
         const duplicateInput: CreateCardInput = {
