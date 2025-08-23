@@ -100,19 +100,19 @@ class AppEnvironment {
   static String get auth0RedirectUri {
     switch (_environment) {
       case Environment.development:
-        // Auth0 Flutter plugin requires specific format: https://DOMAIN/android/PACKAGE/callback
-        return 'https://$auth0Domain/android/dev.curth.nexusmobile/callback';
+        // Using custom scheme for simpler setup (Android: SCHEME://DOMAIN/android/PACKAGE/callback)
+        return 'dev.curth.nexusmobile://$auth0Domain/android/dev.curth.nexusmobile/callback';
       case Environment.production:
-        return 'https://$auth0Domain/android/dev.curth.nexusmobile/callback';
+        return 'dev.curth.nexusmobile://$auth0Domain/android/dev.curth.nexusmobile/callback';
     }
   }
 
   static String get auth0LogoutUri {
     switch (_environment) {
       case Environment.development:
-        return 'https://$auth0Domain/android/dev.curth.nexusmobile/callback';
+        return 'dev.curth.nexusmobile://$auth0Domain/android/dev.curth.nexusmobile/callback';
       case Environment.production:
-        return 'https://$auth0Domain/android/dev.curth.nexusmobile/callback';
+        return 'dev.curth.nexusmobile://$auth0Domain/android/dev.curth.nexusmobile/callback';
     }
   }
 

@@ -32,7 +32,7 @@ android {
         // Auth0 configuration  
         // Use environment variables or replace with your actual Auth0 domain
         manifestPlaceholders["auth0Domain"] = "auth.nexus-app.de"
-        manifestPlaceholders["auth0Scheme"] = "https"
+        manifestPlaceholders["auth0Scheme"] = "dev.curth.nexusmobile"
     }
 
     buildTypes {
