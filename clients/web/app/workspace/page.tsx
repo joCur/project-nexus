@@ -12,6 +12,7 @@ function WorkspaceContent() {
   const router = useRouter();
   const { status: onboardingStatus, isLoading: onboardingLoading } = useOnboardingStatus();
   const [showDebug, setShowDebug] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(true);
 
   // Check onboarding status and redirect if needed
   useEffect(() => {
@@ -108,18 +109,34 @@ function WorkspaceContent() {
         />
         
         {/* Welcome Overlay for First-Time Users */}
-        <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-4 max-w-sm pointer-events-none">
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">
-            Welcome to Your Canvas!
-          </h2>
-          <div className="text-sm text-gray-600 space-y-1">
-            <p>• Use mouse wheel or pinch to zoom</p>
-            <p>• Click and drag to pan around</p>
-            <p>• Arrow keys for keyboard navigation</p>
-            <p>• Press Space to center view</p>
-            <p>• Try the debug toggle above!</p>
+        {showWelcome && (
+          <div className={`absolute bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-4 max-w-sm transition-all duration-300 ${
+            showDebug 
+              ? 'top-4 right-4' // Move to right when debug is active
+              : 'top-4 left-4'   // Default position when debug is off
+          }`}>
+            <button
+              onClick={() => setShowWelcome(false)}
+              className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 transition-colors"
+              aria-label="Dismiss welcome message"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            
+            <h2 className="text-lg font-semibold text-gray-900 mb-2 pr-6">
+              Welcome to Your Canvas!
+            </h2>
+            <div className="text-sm text-gray-600 space-y-1">
+              <p>• Use mouse wheel or pinch to zoom</p>
+              <p>• Click and drag to pan around</p>
+              <p>• Arrow keys for keyboard navigation</p>
+              <p>• Press Space to center view</p>
+              <p>• Try the debug toggle above!</p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
