@@ -93,7 +93,8 @@ class AuthNotifier extends _$AuthNotifier {
   @override
   AuthState build() {
     _authService = ref.watch(authServiceProvider);
-    _checkAuthStatus();
+    // Schedule auth check after build completes
+    Future.microtask(() => _checkAuthStatus());
     return const AuthState();
   }
 
