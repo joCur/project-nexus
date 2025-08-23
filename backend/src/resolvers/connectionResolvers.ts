@@ -7,6 +7,7 @@ import {
 import { createContextLogger } from '@/utils/logger';
 import { GraphQLContext } from '@/types';
 import { ConnectionService } from '@/services/ConnectionService';
+import { CardService } from '@/services/CardService';
 import { WorkspaceAuthorizationService } from '@/services/workspaceAuthorization';
 import { 
   Connection, 
@@ -639,7 +640,7 @@ export const connectionResolvers = {
     },
 
     /**
-     * Batch delete multiple connections with authorization
+     * Batch delete multiple connections with authorization and secure event publishing
      */
     batchDeleteConnections: async (
       _: any,
@@ -651,20 +652,52 @@ export const connectionResolvers = {
       }
 
       try {
+        // SECURITY FIX: Get workspace information BEFORE deletion for secure event publishing
         const connectionService = new ConnectionService();
+        const connections = await connectionService.getConnectionsByIds(connectionIds);
+        
+        // Build workspace mapping for secure event publishing
+        const cardIds = [...new Set([
+          ...connections.map(c => c.sourceCardId),
+          ...connections.map(c => c.targetCardId)
+        ])];
+        
+        const cardService = new CardService();
+        const cards = await cardService.getCardsByIds(cardIds);
+        const cardToWorkspaceMap = new Map(cards.map(card => [card.id, card.workspaceId]));
+        
+        // Create secure connection to workspace mapping
+        const connectionWorkspaceMap = new Map();
+        connections.forEach(connection => {
+          const sourceWorkspace = cardToWorkspaceMap.get(connection.sourceCardId);
+          const targetWorkspace = cardToWorkspaceMap.get(connection.targetCardId);
+          // Use source workspace as primary workspace for the connection
+          connectionWorkspaceMap.set(connection.id, sourceWorkspace || targetWorkspace);
+        });
+        
+        const workspaceIds = [...new Set(cards.map(card => card.workspaceId))];
+        
+        // Validate workspace access for all affected workspaces
+        const authService = new WorkspaceAuthorizationService();
+        await authService.requireMultipleWorkspacePermissions(
+          context.user!.id,
+          workspaceIds,
+          'connection:delete',
+          'Cannot delete connections in workspaces you do not have access to'
+        );
+
         const result = await connectionService.batchDeleteConnections(connectionIds, context.user!.id);
 
-        // Publish real-time events for successful deletions
+        // Publish secure real-time events for successful deletions
         if (result.successful.length > 0) {
-          // Note: For deletions, we need to track workspace IDs before deletion
-          // This is a simplified approach - in practice, you'd want to capture workspace info before deletion
           for (const connectionId of result.successful) {
-            // We can't easily get the workspace after deletion, so we'll publish a generic event
-            // In a real implementation, you'd want to capture this info during the deletion process
-            await pubSub.publish(CONNECTION_EVENTS.CONNECTION_DELETED, {
-              connectionDeleted: connectionId,
-              workspaceId: 'unknown', // This would need better handling in a real implementation
-            });
+            const workspaceId = connectionWorkspaceMap.get(connectionId);
+            if (workspaceId) {
+              await pubSub.publish(CONNECTION_EVENTS.CONNECTION_DELETED, {
+                connectionDeleted: connectionId,
+                workspaceId,
+              });
+            }
           }
         }
 

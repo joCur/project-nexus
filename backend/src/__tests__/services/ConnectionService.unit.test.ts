@@ -275,7 +275,7 @@ describe('ConnectionMapper', () => {
       expect(result.label).toBeUndefined();
     });
 
-    it('should handle string "null" and "undefined" correctly', () => {
+    it('should handle string "null" and "undefined" correctly with security sanitization', () => {
       const dbConnection = {
         id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
         source_card_id: 'f47ac10b-58cc-4372-a567-0e02b2c3d480',
@@ -296,9 +296,10 @@ describe('ConnectionMapper', () => {
 
       const result = ConnectionMapper.mapDbConnectionToConnection(dbConnection as any);
       
-      expect(result.style).toBeNull();
-      expect(result.metadata).toBe("");
-      expect(result.label).toBeUndefined();
+      // Security fix: dangerous literal strings are sanitized to safe defaults
+      expect(result.style).toEqual({}); // Sanitized to empty object instead of null
+      expect(result.metadata).toEqual({}); // Empty string can't be parsed as JSON, falls back to {}
+      expect(result.label).toBeUndefined(); // Undefined as expected
     });
   });
 });

@@ -19,6 +19,12 @@ import {
 } from '@/utils/errors';
 import { createContextLogger } from '@/utils/logger';
 import { 
+  sanitizeMetadata,
+  sanitizeConnectionStyle,
+  sanitizeConnectionLabel,
+  validateJsonObject
+} from '@/utils/jsonSecurity';
+import { 
   validateCreateConnection,
   validateUpdateConnection, 
   validateConnectionQuery,
@@ -41,7 +47,7 @@ const logger = createContextLogger({ service: 'ConnectionService' });
  */
 export class ConnectionMapper {
   /**
-   * Map database connection record to Connection interface
+   * Map database connection record to Connection interface with security sanitization
    */
   static mapDbConnectionToConnection(dbConnection: DbConnection): Connection {
     return {
@@ -50,9 +56,10 @@ export class ConnectionMapper {
       targetCardId: dbConnection.target_card_id,
       type: dbConnection.type as ConnectionType,
       confidence: dbConnection.confidence,
-      style: this.parseJsonSafely(dbConnection.style, DEFAULT_CONNECTION_STYLE),
-      label: this.parseJsonSafely(dbConnection.label, undefined),
-      metadata: this.parseJsonSafely(dbConnection.metadata, {}),
+      // SECURITY FIX: Sanitize JSON fields to prevent XSS and pollution attacks
+      style: sanitizeConnectionStyle(this.parseJsonSafely(dbConnection.style, DEFAULT_CONNECTION_STYLE)),
+      label: sanitizeConnectionLabel(this.parseJsonSafely(dbConnection.label, undefined)),
+      metadata: sanitizeMetadata(this.parseJsonSafely(dbConnection.metadata, {})),
       createdBy: dbConnection.created_by,
       isVisible: dbConnection.is_visible,
       aiReasoning: dbConnection.ai_reasoning,
@@ -161,20 +168,23 @@ export class ConnectionService {
         )
       ]);
 
-      // Merge default style with provided style
-      const connectionStyle = {
+      // SECURITY FIX: Sanitize inputs before processing
+      const sanitizedStyle = sanitizeConnectionStyle({
         ...DEFAULT_CONNECTION_STYLE,
         ...(validatedInput.style || {})
-      };
+      });
+
+      const sanitizedLabel = validatedInput.label ? sanitizeConnectionLabel(validatedInput.label) : undefined;
+      const sanitizedMetadata = sanitizeMetadata(validatedInput.metadata || {});
 
       const connectionData = {
         source_card_id: validatedInput.sourceCardId,
         target_card_id: validatedInput.targetCardId,
         type: validatedInput.type,
         confidence: validatedInput.confidence ?? 1.0,
-        style: JSON.stringify(connectionStyle),
-        label: validatedInput.label ? JSON.stringify(validatedInput.label) : undefined,
-        metadata: JSON.stringify(validatedInput.metadata || {}),
+        style: JSON.stringify(sanitizedStyle),
+        label: sanitizedLabel ? JSON.stringify(sanitizedLabel) : undefined,
+        metadata: JSON.stringify(sanitizedMetadata),
         created_by: userId,
         is_visible: true,
         ai_reasoning: validatedInput.aiReasoning,
@@ -235,6 +245,28 @@ export class ConnectionService {
     } catch (error) {
       logger.error('Failed to get connection', {
         connectionId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get multiple connections by IDs
+   */
+  async getConnectionsByIds(connectionIds: string[]): Promise<Connection[]> {
+    try {
+      const dbConnections = await database.query<any[]>(
+        knex(this.tableName)
+          .whereIn('id', connectionIds),
+        'connections_get_by_ids'
+      );
+
+      return dbConnections.map(dbConn => ConnectionMapper.mapDbConnectionToConnection(dbConn));
+
+    } catch (error) {
+      logger.error('Failed to get connections by IDs', {
+        connectionIds,
         error: error instanceof Error ? error.message : 'Unknown error',
       });
       throw error;
@@ -342,20 +374,24 @@ export class ConnectionService {
         updateData.confidence = validatedInput.confidence;
       }
 
+      // SECURITY FIX: Sanitize inputs before updating
       if (validatedInput.style !== undefined) {
         const mergedStyle = {
           ...existingConnection.style,
           ...validatedInput.style
         };
-        updateData.style = JSON.stringify(mergedStyle);
+        const sanitizedStyle = sanitizeConnectionStyle(mergedStyle);
+        updateData.style = JSON.stringify(sanitizedStyle);
       }
 
       if (validatedInput.label !== undefined) {
-        updateData.label = validatedInput.label ? JSON.stringify(validatedInput.label) : null;
+        const sanitizedLabel = validatedInput.label ? sanitizeConnectionLabel(validatedInput.label) : null;
+        updateData.label = sanitizedLabel ? JSON.stringify(sanitizedLabel) : null;
       }
 
       if (validatedInput.metadata !== undefined) {
-        updateData.metadata = JSON.stringify(validatedInput.metadata);
+        const sanitizedMetadata = sanitizeMetadata(validatedInput.metadata);
+        updateData.metadata = JSON.stringify(sanitizedMetadata);
       }
 
       if (validatedInput.isVisible !== undefined) {
@@ -552,20 +588,23 @@ export class ConnectionService {
               continue;
             }
 
-            // Merge default style
-            const connectionStyle = {
+            // SECURITY FIX: Sanitize inputs for batch creation
+            const sanitizedStyle = sanitizeConnectionStyle({
               ...DEFAULT_CONNECTION_STYLE,
               ...(connectionInput.style || {})
-            };
+            });
+
+            const sanitizedLabel = connectionInput.label ? sanitizeConnectionLabel(connectionInput.label) : undefined;
+            const sanitizedMetadata = sanitizeMetadata(connectionInput.metadata || {});
 
             const connectionData = {
               source_card_id: connectionInput.sourceCardId,
               target_card_id: connectionInput.targetCardId,
               type: connectionInput.type,
               confidence: connectionInput.confidence ?? 1.0,
-              style: JSON.stringify(connectionStyle),
-              label: connectionInput.label ? JSON.stringify(connectionInput.label) : undefined,
-              metadata: JSON.stringify(connectionInput.metadata || {}),
+              style: JSON.stringify(sanitizedStyle),
+              label: sanitizedLabel ? JSON.stringify(sanitizedLabel) : undefined,
+              metadata: JSON.stringify(sanitizedMetadata),
               created_by: userId,
               is_visible: true,
               ai_reasoning: connectionInput.aiReasoning,
@@ -695,18 +734,22 @@ export class ConnectionService {
               updateData.confidence = input.confidence;
             }
 
+            // SECURITY FIX: Sanitize inputs for batch updates
             if (input.style !== undefined) {
               const existingStyle = this.parseJsonSafely(existingConnection.style, DEFAULT_CONNECTION_STYLE);
               const mergedStyle = { ...existingStyle, ...input.style };
-              updateData.style = JSON.stringify(mergedStyle);
+              const sanitizedStyle = sanitizeConnectionStyle(mergedStyle);
+              updateData.style = JSON.stringify(sanitizedStyle);
             }
 
             if (input.label !== undefined) {
-              updateData.label = input.label ? JSON.stringify(input.label) : null;
+              const sanitizedLabel = input.label ? sanitizeConnectionLabel(input.label) : null;
+              updateData.label = sanitizedLabel ? JSON.stringify(sanitizedLabel) : null;
             }
 
             if (input.metadata !== undefined) {
-              updateData.metadata = JSON.stringify(input.metadata);
+              const sanitizedMetadata = sanitizeMetadata(input.metadata);
+              updateData.metadata = JSON.stringify(sanitizedMetadata);
             }
 
             if (input.isVisible !== undefined) {
@@ -1056,12 +1099,25 @@ export class ConnectionService {
       }
     }
 
+    // SECURITY FIX: Use safe parameterized queries for PostgreSQL array operations
     if (filter.keywords && filter.keywords.length > 0) {
-      query = query.whereRaw('keywords && ?', [filter.keywords]);
+      // Use parameterized query with proper escaping for PostgreSQL array overlap operator
+      const sanitizedKeywords = filter.keywords.filter(keyword => 
+        typeof keyword === 'string' && keyword.trim().length > 0
+      );
+      if (sanitizedKeywords.length > 0) {
+        query = query.where(knex.raw('keywords && ?::text[]', [sanitizedKeywords]));
+      }
     }
 
     if (filter.concepts && filter.concepts.length > 0) {
-      query = query.whereRaw('concepts && ?', [filter.concepts]);
+      // Use parameterized query with proper escaping for PostgreSQL array overlap operator
+      const sanitizedConcepts = filter.concepts.filter(concept => 
+        typeof concept === 'string' && concept.trim().length > 0
+      );
+      if (sanitizedConcepts.length > 0) {
+        query = query.where(knex.raw('concepts && ?::text[]', [sanitizedConcepts]));
+      }
     }
 
     return query;
