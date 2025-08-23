@@ -100,22 +100,22 @@ class AppEnvironment {
   static String get auth0RedirectUri {
     switch (_environment) {
       case Environment.development:
-        return 'com.nexus.mobile.dev://login-callback';
+        return 'de.nexus-app.mobile://login';
       case Environment.production:
-        return 'com.nexus.mobile://login-callback';
+        return 'de.nexus-app.mobile://login';
     }
   }
 
   static String get auth0LogoutUri {
     switch (_environment) {
       case Environment.development:
-        return 'com.nexus.mobile.dev://logout-callback';
+        return 'de.nexus-app.mobile://logout';
       case Environment.production:
-        return 'com.nexus.mobile://logout-callback';
+        return 'de.nexus-app.mobile://logout';
     }
   }
 
-  // Development mode authentication
+  // Development mode authentication - disabled by default to ensure real Auth0 integration
   static bool get enableDevelopmentAuth => isDevelopment && 
-    const bool.fromEnvironment('ENABLE_DEV_AUTH', defaultValue: true);
+    const bool.fromEnvironment('ENABLE_DEV_AUTH', defaultValue: false);
 }

@@ -58,9 +58,6 @@
       "mcp__linear-server__create_comment"
     ],
     "deny": [],
-    "defaultMode": "acceptEdits",
-    "additionalDirectories": [
-      "C:\\c\\Users\\curth\\Documents\\git\\project-nexus"
-    ]
+    "defaultMode": "acceptEdits"
   }
 }

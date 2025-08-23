@@ -21,7 +21,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.nexus.nexus_mobile"
+        applicationId = "de.nexus-app.mobile"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -29,9 +29,9 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         
-        // Auth0 configuration
+        // Auth0 configuration  
         manifestPlaceholders["auth0Domain"] = "your-tenant.auth0.com"
-        manifestPlaceholders["auth0Scheme"] = "${applicationId}.auth0"
+        manifestPlaceholders["auth0Scheme"] = "de.nexus-app.mobile"
     }
 
     buildTypes {

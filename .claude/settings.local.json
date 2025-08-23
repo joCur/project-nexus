@@ -4,7 +4,10 @@
       "Bash(gh pr list:*)",
       "Bash(gh run view:*)",
       "Bash(npx tsc:*)",
-      "Bash(gh run list:*)"
+      "Bash(gh run list:*)",
+      "Bash(dart run build_runner build:*)",
+      "Bash(flutter analyze:*)",
+      "Bash(flutter build:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

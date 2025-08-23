@@ -45,16 +45,18 @@ class AuthService {
   /// Login using Auth0 Universal Login
   Future<Result<UserProfile>> login() async {
     try {
-      // Check if development mode authentication is enabled
+      // Use real Auth0 authentication by default
+      // Development mode is only for UI testing when explicitly enabled
       if (AppEnvironment.enableDevelopmentAuth) {
-        dev.log('Development mode authentication enabled', name: 'AuthService');
+        dev.log('Development mode authentication enabled - UI testing only', name: 'AuthService');
         return await _handleDevelopmentAuth();
       }
 
-      final credentials = await _auth0.webAuthentication(scheme: AppEnvironment.auth0RedirectUri.split('://')[0])
+      final credentials = await _auth0.webAuthentication()
           .login(
             audience: AppEnvironment.auth0Audience,
             scopes: {'openid', 'profile', 'email', 'offline_access'},
+            redirectUrl: AppEnvironment.auth0RedirectUri,
           );
 
       await _storeCredentials(credentials);
@@ -84,8 +86,8 @@ class AuthService {
         return const Success(null);
       }
 
-      await _auth0.webAuthentication(scheme: AppEnvironment.auth0LogoutUri.split('://')[0])
-          .logout();
+      await _auth0.webAuthentication()
+          .logout(returnToUrl: AppEnvironment.auth0LogoutUri);
       
       await _clearStoredCredentials();
       
