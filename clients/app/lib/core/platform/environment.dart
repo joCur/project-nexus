@@ -100,18 +100,18 @@ class AppEnvironment {
   static String get auth0RedirectUri {
     switch (_environment) {
       case Environment.development:
-        return 'de.nexus-app.mobile://login';
+        return 'dev.curth.nexusmobile://login';
       case Environment.production:
-        return 'de.nexus-app.mobile://login';
+        return 'dev.curth.nexusmobile://login';
     }
   }
 
   static String get auth0LogoutUri {
     switch (_environment) {
       case Environment.development:
-        return 'de.nexus-app.mobile://logout';
+        return 'dev.curth.nexusmobile://logout';
       case Environment.production:
-        return 'de.nexus-app.mobile://logout';
+        return 'dev.curth.nexusmobile://logout';
     }
   }
 
