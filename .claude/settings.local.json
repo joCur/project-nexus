@@ -5,6 +5,9 @@
       "Bash(gh run view:*)",
       "Bash(npx tsc:*)",
       "Bash(gh run list:*)"
+    ],
+    "additionalDirectories": [
+      "C:\\c\\Users\\curth\\Documents\\git\\project-nexus"
     ]
   },
   "enableAllProjectMcpServers": true,
