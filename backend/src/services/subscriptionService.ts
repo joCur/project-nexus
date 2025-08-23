@@ -1,6 +1,7 @@
 import { PubSub } from 'graphql-subscriptions';
 import { createContextLogger } from '@/utils/logger';
 import { Card } from '@/types/CardTypes';
+import { Connection } from '@/types/ConnectionTypes';
 
 /**
  * Subscription service for real-time GraphQL updates
@@ -21,6 +22,13 @@ export const CARD_EVENTS = {
   CARDS_BATCH_UPDATED: 'CARDS_BATCH_UPDATED',
 } as const;
 
+// Event names for connection subscriptions
+export const CONNECTION_EVENTS = {
+  CONNECTION_CREATED: 'CONNECTION_CREATED',
+  CONNECTION_UPDATED: 'CONNECTION_UPDATED',
+  CONNECTION_DELETED: 'CONNECTION_DELETED',
+} as const;
+
 // Event names for workspace subscriptions
 export const WORKSPACE_EVENTS = {
   USER_JOINED_CANVAS: 'USER_JOINED_CANVAS',
@@ -29,6 +37,7 @@ export const WORKSPACE_EVENTS = {
 } as const;
 
 export type CardEventType = typeof CARD_EVENTS[keyof typeof CARD_EVENTS];
+export type ConnectionEventType = typeof CONNECTION_EVENTS[keyof typeof CONNECTION_EVENTS];
 export type WorkspaceEventType = typeof WORKSPACE_EVENTS[keyof typeof WORKSPACE_EVENTS];
 
 /**
@@ -143,6 +152,76 @@ export class SubscriptionService {
     } catch (error) {
       logger.error('Failed to publish cards batch updated event', {
         cardCount: cards.length,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  /**
+   * Publish connection created event
+   */
+  static async publishConnectionCreated(connection: Connection): Promise<void> {
+    try {
+      // We need to determine workspace ID from the connection's cards
+      // This is a simplified approach - in practice, you'd get the workspace ID from the card
+      await pubSub.publish(CONNECTION_EVENTS.CONNECTION_CREATED, {
+        connectionCreated: connection,
+        // Note: workspaceId should be passed separately or derived from the connection's cards
+      });
+
+      logger.info('Connection created event published', {
+        connectionId: connection.id,
+        sourceCardId: connection.sourceCardId,
+        targetCardId: connection.targetCardId,
+        type: connection.type,
+      });
+    } catch (error) {
+      logger.error('Failed to publish connection created event', {
+        connectionId: connection.id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  /**
+   * Publish connection updated event
+   */
+  static async publishConnectionUpdated(connection: Connection): Promise<void> {
+    try {
+      await pubSub.publish(CONNECTION_EVENTS.CONNECTION_UPDATED, {
+        connectionUpdated: connection,
+      });
+
+      logger.info('Connection updated event published', {
+        connectionId: connection.id,
+        sourceCardId: connection.sourceCardId,
+        targetCardId: connection.targetCardId,
+      });
+    } catch (error) {
+      logger.error('Failed to publish connection updated event', {
+        connectionId: connection.id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  /**
+   * Publish connection deleted event
+   */
+  static async publishConnectionDeleted(connectionId: string, workspaceId: string): Promise<void> {
+    try {
+      await pubSub.publish(CONNECTION_EVENTS.CONNECTION_DELETED, {
+        connectionDeleted: connectionId,
+        workspaceId,
+      });
+
+      logger.info('Connection deleted event published', {
+        connectionId,
+        workspaceId,
+      });
+    } catch (error) {
+      logger.error('Failed to publish connection deleted event', {
+        connectionId,
         error: error instanceof Error ? error.message : 'Unknown error',
       });
     }
