@@ -1,4 +1,4 @@
-package com.nexus.nexus_mobile
+package dev.curth.nexusmobile
 
 import io.flutter.embedding.android.FlutterActivity
 
