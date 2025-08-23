@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.nexus.nexus_mobile"
+    namespace = "dev.curth.nexusmobile"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -31,8 +31,9 @@ android {
         
         // Auth0 configuration  
         // Use environment variables or replace with your actual Auth0 domain
-        manifestPlaceholders["auth0Domain"] = project.findProperty("AUTH0_DOMAIN") ?: "your-tenant.auth0.com"
+        manifestPlaceholders["auth0Domain"] = "auth.nexus-app.de"
         manifestPlaceholders["appAuthRedirectScheme"] = "dev.curth.nexusmobile"
+        manifestPlaceholders["auth0Scheme"] = "https"
     }
 
     buildTypes {
