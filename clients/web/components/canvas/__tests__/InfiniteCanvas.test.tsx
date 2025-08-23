@@ -16,6 +16,64 @@ jest.mock('@/hooks/useCanvasEvents', () => ({
   useCanvasEvents: jest.fn(),
 }));
 
+// Mock the new hooks
+jest.mock('@/hooks/useViewport', () => ({
+  useViewport: jest.fn(() => ({
+    viewport: { position: { x: 0, y: 0 }, zoom: 1 },
+    metrics: {
+      visibleBounds: { minX: -300, minY: -300, maxX: 1100, maxY: 900 },
+      contentBounds: { minX: -200, minY: -200, maxX: 200, maxY: 200 },
+      effectiveBounds: { minX: -200, minY: -200, maxX: 200, maxY: 200 },
+      viewportArea: 1440000,
+      contentCoverage: 0.1,
+      zoomLevel: 1,
+      centerPoint: { x: 400, y: 300 },
+      isContentVisible: true,
+    },
+    visibleBounds: { minX: -300, minY: -300, maxX: 1100, maxY: 900 },
+    contentBounds: { minX: -200, minY: -200, maxX: 200, maxY: 200 },
+    effectiveBounds: { minX: -200, minY: -200, maxX: 200, maxY: 200 },
+    updateEntities: jest.fn(),
+    getViewportInfo: jest.fn(() => ({
+      position: { x: 0, y: 0 },
+      zoom: 1,
+      bounds: { minX: -200, minY: -200, maxX: 200, maxY: 200 },
+    })),
+  })),
+}));
+
+jest.mock('@/hooks/useCanvasNavigation', () => ({
+  useCanvasNavigation: jest.fn(() => ({
+    isAnimating: false,
+    isGestureActive: false,
+    isMomentumActive: false,
+    panTo: jest.fn(),
+    zoomTo: jest.fn(),
+    resetView: jest.fn(),
+    startNavigation: jest.fn(),
+    updateNavigation: jest.fn(),
+    endNavigation: jest.fn(),
+    stopAllAnimations: jest.fn(),
+    currentVelocity: { x: 0, y: 0 },
+    config: {
+      enableMomentum: true,
+      enableInertia: true,
+      enableSmoothing: true,
+      momentumFriction: 0.95,
+      animationDuration: 300,
+      velocityThreshold: 50,
+      maxVelocity: 2000,
+    },
+  })),
+}));
+
+// Mock canvas calculations
+jest.mock('@/utils/canvas-calculations', () => ({
+  getLevelOfDetail: jest.fn(() => 'high'),
+  cullEntities: jest.fn((entities) => entities),
+  shouldUseSimplifiedRendering: jest.fn(() => false),
+}));
+
 // Mock Konva components
 jest.mock('react-konva', () => ({
   Stage: ({ children, ...props }: { children?: React.ReactNode; [key: string]: unknown }) => (
@@ -96,6 +154,7 @@ describe('InfiniteCanvas', () => {
     expect(screen.getByText(/Size: 800×600px/)).toBeInTheDocument();
     expect(screen.getByText(/Zoom: 100%/)).toBeInTheDocument();
     expect(screen.getByText(/Position: \(0, 0\)/)).toBeInTheDocument();
+    expect(screen.getByText(/LOD: high/)).toBeInTheDocument();
   });
 
   it('does not render debug info when debug prop is false', () => {

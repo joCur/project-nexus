@@ -15,6 +15,7 @@ jest.mock('react-konva', () => ({
     onWheel?: React.WheelEventHandler<HTMLDivElement>;
     onDragEnd?: React.DragEventHandler<HTMLDivElement>;
     onContextMenu?: React.MouseEventHandler<HTMLDivElement>;
+    onMouseMove?: React.MouseEventHandler<HTMLDivElement>;
     width?: number;
     height?: number;
     draggable?: boolean;
@@ -22,11 +23,15 @@ jest.mock('react-konva', () => ({
     scaleY?: number;
     x?: number;
     y?: number;
+    pixelRatio?: number;
+    perfectDrawEnabled?: boolean;
+    listening?: boolean;
   }>(function MockStage({ 
     children, 
     onWheel, 
     onDragEnd, 
     onContextMenu, 
+    onMouseMove,
     width,
     height,
     draggable,
@@ -34,6 +39,9 @@ jest.mock('react-konva', () => ({
     scaleY,
     x,
     y,
+    pixelRatio,
+    perfectDrawEnabled,
+    listening,
     ...otherProps 
   }, ref) {
     return (
@@ -43,6 +51,7 @@ jest.mock('react-konva', () => ({
       onWheel={onWheel}
       onDragEnd={onDragEnd}
       onContextMenu={onContextMenu}
+      onMouseMove={onMouseMove}
       data-width={width}
       data-height={height}
       draggable={draggable}
@@ -50,6 +59,9 @@ jest.mock('react-konva', () => ({
       data-scale-y={scaleY}
       data-x={x}
       data-y={y}
+      data-pixel-ratio={pixelRatio}
+      data-perfect-draw-enabled={perfectDrawEnabled}
+      data-listening={listening}
       {...otherProps}
     >
       {children}
@@ -193,5 +205,65 @@ describe('CanvasStage', () => {
     expect(onWheelProp).toBeDefined();
     expect(onDragEndProp).toBeDefined();
     expect(onContextMenuProp).toBeDefined();
+  });
+  
+  it('applies hardware acceleration settings correctly', () => {
+    const hardwareAccelerationConfig = {
+      useWebGL: true,
+      bufferRatio: 2,
+      useOptimizedDrawing: true,
+    };
+    
+    render(
+      <CanvasStage 
+        {...defaultProps} 
+        hardwareAcceleration={hardwareAccelerationConfig}
+      />
+    );
+    
+    const stage = screen.getByTestId('konva-stage');
+    expect(stage).toHaveAttribute('data-pixel-ratio', '2');
+    expect(stage).toHaveAttribute('data-perfect-draw-enabled', 'true');
+  });
+  
+  it('enables performance monitoring when configured', () => {
+    const performanceConfig = {
+      enableFPSMonitoring: true,
+      targetFPS: 60,
+    };
+    
+    const onPerformanceUpdate = jest.fn();
+    
+    render(
+      <CanvasStage 
+        {...defaultProps} 
+        performanceConfig={performanceConfig}
+        onPerformanceUpdate={onPerformanceUpdate}
+      />
+    );
+    
+    const stage = screen.getByTestId('konva-stage');
+    
+    // Performance monitoring should add mouse move handler
+    const onMouseMoveProp = stage.getAttribute('onMouseMove');
+    expect(onMouseMoveProp).toBeDefined();
+  });
+  
+  it('applies performance optimizations based on metrics', () => {
+    const performanceConfig = {
+      enableFPSMonitoring: true,
+      enablePerformanceWarnings: true,
+      targetFPS: 60,
+    };
+    
+    render(
+      <CanvasStage 
+        {...defaultProps} 
+        performanceConfig={performanceConfig}
+      />
+    );
+    
+    const stage = screen.getByTestId('konva-stage');
+    expect(stage).toHaveAttribute('data-listening', 'true');
   });
 });

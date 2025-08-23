@@ -29,6 +29,63 @@ jest.mock('next/navigation', () => ({
 // Make router mock available globally
 global.mockRouter = mockRouter;
 
+// Mock Konva and related canvas functionality
+jest.mock('konva', () => ({
+  enableTrace: true,
+  Layer: class MockLayer {
+    listening() { return this; }
+    hitGraphEnabled() { return this; }
+  },
+  Stage: class MockStage {
+    container() { 
+      return {
+        setAttribute: jest.fn(),
+        style: {}
+      };
+    }
+    cache() { return this; }
+    getStage() { return this; }
+    setAttr() { return this; }
+    children = [];
+    perfectDrawEnabled() { return this; }
+    listening() { return this; }
+    hitGraphEnabled() { return this; }
+    getPointerPosition() { return { x: 100, y: 100 }; }
+  },
+}));
+
+// Mock canvas calculations utility
+jest.mock('@/utils/canvas-calculations', () => ({
+  getLevelOfDetail: jest.fn(() => 'medium'),
+  canvasToScreen: jest.fn((pos) => pos),
+  screenToCanvas: jest.fn((pos) => pos),
+  distance: jest.fn(() => 0),
+  angle: jest.fn(() => 0),
+  containsPoint: jest.fn(() => true),
+  intersectsBounds: jest.fn(() => true),
+  expandBounds: jest.fn((bounds) => bounds),
+  getVisibleBounds: jest.fn(() => ({ minX: 0, minY: 0, maxX: 100, maxY: 100 })),
+  cullEntities: jest.fn((entities) => entities),
+  shouldUseSimplifiedRendering: jest.fn(() => false),
+  easeOutCubic: jest.fn((t) => t),
+  interpolatePosition: jest.fn((from) => from),
+  interpolateZoom: jest.fn((from) => from),
+  calculateContentBounds: jest.fn(() => ({ minX: 0, minY: 0, maxX: 100, maxY: 100 })),
+  fitBoundsToViewport: jest.fn(() => ({ position: { x: 0, y: 0 }, zoom: 1 })),
+}));
+
+// Mock performance API
+Object.defineProperty(window, 'performance', {
+  value: {
+    now: jest.fn(() => Date.now()),
+  },
+  writable: true,
+});
+
+// Mock requestAnimationFrame
+global.requestAnimationFrame = jest.fn((cb) => setTimeout(cb, 16));
+global.cancelAnimationFrame = jest.fn((id) => clearTimeout(id));
+
 // Mock Auth0 NextJS SDK
 jest.mock('@auth0/nextjs-auth0/client', () => ({
   useUser: jest.fn(() => ({
