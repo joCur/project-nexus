@@ -14,17 +14,20 @@ interface CanvasBackgroundProps {
 }
 
 /**
- * Canvas background component that renders an optional grid pattern.
- * The grid adapts to zoom level for optimal visibility.
+ * Canvas background component that renders an adaptive grid pattern.
+ * The grid dynamically adjusts size, opacity, and visibility based on zoom level.
+ * 
+ * Adaptive Grid Features:
+ * - High zoom (>4.0x): Shows fine-grained grid with increased opacity
+ * - Normal zoom (0.5x-4.0x): Standard grid spacing and visibility
+ * - Low zoom (<0.5x): Coarse grid to reduce visual clutter
+ * - Adaptive stroke width ensures visibility at all zoom levels
  * 
  * Design System Integration:
  * - Uses semantic color tokens for consistent theming
- * - Grid visibility optimized for zoom range 0.25x-4.0x
- * - Performance optimized with zoom-based rendering
- * - WCAG compliant color contrast for accessibility
- * 
- * Grid visibility is limited to zoom range 0.25x-4.0x to maintain performance
- * and visual clarity at extreme zoom levels as defined in design tokens.
+ * - Grid adapts seamlessly across all zoom levels (0.25x-∞)
+ * - Performance optimized with intelligent grid density
+ * - WCAG compliant color contrast with adaptive opacity
  */
 export const CanvasBackground: React.FC<CanvasBackgroundProps> = ({
   width,
@@ -47,8 +50,20 @@ export const CanvasBackground: React.FC<CanvasBackgroundProps> = ({
       horizontal: [] as number[][],
     };
 
-    // Adjust grid spacing based on zoom level
-    const effectiveGridSize = gridSize;
+    // Adaptive grid system based on zoom level
+    // At high zoom levels, show denser grid; at low zoom, show sparser grid
+    let effectiveGridSize = gridSize;
+    
+    if (zoom > 4.0) {
+      // Very high zoom - show fine grid (smaller grid size)
+      effectiveGridSize = gridSize / Math.ceil(zoom / 4);
+    } else if (zoom < 0.5) {
+      // Low zoom - show coarse grid (larger grid size)  
+      effectiveGridSize = gridSize * Math.ceil(1 / zoom);
+    } else if (zoom < 0.25) {
+      // Very low zoom - show very coarse grid
+      effectiveGridSize = gridSize * 8;
+    }
     
     // Calculate visible area in canvas coordinates
     const startX = -width / zoom;
@@ -69,9 +84,28 @@ export const CanvasBackground: React.FC<CanvasBackgroundProps> = ({
     return lines;
   }, [width, height, showGrid, zoom, gridSize]);
 
-  // Only show grid at reasonable zoom levels using design token constants
-  // This range ensures optimal performance and visual clarity as per design specifications
-  const isGridVisible = showGrid && zoom >= ZOOM_MIN && zoom <= ZOOM_MAX;
+  // Calculate grid visibility properties based on zoom
+  const gridProperties = useMemo(() => {
+    if (!showGrid) return { visible: false, opacity: 0, strokeWidth: 1 };
+    
+    // Adaptive opacity - more visible at higher zoom levels
+    let opacity = 0.3; // Default opacity
+    let strokeWidth = 1 / zoom; // Base stroke width
+    
+    if (zoom > 2.0) {
+      // High zoom - increase visibility
+      opacity = Math.min(0.6, 0.3 + (zoom - 2.0) * 0.1);
+      strokeWidth = Math.max(0.5 / zoom, 0.1); // Minimum visible stroke width
+    } else if (zoom < 0.5) {
+      // Low zoom - slightly reduce visibility to avoid cluttering
+      opacity = Math.max(0.15, 0.3 - (0.5 - zoom) * 0.3);
+      strokeWidth = 1 / zoom;
+    }
+    
+    return { visible: true, opacity, strokeWidth };
+  }, [showGrid, zoom]);
+  
+  const isGridVisible = gridProperties.visible;
 
   return (
     <Layer listening={false} name="canvas-background">
@@ -93,7 +127,8 @@ export const CanvasBackground: React.FC<CanvasBackgroundProps> = ({
               key={`grid-vertical-${index}`}
               points={points}
               stroke={gridColor}
-              strokeWidth={1 / zoom}
+              strokeWidth={gridProperties.strokeWidth}
+              opacity={gridProperties.opacity}
               listening={false}
               name={`grid-vertical-${index}`}
               // Accessibility: Provide semantic meaning
@@ -105,7 +140,8 @@ export const CanvasBackground: React.FC<CanvasBackgroundProps> = ({
               key={`grid-horizontal-${index}`}
               points={points}
               stroke={gridColor}
-              strokeWidth={1 / zoom}
+              strokeWidth={gridProperties.strokeWidth}
+              opacity={gridProperties.opacity}
               listening={false}
               name={`grid-horizontal-${index}`}
               // Accessibility: Provide semantic meaning
