@@ -87,7 +87,7 @@ class AuthService {
       }
 
       await _auth0.webAuthentication()
-          .logout(returnToUrl: AppEnvironment.auth0LogoutUri);
+          .logout(returnTo: AppEnvironment.auth0LogoutUri);
       
       await _clearStoredCredentials();
       
@@ -149,10 +149,9 @@ class AuthService {
     await Future.wait([
       _storage.write(key: _accessTokenKey, value: credentials.accessToken),
       if (credentials.refreshToken != null)
-        _storage.write(key: _refreshTokenKey, value: credentials.refreshToken),
-      if (credentials.idToken != null)
-        _storage.write(key: _idTokenKey, value: credentials.idToken),
-    ].whereType<Future<void>>());
+        _storage.write(key: _refreshTokenKey, value: credentials.refreshToken!),
+      _storage.write(key: _idTokenKey, value: credentials.idToken),
+    ]);
   }
 
   /// Store user profile securely
