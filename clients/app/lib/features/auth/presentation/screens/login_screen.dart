@@ -110,7 +110,7 @@ class LoginScreen extends ConsumerWidget {
                             )
                           : const Icon(Icons.login),
                       label: Text(
-                        authState.isLoading ? 'Logging in...' : 'Login with Auth0',
+                        authState.isLoading ? 'Logging in...' : 'Login',
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                       ),
                       style: ElevatedButton.styleFrom(
