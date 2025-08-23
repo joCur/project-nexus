@@ -14,15 +14,13 @@ import { ConnectionType } from '@/types/CardTypes';
 import { 
   NotFoundError, 
   ValidationError,
-  UniqueConstraintError,
-  AuthorizationError
+  UniqueConstraintError
 } from '@/utils/errors';
 import { createContextLogger } from '@/utils/logger';
 import { 
   sanitizeMetadata,
   sanitizeConnectionStyle,
-  sanitizeConnectionLabel,
-  validateJsonObject
+  sanitizeConnectionLabel
 } from '@/utils/jsonSecurity';
 import { 
   validateCreateConnection,
