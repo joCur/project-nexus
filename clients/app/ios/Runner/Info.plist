@@ -60,5 +60,11 @@
 			</array>
 		</dict>
 	</array>
+	
+	<!-- Associated Domains for Universal Links (HTTPS callbacks) -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:your-tenant.auth0.com</string>
+	</array>
 </dict>
 </plist>

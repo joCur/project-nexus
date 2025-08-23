@@ -100,20 +100,19 @@ class AppEnvironment {
   static String get auth0RedirectUri {
     switch (_environment) {
       case Environment.development:
-        // Android: SCHEME://DOMAIN/android/PACKAGE_NAME/callback
-        // iOS: BUNDLE_ID://DOMAIN/ios/BUNDLE_ID/callback
-        return 'dev.curth.nexusmobile://${auth0Domain}/android/dev.curth.nexusmobile/callback';
+        // Using HTTPS callback URLs (more secure than custom schemes)
+        return 'https://$auth0Domain/mobile/callback';
       case Environment.production:
-        return 'dev.curth.nexusmobile://${auth0Domain}/android/dev.curth.nexusmobile/callback';
+        return 'https://$auth0Domain/mobile/callback';
     }
   }
 
   static String get auth0LogoutUri {
     switch (_environment) {
       case Environment.development:
-        return 'dev.curth.nexusmobile://${auth0Domain}/android/dev.curth.nexusmobile/callback';
+        return 'https://$auth0Domain/mobile/logout';
       case Environment.production:
-        return 'dev.curth.nexusmobile://${auth0Domain}/android/dev.curth.nexusmobile/callback';
+        return 'https://$auth0Domain/mobile/logout';
     }
   }
 

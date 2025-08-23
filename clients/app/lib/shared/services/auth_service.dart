@@ -59,12 +59,12 @@ class AuthService {
       dev.log('  Audience: ${AppEnvironment.auth0Audience}', name: 'AuthService');
       dev.log('  Redirect URI: ${AppEnvironment.auth0RedirectUri}', name: 'AuthService');
 
-      final credentials = await _auth0.webAuthentication(
-            scheme: 'dev.curth.nexusmobile' // Required for Android custom scheme
-          ).login(
+      final credentials = await _auth0.webAuthentication()
+          .login(
             audience: AppEnvironment.auth0Audience,
             scopes: {'openid', 'profile', 'email', 'offline_access'},
             redirectUrl: AppEnvironment.auth0RedirectUri,
+            useHTTPS: true, // Use HTTPS callback URLs
           );
 
       dev.log('Auth0 credentials received', name: 'AuthService');
@@ -101,9 +101,11 @@ class AuthService {
         return const Success(null);
       }
 
-      await _auth0.webAuthentication(
-            scheme: 'dev.curth.nexusmobile' // Required for Android custom scheme
-          ).logout(returnTo: AppEnvironment.auth0LogoutUri);
+      await _auth0.webAuthentication()
+          .logout(
+            returnTo: AppEnvironment.auth0LogoutUri,
+            useHTTPS: true, // Use HTTPS callback URLs
+          );
       
       await _clearStoredCredentials();
       

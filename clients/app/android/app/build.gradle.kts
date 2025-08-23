@@ -30,7 +30,8 @@ android {
         versionName = flutter.versionName
         
         // Auth0 configuration  
-        manifestPlaceholders["auth0Domain"] = "your-tenant.auth0.com"
+        // Use environment variables or replace with your actual Auth0 domain
+        manifestPlaceholders["auth0Domain"] = project.findProperty("AUTH0_DOMAIN") ?: "your-tenant.auth0.com"
         manifestPlaceholders["appAuthRedirectScheme"] = "dev.curth.nexusmobile"
     }
 
