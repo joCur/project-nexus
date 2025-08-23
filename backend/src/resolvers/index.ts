@@ -5,6 +5,7 @@ import { healthResolvers } from './health';
 import { userProfileResolvers } from './userProfile';
 import { onboardingResolvers } from './onboarding';
 import { workspaceResolvers } from './workspace';
+import { workspaceMemberResolvers } from './workspaceMemberResolvers';
 import { onboardingWorkflowResolvers } from './onboardingWorkflow';
 import { cardResolvers } from './cardResolvers';
 
@@ -18,6 +19,7 @@ export const resolvers = mergeResolvers([
   onboardingResolvers,
   onboardingWorkflowResolvers,
   workspaceResolvers,
+  workspaceMemberResolvers,
   cardResolvers,
   healthResolvers,
 ]);

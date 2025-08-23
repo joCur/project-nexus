@@ -73,6 +73,39 @@ export const authTypeDefs = gql`
     
     # Computed fields
     owner: User!
+    members: [WorkspaceMember!]!
+    memberCount: Int!
+    currentUserRole: WorkspaceRole
+  }
+
+  # Workspace member types
+  type WorkspaceMember {
+    id: ID!
+    workspaceId: ID!
+    userId: ID!
+    user: User!
+    role: WorkspaceRole!
+    permissions: [String!]!
+    invitedBy: User
+    joinedAt: DateTime!
+    lastAccessed: DateTime
+    memberSettings: JSON
+    isActive: Boolean!
+  }
+
+  # Workspace invitation types
+  type WorkspaceInvite {
+    id: ID!
+    workspaceId: ID!
+    workspace: Workspace!
+    email: String!
+    role: WorkspaceRole!
+    permissions: [String!]!
+    invitedBy: User!
+    status: InviteStatus!
+    message: String
+    expiresAt: DateTime!
+    createdAt: DateTime!
   }
 
   # Onboarding workflow types
@@ -185,6 +218,23 @@ export const authTypeDefs = gql`
     isDefault: Boolean
   }
 
+  input WorkspaceInviteInput {
+    workspaceId: ID!
+    email: String!
+    role: WorkspaceRole!
+    permissions: [String!] = []
+    message: String
+  }
+
+  input WorkspaceMemberUpdateInput {
+    role: WorkspaceRole!
+    permissions: [String!]
+  }
+
+  input AcceptInviteInput {
+    token: String!
+  }
+
   input PaginationInput {
     page: Int = 1
     limit: Int = 20
@@ -229,6 +279,21 @@ export const authTypeDefs = gql`
     PRIVATE
     TEAM
     PUBLIC
+  }
+
+  enum WorkspaceRole {
+    OWNER
+    ADMIN
+    EDITOR
+    VIEWER
+  }
+
+  enum InviteStatus {
+    PENDING
+    ACCEPTED
+    REJECTED
+    EXPIRED
+    CANCELLED
   }
 
   # Health check types
@@ -297,6 +362,15 @@ export const authTypeDefs = gql`
     defaultWorkspace(ownerId: ID!): Workspace
     myDefaultWorkspace: Workspace
     
+    # Workspace member queries
+    workspaceMembers(workspaceId: ID!): [WorkspaceMember!]!
+    workspaceMember(workspaceId: ID!, userId: ID!): WorkspaceMember
+    
+    # Workspace invitation queries
+    workspaceInvites(workspaceId: ID!): [WorkspaceInvite!]!
+    myInvites: [WorkspaceInvite!]!
+    inviteByToken(token: String!): WorkspaceInvite
+    
     # Health checks
     health: HealthCheck!
     healthReady: Boolean!
@@ -340,6 +414,15 @@ export const authTypeDefs = gql`
     updateWorkspace(id: ID!, input: WorkspaceUpdateInput!): Workspace!
     deleteWorkspace(id: ID!): Boolean!
     createDefaultWorkspace(workspaceName: String!): Workspace!
+    
+    # Workspace member mutations
+    inviteToWorkspace(input: WorkspaceInviteInput!): WorkspaceInvite!
+    acceptInvite(input: AcceptInviteInput!): WorkspaceMember!
+    rejectInvite(token: String!): Boolean!
+    cancelInvite(inviteId: ID!): Boolean!
+    updateWorkspaceMember(workspaceId: ID!, userId: ID!, input: WorkspaceMemberUpdateInput!): WorkspaceMember!
+    removeWorkspaceMember(workspaceId: ID!, userId: ID!): Boolean!
+    leaveWorkspace(workspaceId: ID!): Boolean!
     
     # Permission mutations
     grantPermissions(userId: ID!, permissions: [String!]!): User!

@@ -662,7 +662,7 @@ describe('Security Testing Scenarios', () => {
       mockAuth0Service.validateSession.mockResolvedValue(true);
 
       // Create deeply nested object
-      let nestedObject: any = {};
+      const nestedObject: any = {};
       let current = nestedObject;
       for (let i = 0; i < 1000; i++) {
         current.nested = {};
