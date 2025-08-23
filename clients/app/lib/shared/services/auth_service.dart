@@ -52,12 +52,24 @@ class AuthService {
         return await _handleDevelopmentAuth();
       }
 
+      // Log Auth0 configuration for debugging
+      dev.log('Auth0 Configuration:', name: 'AuthService');
+      dev.log('  Domain: ${AppEnvironment.auth0Domain}', name: 'AuthService');
+      dev.log('  Client ID: ${AppEnvironment.auth0ClientId}', name: 'AuthService');
+      dev.log('  Audience: ${AppEnvironment.auth0Audience}', name: 'AuthService');
+      dev.log('  Redirect URI: ${AppEnvironment.auth0RedirectUri}', name: 'AuthService');
+
       final credentials = await _auth0.webAuthentication()
           .login(
             audience: AppEnvironment.auth0Audience,
             scopes: {'openid', 'profile', 'email', 'offline_access'},
             redirectUrl: AppEnvironment.auth0RedirectUri,
           );
+
+      dev.log('Auth0 credentials received', name: 'AuthService');
+      dev.log('  Has access token: ${credentials.accessToken.isNotEmpty}', name: 'AuthService');
+      dev.log('  Has refresh token: ${credentials.refreshToken != null}', name: 'AuthService');
+      dev.log('  Has ID token: ${credentials.idToken.isNotEmpty}', name: 'AuthService');
 
       await _storeCredentials(credentials);
       
@@ -66,10 +78,12 @@ class AuthService {
 
       dev.log('Auth0 login successful: ${user.email}', name: 'AuthService');
       return Success(user);
-    } catch (error) {
-      dev.log('Auth0 login failed: $error', name: 'AuthService');
+    } catch (error, stackTrace) {
+      dev.log('Auth0 login failed: $error', name: 'AuthService', error: error, stackTrace: stackTrace);
       if (error is WebAuthenticationException) {
-        if (error.code == 'a0.authentication_canceled') {
+        dev.log('WebAuthenticationException code: ${error.code}', name: 'AuthService');
+        dev.log('WebAuthenticationException message: ${error.message}', name: 'AuthService');
+        if (error.code == 'a0.authentication_canceled' || error.code == 'a0.authentication_cancelled') {
           return Error(AuthFailure.loginCancelled());
         }
       }

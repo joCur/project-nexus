@@ -148,11 +148,17 @@ class AuthNotifier extends _$AuthNotifier {
         case Error(failure: final failure):
           final authFailure = failure as AuthFailure;
           if (authFailure.code == 'login_cancelled') {
-            // User cancelled login, don't show error
-            state = state.copyWith(isLoading: false);
+            // User cancelled login, don't show error but ensure loading is false
+            state = state.copyWith(
+              isLoading: false,
+              isAuthenticated: false,
+              user: null,
+            );
           } else {
             state = state.copyWith(
               isLoading: false,
+              isAuthenticated: false,
+              user: null,
               error: authFailure.message,
             );
           }
