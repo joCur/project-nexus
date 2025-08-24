@@ -1,11 +1,18 @@
 'use client';
 
 import React, { useRef } from 'react';
-import { CanvasStage } from './CanvasStage';
-import { CanvasBackground } from './CanvasBackground';
+import dynamic from 'next/dynamic';
 import { useCanvasSize } from '@/hooks/useCanvasSize';
 import { useCanvasEvents } from '@/hooks/useCanvasEvents';
 import { useCanvasStore } from '@/stores/canvasStore';
+
+const CanvasStage = dynamic(() => import('./CanvasStage').then(mod => ({ default: mod.CanvasStage })), {
+  ssr: false
+});
+
+const CanvasBackground = dynamic(() => import('./CanvasBackground').then(mod => ({ default: mod.CanvasBackground })), {
+  ssr: false
+});
 
 interface InfiniteCanvasProps {
   className?: string;
