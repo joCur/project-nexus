@@ -44,6 +44,9 @@ dependencies:
   auth0_flutter: ^1.7.2
   flutter_secure_storage: ^9.2.2
   crypto: ^3.0.3
+  
+  # GraphQL
+  graphql_flutter: ^5.1.2
 
 dev_dependencies:
   flutter_test:
