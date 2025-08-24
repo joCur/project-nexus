@@ -222,14 +222,15 @@ void main() {
   group('User model', () {
     test('should create User from Auth0 UserProfile', () {
       // Arrange
-      final mockUserProfile = MockUserProfile();
-      when(() => mockUserProfile.sub).thenReturn('auth0|12345');
-      when(() => mockUserProfile.email).thenReturn('test@example.com');
-      when(() => mockUserProfile.name).thenReturn('Test User');
-      when(() => mockUserProfile.picture).thenReturn('https://example.com/avatar.jpg');
+      final userProfile = UserProfile(
+        sub: 'auth0|12345',
+        email: 'test@example.com',
+        name: 'Test User',
+        picture: 'https://example.com/avatar.jpg',
+      );
 
       // Act
-      final user = User.fromAuth0Profile(mockUserProfile);
+      final user = User.fromAuth0Profile(userProfile);
 
       // Assert
       expect(user.id, equals('auth0|12345'));
@@ -240,14 +241,15 @@ void main() {
 
     test('should handle null values in Auth0 UserProfile', () {
       // Arrange
-      final mockUserProfile = MockUserProfile();
-      when(() => mockUserProfile.sub).thenReturn('auth0|12345');
-      when(() => mockUserProfile.email).thenReturn('test@example.com');
-      when(() => mockUserProfile.name).thenReturn(null);
-      when(() => mockUserProfile.picture).thenReturn(null);
+      final userProfile = UserProfile(
+        sub: 'auth0|12345',
+        email: 'test@example.com',
+        name: null,
+        picture: null,
+      );
 
       // Act
-      final user = User.fromAuth0Profile(mockUserProfile);
+      final user = User.fromAuth0Profile(userProfile);
 
       // Assert
       expect(user.id, equals('auth0|12345'));
