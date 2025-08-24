@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.nexus.nexus_mobile"
+    namespace = "dev.curth.nexusmobile"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -21,13 +21,18 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.nexus.nexus_mobile"
+        applicationId = "dev.curth.nexusmobile"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        
+        // Auth0 configuration  
+        // Use environment variables or replace with your actual Auth0 domain
+        manifestPlaceholders["auth0Domain"] = "auth.nexus-app.de"
+        manifestPlaceholders["auth0Scheme"] = "dev.curth.nexusmobile"
     }
 
     buildTypes {
