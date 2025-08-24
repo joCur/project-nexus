@@ -253,7 +253,9 @@ describe('WorkspaceStore', () => {
       const canvasId = await store.createCanvas(invalidParams);
 
       expect(canvasId).toBeNull();
-      expect(store.canvasManagement.errors.mutationError).toContain('Failed to create canvas');
+      // Get fresh state after async operation
+      const updatedState = useWorkspaceStore.getState();
+      expect(updatedState.canvasManagement.errors.mutationError).toContain('Failed to create canvas');
       
       consoleError.mockRestore();
     });
@@ -278,10 +280,12 @@ describe('WorkspaceStore', () => {
       const success = await store.setDefaultCanvas(workspaceId, canvas2Id!);
 
       expect(success).toBe(true);
-      expect(store.canvasManagement.defaultCanvasId).toBe(canvas2Id);
+      // Get fresh state after async operation
+      const updatedState = useWorkspaceStore.getState();
+      expect(updatedState.canvasManagement.defaultCanvasId).toBe(canvas2Id);
       
-      const canvas1 = store.getCanvas(canvas1Id!);
-      const canvas2 = store.getCanvas(canvas2Id!);
+      const canvas1 = updatedState.getCanvas(canvas1Id!);
+      const canvas2 = updatedState.getCanvas(canvas2Id!);
       
       expect(canvas1!.settings.isDefault).toBe(false);
       expect(canvas2!.settings.isDefault).toBe(true);
@@ -470,9 +474,10 @@ describe('WorkspaceStore', () => {
       store.setError('fetch', 'Network error');
       store.setError('mutation', 'Validation error');
       
-      const { errors } = store.canvasManagement;
-      expect(errors.fetchError).toBe('Network error');
-      expect(errors.mutationError).toBe('Validation error');
+      // Get fresh state after updates
+      const { canvasManagement } = useWorkspaceStore.getState();
+      expect(canvasManagement.errors.fetchError).toBe('Network error');
+      expect(canvasManagement.errors.mutationError).toBe('Validation error');
     });
   });
 

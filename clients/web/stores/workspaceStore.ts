@@ -79,6 +79,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
             // Clear canvas data when workspace changes
             canvasManagement: {
               ...DEFAULT_CANVAS_MANAGEMENT,
+              canvases: new Map(), // Create a fresh Map instance
             },
             isInitialized: false,
           }));
@@ -111,7 +112,10 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         clearContext: () => {
           set({
             context: DEFAULT_CONTEXT,
-            canvasManagement: DEFAULT_CANVAS_MANAGEMENT,
+            canvasManagement: {
+              ...DEFAULT_CANVAS_MANAGEMENT,
+              canvases: new Map(), // Create a fresh Map instance
+            },
             isInitialized: false,
           });
         },
@@ -129,6 +133,11 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           }));
 
           try {
+            // Validate required parameters
+            if (!params.workspaceId || !params.name) {
+              throw new Error('Missing required parameters: workspaceId and name are required');
+            }
+
             // This will be replaced by the actual GraphQL mutation in hooks
             const newCanvasId = createCanvasId(`canvas_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
             
@@ -383,6 +392,12 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           }));
 
           try {
+            // Check if canvas exists
+            const { canvasManagement } = get();
+            if (!canvasManagement.canvases.has(canvasId)) {
+              throw new Error('Canvas not found');
+            }
+
             // Update the default canvas
             set((state) => {
               const newCanvases = new Map(state.canvasManagement.canvases);
