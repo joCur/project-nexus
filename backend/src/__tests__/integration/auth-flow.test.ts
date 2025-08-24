@@ -2,7 +2,6 @@ import request from 'supertest';
 import express from 'express';
 import { ApolloServer } from '@apollo/server';
 import { expressMiddleware } from '@apollo/server/express4';
-import { buildSchema } from 'graphql';
 import { Auth0Service } from '@/services/auth0';
 import { UserService } from '@/services/user';
 import { CacheService } from '@/services/cache';
@@ -13,7 +12,6 @@ import {
   createMockUserService,
   createMockCacheService,
   generateMockJWT,
-  generateExpiredJWT,
   createMockUser,
   createMockAuth0User,
 } from '../utils/test-helpers';
@@ -23,8 +21,6 @@ import {
   USER_FIXTURES,
   SESSION_FIXTURES,
   GRAPHQL_FIXTURES,
-  REQUEST_FIXTURES,
-  ERROR_FIXTURES,
 } from '../utils/test-fixtures';
 
 // Mock external dependencies
@@ -79,7 +75,7 @@ const typeDefs = `
 
 describe('End-to-End Authentication Flow Tests', () => {
   let app: express.Application;
-  let server: ApolloServer<any>;
+  let server: ApolloServer<any>; // eslint-disable-line @typescript-eslint/no-explicit-any
   let mockAuth0Service: jest.Mocked<Auth0Service>;
   let mockUserService: jest.Mocked<UserService>;
   let mockCacheService: jest.Mocked<CacheService>;
@@ -117,14 +113,14 @@ describe('End-to-End Authentication Flow Tests', () => {
     app.use(
       '/graphql',
       expressMiddleware(server, {
-        context: async ({ req, res }: { req: any; res: any }) => {
+        context: async ({ req, res }: { req: any; res: any }) => { // eslint-disable-line @typescript-eslint/no-explicit-any
           const context = await createGraphQLContext(
             mockAuth0Service,
             mockUserService,
             mockCacheService,
-            {} as any, // userProfileService
-            {} as any, // onboardingService
-            {} as any  // workspaceService
+            {} as any, // userProfileService // eslint-disable-line @typescript-eslint/no-explicit-any
+            {} as any, // onboardingService // eslint-disable-line @typescript-eslint/no-explicit-any
+            {} as any  // workspaceService // eslint-disable-line @typescript-eslint/no-explicit-any
           )({ req, res });
           
           
@@ -134,7 +130,7 @@ describe('End-to-End Authentication Flow Tests', () => {
     );
 
     // Setup REST endpoint for testing
-    app.get('/protected', (req: any, res) => {
+    app.get('/protected', (req: any, res) => { // eslint-disable-line @typescript-eslint/no-explicit-any
       if (!req.isAuthenticated) {
         return res.status(401).json({ error: 'Unauthorized' });
       }

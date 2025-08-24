@@ -181,7 +181,7 @@ export class MockAuth0ManagementClient {
     this.scenario = scenario;
   }
 
-  async getUser(userId: string) {
+  async getUser(_userId: string) {
     switch (this.scenario) {
       case 'valid':
         return mockAuth0ManagementResponses.user;
@@ -189,10 +189,11 @@ export class MockAuth0ManagementClient {
       case 'user_not_found':
         throw new Error('The user does not exist.');
       
-      case 'rate_limited':
+      case 'rate_limited': {
         const error = new Error('Rate limit exceeded') as any;
         error.statusCode = 429;
         throw error;
+      }
       
       case 'network_error':
         throw new Error('Network error');

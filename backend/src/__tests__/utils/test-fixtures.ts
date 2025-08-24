@@ -1,10 +1,10 @@
-import { randomUUID } from 'crypto';
+import { randomUUID as _randomUUID } from 'crypto';
 import { 
   generateMockJWT, 
   generateExpiredJWT,
   createMockAuth0User,
   createMockUser,
-  TEST_AUTH0_CONFIG 
+  TEST_AUTH0_CONFIG as _TEST_AUTH0_CONFIG 
 } from './test-helpers';
 
 /**

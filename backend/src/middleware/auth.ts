@@ -29,7 +29,7 @@ export interface AuthenticatedRequest extends Request {
 export function createAuthMiddleware(
   auth0Service: Auth0Service,
   userService: UserService,
-  cacheService: CacheService
+  _cacheService: CacheService
 ) {
   return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     // Initialize authentication context
@@ -217,7 +217,7 @@ export function requireRole(role: string) {
 export function createGraphQLContext(
   auth0Service: Auth0Service,
   userService: UserService,
-  cacheService: CacheService,
+  _cacheService: CacheService,
   userProfileService: import('@/services/userProfile').UserProfileService,
   onboardingService: import('@/services/onboarding').OnboardingService,
   workspaceService: import('@/services/workspace').WorkspaceService
@@ -239,7 +239,7 @@ export function createGraphQLContext(
       dataSources: {
         auth0Service,
         userService,
-        cacheService,
+        _cacheService,
         userProfileService,
         onboardingService,
         workspaceService,

@@ -1,6 +1,6 @@
 import { 
   AuthenticationError, 
-  ValidationError 
+  ValidationError as _ValidationError 
 } from '@/utils/errors';
 import { createContextLogger } from '@/utils/logger';
 import { GraphQLContext } from '@/types';

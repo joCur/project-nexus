@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express';
+import { Response, NextFunction } from 'express';
 import {
   createAuthMiddleware,
   requireAuth,
@@ -15,7 +15,6 @@ import {
   AuthenticationError,
   AuthorizationError,
   TokenExpiredError,
-  InvalidTokenError,
 } from '@/utils/errors';
 import {
   createMockRequest,
@@ -30,7 +29,6 @@ import {
   JWT_FIXTURES,
   AUTH0_USER_FIXTURES,
   USER_FIXTURES,
-  REQUEST_FIXTURES,
 } from '../../utils/test-fixtures';
 
 // Mock logger

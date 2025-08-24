@@ -3,12 +3,12 @@ import {
   Canvas, 
   CreateCanvasInput, 
   UpdateCanvasInput, 
-  CanvasStats,
+  _CanvasStats,
   DuplicateCanvasOptions,
-  CanvasNameConflictError,
-  DefaultCanvasError
+  _CanvasNameConflictError,
+  _DefaultCanvasError
 } from '@/types/canvas';
-import { database, knex } from '@/database/connection';
+import { database, knex as _knex } from '@/database/connection';
 import { WorkspaceAuthorizationService } from '@/services/workspaceAuthorization';
 import { 
   ValidationError, 
@@ -16,6 +16,9 @@ import {
   ConflictError 
 } from '@/utils/errors';
 import { createMockKnex } from '../../utils/test-helpers';
+
+// Import for mocking purposes
+import * as dbConnection from '@/database/connection';
 
 // Mock database connection
 jest.mock('@/database/connection', () => ({
@@ -108,7 +111,7 @@ describe('CanvasService', () => {
         where: jest.fn().mockReturnThis(),
         first: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      (dbConnection.knex as jest.Mock).mockReturnValue(mockKnexQuery);
 
       mockDatabase.query.mockResolvedValue(mockDbCanvas);
 
@@ -126,7 +129,7 @@ describe('CanvasService', () => {
         where: jest.fn().mockReturnThis(),
         first: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      (dbConnection.knex as jest.Mock).mockReturnValue(mockKnexQuery);
 
       mockDatabase.query.mockResolvedValue(null);
 
@@ -140,7 +143,7 @@ describe('CanvasService', () => {
         where: jest.fn().mockReturnThis(),
         first: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      (dbConnection.knex as jest.Mock).mockReturnValue(mockKnexQuery);
 
       const dbError = new Error('Database error');
       mockDatabase.query.mockRejectedValue(dbError);
@@ -161,7 +164,7 @@ describe('CanvasService', () => {
         offset: jest.fn().mockReturnThis(),
       };
 
-      require('@/database/connection').knex.mockReturnValue(mockQuery);
+      (dbConnection.knex as jest.Mock).mockReturnValue(mockQuery);
 
       mockDatabase.query
         .mockResolvedValueOnce([{ count: '5' }])
@@ -188,7 +191,7 @@ describe('CanvasService', () => {
         offset: jest.fn().mockReturnThis(),
       };
 
-      require('@/database/connection').knex.mockReturnValue(mockQuery);
+      (dbConnection.knex as jest.Mock).mockReturnValue(mockQuery);
 
       // Mock applyFilters method
       jest.spyOn(canvasService as any, 'applyFilters').mockImplementation((query) => query);
@@ -225,7 +228,7 @@ describe('CanvasService', () => {
         insert: jest.fn().mockReturnThis(),
         returning: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      (dbConnection.knex as jest.Mock).mockReturnValue(mockKnexQuery);
 
       const newDbCanvas = {
         ...mockDbCanvas,
@@ -262,7 +265,7 @@ describe('CanvasService', () => {
         insert: jest.fn().mockReturnThis(),
         returning: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      (dbConnection.knex as jest.Mock).mockReturnValue(mockKnexQuery);
 
       mockDatabase.query.mockResolvedValue([mockDbCanvas]);
 
@@ -279,7 +282,7 @@ describe('CanvasService', () => {
         insert: jest.fn().mockReturnThis(),
         returning: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      (dbConnection.knex as jest.Mock).mockReturnValue(mockKnexQuery);
 
       mockDatabase.query.mockResolvedValue([mockDbCanvas]);
 
@@ -326,7 +329,7 @@ describe('CanvasService', () => {
         update: jest.fn().mockReturnThis(),
         returning: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      (dbConnection.knex as jest.Mock).mockReturnValue(mockKnexQuery);
 
       const updatedDbCanvas = {
         ...mockDbCanvas,
@@ -374,7 +377,7 @@ describe('CanvasService', () => {
         update: jest.fn().mockReturnThis(),
         returning: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      (dbConnection.knex as jest.Mock).mockReturnValue(mockKnexQuery);
 
       mockDatabase.query.mockResolvedValue([mockDbCanvas]);
 
@@ -392,7 +395,7 @@ describe('CanvasService', () => {
         update: jest.fn().mockReturnThis(),
         returning: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      (dbConnection.knex as jest.Mock).mockReturnValue(mockKnexQuery);
 
       mockDatabase.query.mockResolvedValue([{ ...mockDbCanvas, is_default: true }]);
 
@@ -414,7 +417,7 @@ describe('CanvasService', () => {
         where: jest.fn().mockReturnThis(),
         del: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      (dbConnection.knex as jest.Mock).mockReturnValue(mockKnexQuery);
 
       mockDatabase.query.mockResolvedValue(undefined);
 
@@ -458,7 +461,7 @@ describe('CanvasService', () => {
         where: jest.fn().mockReturnThis(),
         del: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      (dbConnection.knex as jest.Mock).mockReturnValue(mockKnexQuery);
 
       mockDatabase.query.mockResolvedValue(undefined);
 
@@ -475,7 +478,7 @@ describe('CanvasService', () => {
         where: jest.fn().mockReturnThis(),
         first: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      (dbConnection.knex as jest.Mock).mockReturnValue(mockKnexQuery);
 
       mockDatabase.query.mockResolvedValue(defaultCanvas);
 
@@ -491,7 +494,7 @@ describe('CanvasService', () => {
         where: jest.fn().mockReturnThis(),
         first: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      (dbConnection.knex as jest.Mock).mockReturnValue(mockKnexQuery);
 
       mockDatabase.query.mockResolvedValue(null);
 
@@ -514,7 +517,7 @@ describe('CanvasService', () => {
         update: jest.fn().mockReturnThis(),
         returning: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      (dbConnection.knex as jest.Mock).mockReturnValue(mockKnexQuery);
 
       const defaultDbCanvas = { ...mockDbCanvas, is_default: true };
       mockDatabase.query.mockResolvedValue([defaultDbCanvas]);
@@ -610,7 +613,7 @@ describe('CanvasService', () => {
         first: jest.fn().mockReturnThis(),
       };
 
-      require('@/database/connection').knex
+      (dbConnection.knex as jest.Mock)
         .mockReturnValueOnce(mockCardCountQuery)
         .mockReturnValueOnce(mockConnectionCountQuery) 
         .mockReturnValueOnce(mockLastActivityQuery);
@@ -652,7 +655,7 @@ describe('CanvasService', () => {
         first: jest.fn().mockReturnThis(),
       };
 
-      require('@/database/connection').knex
+      (dbConnection.knex as jest.Mock)
         .mockReturnValueOnce(mockCardCountQuery)
         .mockReturnValueOnce(mockConnectionCountQuery)
         .mockReturnValueOnce(mockLastActivityQuery);
@@ -750,7 +753,7 @@ describe('CanvasService', () => {
           where: jest.fn().mockReturnThis(),
           first: jest.fn().mockReturnThis(),
         };
-        require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+        (dbConnection.knex as jest.Mock).mockReturnValue(mockKnexQuery);
 
         mockDatabase.query.mockResolvedValue(mockDbCanvas);
 
@@ -769,7 +772,7 @@ describe('CanvasService', () => {
           max: jest.fn().mockReturnThis(),
           first: jest.fn().mockReturnThis(),
         };
-        require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+        (dbConnection.knex as jest.Mock).mockReturnValue(mockKnexQuery);
 
         mockDatabase.query.mockResolvedValue({ maxPosition: 5 });
 
@@ -784,7 +787,7 @@ describe('CanvasService', () => {
           max: jest.fn().mockReturnThis(),
           first: jest.fn().mockReturnThis(),
         };
-        require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+        (dbConnection.knex as jest.Mock).mockReturnValue(mockKnexQuery);
 
         mockDatabase.query.mockResolvedValue({ maxPosition: null });
 
@@ -809,7 +812,7 @@ describe('CanvasService', () => {
           update: jest.fn().mockReturnThis(),
         };
 
-        require('@/database/connection').knex
+        (dbConnection.knex as jest.Mock)
           .mockReturnValueOnce(mockSelectQuery)
           .mockReturnValueOnce(mockUpdateQuery);
 
@@ -845,7 +848,7 @@ describe('CanvasService', () => {
         where: jest.fn().mockReturnThis(),
         first: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      (dbConnection.knex as jest.Mock).mockReturnValue(mockKnexQuery);
 
       mockDatabase.query.mockResolvedValue(malformedCanvas);
 
@@ -871,7 +874,7 @@ describe('CanvasService', () => {
         insert: jest.fn().mockReturnThis(),
         returning: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      (dbConnection.knex as jest.Mock).mockReturnValue(mockKnexQuery);
 
       const constraintError = new Error('duplicate key value violates unique constraint');
       mockDatabase.query.mockRejectedValue(constraintError);

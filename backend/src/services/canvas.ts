@@ -9,10 +9,10 @@ import {
   CreateCanvasSchema,
   UpdateCanvasSchema,
   DuplicateCanvasSchema,
-  CanvasNotFoundError,
+  CanvasNotFoundError as _CanvasNotFoundError,
   CanvasNameConflictError,
   DefaultCanvasError,
-  CanvasValidationError
+  CanvasValidationError as _CanvasValidationError
 } from '@/types/canvas';
 import { 
   NotFoundError, 

@@ -10,7 +10,6 @@ import {
   createMockUserService,
   createMockCacheService,
   generateMockJWT,
-  wait,
 } from '../utils/test-helpers';
 import {
   JWT_FIXTURES,
@@ -117,7 +116,7 @@ describe('Security Testing Scenarios', () => {
     it('should reject tampered JWT tokens', async () => {
       // Take a valid token and modify the payload
       const validToken = JWT_FIXTURES.VALID_TOKEN;
-      const [header, payload, signature] = validToken.split('.');
+      const [header, _payload, signature] = validToken.split('.');
       
       // Modify the payload to change user ID
       const tamperedPayload = Buffer.from(JSON.stringify({

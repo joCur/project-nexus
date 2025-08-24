@@ -2,13 +2,13 @@ import {
   AuthenticationError, 
   AuthorizationError, 
   NotFoundError,
-  ValidationError 
+  ValidationError as _ValidationError 
 } from '@/utils/errors';
 import { securityLogger } from '@/utils/logger';
 import { GraphQLContext } from '@/types';
-import { UserService } from '@/services/user';
-import { Auth0Service } from '@/services/auth0';
-import { CacheService } from '@/services/cache';
+import { UserService as _UserService } from '@/services/user';
+import { Auth0Service as _Auth0Service } from '@/services/auth0';
+import { CacheService as _CacheService } from '@/services/cache';
 
 /**
  * GraphQL resolvers for authentication operations

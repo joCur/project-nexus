@@ -4,10 +4,13 @@
  * Basic tests for canvas migrations - focused on key functionality
  */
 
+import migration011 from '@/database/migrations/011_create_canvases_table';
+import migration012 from '@/database/migrations/012_add_canvas_id_to_cards';
+
 describe('Canvas Migration Tests (NEX-174)', () => {
   describe('Migration 011: Create Canvases Table', () => {
     it('should define migration functions', () => {
-      const migration = require('@/database/migrations/011_create_canvases_table');
+      const migration = migration011;
       
       expect(typeof migration.up).toBe('function');
       expect(typeof migration.down).toBe('function');
@@ -40,7 +43,7 @@ describe('Canvas Migration Tests (NEX-174)', () => {
 
   describe('Migration 012: Add Canvas ID to Cards', () => {
     it('should define migration functions', () => {
-      const migration = require('@/database/migrations/012_add_canvas_id_to_cards');
+      const migration = migration012;
       
       expect(typeof migration.up).toBe('function');
       expect(typeof migration.down).toBe('function');

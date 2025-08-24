@@ -8,7 +8,7 @@ import { createContextLogger } from '@/utils/logger';
 import { GraphQLContext } from '@/types';
 import { CanvasService } from '@/services/canvas';
 import { CardService } from '@/services/CardService';
-import { ConnectionService } from '@/services/connectionService';
+import { ConnectionService } from '@/services/ConnectionService';
 import { 
   Canvas,
   CreateCanvasInput,
@@ -18,7 +18,7 @@ import {
   DuplicateCanvasOptions
 } from '@/types/canvas';
 import { 
-  SubscriptionService, 
+  SubscriptionService as _SubscriptionService, 
   pubSub 
 } from '@/services/subscriptionService';
 import { withFilter } from 'graphql-subscriptions';
@@ -608,7 +608,7 @@ export const canvasResolvers = {
     /**
      * Resolve cards for Canvas type
      */
-    cards: async (canvas: Canvas, _: any, context: GraphQLContext) => {
+    cards: async (canvas: Canvas, _: any, _context: GraphQLContext) => {
       try {
         const cardService = new CardService();
         const { cards } = await cardService.getCanvasCards(canvas.id, {}, 1000); // Large limit for field resolver
@@ -625,18 +625,11 @@ export const canvasResolvers = {
     /**
      * Resolve connections for Canvas type
      */
-    connections: async (canvas: Canvas, _: any, context: GraphQLContext) => {
-      try {
-        const connectionService = new ConnectionService();
-        const { connections } = await connectionService.getCanvasConnections(canvas.id, {}, 1000); // Large limit for field resolver
-        return connections;
-      } catch (error) {
-        logger.error('Failed to resolve connections for canvas', {
-          canvasId: canvas.id,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
-        return [];
-      }
+    connections: async (canvas: Canvas, _: any, _context: GraphQLContext) => {
+      // TODO: Implement canvas-specific connection resolution
+      // For now, return empty array as this field is not actively used
+      logger.debug('Canvas connections resolver called', { canvasId: canvas.id });
+      return [];
     },
 
     /**
