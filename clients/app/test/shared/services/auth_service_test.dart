@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:auth0_flutter/auth0_flutter.dart';
+import 'package:auth0_flutter/auth0_flutter.dart' as auth0;
 
 import 'package:nexus_mobile/shared/services/auth_service.dart';
 import 'package:nexus_mobile/shared/models/user_profile.dart';
@@ -9,24 +9,25 @@ import 'package:nexus_mobile/core/utils/result.dart';
 import 'package:nexus_mobile/core/platform/environment.dart';
 
 // Mock classes
-class MockAuth0 extends Mock implements Auth0 {}
-class MockWebAuthentication extends Mock implements WebAuthentication {}
-class MockManagementAPI extends Mock implements ManagementAPI {}
-class MockCredentials extends Mock implements Credentials {}
+class MockAuth0 extends Mock implements auth0.Auth0 {}
+class MockWebAuthentication extends Mock implements auth0.WebAuthentication {}
+class MockAuthenticationAPI extends Mock implements auth0.AuthenticationApi {}
+class MockCredentials extends Mock implements auth0.Credentials {}
+class MockAuth0UserProfile extends Mock implements auth0.UserProfile {}
 class MockUserProfile extends Mock implements UserProfile {}
-class MockWebAuthenticationException extends Mock implements WebAuthenticationException {}
+class MockWebAuthenticationException extends Mock implements auth0.WebAuthenticationException {}
 
 void main() {
   group('AuthService', () {
     late AuthService authService;
     late MockAuth0 mockAuth0;
     late MockWebAuthentication mockWebAuth;
-    late MockManagementAPI mockAPI;
+    late MockAuthenticationAPI mockAPI;
 
     setUp(() {
       mockAuth0 = MockAuth0();
       mockWebAuth = MockWebAuthentication();
-      mockAPI = MockManagementAPI();
+      mockAPI = MockAuthenticationAPI();
       
       // Setup Auth0 mock behaviors
       when(() => mockAuth0.webAuthentication(scheme: any(named: 'scheme')))
@@ -42,18 +43,20 @@ void main() {
       test('should return Success with UserProfile on successful login', () async {
         // Arrange
         final mockCredentials = MockCredentials();
-        final mockUserProfile = MockUserProfile();
+        final mockAuth0UserProfile = MockAuth0UserProfile();
         
         when(() => mockCredentials.accessToken).thenReturn('test-access-token');
         when(() => mockCredentials.refreshToken).thenReturn('test-refresh-token');
         when(() => mockCredentials.idToken).thenReturn('test-id-token');
         
-        when(() => mockUserProfile.email).thenReturn('test@example.com');
-        when(() => mockUserProfile.toMap()).thenReturn({
-          'sub': 'test-user-id',
-          'email': 'test@example.com',
-          'name': 'Test User',
-        });
+        // Setup Auth0 UserProfile mock (what comes from Auth0 API)
+        when(() => mockAuth0UserProfile.sub).thenReturn('test-user-id');
+        when(() => mockAuth0UserProfile.email).thenReturn('test@example.com');
+        when(() => mockAuth0UserProfile.name).thenReturn('Test User');
+        when(() => mockAuth0UserProfile.pictureUrl).thenReturn(Uri.parse('https://example.com/avatar.jpg'));
+        when(() => mockAuth0UserProfile.nickname).thenReturn('testuser');
+        when(() => mockAuth0UserProfile.isEmailVerified).thenReturn(true);
+        when(() => mockAuth0UserProfile.updatedAt).thenReturn(DateTime.now());
 
         when(() => mockWebAuth.login(
           audience: any(named: 'audience'),
@@ -62,7 +65,7 @@ void main() {
         )).thenAnswer((_) async => mockCredentials);
 
         when(() => mockAPI.userProfile(accessToken: any(named: 'accessToken')))
-            .thenAnswer((_) async => mockUserProfile);
+            .thenAnswer((_) async => mockAuth0UserProfile);
 
         // Act
         final result = await authService.login();
