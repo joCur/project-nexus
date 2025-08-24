@@ -1,9 +1,9 @@
-import 'package:auth0_flutter/auth0_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/errors/failures.dart';
 import '../../../../shared/services/auth_service.dart';
+import '../../../../shared/models/user_profile.dart';
 import '../../../../core/utils/result.dart';
 
 part 'auth_providers.g.dart';
