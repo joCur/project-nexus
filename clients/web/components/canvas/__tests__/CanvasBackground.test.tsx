@@ -42,6 +42,7 @@ describe('CanvasBackground', () => {
     width: 800,
     height: 600,
     zoom: 1,
+    position: { x: 0, y: 0 },
   };
 
   it('renders layer with correct props', () => {
@@ -52,15 +53,16 @@ describe('CanvasBackground', () => {
     expect(layer).toHaveAttribute('data-listening', 'false');
   });
 
-  it('renders background rect with correct dimensions', () => {
+  it('renders background rect with infinite dimensions', () => {
     render(<CanvasBackground {...defaultProps} />);
     
     const rect = screen.getByTestId('konva-rect');
     expect(rect).toBeInTheDocument();
-    expect(rect).toHaveAttribute('data-x', '-800');
-    expect(rect).toHaveAttribute('data-y', '-600');
-    expect(rect).toHaveAttribute('data-width', '1600');
-    expect(rect).toHaveAttribute('data-height', '1200');
+    // The new infinite background should have much larger dimensions with padding
+    // backgroundPadding = Math.max(800, 600) * 5 = 4000
+    // backgroundWidth = (width / zoom) + (padding * 2) = 800 + 8000 = 8800
+    expect(rect).toHaveAttribute('data-width', '8800');
+    expect(rect).toHaveAttribute('data-height', '8600'); // (600) + 8000
     expect(rect).toHaveAttribute('data-fill', '#f9fafb');
   });
 
@@ -114,10 +116,11 @@ describe('CanvasBackground', () => {
     render(<CanvasBackground {...defaultProps} zoom={2} />);
     
     const rect = screen.getByTestId('konva-rect');
-    expect(rect).toHaveAttribute('data-x', '-400');
-    expect(rect).toHaveAttribute('data-y', '-300');
-    expect(rect).toHaveAttribute('data-width', '800');
-    expect(rect).toHaveAttribute('data-height', '600');
+    // At zoom 2, viewport size is halved in canvas coordinates, but padding remains large
+    // backgroundPadding = Math.max(800, 600) * 5 = 4000
+    // backgroundWidth = (800/2) + (4000 * 2) = 400 + 8000 = 8400
+    expect(rect).toHaveAttribute('data-width', '8400');
+    expect(rect).toHaveAttribute('data-height', '8300'); // (600/2) + 8000
   });
 
   it('hides grid at extreme zoom levels', () => {
@@ -186,7 +189,7 @@ describe('CanvasBackground', () => {
   it('optimizes grid lines based on visible area', () => {
     // Test with different canvas sizes
     render(
-      <CanvasBackground width={400} height={300} zoom={1} showGrid={true} />
+      <CanvasBackground width={400} height={300} zoom={1} position={{ x: 0, y: 0 }} showGrid={true} />
     );
     
     const smallLines = screen.getAllByTestId('konva-line');
@@ -194,7 +197,7 @@ describe('CanvasBackground', () => {
 
     // Re-render with larger canvas
     render(
-      <CanvasBackground width={1600} height={1200} zoom={1} showGrid={true} />
+      <CanvasBackground width={1600} height={1200} zoom={1} position={{ x: 0, y: 0 }} showGrid={true} />
     );
     
     const largeLines = screen.getAllByTestId('konva-line');
@@ -204,7 +207,7 @@ describe('CanvasBackground', () => {
   });
 
   it('uses default props when not provided', () => {
-    render(<CanvasBackground width={800} height={600} zoom={1} />);
+    render(<CanvasBackground width={800} height={600} zoom={1} position={{ x: 0, y: 0 }} />);
     
     // Should render with default grid (showGrid = true by default)
     const lines = screen.getAllByTestId('konva-line');
