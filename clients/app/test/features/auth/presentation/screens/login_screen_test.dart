@@ -28,7 +28,7 @@ void main() {
     Widget createTestWidget({AuthState? authState}) {
       return ProviderScope(
         overrides: [
-          authNotifierProvider.overrideWith((ref) => mockAuthNotifier),
+          authNotifierProvider.overrideWith(() => mockAuthNotifier),
         ],
         child: MaterialApp(
           home: Builder(

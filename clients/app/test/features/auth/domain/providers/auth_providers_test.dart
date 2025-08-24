@@ -19,6 +19,10 @@ void main() {
 
     setUp(() {
       mockAuthService = MockAuthService();
+      
+      // Register fallback values for Mocktail
+      registerFallbackValue(const UserProfile(sub: 'fallback'));
+      
       container = ProviderContainer(
         overrides: [
           authServiceProvider.overrideWithValue(mockAuthService),
