@@ -13,6 +13,31 @@ class MockGoRouter extends Mock implements GoRouter {}
 
 class FakeAuthState extends Fake implements AuthState {}
 
+// Test AuthNotifier that provides a fixed state
+class TestAuthNotifier extends AuthNotifier {
+  final AuthState _state;
+  
+  TestAuthNotifier(this._state);
+  
+  @override
+  AuthState build() => _state;
+  
+  @override
+  Future<void> login() async {
+    // No-op for testing
+  }
+  
+  @override
+  Future<void> logout() async {
+    // No-op for testing  
+  }
+  
+  @override
+  Future<void> refreshAuth() async {
+    // No-op for testing
+  }
+}
+
 void main() {
   group('LoginScreen Widget Tests', () {
     late MockAuthNotifier mockAuthNotifier;
@@ -28,20 +53,16 @@ void main() {
     Widget createTestWidget({AuthState? authState}) {
       return ProviderScope(
         overrides: [
-          authNotifierProvider.overrideWith(() => mockAuthNotifier),
+          // Override just the state, not the notifier
+          authNotifierProvider.overrideWith((ref) => AuthNotifier()),
         ],
         child: MaterialApp(
-          home: Builder(
-            builder: (context) {
-              // Mock the provider to return specific state
-              return Consumer(
-                builder: (context, ref, child) {
-                  // Override the provider if state is provided
-                  if (authState != null) {
-                    ref.read(authNotifierProvider.notifier);
-                  }
-                  return const LoginScreen();
-                },
+          home: Consumer(
+            builder: (context, ref, child) {
+              // Provide a fixed AuthState for testing
+              return Provider.value(
+                value: authState ?? const AuthState(),
+                child: const LoginScreen(),
               );
             },
           ),

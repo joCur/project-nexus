@@ -23,6 +23,9 @@ void main() {
       // Register fallback values for Mocktail
       registerFallbackValue(const UserProfile(sub: 'fallback'));
       
+      // Set up default mock behaviors
+      when(() => mockAuthService.isAuthenticated()).thenAnswer((_) async => false);
+      
       container = ProviderContainer(
         overrides: [
           authServiceProvider.overrideWithValue(mockAuthService),
@@ -111,7 +114,7 @@ void main() {
 
       test('should show error on login failure', () async {
         // Arrange
-        const errorMessage = 'Login failed';
+        const errorMessage = 'Network error';
         when(() => mockAuthService.login())
             .thenAnswer((_) async => Error(AuthFailure.loginFailed(errorMessage)));
 
@@ -124,7 +127,7 @@ void main() {
         expect(finalState.isLoading, isFalse);
         expect(finalState.isAuthenticated, isFalse);
         expect(finalState.user, isNull);
-        expect(finalState.error, equals(errorMessage));
+        expect(finalState.error, equals('Login failed: $errorMessage'));
       });
     });
 
@@ -161,7 +164,7 @@ void main() {
 
       test('should show error on logout failure', () async {
         // Arrange
-        const errorMessage = 'Logout failed';
+        const errorMessage = 'Network error';
         when(() => mockAuthService.logout())
             .thenAnswer((_) async => Error(AuthFailure.logoutFailed(errorMessage)));
 
@@ -172,7 +175,7 @@ void main() {
         // Assert
         final finalState = container.read(authNotifierProvider);
         expect(finalState.isLoading, isFalse);
-        expect(finalState.error, equals(errorMessage));
+        expect(finalState.error, equals('Logout warning: Logout failed: $errorMessage'));
       });
     });
 
@@ -254,7 +257,7 @@ void main() {
       // Assert
       expect(user.id, equals('auth0|12345'));
       expect(user.email, equals('test@example.com'));
-      expect(user.name, isNull);
+      expect(user.name, equals('test@example.com')); // Falls back to email when name is null
       expect(user.avatarUrl, isNull);
     });
   });
