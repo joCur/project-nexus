@@ -9,6 +9,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../core/errors/failures.dart';
 import '../../core/platform/environment.dart';
 import '../../core/utils/result.dart';
+import '../models/user_profile.dart';
 
 part 'auth_service.g.dart';
 
@@ -55,7 +56,19 @@ class AuthService {
 
       await _storeCredentials(credentials);
       
-      final user = await _auth0.api.userProfile(accessToken: credentials.accessToken);
+      final auth0User = await _auth0.api.userProfile(accessToken: credentials.accessToken);
+      
+      // Convert Auth0 User to our UserProfile
+      final user = UserProfile(
+        sub: auth0User.sub,
+        email: auth0User.email,
+        name: auth0User.name,
+        picture: auth0User.pictureUrl,
+        nickname: auth0User.nickname,
+        emailVerified: auth0User.isEmailVerified,
+        updatedAt: auth0User.updatedAt,
+      );
+      
       await _storeUserProfile(user);
 
       return Success(user);

@@ -3,6 +3,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:auth0_flutter/auth0_flutter.dart';
 
 import 'package:nexus_mobile/shared/services/auth_service.dart';
+import 'package:nexus_mobile/shared/models/user_profile.dart';
 import 'package:nexus_mobile/core/errors/failures.dart';
 import 'package:nexus_mobile/core/utils/result.dart';
 import 'package:nexus_mobile/core/platform/environment.dart';

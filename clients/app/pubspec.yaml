@@ -31,35 +31,32 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # Auth0 and Security
+  auth0_flutter: ^1.7.2
+  crypto: ^3.0.3
   cupertino_icons: ^1.0.8
   dio: ^5.4.0
   flutter_riverpod: ^2.4.9
+  flutter_secure_storage: ^9.2.2
   go_router: ^16.2.0
+  # GraphQL
+  graphql_flutter: ^5.1.2
   json_annotation: ^4.8.1
   path_provider: ^2.1.2
   riverpod_annotation: ^2.3.5
   shared_preferences: ^2.2.2
-  
-  # Auth0 and Security
-  auth0_flutter: ^1.7.2
-  flutter_secure_storage: ^9.2.2
-  crypto: ^3.0.3
-  
-  # GraphQL
-  graphql_flutter: ^5.1.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
-  # Testing dependencies
-  mocktail: ^1.0.3
-  integration_test:
-    sdk: flutter
-
   build_runner: ^2.4.8
   flutter_lints: ^5.0.0
+  integration_test:
+    sdk: flutter
   json_serializable: ^6.7.1
+  # Testing dependencies
+  mocktail: ^1.0.3
   riverpod_generator: ^2.3.9
   riverpod_lint: ^2.3.7
 

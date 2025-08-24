@@ -10,6 +10,13 @@ part 'auth_providers.g.dart';
 
 /// User model adapted from Auth0 UserProfile
 class User {
+  final String id;
+  final String name;
+  final String email;
+  final String? avatarUrl;
+  final bool emailVerified;
+  final String? sub;
+
   const User({
     required this.id,
     required this.name,
@@ -19,20 +26,13 @@ class User {
     this.sub,
   });
 
-  final String id;
-  final String name;
-  final String email;
-  final String? avatarUrl;
-  final bool emailVerified;
-  final String? sub;
-
   factory User.fromAuth0Profile(UserProfile profile) {
     return User(
       id: profile.sub,
       name: profile.name ?? profile.email ?? 'Unknown User',
       email: profile.email ?? '',
-      avatarUrl: profile.pictureUrl?.toString(),
-      emailVerified: profile.isEmailVerified ?? false,
+      avatarUrl: profile.picture,
+      emailVerified: profile.emailVerified ?? false,
       sub: profile.sub,
     );
   }
