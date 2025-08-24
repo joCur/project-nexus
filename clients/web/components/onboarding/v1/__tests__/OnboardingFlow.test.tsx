@@ -1,11 +1,12 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { useRouter } from 'next/navigation';
 import { OnboardingFlow } from '../OnboardingFlow';
 
 // Mock hooks
 jest.mock('@/hooks/use-auth');
+
+const mockUseAuth = jest.fn();
+(require('@/hooks/use-auth') as any).useAuth = mockUseAuth;
 
 // Mock step components
 jest.mock('../steps/ProfileSetupStep', () => ({
@@ -79,7 +80,6 @@ jest.mock('../shared/StepContainer', () => ({
 }));
 
 describe('OnboardingFlow', () => {
-  const mockUseAuth = require('@/hooks/use-auth').useAuth;
 
   const defaultUser = {
     sub: 'auth0|test-user-id',

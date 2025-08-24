@@ -11,14 +11,6 @@
  */
 
 import { gql } from '@apollo/client';
-import type {
-  Connection,
-  ConnectionType,
-  ConnectionStyle,
-  ConnectionLabel,
-  ConnectionId
-} from '@/types/connection.types';
-import type { EntityId } from '@/types/common.types';
 
 // ============================================================================
 // FRAGMENTS
