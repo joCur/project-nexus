@@ -133,6 +133,26 @@ export const canvasTypeDefs = gql`
     RELATED          # Matches frontend ConnectionType.RELATED
   }
 
+  # Connection visual styling (aligns with frontend ConnectionStyle)
+  type ConnectionStyle {
+    color: String!
+    width: Int!
+    opacity: Float!
+    dashArray: String
+    curve: String!         # 'straight' | 'curved' | 'stepped'
+    showArrow: Boolean!
+    showLabel: Boolean!
+  }
+
+  # Connection label configuration (aligns with frontend ConnectionLabel)
+  type ConnectionLabel {
+    text: String!
+    position: String!      # 'start' | 'middle' | 'end'
+    backgroundColor: String
+    textColor: String
+    fontSize: Int!
+  }
+
   # Connection entity (aligns with frontend Connection interface)
   type Connection {
     id: ID!
@@ -141,18 +161,25 @@ export const canvasTypeDefs = gql`
     type: ConnectionType!
     confidence: Float!     # Aligns with frontend confidence (0.0-1.0)
     
+    # Visual styling (aligns with frontend)
+    style: ConnectionStyle!
+    label: ConnectionLabel
+    
     # Relationships
     sourceCard: Card!
     targetCard: Card!
     createdBy: User!
     
-    # Metadata
+    # Metadata and AI fields (aligns with frontend)
     metadata: JSON!
-    reason: String         # AI explanation for connection
+    isVisible: Boolean!
+    aiReasoning: String    # AI explanation for connection
+    keywords: [String!]    # Keywords that triggered connection
+    concepts: [String!]    # Concepts linking the cards
     
     # Audit fields
     createdAt: DateTime!
-    isVisible: Boolean!
+    updatedAt: DateTime!
   }
 
   # ============================================================================
@@ -254,23 +281,57 @@ export const canvasTypeDefs = gql`
     position: PositionInput!
   }
 
-  # Connection creation input
+  # Connection style input (aligns with frontend ConnectionStyle)
+  input ConnectionStyleInput {
+    color: String
+    width: Int
+    opacity: Float
+    dashArray: String
+    curve: String         # 'straight' | 'curved' | 'stepped'
+    showArrow: Boolean
+    showLabel: Boolean
+  }
+
+  # Connection label input (aligns with frontend ConnectionLabel)
+  input ConnectionLabelInput {
+    text: String!
+    position: String!      # 'start' | 'middle' | 'end'
+    backgroundColor: String
+    textColor: String
+    fontSize: Int!
+  }
+
+  # Connection creation input (aligns with frontend ConnectionActions.createConnection)
   input CreateConnectionInput {
     sourceCardId: ID!
     targetCardId: ID!
-    type: ConnectionType!
+    type: ConnectionType = MANUAL
     confidence: Float
+    style: ConnectionStyleInput
+    label: ConnectionLabelInput
     metadata: JSON
-    reason: String
+    aiReasoning: String    # AI explanation for connection
+    keywords: [String!]    # Keywords that triggered connection
+    concepts: [String!]    # Concepts linking the cards
   }
 
-  # Connection update input
+  # Connection update input (aligns with frontend ConnectionActions.updateConnection)
   input UpdateConnectionInput {
     type: ConnectionType
     confidence: Float
+    style: ConnectionStyleInput
+    label: ConnectionLabelInput
     metadata: JSON
-    reason: String
     isVisible: Boolean
+    aiReasoning: String    # AI explanation for connection
+    keywords: [String!]    # Keywords that triggered connection
+    concepts: [String!]    # Concepts linking the cards
+  }
+
+  # Batch connection operations
+  input BatchConnectionUpdate {
+    connectionId: ID!
+    updates: UpdateConnectionInput!
   }
 
   # Canvas settings input
@@ -311,13 +372,20 @@ export const canvasTypeDefs = gql`
     end: DateTime!
   }
 
-  # Connection filter options
+  # Connection filter options (aligns with backend ConnectionFilter)
   input ConnectionFilter {
     types: [ConnectionType!]
     minConfidence: Float
-    sourceCardId: ID
-    targetCardId: ID
+    maxConfidence: Float
+    sourceCardIds: [ID!]
+    targetCardIds: [ID!]
     createdBy: ID
+    isVisible: Boolean
+    createdAfter: DateTime
+    createdBefore: DateTime
+    hasAIReasoning: Boolean
+    keywords: [String!]
+    concepts: [String!]
   }
 
   # Paginated card results
@@ -426,7 +494,11 @@ export const canvasTypeDefs = gql`
     createConnection(input: CreateConnectionInput!): Connection! @auth
     updateConnection(id: ID!, input: UpdateConnectionInput!): Connection! @auth
     deleteConnection(id: ID!): Boolean! @auth
-    deleteConnections(ids: [ID!]!): Boolean! @auth
+    
+    # Batch connection operations for performance
+    batchCreateConnections(connections: [CreateConnectionInput!]!): [Connection!]! @auth
+    batchUpdateConnections(updates: [BatchConnectionUpdate!]!): [Connection!]! @auth
+    batchDeleteConnections(connectionIds: [ID!]!): Boolean! @auth
     
     # Canvas settings management
     updateCanvasSettings(

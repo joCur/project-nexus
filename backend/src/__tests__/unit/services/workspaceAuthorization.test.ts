@@ -174,10 +174,10 @@ describe('WorkspaceAuthorizationService', () => {
   });
 
   describe('role validation', () => {
-    test('cannot set owner role directly', () => {
+    test('owner role has comprehensive permissions', () => {
       expect(() => {
-        (authService as any).validateRole('owner');
-      }).not.toThrow(); // Owner role validation should be handled elsewhere
+        (authService as any).getRolePermissions('owner');
+      }).not.toThrow(); // Owner role should have valid permissions
     });
 
     test('valid roles are accepted', () => {
