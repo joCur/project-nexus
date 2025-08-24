@@ -20,10 +20,72 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
+  # Detect which parts of the codebase have changed
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.changes.outputs.backend }}
+      web: ${{ steps.changes.outputs.web }}
+      mobile: ${{ steps.changes.outputs.mobile }}
+      docker: ${{ steps.changes.outputs.docker }}
+      ci: ${{ steps.changes.outputs.ci }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - 'database/**'
+              - 'redis/**'
+            web:
+              - 'clients/web/**'
+            mobile:
+              - 'clients/app/**'
+            docker:
+              - '**/Dockerfile'
+              - 'docker-compose*.yml'
+            ci:
+              - '.github/workflows/**'
+      
+      - name: Display detected changes
+        run: |
+          echo "## 🔍 Changes Detected" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Backend**: ${{ steps.changes.outputs.backend }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Web Frontend**: ${{ steps.changes.outputs.web }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Mobile App**: ${{ steps.changes.outputs.mobile }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Docker**: ${{ steps.changes.outputs.docker }}" >> $GITHUB_STEP_SUMMARY
+          echo "**CI/CD**: ${{ steps.changes.outputs.ci }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Jobs that will run:" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ steps.changes.outputs.backend }}" == "true" || "${{ steps.changes.outputs.ci }}" == "true" ]]; then
+            echo "- ✅ Backend code quality and tests" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ⏭️ Backend code quality and tests (skipped)" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [[ "${{ steps.changes.outputs.web }}" == "true" || "${{ steps.changes.outputs.ci }}" == "true" ]]; then
+            echo "- ✅ Web frontend code quality and tests" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ⏭️ Web frontend code quality and tests (skipped)" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [[ "${{ steps.changes.outputs.mobile }}" == "true" || "${{ steps.changes.outputs.ci }}" == "true" ]]; then
+            echo "- ✅ Mobile app build and test" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ⏭️ Mobile app build and test (skipped)" >> $GITHUB_STEP_SUMMARY
+          fi
+
   # Code quality and type checking
   code-quality:
     name: Code Quality Check - ${{ matrix.app }}
     runs-on: ubuntu-latest
+    needs: detect-changes
+    if: |
+      (matrix.app == 'backend' && (needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.ci == 'true' || github.event_name == 'workflow_dispatch')) ||
+      (matrix.app == 'web' && (needs.detect-changes.outputs.web == 'true' || needs.detect-changes.outputs.ci == 'true' || github.event_name == 'workflow_dispatch'))
     strategy:
       matrix:
         app: [backend, web]
@@ -60,6 +122,14 @@ jobs:
   # Security scanning
   security:
     runs-on: ubuntu-latest
+    needs: detect-changes
+    # Run security checks if any code changed, or on manual trigger, or CI changes
+    if: |
+      needs.detect-changes.outputs.backend == 'true' || 
+      needs.detect-changes.outputs.web == 'true' || 
+      needs.detect-changes.outputs.mobile == 'true' || 
+      needs.detect-changes.outputs.ci == 'true' || 
+      github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4
       
@@ -106,6 +176,13 @@ jobs:
   # Test suite
   test:
     runs-on: ubuntu-latest
+    needs: detect-changes
+    # Run tests if backend, web, or CI changes detected
+    if: |
+      needs.detect-changes.outputs.backend == 'true' || 
+      needs.detect-changes.outputs.web == 'true' || 
+      needs.detect-changes.outputs.ci == 'true' || 
+      github.event_name == 'workflow_dispatch'
     services:
       postgres:
         image: pgvector/pgvector:pg15
@@ -142,16 +219,19 @@ jobs:
           cache-dependency-path: 'backend/package-lock.json'
       
       - name: Install backend dependencies
+        if: needs.detect-changes.outputs.backend == 'true'
         working-directory: backend
         run: npm ci
       
       - name: Run database migrations
+        if: needs.detect-changes.outputs.backend == 'true'
         working-directory: backend
         env:
           DATABASE_URL: postgresql://postgres:test_password@localhost:5432/nexus_test
         run: npm run db:migrate || echo "No migrations found"
       
       - name: Run backend tests
+        if: needs.detect-changes.outputs.backend == 'true'
         working-directory: backend
         env:
           NODE_ENV: test
@@ -168,10 +248,12 @@ jobs:
         run: npm test
       
       - name: Install frontend dependencies
+        if: needs.detect-changes.outputs.web == 'true'
         working-directory: clients/web
         run: npm ci
       
       - name: Run frontend tests
+        if: needs.detect-changes.outputs.web == 'true'
         working-directory: clients/web
         env:
           NEXT_PUBLIC_AUTH0_DOMAIN: test.auth0.com
@@ -182,6 +264,12 @@ jobs:
   mobile:
     name: Mobile App Build & Test
     runs-on: ubuntu-latest
+    needs: detect-changes
+    # Run mobile build and test only if mobile app changes detected
+    if: |
+      needs.detect-changes.outputs.mobile == 'true' || 
+      needs.detect-changes.outputs.ci == 'true' || 
+      github.event_name == 'workflow_dispatch'
     
     steps:
       - uses: actions/checkout@v4
@@ -318,9 +406,15 @@ jobs:
   build:
     name: Build & Push Docker Images
     runs-on: ubuntu-latest
-    needs: [code-quality, security, test, mobile]
-    # Build on main branch push or manual trigger
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    needs: [detect-changes]
+    # Build on main branch push or manual trigger, and only if backend/web changes detected
+    if: |
+      (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') &&
+      (needs.detect-changes.outputs.backend == 'true' || 
+       needs.detect-changes.outputs.web == 'true' || 
+       needs.detect-changes.outputs.docker == 'true' || 
+       needs.detect-changes.outputs.ci == 'true' || 
+       github.event_name == 'workflow_dispatch')
     
     outputs:
       backend-image: ${{ steps.meta-backend.outputs.tags }}
@@ -370,6 +464,7 @@ jobs:
             type=raw,value=${{ steps.meta.outputs.version }}
       
       - name: Build and push backend image
+        if: needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.docker == 'true'
         uses: docker/build-push-action@v5
         with:
           context: ./backend
@@ -384,6 +479,7 @@ jobs:
             VERSION=${{ steps.meta.outputs.version }}
       
       - name: Build and push frontend image
+        if: needs.detect-changes.outputs.web == 'true' || needs.detect-changes.outputs.docker == 'true'
         uses: docker/build-push-action@v5
         with:
           context: ./clients/web
@@ -426,7 +522,7 @@ jobs:
   build-summary:
     name: Build Summary
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [detect-changes, build]
     if: always() && needs.build.result == 'success'
     
     steps:
