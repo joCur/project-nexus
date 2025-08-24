@@ -128,33 +128,6 @@ class AuthScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
 
-          // Development mode indicator
-          if (_isDevelopmentMode())
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.amber.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.amber.shade200),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.developer_mode, 
-                       size: 16, 
-                       color: Colors.amber.shade700),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Development Mode',
-                    style: TextStyle(
-                      color: Colors.amber.shade700,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
         ],
       ),
     );
@@ -317,8 +290,4 @@ class AuthScreen extends ConsumerWidget {
     );
   }
 
-  bool _isDevelopmentMode() {
-    // This would typically check environment variables or build mode
-    return true; // Placeholder - replace with actual development mode check
-  }
 }

@@ -8,6 +8,7 @@ import 'package:auth0_flutter/auth0_flutter.dart';
 import 'package:nexus_mobile/main.dart';
 import 'package:nexus_mobile/shared/services/auth_service.dart';
 import 'package:nexus_mobile/core/utils/result.dart';
+import 'package:nexus_mobile/core/errors/failures.dart';
 
 // Mock classes for integration testing
 class MockAuthService extends Mock implements AuthService {}

@@ -116,7 +116,4 @@ class AppEnvironment {
     }
   }
 
-  // Development mode authentication - disabled by default to ensure real Auth0 integration
-  static bool get enableDevelopmentAuth => isDevelopment && 
-    const bool.fromEnvironment('ENABLE_DEV_AUTH', defaultValue: false);
 }

@@ -45,45 +45,22 @@ class AuthService {
   /// Login using Auth0 Universal Login
   Future<Result<UserProfile>> login() async {
     try {
-      // Use real Auth0 authentication by default
-      // Development mode is only for UI testing when explicitly enabled
-      if (AppEnvironment.enableDevelopmentAuth) {
-        dev.log('Development mode authentication enabled - UI testing only', name: 'AuthService');
-        return await _handleDevelopmentAuth();
-      }
-
-      // Log Auth0 configuration for debugging
-      dev.log('Auth0 Configuration:', name: 'AuthService');
-      dev.log('  Domain: ${AppEnvironment.auth0Domain}', name: 'AuthService');
-      dev.log('  Client ID: ${AppEnvironment.auth0ClientId}', name: 'AuthService');
-      dev.log('  Audience: ${AppEnvironment.auth0Audience}', name: 'AuthService');
-      dev.log('  Redirect URI: ${AppEnvironment.auth0RedirectUri}', name: 'AuthService');
-
       final credentials = await _auth0.webAuthentication(
-            scheme: 'dev.curth.nexusmobile' // Required for custom scheme callbacks
+            scheme: 'dev.curth.nexusmobile'
           ).login(
             audience: AppEnvironment.auth0Audience,
             scopes: {'openid', 'profile', 'email', 'offline_access'},
             redirectUrl: AppEnvironment.auth0RedirectUri,
           );
 
-      dev.log('Auth0 credentials received', name: 'AuthService');
-      dev.log('  Has access token: ${credentials.accessToken.isNotEmpty}', name: 'AuthService');
-      dev.log('  Has refresh token: ${credentials.refreshToken != null}', name: 'AuthService');
-      dev.log('  Has ID token: ${credentials.idToken.isNotEmpty}', name: 'AuthService');
-
       await _storeCredentials(credentials);
       
       final user = await _auth0.api.userProfile(accessToken: credentials.accessToken);
       await _storeUserProfile(user);
 
-      dev.log('Auth0 login successful: ${user.email}', name: 'AuthService');
       return Success(user);
-    } catch (error, stackTrace) {
-      dev.log('Auth0 login failed: $error', name: 'AuthService', error: error, stackTrace: stackTrace);
+    } catch (error) {
       if (error is WebAuthenticationException) {
-        dev.log('WebAuthenticationException code: ${error.code}', name: 'AuthService');
-        dev.log('WebAuthenticationException message: ${error.message}', name: 'AuthService');
         if (error.code == 'a0.authentication_canceled' || error.code == 'a0.authentication_cancelled') {
           return Error(AuthFailure.loginCancelled());
         }
@@ -95,24 +72,15 @@ class AuthService {
   /// Logout and clear stored credentials
   Future<Result<void>> logout() async {
     try {
-      if (AppEnvironment.enableDevelopmentAuth) {
-        dev.log('Development mode logout', name: 'AuthService');
-        await _clearStoredCredentials();
-        return const Success(null);
-      }
-
       await _auth0.webAuthentication(
-            scheme: 'dev.curth.nexusmobile' // Required for custom scheme callbacks
+            scheme: 'dev.curth.nexusmobile'
           ).logout(
             returnTo: AppEnvironment.auth0LogoutUri,
           );
       
       await _clearStoredCredentials();
-      
-      dev.log('Auth0 logout successful', name: 'AuthService');
       return const Success(null);
     } catch (error) {
-      dev.log('Auth0 logout failed: $error', name: 'AuthService');
       // Even if logout fails, clear local credentials
       await _clearStoredCredentials();
       return Error(AuthFailure.logoutFailed(error.toString()));
@@ -140,10 +108,6 @@ class AuthService {
 
   /// Check if user is authenticated
   Future<bool> isAuthenticated() async {
-    if (AppEnvironment.enableDevelopmentAuth) {
-      return await _storage.containsKey(key: _userProfileKey);
-    }
-    
     final accessToken = await _storage.read(key: _accessTokenKey);
     return accessToken != null;
   }
@@ -188,50 +152,5 @@ class AuthService {
     ]);
   }
 
-  /// Handle development mode authentication
-  Future<Result<UserProfile>> _handleDevelopmentAuth() async {
-    try {
-      // Create a mock user for development
-      final mockUser = UserProfile.fromMap({
-        'sub': 'dev|mock-user-123',
-        'email': 'developer@nexus.app',
-        'name': 'Development User',
-        'picture': 'https://via.placeholder.com/150',
-        'email_verified': true,
-      });
-
-      await _storeUserProfile(mockUser);
-      
-      // Store mock tokens (create a simplified mock credentials object)
-      final mockCredentials = Credentials(
-        accessToken: 'mock-access-token',
-        refreshToken: 'mock-refresh-token',
-        idToken: 'mock-id-token',
-        tokenType: 'Bearer',
-        expiresAt: DateTime.now().add(const Duration(hours: 24)),
-        scopes: {'openid', 'profile', 'email'},
-        user: mockUser,
-      );
-      await _storeCredentials(mockCredentials);
-
-      dev.log('Development authentication successful', name: 'AuthService');
-      return Success(mockUser);
-    } catch (error) {
-      dev.log('Development authentication failed: $error', name: 'AuthService');
-      return Error(AuthFailure.loginFailed(error.toString()));
-    }
-  }
-
-  /// Get development headers for API calls
-  Map<String, String> getDevelopmentHeaders() {
-    if (!AppEnvironment.enableDevelopmentAuth) {
-      return {};
-    }
-
-    return {
-      'X-User-Sub': 'dev|mock-user-123',
-      'X-User-Email': 'developer@nexus.app',
-    };
-  }
 }
 

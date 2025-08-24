@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/platform/environment.dart';
 import '../../domain/providers/auth_providers.dart';
 
 class LoginScreen extends ConsumerWidget {
@@ -125,33 +124,6 @@ class LoginScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 32),
 
-                  // Development mode indicator
-                  if (_isDevelopmentMode())
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.amber.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.amber.shade200),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.developer_mode, 
-                               size: 16, 
-                               color: Colors.amber.shade700),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Development Mode',
-                            style: TextStyle(
-                              color: Colors.amber.shade700,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   
                   const SizedBox(height: 48),
                   
@@ -197,7 +169,4 @@ class LoginScreen extends ConsumerWidget {
     }
   }
 
-  bool _isDevelopmentMode() {
-    return AppEnvironment.enableDevelopmentAuth;
-  }
 }

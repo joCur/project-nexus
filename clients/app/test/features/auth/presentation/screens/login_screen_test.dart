@@ -6,8 +6,6 @@ import 'package:go_router/go_router.dart';
 
 import 'package:nexus_mobile/features/auth/presentation/screens/login_screen.dart';
 import 'package:nexus_mobile/features/auth/domain/providers/auth_providers.dart';
-import 'package:nexus_mobile/features/auth/domain/models/auth_state.dart';
-import 'package:nexus_mobile/core/platform/environment.dart';
 
 // Mock classes
 class MockAuthNotifier extends Mock implements AuthNotifier {}

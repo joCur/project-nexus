@@ -95,21 +95,10 @@ class ApiClient {
 
   Future<void> _addAuthHeaders(RequestOptions options) async {
     try {
-      // Add development headers if in development mode
-      if (AppEnvironment.enableDevelopmentAuth) {
-        final devHeaders = _authService.getDevelopmentHeaders();
-        options.headers.addAll(devHeaders);
-        dev.log('Added development headers: $devHeaders', name: 'ApiClient');
-        return;
-      }
-
       // Add Auth0 access token
       final accessToken = await _authService.getAccessToken();
       if (accessToken != null) {
         options.headers['Authorization'] = 'Bearer $accessToken';
-        dev.log('Added Auth0 access token to request', name: 'ApiClient');
-      } else {
-        dev.log('No access token available for request', name: 'ApiClient');
       }
     } catch (error) {
       dev.log('Failed to add auth headers: $error', name: 'ApiClient');
