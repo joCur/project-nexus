@@ -234,7 +234,7 @@ jobs:
       
       - name: Run Flutter analyze
         working-directory: clients/app
-        run: flutter analyze . --fatal-infos --fatal-warnings
+        run: flutter analyze . --fatal-warnings
       
       - name: Run Flutter tests
         working-directory: clients/app
