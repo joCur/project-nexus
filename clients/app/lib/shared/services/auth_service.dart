@@ -29,11 +29,11 @@ class AuthService {
     );
     
     _storage = const FlutterSecureStorage(
-      aOptions: auth0.AndroidOptions(
+      aOptions: AndroidOptions(
         encryptedSharedPreferences: true,
       ),
-      iOptions: auth0.IOSOptions(
-        accessibility: auth0.KeychainAccessibility.first_unlock_this_device,
+      iOptions: IOSOptions(
+        accessibility: KeychainAccessibility.first_unlock_this_device,
       ),
     );
   }
