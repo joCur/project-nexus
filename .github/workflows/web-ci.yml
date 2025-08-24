@@ -1,0 +1,156 @@
+name: Web Frontend CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'clients/web/**'
+      - '.github/workflows/web-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'clients/web/**'
+      - '.github/workflows/web-ci.yml'
+  workflow_dispatch:
+    inputs:
+      run_tests:
+        description: 'Run test suite'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  code-quality:
+    name: Web Code Quality
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: clients/web/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: clients/web
+        run: npm ci --silent
+      
+      - name: Run ESLint
+        working-directory: clients/web
+        run: npm run lint
+        continue-on-error: true
+      
+      - name: TypeScript type check
+        working-directory: clients/web
+        run: npm run type-check
+      
+      - name: Check for unused dependencies
+        working-directory: clients/web
+        run: npx depcheck
+        continue-on-error: true
+      
+      - name: Next.js build check
+        working-directory: clients/web
+        env:
+          NEXT_PUBLIC_AUTH0_DOMAIN: test.auth0.com
+          NEXT_PUBLIC_AUTH0_CLIENT_ID: test_client_id
+        run: npm run build
+
+  test:
+    name: Web Tests
+    runs-on: ubuntu-latest
+    if: github.event.inputs.run_tests != 'false'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: clients/web/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: clients/web
+        run: npm ci --silent
+      
+      - name: Run tests
+        working-directory: clients/web
+        env:
+          NEXT_PUBLIC_AUTH0_DOMAIN: test.auth0.com
+          NEXT_PUBLIC_AUTH0_CLIENT_ID: test_client_id
+        run: npm test -- --coverage --watchAll=false
+      
+      - name: Upload test coverage
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-coverage-${{ github.run_number }}
+          path: clients/web/coverage/
+          retention-days: 7
+
+  accessibility:
+    name: Accessibility Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: clients/web/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: clients/web
+        run: npm ci --silent
+      
+      - name: Build application
+        working-directory: clients/web
+        env:
+          NEXT_PUBLIC_AUTH0_DOMAIN: test.auth0.com
+          NEXT_PUBLIC_AUTH0_CLIENT_ID: test_client_id
+        run: npm run build
+      
+      - name: Run accessibility audit
+        working-directory: clients/web
+        run: |
+          npx start-server-and-test 'npm start' 3000 'npx @axe-core/cli http://localhost:3000' || echo "Accessibility audit completed with warnings"
+        continue-on-error: true
+
+  web-summary:
+    name: Web Frontend Summary
+    runs-on: ubuntu-latest
+    needs: [code-quality, test, accessibility]
+    if: always()
+    
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## 🌐 Web Frontend Pipeline Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Code Quality**: ${{ needs.code-quality.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Tests**: ${{ needs.test.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Accessibility**: ${{ needs.accessibility.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ needs.code-quality.result }}" == "success" && "${{ needs.test.result }}" == "success" ]]; then
+            echo "✅ **Web frontend pipeline passed successfully!**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Web frontend pipeline failed. Check individual jobs for details.**" >> $GITHUB_STEP_SUMMARY
+          fi

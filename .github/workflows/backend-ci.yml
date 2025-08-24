@@ -1,0 +1,160 @@
+name: Backend CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'database/**'
+      - 'redis/**'
+      - '.github/workflows/backend-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'database/**'
+      - 'redis/**'
+      - '.github/workflows/backend-ci.yml'
+  workflow_dispatch:
+    inputs:
+      run_tests:
+        description: 'Run full test suite'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  code-quality:
+    name: Backend Code Quality
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci --silent
+      
+      - name: Run ESLint
+        working-directory: backend
+        run: npm run lint
+        continue-on-error: true
+      
+      - name: TypeScript type check
+        working-directory: backend
+        run: npm run type-check
+      
+      - name: Check for unused dependencies
+        working-directory: backend
+        run: npx depcheck
+        continue-on-error: true
+
+  test:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    if: github.event.inputs.run_tests != 'false'
+    
+    services:
+      postgres:
+        image: pgvector/pgvector:pg15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: nexus_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci --silent
+      
+      - name: Run database migrations
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://postgres:test_password@localhost:5432/nexus_test
+        run: npm run db:migrate
+      
+      - name: Run backend tests
+        working-directory: backend
+        env:
+          NODE_ENV: test
+          POSTGRES_DB: nexus_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test_password
+          DATABASE_URL: postgresql://postgres:test_password@localhost:5432/nexus_test
+          REDIS_URL: redis://localhost:6379
+          AUTH0_DOMAIN: test.auth0.com
+          AUTH0_CLIENT_ID: test_client_id
+          AUTH0_CLIENT_SECRET: test_client_secret_for_testing_purposes
+          JWT_SECRET: test_jwt_secret_for_unit_tests_minimum_32_chars_required_by_validation
+          SESSION_SECRET: test_session_secret_for_testing_minimum_32_chars_required_validation
+        run: npm test -- --coverage
+      
+      - name: Upload test coverage
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage-${{ github.run_number }}
+          path: backend/coverage/
+          retention-days: 7
+
+  backend-summary:
+    name: Backend Summary
+    runs-on: ubuntu-latest
+    needs: [code-quality, test]
+    if: always()
+    
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## 🔧 Backend Pipeline Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Code Quality**: ${{ needs.code-quality.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Tests**: ${{ needs.test.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ needs.code-quality.result }}" == "success" && "${{ needs.test.result }}" == "success" ]]; then
+            echo "✅ **Backend pipeline passed successfully!**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Backend pipeline failed. Check individual jobs for details.**" >> $GITHUB_STEP_SUMMARY
+          fi
