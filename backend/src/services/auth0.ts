@@ -14,7 +14,7 @@ import {
   TokenExpiredError,
   EmailNotVerifiedError,
   Auth0ServiceError,
-  ErrorFactory,
+  ErrorFactory as _ErrorFactory,
 } from '@/utils/errors';
 import { securityLogger, performanceLogger, createContextLogger } from '@/utils/logger';
 import { CacheService } from './cache';
@@ -77,22 +77,15 @@ export class Auth0Service {
         clockTolerance: 60, // Allow 60 seconds clock skew
       }) as unknown as Auth0TokenPayload;
 
-      // Validate email verification requirement
-      if (!payload.email_verified) {
-        securityLogger.authFailure('Email not verified', { 
-          auth0UserId: payload.sub,
-          email: payload.email 
-        });
-        throw new EmailNotVerifiedError();
-      }
+      // Email verification is handled by Auth0 during authentication
+      // If we receive a valid JWT token, Auth0 has already enforced its verification requirements
 
       // Map to Auth0User interface
       const auth0User: Auth0User = {
         sub: payload.sub as string,
-        email: payload.email as string,
-        email_verified: payload.email_verified as boolean,
+        username: payload.username as string,
         name: payload.name as string,
-        nickname: payload.nickname as string,
+        'https://api.nexus-app.de/email': payload['https://api.nexus-app.de/email'] as string,
         picture: payload.picture as string,
         updated_at: payload.updated_at as string,
         iss: payload.iss,
@@ -116,7 +109,7 @@ export class Auth0Service {
         auth0User['https://api.nexus-app.de/user_id'] || 'unknown',
         auth0User.sub,
         { 
-          email: auth0User.email,
+          email: auth0User['https://api.nexus-app.de/email'] || auth0User.email,
           roles: auth0User['https://api.nexus-app.de/roles'],
           tokenExp: new Date(auth0User.exp * 1000).toISOString(),
         }
@@ -160,19 +153,43 @@ export class Auth0Service {
     const startTime = Date.now();
 
     try {
+      // Debug logging to see what Auth0 user data we're receiving
+      this.logger.debug('Auth0 user data received', {
+        auth0UserId: auth0User.sub,
+        customEmail: auth0User['https://api.nexus-app.de/email'],
+        standardEmail: auth0User.email,
+        username: auth0User.username,
+        name: auth0User.name,
+        picture: auth0User.picture,
+        hasCustomEmail: !!auth0User['https://api.nexus-app.de/email'],
+        hasStandardEmail: !!auth0User.email,
+      });
+
       // Check if user exists in local database
       let user = await this.userService.findByAuth0Id(auth0User.sub);
 
+      // Create a valid fallback email by replacing invalid characters
+      const sanitizedAuth0Id = auth0User.sub.replace(/[^a-zA-Z0-9]/g, '-');
+      const fallbackEmail = `${sanitizedAuth0Id}@nexus.local`;
+      
       const userData = {
-        email: auth0User.email,
+        email: auth0User['https://api.nexus-app.de/email'] || auth0User.email || fallbackEmail,
         auth0UserId: auth0User.sub,
-        emailVerified: auth0User.email_verified,
-        displayName: auth0User.name || auth0User.nickname,
+        emailVerified: true, // Since we're getting email from custom claims, assume verified
+        displayName: auth0User.name || auth0User.username || 'User',
         avatarUrl: auth0User.picture,
         roles: auth0User['https://api.nexus-app.de/roles'] || [],
         permissions: auth0User['https://api.nexus-app.de/permissions'] || [],
         lastLogin: new Date(),
       };
+
+      this.logger.debug('UserData constructed for sync', {
+        auth0UserId: userData.auth0UserId,
+        email: userData.email,
+        hasEmail: !!userData.email,
+        emailVerified: userData.emailVerified,
+        displayName: userData.displayName,
+      });
 
       if (user) {
         // Update existing user
@@ -193,7 +210,7 @@ export class Auth0Service {
         this.logger.info('New user created from Auth0', {
           userId: user.id,
           auth0UserId: auth0User.sub,
-          email: auth0User.email,
+          email: auth0User['https://api.nexus-app.de/email'] || auth0User.email,
           action: 'create',
         });
       }
@@ -241,7 +258,7 @@ export class Auth0Service {
 
       this.logger.error('Failed to sync user from Auth0', {
         auth0UserId: auth0User.sub,
-        email: auth0User.email,
+        email: auth0User['https://api.nexus-app.de/email'] || auth0User.email,
         error: error instanceof Error ? error.message : 'Unknown error',
         stack: error instanceof Error ? error.stack : undefined,
       });

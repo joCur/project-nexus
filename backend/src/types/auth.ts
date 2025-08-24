@@ -5,10 +5,8 @@
 
 export interface Auth0User {
   sub: string; // Auth0 user ID
-  email: string;
-  email_verified: boolean;
+  username?: string; // Auth0 username
   name?: string;
-  nickname?: string;
   picture?: string;
   updated_at?: string;
   iss: string; // Auth0 issuer
@@ -16,6 +14,10 @@ export interface Auth0User {
   iat: number; // issued at
   exp: number; // expires at
   scope: string; // OAuth scopes
+  
+  // Email can come from either custom claims (production) or standard field (tests)
+  email?: string; // For tests and some Auth0 configurations
+  'https://api.nexus-app.de/email'?: string; // Email from custom claims (production)
   
   // Custom claims (set via Auth0 Rules/Actions)
   'https://api.nexus-app.de/roles'?: string[];
@@ -144,8 +146,8 @@ export interface Auth0ManagementUser {
 
 export interface Auth0TokenPayload {
   sub: string;
-  email: string;
-  email_verified: boolean;
+  username?: string;
+  email?: string; // For tests and some configurations
   iss: string;
   aud: string;
   iat: number;
@@ -153,6 +155,7 @@ export interface Auth0TokenPayload {
   scope: string;
   
   // Custom claims
+  'https://api.nexus-app.de/email'?: string;
   [key: string]: unknown;
 }
 

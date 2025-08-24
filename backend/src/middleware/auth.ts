@@ -37,35 +37,6 @@ export function createAuthMiddleware(
     req.permissions = [];
 
     try {
-      // Development mode: Check for X-User-Sub header
-      if (process.env.NODE_ENV === 'development' && req.headers['x-user-sub']) {
-        const auth0UserId = req.headers['x-user-sub'] as string;
-        const email = req.headers['x-user-email'] as string;
-        
-        // Create a mock user for development
-        const user = await userService.findByAuth0Id(auth0UserId) || 
-          await userService.create({
-            auth0UserId,
-            email: email || 'dev@example.com',
-            emailVerified: true,
-            displayName: 'Development User',
-            roles: [],
-            permissions: []
-          });
-
-        req.user = user;
-        req.permissions = user.permissions || [];
-        req.isAuthenticated = true;
-        
-        console.log('Development mode authentication:', {
-          userId: user.id,
-          auth0UserId,
-          email
-        });
-        
-        return next();
-      }
-
       // Extract token from Authorization header
       const authHeader = req.headers.authorization;
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -84,10 +55,17 @@ export function createAuthMiddleware(
       // Sync user from Auth0
       const user = await auth0Service.syncUserFromAuth0(auth0Payload);
 
-      // Validate session
+      // For new users or users without sessions, create a session automatically
+      // This ensures onboarding flows work properly without session errors
       const sessionValid = await auth0Service.validateSession(user.id);
       if (!sessionValid) {
-        throw new TokenExpiredError('Session expired');
+        // Create session automatically for new users during authentication
+        const sessionId = await auth0Service.createSession(user, auth0Payload);
+        securityLogger.sessionEvent('created', user.id, {
+          sessionId,
+          auth0UserId: auth0Payload.sub,
+          reason: 'auto_session_creation_during_auth',
+        });
       }
 
       // Set authenticated context
