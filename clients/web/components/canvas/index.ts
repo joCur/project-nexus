@@ -6,10 +6,3 @@
 export { InfiniteCanvas } from './InfiniteCanvas';
 export { CanvasStage } from './CanvasStage';
 export { CanvasBackground } from './CanvasBackground';
-
-// Export performance types for external use
-export type { 
-  PerformanceConfig,
-  HardwareAccelerationConfig, 
-  PerformanceMetrics 
-} from './CanvasStage';

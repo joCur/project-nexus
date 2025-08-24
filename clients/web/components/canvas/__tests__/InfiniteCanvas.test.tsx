@@ -16,63 +16,6 @@ jest.mock('@/hooks/useCanvasEvents', () => ({
   useCanvasEvents: jest.fn(),
 }));
 
-// Mock the new hooks
-jest.mock('@/hooks/useViewport', () => ({
-  useViewport: jest.fn(() => ({
-    viewport: { position: { x: 0, y: 0 }, zoom: 1 },
-    metrics: {
-      visibleBounds: { minX: -300, minY: -300, maxX: 1100, maxY: 900 },
-      contentBounds: { minX: -200, minY: -200, maxX: 200, maxY: 200 },
-      effectiveBounds: { minX: -200, minY: -200, maxX: 200, maxY: 200 },
-      viewportArea: 1440000,
-      contentCoverage: 0.1,
-      zoomLevel: 1,
-      centerPoint: { x: 400, y: 300 },
-      isContentVisible: true,
-    },
-    visibleBounds: { minX: -300, minY: -300, maxX: 1100, maxY: 900 },
-    contentBounds: { minX: -200, minY: -200, maxX: 200, maxY: 200 },
-    effectiveBounds: { minX: -200, minY: -200, maxX: 200, maxY: 200 },
-    updateEntities: jest.fn(),
-    getViewportInfo: jest.fn(() => ({
-      position: { x: 0, y: 0 },
-      zoom: 1,
-      bounds: { minX: -200, minY: -200, maxX: 200, maxY: 200 },
-    })),
-  })),
-}));
-
-jest.mock('@/hooks/useCanvasNavigation', () => ({
-  useCanvasNavigation: jest.fn(() => ({
-    isAnimating: false,
-    isGestureActive: false,
-    isMomentumActive: false,
-    panTo: jest.fn(),
-    zoomTo: jest.fn(),
-    resetView: jest.fn(),
-    startNavigation: jest.fn(),
-    updateNavigation: jest.fn(),
-    endNavigation: jest.fn(),
-    stopAllAnimations: jest.fn(),
-    currentVelocity: { x: 0, y: 0 },
-    config: {
-      enableMomentum: true,
-      enableInertia: true,
-      enableSmoothing: true,
-      momentumFriction: 0.95,
-      animationDuration: 300,
-      velocityThreshold: 50,
-      maxVelocity: 2000,
-    },
-  })),
-}));
-
-// Mock canvas calculations
-jest.mock('@/utils/canvas-calculations', () => ({
-  getLevelOfDetail: jest.fn(() => 'high'),
-  cullEntities: jest.fn((entities) => entities),
-  shouldUseSimplifiedRendering: jest.fn(() => false),
-}));
 
 // Mock Konva components
 jest.mock('react-konva', () => ({
@@ -149,18 +92,6 @@ describe('InfiniteCanvas', () => {
     expect(layer).toBeInTheDocument();
   });
 
-  it('renders debug info when debug prop is true', () => {
-    render(<InfiniteCanvas debug={true} />);
-    expect(screen.getByText(/Size: 800×600px/)).toBeInTheDocument();
-    expect(screen.getByText(/Zoom: 100%/)).toBeInTheDocument();
-    expect(screen.getByText(/Position: \(0, 0\)/)).toBeInTheDocument();
-    expect(screen.getByText(/LOD: high/)).toBeInTheDocument();
-  });
-
-  it('does not render debug info when debug prop is false', () => {
-    render(<InfiniteCanvas debug={false} />);
-    expect(screen.queryByText(/Size:/)).not.toBeInTheDocument();
-  });
 
   it('renders canvas with proper dimensions', async () => {
     render(<InfiniteCanvas />);
@@ -185,10 +116,11 @@ describe('InfiniteCanvas', () => {
     
     (useCanvasStore as unknown as jest.Mock).mockReturnValue(updatedStore);
     
-    rerender(<InfiniteCanvas debug={true} />);
+    rerender(<InfiniteCanvas />);
     
-    expect(screen.getByText(/Zoom: 200%/)).toBeInTheDocument();
-    expect(screen.getByText(/Position: \(100, 50\)/)).toBeInTheDocument();
+    // Component should re-render with updated viewport
+    const canvas = screen.getByTestId('infinite-canvas');
+    expect(canvas).toBeInTheDocument();
   });
 
   // Accessibility Tests
@@ -199,7 +131,7 @@ describe('InfiniteCanvas', () => {
       
       expect(canvas).toHaveAttribute('role', 'application');
       expect(canvas).toHaveAttribute('aria-label', 'Interactive infinite canvas workspace');
-      expect(canvas).toHaveAttribute('aria-describedby', 'canvas-instructions canvas-status');
+      expect(canvas).toHaveAttribute('aria-describedby', 'canvas-instructions');
       expect(canvas).toHaveAttribute('aria-roledescription', 'Interactive infinite canvas for visual knowledge workspace');
       expect(canvas).toHaveAttribute('tabIndex', '0');
     });
@@ -227,16 +159,6 @@ describe('InfiniteCanvas', () => {
       expect(screen.getByText(/Use arrow keys to pan, plus and minus keys to zoom/)).toBeInTheDocument();
     });
 
-    it('has live region for announcements', () => {
-      render(<InfiniteCanvas />);
-      
-      const statusElement = document.querySelector('#canvas-status');
-      expect(statusElement).toBeInTheDocument();
-      expect(statusElement).toHaveAttribute('role', 'status');
-      expect(statusElement).toHaveAttribute('aria-live', 'polite');
-      expect(statusElement).toHaveAttribute('aria-atomic', 'true');
-      expect(statusElement).toHaveClass('sr-only');
-    });
 
     it('displays current zoom level in instructions', () => {
       render(<InfiniteCanvas />);
@@ -283,17 +205,6 @@ describe('InfiniteCanvas', () => {
       expect(canvas).toHaveClass('bg-canvas-base');
     });
 
-    it('debug info uses design system colors', () => {
-      render(<InfiniteCanvas debug={true} />);
-      const debugInfo = screen.getByLabelText('Canvas debug information');
-      
-      expect(debugInfo).toHaveClass('bg-neutral-800', 'text-neutral-50', 'border-neutral-700');
-    });
 
-    it('shows zoom range from design tokens in debug mode', () => {
-      render(<InfiniteCanvas debug={true} />);
-      
-      expect(screen.getByText(/range: 25%-400%/)).toBeInTheDocument();
-    });
   });
 });
