@@ -178,11 +178,145 @@ jobs:
           NEXT_PUBLIC_AUTH0_CLIENT_ID: test_client_id
         run: npm test || echo "No tests configured"
 
+  # Mobile app build and test
+  mobile:
+    name: Mobile App Build & Test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 'stable'
+          channel: 'stable'
+          cache: true
+          cache-key: 'flutter-:os:-:channel:-:version:-:arch:-:hash:'
+          cache-path: '${{ runner.tool_cache }}/flutter/:channel:-:version:-:arch:'
+      
+      - name: Verify Flutter installation
+        run: |
+          flutter --version
+          flutter doctor -v
+      
+      - name: Cache Flutter pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            clients/app/.dart_tool
+            clients/app/build
+          key: flutter-pub-${{ hashFiles('clients/app/pubspec.lock') }}
+          restore-keys: |
+            flutter-pub-
+      
+      - name: Install Flutter dependencies
+        working-directory: clients/app
+        run: flutter pub get
+      
+      - name: Verify dependencies installation
+        working-directory: clients/app
+        run: flutter pub deps
+      
+      - name: Generate code (if needed)
+        working-directory: clients/app
+        run: |
+          if grep -q "build_runner" pubspec.yaml; then
+            flutter packages pub run build_runner build --delete-conflicting-outputs
+          else
+            echo "No build_runner found, skipping code generation"
+          fi
+      
+      - name: Run Flutter analyze
+        working-directory: clients/app
+        run: flutter analyze . --fatal-infos --fatal-warnings
+      
+      - name: Run Flutter tests
+        working-directory: clients/app
+        run: |
+          flutter test --coverage --reporter=expanded
+          if [ -d "test" ] && [ "$(find test -name '*.dart' | wc -l)" -gt 0 ]; then
+            echo "✅ Tests executed successfully"
+          else
+            echo "⚠️ No test files found, but this is acceptable for early development"
+          fi
+      
+      - name: Upload test coverage
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-coverage-${{ github.run_number }}
+          path: clients/app/coverage/lcov.info
+          retention-days: 5
+      
+      - name: Build Android APK (Debug)
+        working-directory: clients/app
+        run: |
+          flutter build apk --debug --build-name=1.0.0 --build-number=${{ github.run_number }}
+          ls -la build/app/outputs/flutter-apk/
+      
+      - name: Build Android APK (Release)
+        working-directory: clients/app
+        run: |
+          flutter build apk --release --build-name=1.0.0 --build-number=${{ github.run_number }}
+          ls -la build/app/outputs/flutter-apk/
+      
+      - name: Upload Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-mobile-debug-${{ github.run_number }}
+          path: clients/app/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 30
+      
+      - name: Upload Release APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-mobile-release-${{ github.run_number }}
+          path: clients/app/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 90
+      
+      - name: Generate mobile build summary
+        run: |
+          echo "## 📱 Mobile Build Complete!" >> mobile_summary.md
+          echo "" >> mobile_summary.md
+          echo "**Build Number:** ${{ github.run_number }}" >> mobile_summary.md
+          echo "**Flutter Version:** $(flutter --version | head -1)" >> mobile_summary.md
+          echo "**Build Date:** $(date --iso-8601=seconds)" >> mobile_summary.md
+          echo "" >> mobile_summary.md
+          echo "### APK Files Generated:" >> mobile_summary.md
+          echo "- **Debug APK:** \`nexus-mobile-debug-${{ github.run_number }}.zip\`" >> mobile_summary.md
+          echo "- **Release APK:** \`nexus-mobile-release-${{ github.run_number }}.zip\`" >> mobile_summary.md
+          echo "" >> mobile_summary.md
+          echo "### APK Information:" >> mobile_summary.md
+          if [ -f "clients/app/build/app/outputs/flutter-apk/app-debug.apk" ]; then
+            DEBUG_SIZE=$(stat -c%s "clients/app/build/app/outputs/flutter-apk/app-debug.apk" | numfmt --to=iec)
+            echo "- **Debug APK Size:** $DEBUG_SIZE" >> mobile_summary.md
+          fi
+          if [ -f "clients/app/build/app/outputs/flutter-apk/app-release.apk" ]; then
+            RELEASE_SIZE=$(stat -c%s "clients/app/build/app/outputs/flutter-apk/app-release.apk" | numfmt --to=iec)
+            echo "- **Release APK Size:** $RELEASE_SIZE" >> mobile_summary.md
+          fi
+      
+      - name: Upload mobile build summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-build-summary-${{ github.run_number }}
+          path: mobile_summary.md
+          retention-days: 30
+
   # Build Docker images
   build:
     name: Build & Push Docker Images
     runs-on: ubuntu-latest
-    needs: [code-quality, security, test]
+    needs: [code-quality, security, test, mobile]
     # Build on main branch push or manual trigger
     if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     
@@ -299,6 +433,12 @@ jobs:
         with:
           name: deployment-manifest-${{ needs.build.outputs.version }}
       
+      - name: Download mobile build summary
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: mobile-build-summary-${{ github.run_number }}
+      
       - name: Display build summary
         run: |
           echo "## 🚀 Build Complete!" >> $GITHUB_STEP_SUMMARY
@@ -307,6 +447,14 @@ jobs:
           echo "**Backend Image:** ${{ needs.build.outputs.backend-image }}" >> $GITHUB_STEP_SUMMARY
           echo "**Frontend Image:** ${{ needs.build.outputs.frontend-image }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Add mobile build info if available
+          if [ -f "mobile_summary.md" ]; then
+            echo "### 📱 Mobile Build Information" >> $GITHUB_STEP_SUMMARY
+            cat mobile_summary.md | tail -n +2 >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
           echo "### Manual Deployment Commands" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
           echo "# Pull latest images" >> $GITHUB_STEP_SUMMARY
@@ -317,3 +465,13 @@ jobs:
           echo "# backend: $(cat deployment-manifest.json | jq -r '.images.backend')" >> $GITHUB_STEP_SUMMARY
           echo "# frontend: $(cat deployment-manifest.json | jq -r '.images.frontend')" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
+          
+          # Add mobile artifact download info
+          if [ -f "mobile_summary.md" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 📲 Mobile App Downloads" >> $GITHUB_STEP_SUMMARY
+            echo "Mobile APK files are available in the workflow artifacts:" >> $GITHUB_STEP_SUMMARY
+            echo "- **Debug APK**: \`nexus-mobile-debug-${{ github.run_number }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "- **Release APK**: \`nexus-mobile-release-${{ github.run_number }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "- **Test Coverage**: \`flutter-coverage-${{ github.run_number }}\`" >> $GITHUB_STEP_SUMMARY
+          fi
