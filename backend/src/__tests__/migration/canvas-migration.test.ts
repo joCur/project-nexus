@@ -4,8 +4,8 @@
  * Basic tests for canvas migrations - focused on key functionality
  */
 
-import migration011 from '@/database/migrations/011_create_canvases_table';
-import migration012 from '@/database/migrations/012_add_canvas_id_to_cards';
+import * as migration011 from '@/database/migrations/011_create_canvases_table';
+import * as migration012 from '@/database/migrations/012_add_canvas_id_to_cards';
 
 describe('Canvas Migration Tests (NEX-174)', () => {
   describe('Migration 011: Create Canvases Table', () => {

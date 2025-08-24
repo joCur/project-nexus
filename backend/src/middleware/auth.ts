@@ -239,7 +239,7 @@ export function createGraphQLContext(
       dataSources: {
         auth0Service,
         userService,
-        _cacheService,
+        cacheService: _cacheService,
         userProfileService,
         onboardingService,
         workspaceService,
