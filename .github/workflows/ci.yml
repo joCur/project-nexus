@@ -86,17 +86,15 @@ jobs:
     strategy:
       matrix:
         app: [backend, web]
+    env:
+      SHOULD_RUN: ${{ (matrix.app == 'backend' && (needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.ci == 'true' || github.event_name == 'workflow_dispatch')) || (matrix.app == 'web' && (needs.detect-changes.outputs.web == 'true' || needs.detect-changes.outputs.ci == 'true' || github.event_name == 'workflow_dispatch')) }}
     
     steps:
       - uses: actions/checkout@v4
-        if: |
-          (matrix.app == 'backend' && (needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.ci == 'true' || github.event_name == 'workflow_dispatch')) ||
-          (matrix.app == 'web' && (needs.detect-changes.outputs.web == 'true' || needs.detect-changes.outputs.ci == 'true' || github.event_name == 'workflow_dispatch'))
+        if: env.SHOULD_RUN == 'true'
       
       - name: Setup Node.js
-        if: |
-          (matrix.app == 'backend' && (needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.ci == 'true' || github.event_name == 'workflow_dispatch')) ||
-          (matrix.app == 'web' && (needs.detect-changes.outputs.web == 'true' || needs.detect-changes.outputs.ci == 'true' || github.event_name == 'workflow_dispatch'))
+        if: env.SHOULD_RUN == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -105,31 +103,23 @@ jobs:
             ${{ matrix.app == 'web' && 'clients/web/package-lock.json' || 'backend/package-lock.json' }}
       
       - name: Install dependencies
-        if: |
-          (matrix.app == 'backend' && (needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.ci == 'true' || github.event_name == 'workflow_dispatch')) ||
-          (matrix.app == 'web' && (needs.detect-changes.outputs.web == 'true' || needs.detect-changes.outputs.ci == 'true' || github.event_name == 'workflow_dispatch'))
+        if: env.SHOULD_RUN == 'true'
         working-directory: ${{ matrix.app == 'web' && 'clients/web' || 'backend' }}
         run: npm ci
       
       - name: Run ESLint
-        if: |
-          (matrix.app == 'backend' && (needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.ci == 'true' || github.event_name == 'workflow_dispatch')) ||
-          (matrix.app == 'web' && (needs.detect-changes.outputs.web == 'true' || needs.detect-changes.outputs.ci == 'true' || github.event_name == 'workflow_dispatch'))
+        if: env.SHOULD_RUN == 'true'
         working-directory: ${{ matrix.app == 'web' && 'clients/web' || 'backend' }}
         run: npm run lint || true
         continue-on-error: true
       
       - name: TypeScript type check
-        if: |
-          (matrix.app == 'backend' && (needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.ci == 'true' || github.event_name == 'workflow_dispatch')) ||
-          (matrix.app == 'web' && (needs.detect-changes.outputs.web == 'true' || needs.detect-changes.outputs.ci == 'true' || github.event_name == 'workflow_dispatch'))
+        if: env.SHOULD_RUN == 'true'
         working-directory: ${{ matrix.app == 'web' && 'clients/web' || 'backend' }}
         run: npm run type-check || npx tsc --noEmit
       
       - name: Check for unused dependencies
-        if: |
-          (matrix.app == 'backend' && (needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.ci == 'true' || github.event_name == 'workflow_dispatch')) ||
-          (matrix.app == 'web' && (needs.detect-changes.outputs.web == 'true' || needs.detect-changes.outputs.ci == 'true' || github.event_name == 'workflow_dispatch'))
+        if: env.SHOULD_RUN == 'true'
         working-directory: ${{ matrix.app == 'web' && 'clients/web' || 'backend' }}
         run: npx depcheck || true
         continue-on-error: true
