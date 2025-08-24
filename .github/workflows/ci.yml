@@ -238,8 +238,13 @@ jobs:
       
       - name: Run Flutter tests
         working-directory: clients/app
+        env:
+          # Test environment variables for AuthService
+          AUTH0_DOMAIN: test.auth0.com
+          AUTH0_CLIENT_ID: test_client_id_for_flutter_testing
+          AUTH0_AUDIENCE: https://api.test.nexus.app
         run: |
-          flutter test --coverage --reporter=expanded
+          flutter test --coverage --reporter=expanded --dart-define=AUTH0_DOMAIN=test.auth0.com --dart-define=AUTH0_CLIENT_ID=test_client_id_for_flutter_testing --dart-define=AUTH0_AUDIENCE=https://api.test.nexus.app
           if [ -d "test" ] && [ "$(find test -name '*.dart' | wc -l)" -gt 0 ]; then
             echo "✅ Tests executed successfully"
           else
@@ -257,13 +262,13 @@ jobs:
       - name: Build Android APK (Debug)
         working-directory: clients/app
         run: |
-          flutter build apk --debug --build-name=1.0.0 --build-number=${{ github.run_number }}
+          flutter build apk --debug --build-name=1.0.0 --build-number=${{ github.run_number }} --dart-define=AUTH0_DOMAIN=test.auth0.com --dart-define=AUTH0_CLIENT_ID=test_client_id_for_flutter_testing --dart-define=AUTH0_AUDIENCE=https://api.test.nexus.app
           ls -la build/app/outputs/flutter-apk/
       
       - name: Build Android APK (Release)
         working-directory: clients/app
         run: |
-          flutter build apk --release --build-name=1.0.0 --build-number=${{ github.run_number }}
+          flutter build apk --release --build-name=1.0.0 --build-number=${{ github.run_number }} --dart-define=AUTH0_DOMAIN=test.auth0.com --dart-define=AUTH0_CLIENT_ID=test_client_id_for_flutter_testing --dart-define=AUTH0_AUDIENCE=https://api.test.nexus.app
           ls -la build/app/outputs/flutter-apk/
       
       - name: Upload Debug APK Artifact

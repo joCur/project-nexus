@@ -1,14 +1,28 @@
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:nexus_mobile/shared/services/auth_service.dart';
+
 void main() {
-  // Skip all AuthService tests for now since they require environment variables
-  // and significant refactoring to make them testable with dependency injection
   group('AuthService', () {
-    test('placeholder test to avoid empty group', () {
-      // This is a placeholder test to ensure the group isn't empty
-      // The AuthService constructor requires environment variables (AUTH0_DOMAIN, etc.)
-      // which are not available during testing without proper setup
-      expect(true, isTrue);
+    // Basic smoke tests that verify the service can be instantiated with environment variables
+    test('should instantiate with environment variables', () {
+      // This test verifies that AuthService can be created when environment variables are provided
+      expect(() => AuthService(), returnsNormally);
     });
-  }, skip: 'Requires environment variables and dependency injection refactoring');
+
+    test('should have required methods defined', () {
+      final authService = AuthService();
+      
+      // Verify the service has the expected methods
+      expect(authService.login, isA<Function>());
+      expect(authService.logout, isA<Function>());
+      expect(authService.isAuthenticated, isA<Function>());
+      expect(authService.getAccessToken, isA<Function>());
+      expect(authService.getUserProfile, isA<Function>());
+    });
+    
+    // Note: More comprehensive integration tests would require mocking Auth0 SDK
+    // and FlutterSecureStorage, which is complex and better suited for integration testing
+    // The core authentication logic is tested via auth_providers_test.dart
+  });
 }
