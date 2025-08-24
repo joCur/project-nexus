@@ -8,6 +8,7 @@ interface CanvasBackgroundProps {
   height: number;
   showGrid?: boolean;
   zoom: number;
+  position: { x: number; y: number };
   gridSize?: number;
   gridColor?: string;
   backgroundColor?: string;
@@ -31,6 +32,7 @@ export const CanvasBackground: React.FC<CanvasBackgroundProps> = ({
   height,
   showGrid = true,
   zoom,
+  position,
   gridSize = 40,
   // Design tokens: Using Tailwind CSS custom properties for consistent theming
   gridColor = '#e5e7eb', // border-default from design tokens
@@ -51,36 +53,45 @@ export const CanvasBackground: React.FC<CanvasBackgroundProps> = ({
     const effectiveGridSize = gridSize;
     
     // Calculate visible area in canvas coordinates
-    const startX = -width / zoom;
-    const endX = (width * 2) / zoom;
-    const startY = -height / zoom;
-    const endY = (height * 2) / zoom;
+    // Stage position is the canvas offset, visible area starts at -position and extends by viewport size
+    const padding = effectiveGridSize * 10;
+    const startX = (-position.x / zoom) - padding;
+    const endX = (-position.x + width) / zoom + padding;
+    const startY = (-position.y / zoom) - padding;
+    const endY = (-position.y + height) / zoom + padding;
 
-    // Generate vertical lines
+    // Generate vertical lines aligned to grid
     for (let x = Math.floor(startX / effectiveGridSize) * effectiveGridSize; x <= endX; x += effectiveGridSize) {
       lines.vertical.push([x, startY, x, endY]);
     }
 
-    // Generate horizontal lines
+    // Generate horizontal lines aligned to grid
     for (let y = Math.floor(startY / effectiveGridSize) * effectiveGridSize; y <= endY; y += effectiveGridSize) {
       lines.horizontal.push([startX, y, endX, y]);
     }
 
     return lines;
-  }, [width, height, showGrid, zoom, gridSize]);
+  }, [width, height, showGrid, zoom, gridSize, position.x, position.y]);
 
   // Only show grid at reasonable zoom levels using design token constants
   // This range ensures optimal performance and visual clarity as per design specifications
   const isGridVisible = showGrid && zoom >= ZOOM_MIN && zoom <= ZOOM_MAX;
 
+  // Calculate infinite background area based on viewport position
+  const backgroundPadding = Math.max(width, height) * 5; // Large padding for infinite feel
+  const backgroundX = (-position.x / zoom) - backgroundPadding;
+  const backgroundY = (-position.y / zoom) - backgroundPadding;
+  const backgroundWidth = (width / zoom) + (backgroundPadding * 2);
+  const backgroundHeight = (height / zoom) + (backgroundPadding * 2);
+
   return (
     <Layer listening={false} name="canvas-background">
-      {/* Background - Uses semantic.canvas-base design token */}
+      {/* Infinite Background - Uses semantic.canvas-base design token */}
       <Rect
-        x={-width / zoom}
-        y={-height / zoom}
-        width={(width * 2) / zoom}
-        height={(height * 2) / zoom}
+        x={backgroundX}
+        y={backgroundY}
+        width={backgroundWidth}
+        height={backgroundHeight}
         fill={backgroundColor}
         name="canvas-background-rect"
       />

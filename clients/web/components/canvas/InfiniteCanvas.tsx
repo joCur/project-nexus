@@ -77,6 +77,7 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
           height={height}
           showGrid={showGrid}
           zoom={zoom}
+          position={position}
         />
         {/* Future: Card and connection layers will be added here */}
       </CanvasStage>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, useState } from 'react';
 import { Stage } from 'react-konva';
 import Konva from 'konva';
 import { useCanvasStore } from '@/stores/canvasStore';
@@ -26,6 +26,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
 }) => {
   const stageRef = useRef<Konva.Stage>(null);
   const { setZoom, setPosition, config } = useCanvasStore();
+  const [isDragging, setIsDragging] = useState(false);
   
   // Zoom step for mouse wheel
   const ZOOM_STEP = 1.1;
@@ -66,6 +67,11 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
     setPosition(newPos);
   }, [scale.x, position, setZoom, setPosition, config.zoom]);
   
+  // Handle drag start
+  const handleDragStart = useCallback(() => {
+    setIsDragging(true);
+  }, []);
+
   // Handle drag events for panning
   const handleDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
     const stage = e.target as Konva.Stage;
@@ -75,6 +81,7 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
     };
     
     setPosition(newPosition);
+    setIsDragging(false);
   }, [setPosition]);
   
   // Prevent context menu
@@ -89,10 +96,11 @@ export const CanvasStage: React.FC<CanvasStageProps> = ({
       height={height}
       scaleX={scale.x}
       scaleY={scale.y}
-      x={position.x}
-      y={position.y}
+      x={isDragging ? undefined : position.x}
+      y={isDragging ? undefined : position.y}
       draggable
       onWheel={handleWheel}
+      onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onContextMenu={handleContextMenu}
     >
