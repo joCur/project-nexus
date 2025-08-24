@@ -91,16 +91,19 @@ export const cardResolvers = {
 
     /**
      * Get cards with filtering and pagination
+     * Supports both workspace-scoped and canvas-scoped queries
      * Aligns with frontend CardActions.getCards()
      */
     cards: async (
       _: any,
       { 
         workspaceId, 
+        canvasId,
         filter, 
         pagination 
       }: { 
         workspaceId: string; 
+        canvasId?: string;
         filter?: CardFilter; 
         pagination?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'ASC' | 'DESC' } 
       },
@@ -125,22 +128,22 @@ export const cardResolvers = {
         const limit = Math.min(pagination?.limit || 20, 100); // Cap at 100
         const offset = (page - 1) * limit;
 
-        const { cards, totalCount } = await cardService.getWorkspaceCards(
-          workspaceId,
-          filter,
-          limit,
-          offset
-        );
+        // Use canvas-scoped or workspace-scoped query based on canvasId parameter
+        const { cards, totalCount } = canvasId 
+          ? await cardService.getCanvasCards(canvasId, filter, limit, offset)
+          : await cardService.getWorkspaceCards(workspaceId, filter, limit, offset);
 
         const totalPages = Math.ceil(totalCount / limit);
 
         logger.info('Cards retrieved via GraphQL', {
           workspaceId,
+          canvasId,
           userId: context.user?.id,
           totalCount,
           page,
           limit,
           filterApplied: !!filter,
+          scopeType: canvasId ? 'canvas' : 'workspace',
         });
 
         return {
@@ -156,6 +159,7 @@ export const cardResolvers = {
       } catch (error) {
         logger.error('Failed to get cards via GraphQL', {
           workspaceId,
+          canvasId,
           userId: context.user?.id,
           error: error instanceof Error ? error.message : 'Unknown error',
         });
@@ -590,7 +594,7 @@ export const cardResolvers = {
 
   Subscription: {
     /**
-     * Subscribe to card created events in a workspace
+     * Subscribe to card created events in a workspace (with optional canvas filtering)
      * Aligns with frontend real-time card store updates
      */
     cardCreated: {
@@ -608,13 +612,22 @@ export const cardResolvers = {
             context.dataSources.workspaceService
           );
 
-          return hasAccess && payload.workspaceId === variables.workspaceId;
+          // Check workspace match
+          const workspaceMatch = hasAccess && payload.workspaceId === variables.workspaceId;
+          
+          // If no canvas filter specified, return workspace match
+          if (!variables.canvasId) {
+            return workspaceMatch;
+          }
+
+          // If canvas filter specified, check canvas match too
+          return workspaceMatch && payload.cardCreated?.canvasId === variables.canvasId;
         }
       ),
     },
 
     /**
-     * Subscribe to card updated events in a workspace
+     * Subscribe to card updated events in a workspace (with optional canvas filtering)
      * Aligns with frontend real-time card store updates
      */
     cardUpdated: {
@@ -632,13 +645,22 @@ export const cardResolvers = {
             context.dataSources.workspaceService
           );
 
-          return hasAccess && payload.workspaceId === variables.workspaceId;
+          // Check workspace match
+          const workspaceMatch = hasAccess && payload.workspaceId === variables.workspaceId;
+          
+          // If no canvas filter specified, return workspace match
+          if (!variables.canvasId) {
+            return workspaceMatch;
+          }
+
+          // If canvas filter specified, check canvas match too
+          return workspaceMatch && payload.cardUpdated?.canvasId === variables.canvasId;
         }
       ),
     },
 
     /**
-     * Subscribe to card deleted events in a workspace
+     * Subscribe to card deleted events in a workspace (with optional canvas filtering)
      * Aligns with frontend card store deletion handling
      */
     cardDeleted: {
@@ -656,13 +678,24 @@ export const cardResolvers = {
             context.dataSources.workspaceService
           );
 
-          return hasAccess && payload.workspaceId === variables.workspaceId;
+          // Check workspace match
+          const workspaceMatch = hasAccess && payload.workspaceId === variables.workspaceId;
+          
+          // If no canvas filter specified, return workspace match
+          if (!variables.canvasId) {
+            return workspaceMatch;
+          }
+
+          // Canvas filtering for deletions is tricky since card may be gone
+          // For now, just return workspace match - canvas filtering for deletes
+          // should be handled client-side based on which canvas the card was on
+          return workspaceMatch;
         }
       ),
     },
 
     /**
-     * Subscribe to card moved events in a workspace
+     * Subscribe to card moved events in a workspace (with optional canvas filtering)
      * For position-only updates (performance optimization)
      */
     cardMoved: {
@@ -680,7 +713,16 @@ export const cardResolvers = {
             context.dataSources.workspaceService
           );
 
-          return hasAccess && payload.workspaceId === variables.workspaceId;
+          // Check workspace match
+          const workspaceMatch = hasAccess && payload.workspaceId === variables.workspaceId;
+          
+          // If no canvas filter specified, return workspace match
+          if (!variables.canvasId) {
+            return workspaceMatch;
+          }
+
+          // If canvas filter specified, check canvas match too
+          return workspaceMatch && payload.cardMoved?.canvasId === variables.canvasId;
         }
       ),
     },

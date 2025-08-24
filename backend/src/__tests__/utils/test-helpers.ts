@@ -451,6 +451,25 @@ export function createMockWorkspaceService() {
 }
 
 /**
+ * Create mock canvas service
+ */
+export function createMockCanvasService() {
+  return {
+    getCanvasById: jest.fn(),
+    getWorkspaceCanvases: jest.fn(),
+    getCanvasesByWorkspace: jest.fn(),
+    getDefaultCanvas: jest.fn(),
+    createCanvas: jest.fn(),
+    updateCanvas: jest.fn(),
+    deleteCanvas: jest.fn(),
+    setDefaultCanvas: jest.fn(),
+    duplicateCanvas: jest.fn(),
+    getCanvasStats: jest.fn(),
+    getCanvasStatistics: jest.fn(),
+  } as any;
+}
+
+/**
  * Create mock Auth0 service
  */
 export function createMockAuth0Service() {
@@ -554,6 +573,7 @@ export async function createTestApp() {
     auth0Service: createMockAuth0Service(),
     userService: createMockUserService(),
     cacheService: createMockCacheService(),
+    canvasService: createMockCanvasService(),
   };
   
   // Import actual schema and resolvers

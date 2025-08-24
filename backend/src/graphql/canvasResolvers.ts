@@ -1,557 +1,665 @@
-/**
- * Canvas GraphQL Resolver Type Definitions (NEX-96)
- * 
- * Defines TypeScript interfaces for GraphQL resolvers implementing
- * canvas operations. Provides type safety for resolver implementations.
- * 
- * This file defines the resolver interface contracts that will be
- * implemented by actual resolver functions in NEX-115, NEX-116, NEX-117.
- */
-
-import { GraphQLContext } from '../types';
-
-// ============================================================================
-// RESOLVER ARGUMENT TYPES
-// ============================================================================
-
-// Card resolver arguments
-export interface CardResolverArgs {
-  id: string;
-}
-
-export interface CardsResolverArgs {
-  workspaceId: string;
-  filter?: CardFilterInput;
-  pagination?: PaginationInput;
-}
-
-export interface SearchCardsResolverArgs {
-  workspaceId: string;
-  query: string;
-  limit?: number;
-}
-
-export interface CardsInBoundsResolverArgs {
-  workspaceId: string;
-  bounds: CanvasBoundsInput;
-}
-
-export interface CreateCardResolverArgs {
-  input: CreateCardInput;
-}
-
-export interface UpdateCardResolverArgs {
-  id: string;
-  input: UpdateCardInput;
-}
-
-export interface DeleteCardResolverArgs {
-  id: string;
-}
-
-export interface DuplicateCardResolverArgs {
-  id: string;
-  offset?: PositionInput;
-}
-
-export interface BatchUpdateCardPositionsResolverArgs {
-  updates: CardPositionUpdate[];
-}
-
-// Connection resolver arguments  
-export interface ConnectionResolverArgs {
-  id: string;
-}
-
-export interface ConnectionsResolverArgs {
-  workspaceId: string;
-  filter?: ConnectionFilterInput;
-  pagination?: PaginationInput;
-}
-
-export interface CardConnectionsResolverArgs {
-  cardId: string;
-}
-
-export interface CreateConnectionResolverArgs {
-  input: CreateConnectionInput;
-}
-
-export interface UpdateConnectionResolverArgs {
-  id: string;
-  input: UpdateConnectionInput;
-}
-
-export interface DeleteConnectionResolverArgs {
-  id: string;
-}
-
-// Canvas settings resolver arguments
-export interface CanvasSettingsResolverArgs {
-  workspaceId: string;
-}
-
-export interface UpdateCanvasSettingsResolverArgs {
-  workspaceId: string;
-  input: CanvasSettingsInput;
-}
-
-// Subscription arguments
-export interface WorkspaceSubscriptionArgs {
-  workspaceId: string;
-}
-
-// ============================================================================
-// INPUT TYPE INTERFACES (matching GraphQL schema)
-// ============================================================================
-
-export interface PositionInput {
-  x: number;
-  y: number;
-}
-
-export interface DimensionsInput {
-  width: number;
-  height: number;
-}
-
-export interface CanvasBoundsInput {
-  minX: number;
-  minY: number;
-  maxX: number;
-  maxY: number;
-}
-
-export interface CardStyleInput {
-  backgroundColor?: string;
-  borderColor?: string;
-  textColor?: string;
-  borderWidth?: number;
-  borderRadius?: number;
-  opacity?: number;
-  shadow?: boolean;
-}
-
-export interface CreateCardInput {
-  workspaceId: string;
-  type: CardType;
-  title: string;
-  content?: string;
-  position: PositionInput;
-  dimensions?: DimensionsInput;
-  style?: CardStyleInput;
-  tags?: string[];
-  metadata?: Record<string, any>;
-  priority?: CardPriority;
-}
-
-export interface UpdateCardInput {
-  title?: string;
-  content?: string;
-  position?: PositionInput;
-  dimensions?: DimensionsInput;
-  style?: CardStyleInput;
-  tags?: string[];
-  metadata?: Record<string, any>;
-  status?: CardStatus;
-  priority?: CardPriority;
-  zIndex?: number;
-}
-
-export interface CardPositionUpdate {
-  cardId: string;
-  position: PositionInput;
-}
-
-export interface CreateConnectionInput {
-  sourceCardId: string;
-  targetCardId: string;
-  type: ConnectionType;
-  confidence?: number;
-  metadata?: Record<string, any>;
-  reason?: string;
-}
-
-export interface UpdateConnectionInput {
-  type?: ConnectionType;
-  confidence?: number;
-  metadata?: Record<string, any>;
-  reason?: string;
-  isVisible?: boolean;
-}
-
-export interface CanvasSettingsInput {
-  gridEnabled?: boolean;
-  gridSize?: number;
-  gridColor?: string;
-  gridOpacity?: number;
-  minZoom?: number;
-  maxZoom?: number;
-  zoomStep?: number;
-  enableCulling?: boolean;
-  enableVirtualization?: boolean;
-  maxVisibleCards?: number;
-  lastViewport?: Record<string, any>;
-}
-
-export interface CardFilterInput {
-  types?: CardType[];
-  status?: CardStatus[];
-  priority?: CardPriority[];
-  tags?: string[];
-  searchQuery?: string;
-  bounds?: CanvasBoundsInput;
-  createdDateRange?: DateRangeInput;
-  updatedDateRange?: DateRangeInput;
-  ownerId?: string;
-}
-
-export interface DateRangeInput {
-  start: Date;
-  end: Date;
-}
-
-export interface ConnectionFilterInput {
-  types?: ConnectionType[];
-  minConfidence?: number;
-  sourceCardId?: string;
-  targetCardId?: string;
-  createdBy?: string;
-}
-
-export interface PaginationInput {
-  page?: number;
-  limit?: number;
-  sortBy?: string;
-  sortOrder?: 'ASC' | 'DESC';
-}
-
-// ============================================================================
-// ENUM TYPES (matching GraphQL schema)
-// ============================================================================
-
-export enum CardType {
-  TEXT = 'TEXT',
-  IMAGE = 'IMAGE', 
-  LINK = 'LINK',
-  CODE = 'CODE'
-}
-
-export enum CardStatus {
-  DRAFT = 'DRAFT',
-  ACTIVE = 'ACTIVE',
-  ARCHIVED = 'ARCHIVED',
-  DELETED = 'DELETED'
-}
-
-export enum CardPriority {
-  LOW = 'LOW',
-  NORMAL = 'NORMAL',
-  HIGH = 'HIGH',
-  URGENT = 'URGENT'
-}
-
-export enum ConnectionType {
-  MANUAL = 'MANUAL',
-  AI_SUGGESTED = 'AI_SUGGESTED',
-  AI_GENERATED = 'AI_GENERATED',
-  REFERENCE = 'REFERENCE',
-  DEPENDENCY = 'DEPENDENCY',
-  SIMILARITY = 'SIMILARITY',
-  RELATED = 'RELATED'
-}
-
-// ============================================================================
-// ENTITY TYPE INTERFACES (matching GraphQL schema)
-// ============================================================================
-
-export interface Position {
-  x: number;
-  y: number;
-}
-
-export interface Dimensions {
-  width: number;
-  height: number;
-}
-
-export interface CanvasBounds {
-  minX: number;
-  minY: number;
-  maxX: number;
-  maxY: number;
-}
-
-export interface CardStyle {
-  backgroundColor: string;
-  borderColor: string;
-  textColor: string;
-  borderWidth: number;
-  borderRadius: number;
-  opacity: number;
-  shadow: boolean;
-}
-
-export interface Card {
-  id: string;
-  workspaceId: string;
-  ownerId: string;
-  title: string;
-  content?: string;
-  type: CardType;
-  position: Position;
-  dimensions: Dimensions;
-  zIndex: number;
-  style: CardStyle;
-  tags: string[];
-  metadata: Record<string, any>;
-  status: CardStatus;
-  priority: CardPriority;
-  createdAt: Date;
-  updatedAt: Date;
-  version: number;
-  embeddingModel?: string;
-  contentHash?: string;
-  embeddingUpdatedAt?: Date;
-}
-
-export interface Connection {
-  id: string;
-  sourceCardId: string;
-  targetCardId: string;
-  type: ConnectionType;
-  confidence: number;
-  metadata: Record<string, any>;
-  reason?: string;
-  createdAt: Date;
-  isVisible: boolean;
-  createdBy: string;
-}
-
-export interface CanvasSettings {
-  workspaceId: string;
-  gridEnabled: boolean;
-  gridSize: number;
-  gridColor: string;
-  gridOpacity: number;
-  minZoom: number;
-  maxZoom: number;
-  zoomStep: number;
-  enableCulling: boolean;
-  enableVirtualization: boolean;
-  maxVisibleCards: number;
-  lastViewport?: Record<string, any>;
-  updatedAt: Date;
-}
-
-export interface CardConnection {
-  items: Card[];
-  totalCount: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-  hasNextPage: boolean;
-  hasPreviousPage: boolean;
-}
-
-export interface ConnectionConnection {
-  items: Connection[];
-  totalCount: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-  hasNextPage: boolean;
-  hasPreviousPage: boolean;
-}
-
-export interface CanvasStats {
-  totalCards: number;
-  totalConnections: number;
-  cardsByType: CardTypeCount[];
-  connectionsByType: ConnectionTypeCount[];
-  lastActivity?: Date;
-}
-
-export interface CardTypeCount {
-  type: CardType;
-  count: number;
-}
-
-export interface ConnectionTypeCount {
-  type: ConnectionType;
-  count: number;
-}
-
-export interface CursorPosition {
-  userId: string;
-  position: Position;
-  timestamp: Date;
-}
-
-// ============================================================================
-// RESOLVER INTERFACE DEFINITIONS
-// ============================================================================
+import { 
+  AuthenticationError, 
+  AuthorizationError, 
+  NotFoundError,
+  ValidationError 
+} from '@/utils/errors';
+import { createContextLogger } from '@/utils/logger';
+import { GraphQLContext } from '@/types';
+import { CanvasService } from '@/services/canvas';
+import { CardService } from '@/services/CardService';
+import { ConnectionService } from '@/services/connectionService';
+import { 
+  Canvas,
+  CreateCanvasInput,
+  UpdateCanvasInput,
+  CanvasStats,
+  CanvasFilter,
+  DuplicateCanvasOptions
+} from '@/types/canvas';
+import { 
+  SubscriptionService, 
+  pubSub 
+} from '@/services/subscriptionService';
+import { withFilter } from 'graphql-subscriptions';
+import { WorkspaceAuthorizationService } from '@/services/workspaceAuthorization';
 
 /**
- * Query resolver interface for canvas operations
+ * GraphQL resolvers for Canvas management operations (NEX-174)
+ * Implements comprehensive canvas CRUD with real-time updates and authorization
  */
-export interface CanvasQueryResolvers {
-  // Card queries
-  card: (parent: any, args: CardResolverArgs, context: GraphQLContext) => Promise<Card | null>;
-  cards: (parent: any, args: CardsResolverArgs, context: GraphQLContext) => Promise<CardConnection>;
-  searchCards: (parent: any, args: SearchCardsResolverArgs, context: GraphQLContext) => Promise<Card[]>;
-  cardsInBounds: (parent: any, args: CardsInBoundsResolverArgs, context: GraphQLContext) => Promise<Card[]>;
-  
-  // Connection queries
-  connection: (parent: any, args: ConnectionResolverArgs, context: GraphQLContext) => Promise<Connection | null>;
-  connections: (parent: any, args: ConnectionsResolverArgs, context: GraphQLContext) => Promise<ConnectionConnection>;
-  cardConnections: (parent: any, args: CardConnectionsResolverArgs, context: GraphQLContext) => Promise<Connection[]>;
-  
-  // Canvas settings
-  canvasSettings: (parent: any, args: CanvasSettingsResolverArgs, context: GraphQLContext) => Promise<CanvasSettings | null>;
-  
-  // Analytics
-  cardCount: (parent: any, args: CanvasSettingsResolverArgs, context: GraphQLContext) => Promise<number>;
-  connectionCount: (parent: any, args: CanvasSettingsResolverArgs, context: GraphQLContext) => Promise<number>;
-  canvasStats: (parent: any, args: CanvasSettingsResolverArgs, context: GraphQLContext) => Promise<CanvasStats>;
-}
 
-/**
- * Mutation resolver interface for canvas operations
- */
-export interface CanvasMutationResolvers {
-  // Card CRUD operations
-  createCard: (parent: any, args: CreateCardResolverArgs, context: GraphQLContext) => Promise<Card>;
-  updateCard: (parent: any, args: UpdateCardResolverArgs, context: GraphQLContext) => Promise<Card>;
-  deleteCard: (parent: any, args: DeleteCardResolverArgs, context: GraphQLContext) => Promise<boolean>;
-  duplicateCard: (parent: any, args: DuplicateCardResolverArgs, context: GraphQLContext) => Promise<Card>;
-  
-  // Batch operations
-  createCards: (parent: any, args: { inputs: CreateCardInput[] }, context: GraphQLContext) => Promise<Card[]>;
-  updateCards: (parent: any, args: { updates: UpdateCardInput[] }, context: GraphQLContext) => Promise<Card[]>;
-  deleteCards: (parent: any, args: { ids: string[] }, context: GraphQLContext) => Promise<boolean>;
-  batchUpdateCardPositions: (parent: any, args: BatchUpdateCardPositionsResolverArgs, context: GraphQLContext) => Promise<Card[]>;
-  
-  // Connection CRUD operations  
-  createConnection: (parent: any, args: CreateConnectionResolverArgs, context: GraphQLContext) => Promise<Connection>;
-  updateConnection: (parent: any, args: UpdateConnectionResolverArgs, context: GraphQLContext) => Promise<Connection>;
-  deleteConnection: (parent: any, args: DeleteConnectionResolverArgs, context: GraphQLContext) => Promise<boolean>;
-  deleteConnections: (parent: any, args: { ids: string[] }, context: GraphQLContext) => Promise<boolean>;
-  
-  // Canvas settings
-  updateCanvasSettings: (parent: any, args: UpdateCanvasSettingsResolverArgs, context: GraphQLContext) => Promise<CanvasSettings>;
-  resetCanvasSettings: (parent: any, args: CanvasSettingsResolverArgs, context: GraphQLContext) => Promise<CanvasSettings>;
-  
-  // AI features
-  generateCardEmbeddings: (parent: any, args: { cardIds: string[] }, context: GraphQLContext) => Promise<boolean>;
-  suggestConnections: (parent: any, args: { cardId: string; limit?: number }, context: GraphQLContext) => Promise<Connection[]>;
-}
+const logger = createContextLogger({ service: 'CanvasResolvers' });
 
-/**
- * Subscription resolver interface for real-time canvas updates
- */
-export interface CanvasSubscriptionResolvers {
-  // Card subscriptions
-  cardCreated: (parent: any, args: WorkspaceSubscriptionArgs, context: GraphQLContext) => AsyncIterableIterator<Card>;
-  cardUpdated: (parent: any, args: WorkspaceSubscriptionArgs, context: GraphQLContext) => AsyncIterableIterator<Card>;
-  cardDeleted: (parent: any, args: WorkspaceSubscriptionArgs, context: GraphQLContext) => AsyncIterableIterator<string>;
-  cardMoved: (parent: any, args: WorkspaceSubscriptionArgs, context: GraphQLContext) => AsyncIterableIterator<Card>;
-  
-  // Connection subscriptions
-  connectionCreated: (parent: any, args: WorkspaceSubscriptionArgs, context: GraphQLContext) => AsyncIterableIterator<Connection>;
-  connectionUpdated: (parent: any, args: WorkspaceSubscriptionArgs, context: GraphQLContext) => AsyncIterableIterator<Connection>;
-  connectionDeleted: (parent: any, args: WorkspaceSubscriptionArgs, context: GraphQLContext) => AsyncIterableIterator<string>;
-  
-  // Canvas settings subscriptions
-  canvasSettingsUpdated: (parent: any, args: WorkspaceSubscriptionArgs, context: GraphQLContext) => AsyncIterableIterator<CanvasSettings>;
-  
-  // Collaborative editing
-  userJoinedCanvas: (parent: any, args: WorkspaceSubscriptionArgs, context: GraphQLContext) => AsyncIterableIterator<any>;
-  userLeftCanvas: (parent: any, args: WorkspaceSubscriptionArgs, context: GraphQLContext) => AsyncIterableIterator<string>;
-  cursorPositionUpdated: (parent: any, args: WorkspaceSubscriptionArgs, context: GraphQLContext) => AsyncIterableIterator<CursorPosition>;
-}
+// Canvas event names for subscriptions
+export const CANVAS_EVENTS = {
+  CANVAS_CREATED: 'CANVAS_CREATED',
+  CANVAS_UPDATED: 'CANVAS_UPDATED',
+  CANVAS_DELETED: 'CANVAS_DELETED',
+} as const;
 
-/**
- * Field resolver interface for canvas entities
- */
-export interface CanvasFieldResolvers {
-  Card: {
-    workspace: (parent: Card, args: any, context: GraphQLContext) => Promise<any>;
-    owner: (parent: Card, args: any, context: GraphQLContext) => Promise<any>;
-  };
-  
-  Connection: {
-    sourceCard: (parent: Connection, args: any, context: GraphQLContext) => Promise<Card>;
-    targetCard: (parent: Connection, args: any, context: GraphQLContext) => Promise<Card>;
-    createdBy: (parent: Connection, args: any, context: GraphQLContext) => Promise<any>;
-  };
-}
+export const canvasResolvers = {
+  Query: {
+    /**
+     * Get canvas by ID
+     */
+    canvas: async (
+      _: any,
+      { id }: { id: string },
+      context: GraphQLContext
+    ): Promise<Canvas | null> => {
+      if (!context.isAuthenticated) {
+        throw new AuthenticationError();
+      }
 
-/**
- * Complete canvas resolver interface combining all resolver types
- */
-export interface CanvasResolvers {
-  Query: CanvasQueryResolvers;
-  Mutation: CanvasMutationResolvers;
-  Subscription: CanvasSubscriptionResolvers;
-  
-  // Field resolvers
-  Card: CanvasFieldResolvers['Card'];
-  Connection: CanvasFieldResolvers['Connection'];
-}
+      try {
+        const canvasService = new CanvasService();
+        const canvas = await canvasService.getCanvasById(id);
 
-// ============================================================================
-// UTILITY TYPES FOR RESOLVER IMPLEMENTATIONS
-// ============================================================================
+        if (!canvas) {
+          return null;
+        }
 
-/**
- * Database model interfaces (to be implemented by data layer)
- */
-export interface CardModel {
-  findById(id: string): Promise<Card | null>;
-  findByWorkspace(workspaceId: string, filter?: CardFilterInput, pagination?: PaginationInput): Promise<CardConnection>;
-  create(data: CreateCardInput, ownerId: string): Promise<Card>;
-  update(id: string, data: UpdateCardInput): Promise<Card>;
-  delete(id: string): Promise<boolean>;
-  search(workspaceId: string, query: string, limit?: number): Promise<Card[]>;
-  findInBounds(workspaceId: string, bounds: CanvasBounds): Promise<Card[]>;
-  batchUpdatePositions(updates: CardPositionUpdate[]): Promise<Card[]>;
-}
+        // Authorization check - users can only access canvases in workspaces they have access to
+        const authService = new WorkspaceAuthorizationService();
+        const hasAccess = await authService.hasWorkspaceAccess(
+          context.user!.id,
+          canvas.workspaceId,
+          'canvas:read'
+        );
+        
+        if (!hasAccess) {
+          throw new AuthorizationError(
+            'Cannot access canvases in workspaces you do not have access to',
+            'WORKSPACE_ACCESS_DENIED',
+            'canvas:read',
+            []
+          );
+        }
 
-export interface ConnectionModel {
-  findById(id: string): Promise<Connection | null>;
-  findByWorkspace(workspaceId: string, filter?: ConnectionFilterInput, pagination?: PaginationInput): Promise<ConnectionConnection>;
-  findByCard(cardId: string): Promise<Connection[]>;
-  create(data: CreateConnectionInput, createdBy: string): Promise<Connection>;
-  update(id: string, data: UpdateConnectionInput): Promise<Connection>;
-  delete(id: string): Promise<boolean>;
-  deleteMultiple(ids: string[]): Promise<boolean>;
-}
+        logger.info('Canvas retrieved via GraphQL', {
+          canvasId: id,
+          workspaceId: canvas.workspaceId,
+          userId: context.user?.id,
+        });
 
-export interface CanvasSettingsModel {
-  findByWorkspace(workspaceId: string): Promise<CanvasSettings | null>;
-  upsert(workspaceId: string, data: CanvasSettingsInput): Promise<CanvasSettings>;
-  reset(workspaceId: string): Promise<CanvasSettings>;
-}
+        return canvas;
 
-/**
- * Service interfaces for business logic
- */
-export interface CardService {
-  validateCardData(data: CreateCardInput | UpdateCardInput): Promise<void>;
-  generateEmbeddings(cardIds: string[]): Promise<boolean>;
-  calculateStats(workspaceId: string): Promise<CanvasStats>;
-}
+      } catch (error) {
+        logger.error('Failed to get canvas via GraphQL', {
+          canvasId: id,
+          userId: context.user?.id,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        throw error;
+      }
+    },
 
-export interface ConnectionService {
-  validateConnection(sourceCardId: string, targetCardId: string): Promise<void>;
-  suggestConnections(cardId: string, limit: number): Promise<Connection[]>;
-  calculateConnectionStrength(sourceCard: Card, targetCard: Card): Promise<number>;
-}
+    /**
+     * Get canvases for a workspace with filtering and pagination
+     */
+    workspaceCanvases: async (
+      _: any,
+      { 
+        workspaceId, 
+        filter, 
+        pagination 
+      }: { 
+        workspaceId: string; 
+        filter?: CanvasFilter; 
+        pagination?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'ASC' | 'DESC' } 
+      },
+      context: GraphQLContext
+    ) => {
+      if (!context.isAuthenticated) {
+        throw new AuthenticationError();
+      }
 
-export interface CanvasPermissionService {
-  canReadWorkspace(userId: string, workspaceId: string): Promise<boolean>;
-  canWriteWorkspace(userId: string, workspaceId: string): Promise<boolean>;
-  canDeleteCard(userId: string, cardId: string): Promise<boolean>;
-  canModifyConnection(userId: string, connectionId: string): Promise<boolean>;
-}
+      try {
+        // Authorization check - verify workspace access
+        const authService = new WorkspaceAuthorizationService();
+        await authService.requirePermission(
+          context.user!.id,
+          workspaceId,
+          'canvas:read',
+          'Cannot access canvases in this workspace'
+        );
+
+        const canvasService = new CanvasService();
+        const page = pagination?.page || 1;
+        const limit = Math.min(pagination?.limit || 20, 100); // Cap at 100
+        const offset = (page - 1) * limit;
+
+        const { canvases, totalCount } = await canvasService.getCanvasesByWorkspace(
+          workspaceId,
+          filter,
+          limit,
+          offset
+        );
+
+        const totalPages = Math.ceil(totalCount / limit);
+
+        logger.info('Canvases retrieved via GraphQL', {
+          workspaceId,
+          userId: context.user?.id,
+          totalCount,
+          page,
+          limit,
+          filterApplied: !!filter,
+        });
+
+        return {
+          items: canvases,
+          totalCount,
+          page,
+          limit,
+          totalPages,
+          hasNextPage: page < totalPages,
+          hasPreviousPage: page > 1,
+        };
+
+      } catch (error) {
+        logger.error('Failed to get workspace canvases via GraphQL', {
+          workspaceId,
+          userId: context.user?.id,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        throw error;
+      }
+    },
+
+    /**
+     * Get default canvas for workspace
+     */
+    defaultCanvas: async (
+      _: any,
+      { workspaceId }: { workspaceId: string },
+      context: GraphQLContext
+    ): Promise<Canvas | null> => {
+      if (!context.isAuthenticated) {
+        throw new AuthenticationError();
+      }
+
+      try {
+        // Authorization check - verify workspace access
+        const authService = new WorkspaceAuthorizationService();
+        await authService.requirePermission(
+          context.user!.id,
+          workspaceId,
+          'canvas:read',
+          'Cannot access canvases in this workspace'
+        );
+
+        const canvasService = new CanvasService();
+        const canvas = await canvasService.getDefaultCanvas(workspaceId);
+
+        logger.info('Default canvas retrieved via GraphQL', {
+          workspaceId,
+          canvasId: canvas?.id,
+          userId: context.user?.id,
+        });
+
+        return canvas;
+
+      } catch (error) {
+        logger.error('Failed to get default canvas via GraphQL', {
+          workspaceId,
+          userId: context.user?.id,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        throw error;
+      }
+    },
+  },
+
+  Mutation: {
+    /**
+     * Create new canvas
+     */
+    createCanvas: async (
+      _: any,
+      { input }: { input: CreateCanvasInput },
+      context: GraphQLContext
+    ): Promise<Canvas> => {
+      if (!context.isAuthenticated) {
+        throw new AuthenticationError();
+      }
+
+      try {
+        // Authorization check - verify workspace access for canvas creation
+        const authService = new WorkspaceAuthorizationService();
+        await authService.requirePermission(
+          context.user!.id,
+          input.workspaceId,
+          'canvas:create',
+          'Cannot create canvases in this workspace'
+        );
+
+        const canvasService = new CanvasService();
+        const canvas = await canvasService.createCanvas(input, context.user!.id);
+
+        // Publish real-time event
+        await pubSub.publish(CANVAS_EVENTS.CANVAS_CREATED, {
+          canvasCreated: canvas,
+          workspaceId: canvas.workspaceId,
+        });
+
+        logger.info('Canvas created via GraphQL', {
+          canvasId: canvas.id,
+          workspaceId: input.workspaceId,
+          name: canvas.name,
+          isDefault: canvas.isDefault,
+          userId: context.user!.id,
+        });
+
+        return canvas;
+
+      } catch (error) {
+        if (error instanceof ValidationError) {
+          throw error;
+        }
+
+        logger.error('Failed to create canvas via GraphQL', {
+          input,
+          userId: context.user!.id,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        throw error;
+      }
+    },
+
+    /**
+     * Update existing canvas
+     */
+    updateCanvas: async (
+      _: any,
+      { id, input }: { id: string; input: UpdateCanvasInput },
+      context: GraphQLContext
+    ): Promise<Canvas> => {
+      if (!context.isAuthenticated) {
+        throw new AuthenticationError();
+      }
+
+      try {
+        const canvasService = new CanvasService();
+        
+        // Check if canvas exists and get workspace ID for authorization
+        const existingCanvas = await canvasService.getCanvasById(id);
+        if (!existingCanvas) {
+          throw new NotFoundError('Canvas', id);
+        }
+
+        // Authorization check - verify workspace access for canvas updates
+        const authService = new WorkspaceAuthorizationService();
+        await authService.requirePermission(
+          context.user!.id,
+          existingCanvas.workspaceId,
+          'canvas:update',
+          'Cannot update canvases in this workspace'
+        );
+
+        const updatedCanvas = await canvasService.updateCanvas(id, input, context.user!.id);
+
+        // Publish real-time event
+        await pubSub.publish(CANVAS_EVENTS.CANVAS_UPDATED, {
+          canvasUpdated: updatedCanvas,
+          workspaceId: updatedCanvas.workspaceId,
+        });
+
+        logger.info('Canvas updated via GraphQL', {
+          canvasId: id,
+          userId: context.user!.id,
+          updatedFields: Object.keys(input),
+        });
+
+        return updatedCanvas;
+
+      } catch (error) {
+        if (error instanceof ValidationError || error instanceof NotFoundError) {
+          throw error;
+        }
+
+        logger.error('Failed to update canvas via GraphQL', {
+          canvasId: id,
+          input,
+          userId: context.user!.id,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        throw error;
+      }
+    },
+
+    /**
+     * Delete canvas
+     */
+    deleteCanvas: async (
+      _: any,
+      { id }: { id: string },
+      context: GraphQLContext
+    ): Promise<boolean> => {
+      if (!context.isAuthenticated) {
+        throw new AuthenticationError();
+      }
+
+      try {
+        const canvasService = new CanvasService();
+        
+        // Check if canvas exists and get workspace ID for authorization
+        const existingCanvas = await canvasService.getCanvasById(id);
+        if (!existingCanvas) {
+          throw new NotFoundError('Canvas', id);
+        }
+
+        // Authorization check - verify workspace access for canvas deletion
+        const authService = new WorkspaceAuthorizationService();
+        await authService.requirePermission(
+          context.user!.id,
+          existingCanvas.workspaceId,
+          'canvas:delete',
+          'Cannot delete canvases in this workspace'
+        );
+
+        const success = await canvasService.deleteCanvas(id, context.user!.id);
+
+        if (success) {
+          // Publish real-time event
+          await pubSub.publish(CANVAS_EVENTS.CANVAS_DELETED, {
+            canvasDeleted: id,
+            workspaceId: existingCanvas.workspaceId,
+          });
+        }
+
+        logger.info('Canvas deleted via GraphQL', {
+          canvasId: id,
+          workspaceId: existingCanvas.workspaceId,
+          userId: context.user!.id,
+          success,
+        });
+
+        return success;
+
+      } catch (error) {
+        if (error instanceof NotFoundError) {
+          throw error;
+        }
+
+        logger.error('Failed to delete canvas via GraphQL', {
+          canvasId: id,
+          userId: context.user!.id,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        return false;
+      }
+    },
+
+    /**
+     * Set canvas as default
+     */
+    setDefaultCanvas: async (
+      _: any,
+      { id }: { id: string },
+      context: GraphQLContext
+    ): Promise<Canvas> => {
+      if (!context.isAuthenticated) {
+        throw new AuthenticationError();
+      }
+
+      try {
+        const canvasService = new CanvasService();
+        const updatedCanvas = await canvasService.setDefaultCanvas(id, context.user!.id);
+
+        // Publish real-time event
+        await pubSub.publish(CANVAS_EVENTS.CANVAS_UPDATED, {
+          canvasUpdated: updatedCanvas,
+          workspaceId: updatedCanvas.workspaceId,
+        });
+
+        logger.info('Canvas set as default via GraphQL', {
+          canvasId: id,
+          workspaceId: updatedCanvas.workspaceId,
+          userId: context.user!.id,
+        });
+
+        return updatedCanvas;
+
+      } catch (error) {
+        logger.error('Failed to set default canvas via GraphQL', {
+          canvasId: id,
+          userId: context.user!.id,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        throw error;
+      }
+    },
+
+    /**
+     * Duplicate canvas
+     */
+    duplicateCanvas: async (
+      _: any,
+      { id, input }: { id: string; input: DuplicateCanvasOptions },
+      context: GraphQLContext
+    ): Promise<Canvas> => {
+      if (!context.isAuthenticated) {
+        throw new AuthenticationError();
+      }
+
+      try {
+        const canvasService = new CanvasService();
+        const duplicatedCanvas = await canvasService.duplicateCanvas(
+          id, 
+          input, 
+          context.user!.id
+        );
+
+        // Publish real-time event
+        await pubSub.publish(CANVAS_EVENTS.CANVAS_CREATED, {
+          canvasCreated: duplicatedCanvas,
+          workspaceId: duplicatedCanvas.workspaceId,
+        });
+
+        logger.info('Canvas duplicated via GraphQL', {
+          sourceCanvasId: id,
+          duplicatedCanvasId: duplicatedCanvas.id,
+          workspaceId: duplicatedCanvas.workspaceId,
+          userId: context.user!.id,
+        });
+
+        return duplicatedCanvas;
+
+      } catch (error) {
+        logger.error('Failed to duplicate canvas via GraphQL', {
+          sourceCanvasId: id,
+          input,
+          userId: context.user!.id,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        throw error;
+      }
+    },
+  },
+
+  Subscription: {
+    /**
+     * Subscribe to canvas created events in a workspace
+     */
+    canvasCreated: {
+      subscribe: withFilter(
+        () => pubSub.asyncIterator([CANVAS_EVENTS.CANVAS_CREATED]),
+        async (payload, variables, context: GraphQLContext) => {
+          if (!context.isAuthenticated) {
+            return false;
+          }
+
+          // Verify user has access to the workspace
+          const authService = new WorkspaceAuthorizationService();
+          const hasAccess = await authService.hasWorkspaceAccess(
+            context.user!.id,
+            variables.workspaceId,
+            'canvas:read'
+          );
+
+          return hasAccess && payload.workspaceId === variables.workspaceId;
+        }
+      ),
+    },
+
+    /**
+     * Subscribe to canvas updated events in a workspace
+     */
+    canvasUpdated: {
+      subscribe: withFilter(
+        () => pubSub.asyncIterator([CANVAS_EVENTS.CANVAS_UPDATED]),
+        async (payload, variables, context: GraphQLContext) => {
+          if (!context.isAuthenticated) {
+            return false;
+          }
+
+          // Verify user has access to the workspace
+          const authService = new WorkspaceAuthorizationService();
+          const hasAccess = await authService.hasWorkspaceAccess(
+            context.user!.id,
+            variables.workspaceId,
+            'canvas:read'
+          );
+
+          return hasAccess && payload.workspaceId === variables.workspaceId;
+        }
+      ),
+    },
+
+    /**
+     * Subscribe to canvas deleted events in a workspace
+     */
+    canvasDeleted: {
+      subscribe: withFilter(
+        () => pubSub.asyncIterator([CANVAS_EVENTS.CANVAS_DELETED]),
+        async (payload, variables, context: GraphQLContext) => {
+          if (!context.isAuthenticated) {
+            return false;
+          }
+
+          // Verify user has access to the workspace
+          const authService = new WorkspaceAuthorizationService();
+          const hasAccess = await authService.hasWorkspaceAccess(
+            context.user!.id,
+            variables.workspaceId,
+            'canvas:read'
+          );
+
+          return hasAccess && payload.workspaceId === variables.workspaceId;
+        }
+      ),
+    },
+  },
+
+  // Field resolvers for Canvas type
+  Canvas: {
+    /**
+     * Resolve workspace for Canvas type
+     */
+    workspace: async (canvas: Canvas, _: any, context: GraphQLContext) => {
+      const workspaceService = context.dataSources.workspaceService;
+      return await workspaceService.getWorkspaceById(canvas.workspaceId);
+    },
+
+    /**
+     * Resolve creator (createdBy) for Canvas type
+     */
+    createdByUser: async (canvas: Canvas, _: any, context: GraphQLContext) => {
+      const userService = context.dataSources.userService;
+      return await userService.findById(canvas.createdBy);
+    },
+
+    /**
+     * Resolve card count for Canvas type
+     */
+    cardCount: async (canvas: Canvas, _: any, context: GraphQLContext): Promise<number> => {
+      try {
+        const canvasService = new CanvasService();
+        const stats = await canvasService.getCanvasStatistics(canvas.id, context.user!.id);
+        return stats.cardCount;
+      } catch (error) {
+        logger.error('Failed to resolve card count for canvas', {
+          canvasId: canvas.id,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        return 0;
+      }
+    },
+
+    /**
+     * Resolve connection count for Canvas type
+     */
+    connectionCount: async (canvas: Canvas, _: any, context: GraphQLContext): Promise<number> => {
+      try {
+        const canvasService = new CanvasService();
+        const stats = await canvasService.getCanvasStatistics(canvas.id, context.user!.id);
+        return stats.connectionCount;
+      } catch (error) {
+        logger.error('Failed to resolve connection count for canvas', {
+          canvasId: canvas.id,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        return 0;
+      }
+    },
+
+    /**
+     * Resolve cards for Canvas type
+     */
+    cards: async (canvas: Canvas, _: any, context: GraphQLContext) => {
+      try {
+        const cardService = new CardService();
+        const { cards } = await cardService.getCanvasCards(canvas.id, {}, 1000); // Large limit for field resolver
+        return cards;
+      } catch (error) {
+        logger.error('Failed to resolve cards for canvas', {
+          canvasId: canvas.id,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        return [];
+      }
+    },
+
+    /**
+     * Resolve connections for Canvas type
+     */
+    connections: async (canvas: Canvas, _: any, context: GraphQLContext) => {
+      try {
+        const connectionService = new ConnectionService();
+        const { connections } = await connectionService.getCanvasConnections(canvas.id, {}, 1000); // Large limit for field resolver
+        return connections;
+      } catch (error) {
+        logger.error('Failed to resolve connections for canvas', {
+          canvasId: canvas.id,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        return [];
+      }
+    },
+
+    /**
+     * Resolve stats for Canvas type
+     */
+    stats: async (canvas: Canvas, _: any, context: GraphQLContext): Promise<CanvasStats> => {
+      try {
+        const canvasService = new CanvasService();
+        return await canvasService.getCanvasStatistics(canvas.id, context.user!.id);
+      } catch (error) {
+        logger.error('Failed to resolve stats for canvas', {
+          canvasId: canvas.id,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        // Return default stats if error
+        return {
+          id: canvas.id,
+          name: canvas.name,
+          cardCount: 0,
+          connectionCount: 0,
+          createdAt: canvas.createdAt,
+        };
+      }
+    },
+  },
+};
