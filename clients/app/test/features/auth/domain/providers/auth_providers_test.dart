@@ -1,10 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:auth0_flutter/auth0_flutter.dart';
 
 import 'package:nexus_mobile/features/auth/domain/providers/auth_providers.dart';
 import 'package:nexus_mobile/shared/services/auth_service.dart';
+import 'package:nexus_mobile/shared/models/user_profile.dart';
 import 'package:nexus_mobile/core/errors/failures.dart';
 import 'package:nexus_mobile/core/utils/result.dart';
 
@@ -19,6 +19,13 @@ void main() {
 
     setUp(() {
       mockAuthService = MockAuthService();
+      
+      // Register fallback values for Mocktail
+      registerFallbackValue(const UserProfile(sub: 'fallback'));
+      
+      // Set up default mock behaviors
+      when(() => mockAuthService.isAuthenticated()).thenAnswer((_) async => false);
+      
       container = ProviderContainer(
         overrides: [
           authServiceProvider.overrideWithValue(mockAuthService),
@@ -107,7 +114,7 @@ void main() {
 
       test('should show error on login failure', () async {
         // Arrange
-        const errorMessage = 'Login failed';
+        const errorMessage = 'Network error';
         when(() => mockAuthService.login())
             .thenAnswer((_) async => Error(AuthFailure.loginFailed(errorMessage)));
 
@@ -120,7 +127,7 @@ void main() {
         expect(finalState.isLoading, isFalse);
         expect(finalState.isAuthenticated, isFalse);
         expect(finalState.user, isNull);
-        expect(finalState.error, equals(errorMessage));
+        expect(finalState.error, equals('Login failed: $errorMessage'));
       });
     });
 
@@ -157,7 +164,7 @@ void main() {
 
       test('should show error on logout failure', () async {
         // Arrange
-        const errorMessage = 'Logout failed';
+        const errorMessage = 'Network error';
         when(() => mockAuthService.logout())
             .thenAnswer((_) async => Error(AuthFailure.logoutFailed(errorMessage)));
 
@@ -168,7 +175,7 @@ void main() {
         // Assert
         final finalState = container.read(authNotifierProvider);
         expect(finalState.isLoading, isFalse);
-        expect(finalState.error, equals(errorMessage));
+        expect(finalState.error, equals('Logout warning: Logout failed: $errorMessage'));
       });
     });
 
@@ -218,14 +225,15 @@ void main() {
   group('User model', () {
     test('should create User from Auth0 UserProfile', () {
       // Arrange
-      final mockUserProfile = MockUserProfile();
-      when(() => mockUserProfile.sub).thenReturn('auth0|12345');
-      when(() => mockUserProfile.email).thenReturn('test@example.com');
-      when(() => mockUserProfile.name).thenReturn('Test User');
-      when(() => mockUserProfile.picture).thenReturn('https://example.com/avatar.jpg');
+      final userProfile = UserProfile(
+        sub: 'auth0|12345',
+        email: 'test@example.com',
+        name: 'Test User',
+        picture: 'https://example.com/avatar.jpg',
+      );
 
       // Act
-      final user = User.fromAuth0Profile(mockUserProfile);
+      final user = User.fromAuth0Profile(userProfile);
 
       // Assert
       expect(user.id, equals('auth0|12345'));
@@ -236,19 +244,20 @@ void main() {
 
     test('should handle null values in Auth0 UserProfile', () {
       // Arrange
-      final mockUserProfile = MockUserProfile();
-      when(() => mockUserProfile.sub).thenReturn('auth0|12345');
-      when(() => mockUserProfile.email).thenReturn('test@example.com');
-      when(() => mockUserProfile.name).thenReturn(null);
-      when(() => mockUserProfile.picture).thenReturn(null);
+      final userProfile = UserProfile(
+        sub: 'auth0|12345',
+        email: 'test@example.com',
+        name: null,
+        picture: null,
+      );
 
       // Act
-      final user = User.fromAuth0Profile(mockUserProfile);
+      final user = User.fromAuth0Profile(userProfile);
 
       // Assert
       expect(user.id, equals('auth0|12345'));
       expect(user.email, equals('test@example.com'));
-      expect(user.name, isNull);
+      expect(user.name, equals('test@example.com')); // Falls back to email when name is null
       expect(user.avatarUrl, isNull);
     });
   });

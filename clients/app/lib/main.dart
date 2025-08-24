@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:graphql_flutter/graphql_flutter.dart';
 
 import 'core/router/app_router.dart';
 import 'features/auth/domain/providers/auth_providers.dart';
 import 'features/auth/presentation/screens/auth_loading_screen.dart';
 import 'shared/theme/app_theme.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Hive for GraphQL caching
+  await initHiveForFlutter();
+  
   final container = ProviderContainer();
   initializeRouter(container);
   runApp(UncontrolledProviderScope(

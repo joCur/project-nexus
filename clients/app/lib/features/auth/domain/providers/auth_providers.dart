@@ -1,15 +1,22 @@
-import 'package:auth0_flutter/auth0_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../core/errors/failures.dart';
 import '../../../../shared/services/auth_service.dart';
+import '../../../../shared/models/user_profile.dart';
 import '../../../../core/utils/result.dart';
 
 part 'auth_providers.g.dart';
 
 /// User model adapted from Auth0 UserProfile
 class User {
+  final String id;
+  final String name;
+  final String email;
+  final String? avatarUrl;
+  final bool emailVerified;
+  final String? sub;
+
   const User({
     required this.id,
     required this.name,
@@ -19,20 +26,13 @@ class User {
     this.sub,
   });
 
-  final String id;
-  final String name;
-  final String email;
-  final String? avatarUrl;
-  final bool emailVerified;
-  final String? sub;
-
   factory User.fromAuth0Profile(UserProfile profile) {
     return User(
       id: profile.sub,
       name: profile.name ?? profile.email ?? 'Unknown User',
       email: profile.email ?? '',
-      avatarUrl: profile.pictureUrl?.toString(),
-      emailVerified: profile.isEmailVerified ?? false,
+      avatarUrl: profile.picture,
+      emailVerified: profile.emailVerified ?? false,
       sub: profile.sub,
     );
   }
