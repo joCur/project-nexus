@@ -2,7 +2,9 @@
 
 import React, { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { useMutation, gql } from '@apollo/client';
 import { useAuth } from '@/hooks/use-auth';
+import { useWorkspaceStore } from '@/stores/workspaceStore';
 
 // Step components
 import { ProfileSetupStep } from './steps/ProfileSetupStep';
@@ -36,11 +38,49 @@ interface OnboardingState {
   };
 }
 
+// GraphQL mutation for updating onboarding progress
+const UPDATE_ONBOARDING_PROGRESS = gql`
+  mutation UpdateOnboardingProgress($input: OnboardingProgressUpdateInput!) {
+    updateOnboardingProgress(input: $input) {
+      id
+      currentStep
+      tutorialProgress
+      completedAt
+    }
+  }
+`;
+
+// GraphQL mutation for completing onboarding workflow
+const COMPLETE_ONBOARDING_WORKFLOW = gql`
+  mutation CompleteOnboardingWorkflow($input: OnboardingWorkflowCompleteInput!) {
+    completeOnboardingWorkflow(input: $input) {
+      success
+      profile {
+        id
+        displayName
+        fullName
+      }
+      workspace {
+        id
+        name
+      }
+      onboarding {
+        id
+        completed
+        completedAt
+      }
+    }
+  }
+`;
+
 const TOTAL_STEPS = 3;
 
 export const OnboardingFlow: React.FC = () => {
   const router = useRouter();
   const { user } = useAuth();
+  const { setCurrentWorkspace } = useWorkspaceStore();
+  const [updateOnboardingProgress] = useMutation(UPDATE_ONBOARDING_PROGRESS);
+  const [completeOnboardingWorkflow] = useMutation(COMPLETE_ONBOARDING_WORKFLOW);
   
   const [state, setState] = useState<OnboardingState>({
     currentStep: 1,
@@ -77,25 +117,50 @@ export const OnboardingFlow: React.FC = () => {
 
   const completeOnboarding = useCallback(async (currentState: OnboardingState) => {
     try {
-      // Save final profile and mark onboarding complete
-      await fetch('/api/user/onboarding/complete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          completedAt: new Date().toISOString(),
-          userProfile: currentState.userProfile,
-          tutorialProgress: currentState.tutorialProgress,
-        }),
+      // Save final profile and mark onboarding complete using GraphQL
+      const { data } = await completeOnboardingWorkflow({
+        variables: {
+          input: {
+            userProfile: {
+              ...currentState.userProfile,
+              // Convert role to uppercase for GraphQL enum, with fallback to 'OTHER'
+              role: (currentState.userProfile.role?.trim()?.toUpperCase() || 'OTHER') as any,
+              // Convert preferences privacy to uppercase for GraphQL enum
+              preferences: {
+                ...currentState.userProfile.preferences,
+                privacy: (currentState.userProfile.preferences?.privacy?.toUpperCase() || 'PRIVATE') as any,
+              },
+            },
+            tutorialProgress: currentState.tutorialProgress,
+          },
+        },
       });
 
-      // Redirect to workspace
+      if (data?.completeOnboardingWorkflow?.success) {
+        const result = data.completeOnboardingWorkflow;
+        
+        // Extract workspace ID from the response
+        if (result.workspace?.id) {
+          const workspaceId = result.workspace.id;
+          const workspaceName = result.workspace.name;
+          
+          // Store the workspace context
+          setCurrentWorkspace(workspaceId, workspaceName);
+          
+          // Redirect to the specific workspace
+          router.push(`/workspace/${workspaceId}`);
+          return;
+        }
+      }
+
+      // Fallback to generic workspace route if no workspace ID
       router.push('/workspace');
     } catch (error) {
       console.error('Failed to complete onboarding:', error);
       // Still redirect - user can update profile later
       router.push('/workspace');
     }
-  }, [router]);
+  }, [router, setCurrentWorkspace, completeOnboardingWorkflow]);
 
   const nextStep = useCallback(async () => {
     // Use functional setState to get the most current state
@@ -105,15 +170,13 @@ export const OnboardingFlow: React.FC = () => {
       // Save step completion to backend (async, don't block UI)
       (async () => {
         try {
-          await fetch('/api/user/onboarding', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              step: currentStep,
-              completedAt: new Date().toISOString(),
-              tutorialProgress: prev.tutorialProgress,
-              userProfile: prev.userProfile,
-            }),
+          await updateOnboardingProgress({
+            variables: {
+              input: {
+                currentStep: currentStep,
+                tutorialProgress: prev.tutorialProgress,
+              },
+            },
           });
         } catch (error) {
           console.error('Failed to save onboarding progress:', error);
@@ -131,7 +194,7 @@ export const OnboardingFlow: React.FC = () => {
         return prev;
       }
     });
-  }, [completeOnboarding]);
+  }, [completeOnboarding, updateOnboardingProgress]);
 
   const renderCurrentStep = () => {
     switch (state.currentStep) {
