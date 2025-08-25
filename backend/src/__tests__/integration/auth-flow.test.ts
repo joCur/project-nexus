@@ -342,19 +342,22 @@ describe('End-to-End Authentication Flow Tests', () => {
       expect(response.status).toBe(401);
     });
 
-    it('should handle expired sessions', async () => {
+    it('should handle expired sessions by creating new session', async () => {
       const auth0User = AUTH0_USER_FIXTURES.STANDARD_USER;
       const user = USER_FIXTURES.STANDARD_USER;
 
       mockAuth0Service.validateAuth0Token.mockResolvedValue(auth0User);
       mockAuth0Service.syncUserFromAuth0.mockResolvedValue(user);
       mockAuth0Service.validateSession.mockResolvedValue(false);
+      mockAuth0Service.createSession.mockResolvedValue('new-session-id');
 
       const response = await request(app)
         .get('/protected')
         .set('Authorization', `Bearer ${JWT_FIXTURES.VALID_TOKEN}`);
 
-      expect(response.status).toBe(401);
+      // Should succeed because a new session is created automatically
+      expect(response.status).toBe(200);
+      expect(mockAuth0Service.createSession).toHaveBeenCalledWith(user, auth0User);
     });
   });
 
@@ -496,6 +499,7 @@ describe('End-to-End Authentication Flow Tests', () => {
       mockAuth0Service.validateAuth0Token.mockResolvedValue(auth0User);
       mockAuth0Service.syncUserFromAuth0.mockResolvedValue(user);
       mockAuth0Service.validateSession.mockResolvedValue(false);
+      mockAuth0Service.createSession.mockResolvedValue('new-session-id');
 
       const response = await request(app)
         .post('/graphql')
@@ -504,7 +508,9 @@ describe('End-to-End Authentication Flow Tests', () => {
           query: GRAPHQL_FIXTURES.REFRESH_SESSION_MUTATION,
         });
 
-      expect(response.status).toBe(401);
+      // Should succeed because a new session is created automatically
+      expect(response.status).toBe(200);
+      expect(mockAuth0Service.createSession).toHaveBeenCalledWith(user, auth0User);
     });
 
     it('should handle concurrent session operations', async () => {

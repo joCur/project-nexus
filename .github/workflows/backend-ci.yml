@@ -95,7 +95,7 @@ jobs:
           AUTH0_CLIENT_SECRET: test_client_secret_for_testing_purposes
           JWT_SECRET: test_jwt_secret_for_unit_tests_minimum_32_chars_required_by_validation
           SESSION_SECRET: test_session_secret_for_testing_minimum_32_chars_required_validation
-        run: npm test -- --testPathPattern="unit|security" --coverage
+        run: npm test -- --testPathPatterns="unit|security" --coverage
       
       - name: Upload test coverage
         if: success()
@@ -170,7 +170,7 @@ jobs:
           AUTH0_CLIENT_SECRET: test_client_secret_for_testing_purposes
           JWT_SECRET: test_jwt_secret_for_unit_tests_minimum_32_chars_required_by_validation
           SESSION_SECRET: test_session_secret_for_testing_minimum_32_chars_required_validation
-        run: npm test -- --testPathPattern="integration|migration"
+        run: npm test -- --testPathPatterns="integration|migration"
 
   build-docker-image:
     name: Build Backend Docker Image
