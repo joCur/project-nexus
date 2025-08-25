@@ -2,7 +2,7 @@ import {
   AuthenticationError, 
   AuthorizationError, 
   NotFoundError,
-  ValidationError 
+  ValidationError as _ValidationError 
 } from '@/utils/errors';
 import { createContextLogger } from '@/utils/logger';
 import { GraphQLContext } from '@/types';

@@ -109,8 +109,11 @@ export class MockAuth0TokenValidator {
       const payload = decoded.payload as Auth0TokenPayload;
       return createMockAuth0User({
         sub: payload.sub,
-        email: payload.email,
-        email_verified: payload.email_verified,
+        username: payload.username,
+        email: payload.email || payload['https://api.nexus-app.de/email'] as string,
+        roles: payload['https://api.nexus-app.de/roles'] as string[] || undefined,
+        permissions: payload['https://api.nexus-app.de/permissions'] as string[] || undefined,
+        userId: payload['https://api.nexus-app.de/user_id'] as string || undefined,
         iat: payload.iat,
         exp: payload.exp,
       });
@@ -122,9 +125,10 @@ export class MockAuth0TokenValidator {
 
   private createUnverifiedEmailResponse(token: string) {
     const validUser = this.createValidTokenResponse(token);
+    // Return user without email to simulate unverified state
     return {
       ...validUser,
-      email_verified: false,
+      email: undefined,
     };
   }
 }
@@ -181,7 +185,7 @@ export class MockAuth0ManagementClient {
     this.scenario = scenario;
   }
 
-  async getUser(userId: string) {
+  async getUser(_userId: string) {
     switch (this.scenario) {
       case 'valid':
         return mockAuth0ManagementResponses.user;
@@ -189,10 +193,11 @@ export class MockAuth0ManagementClient {
       case 'user_not_found':
         throw new Error('The user does not exist.');
       
-      case 'rate_limited':
+      case 'rate_limited': {
         const error = new Error('Rate limit exceeded') as any;
         error.statusCode = 429;
         throw error;
+      }
       
       case 'network_error':
         throw new Error('Network error');

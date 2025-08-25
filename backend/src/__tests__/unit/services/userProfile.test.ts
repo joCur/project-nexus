@@ -1,5 +1,8 @@
 import { UserProfileService, UserProfile } from '@/services/userProfile';
-import { database, knex } from '@/database/connection';
+import { database, knex as _knex } from '@/database/connection';
+
+// Import mocked knex for type casting
+const mockKnexDb = jest.requireMock('@/database/connection');
 import { ValidationError, NotFoundError } from '@/utils/errors';
 import { createMockKnex } from '../../utils/test-helpers';
 
@@ -24,7 +27,7 @@ jest.mock('@/utils/logger', () => ({
 describe('UserProfileService', () => {
   let userProfileService: UserProfileService;
   const mockDatabase = database as jest.Mocked<typeof database>;
-  const typedMockKnex = knex as jest.MockedFunction<typeof knex>;
+  const typedMockKnex = _knex as jest.MockedFunction<typeof _knex>;
 
   // Test data
   const testUserId = '123e4567-e89b-12d3-a456-426614174000';
@@ -181,7 +184,7 @@ describe('UserProfileService', () => {
         insert: jest.fn().mockReturnThis(),
         returning: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      mockKnexDb.knex.mockReturnValue(mockKnexQuery);
 
       const minimalDbProfile = {
         ...mockDbProfile,
@@ -225,7 +228,7 @@ describe('UserProfileService', () => {
         update: jest.fn().mockReturnThis(),
         returning: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      mockKnexDb.knex.mockReturnValue(mockKnexQuery);
 
       const updatedDbProfile = {
         ...mockDbProfile,
@@ -273,7 +276,7 @@ describe('UserProfileService', () => {
         update: jest.fn().mockReturnThis(),
         returning: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      mockKnexDb.knex.mockReturnValue(mockKnexQuery);
 
       const updateInput = {
         preferences: {
@@ -365,7 +368,7 @@ describe('UserProfileService', () => {
         where: jest.fn().mockReturnThis(),
         del: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      mockKnexDb.knex.mockReturnValue(mockKnexQuery);
 
       mockDatabase.query.mockResolvedValue(undefined);
 
@@ -394,7 +397,7 @@ describe('UserProfileService', () => {
         orderBy: jest.fn().mockReturnThis(),
         limit: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      mockKnexDb.knex.mockReturnValue(mockKnexQuery);
 
       const searchResults = [mockDbProfile];
       mockDatabase.query.mockResolvedValue(searchResults);
@@ -414,7 +417,7 @@ describe('UserProfileService', () => {
         orderBy: jest.fn().mockReturnThis(),
         limit: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      mockKnexDb.knex.mockReturnValue(mockKnexQuery);
 
       mockDatabase.query.mockResolvedValue([]);
 
@@ -439,7 +442,7 @@ describe('UserProfileService', () => {
         where: jest.fn().mockReturnThis(),
         first: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      mockKnexDb.knex.mockReturnValue(mockKnexQuery);
 
       mockDatabase.query.mockResolvedValue(dbProfileWithLowercase);
 
@@ -460,7 +463,7 @@ describe('UserProfileService', () => {
         where: jest.fn().mockReturnThis(),
         first: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      mockKnexDb.knex.mockReturnValue(mockKnexQuery);
 
       mockDatabase.query.mockResolvedValue(dbProfileWithNulls);
 
@@ -477,7 +480,7 @@ describe('UserProfileService', () => {
         where: jest.fn().mockReturnThis(),
         first: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      mockKnexDb.knex.mockReturnValue(mockKnexQuery);
 
       const malformedProfile = {
         id: testProfileId,

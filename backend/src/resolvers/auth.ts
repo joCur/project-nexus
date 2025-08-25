@@ -2,13 +2,13 @@ import {
   AuthenticationError, 
   AuthorizationError, 
   NotFoundError,
-  ValidationError 
+  ValidationError as _ValidationError 
 } from '@/utils/errors';
 import { securityLogger } from '@/utils/logger';
 import { GraphQLContext } from '@/types';
-import { UserService } from '@/services/user';
-import { Auth0Service } from '@/services/auth0';
-import { CacheService } from '@/services/cache';
+import { UserService as _UserService } from '@/services/user';
+import { Auth0Service as _Auth0Service } from '@/services/auth0';
+import { CacheService as _CacheService } from '@/services/cache';
 
 /**
  * GraphQL resolvers for authentication operations
@@ -225,29 +225,24 @@ export const authResolvers = {
 
       const userService = context.dataSources.userService;
 
-      try {
-        const user = await userService.findById(userId);
-        if (!user) {
-          throw new NotFoundError('User', userId);
-        }
-
-        // Merge with existing permissions
-        const updatedPermissions = Array.from(new Set([...user.permissions, ...permissions]));
-
-        const updatedUser = await userService.update(userId, {
-          permissions: updatedPermissions,
-        });
-
-        securityLogger.authorizationFailure(context.user!.id, 'user_permissions', 'grant', {
-          targetUserId: userId,
-          grantedPermissions: permissions,
-        });
-
-        return updatedUser;
-
-      } catch (error) {
-        throw error;
+      const user = await userService.findById(userId);
+      if (!user) {
+        throw new NotFoundError('User', userId);
       }
+
+      // Merge with existing permissions
+      const updatedPermissions = Array.from(new Set([...user.permissions, ...permissions]));
+
+      const updatedUser = await userService.update(userId, {
+        permissions: updatedPermissions,
+      });
+
+      securityLogger.authorizationFailure(context.user!.id, 'user_permissions', 'grant', {
+        targetUserId: userId,
+        grantedPermissions: permissions,
+      });
+
+      return updatedUser;
     },
 
     /**
@@ -273,31 +268,26 @@ export const authResolvers = {
 
       const userService = context.dataSources.userService;
 
-      try {
-        const user = await userService.findById(userId);
-        if (!user) {
-          throw new NotFoundError('User', userId);
-        }
-
-        // Remove specified permissions
-        const updatedPermissions = user.permissions.filter(
-          permission => !permissions.includes(permission)
-        );
-
-        const updatedUser = await userService.update(userId, {
-          permissions: updatedPermissions,
-        });
-
-        securityLogger.authorizationFailure(context.user!.id, 'user_permissions', 'revoke', {
-          targetUserId: userId,
-          revokedPermissions: permissions,
-        });
-
-        return updatedUser;
-
-      } catch (error) {
-        throw error;
+      const user = await userService.findById(userId);
+      if (!user) {
+        throw new NotFoundError('User', userId);
       }
+
+      // Remove specified permissions
+      const updatedPermissions = user.permissions.filter(
+        permission => !permissions.includes(permission)
+      );
+
+      const updatedUser = await userService.update(userId, {
+        permissions: updatedPermissions,
+      });
+
+      securityLogger.authorizationFailure(context.user!.id, 'user_permissions', 'revoke', {
+        targetUserId: userId,
+        revokedPermissions: permissions,
+      });
+
+      return updatedUser;
     },
 
     /**
@@ -323,31 +313,26 @@ export const authResolvers = {
 
       const userService = context.dataSources.userService;
 
-      try {
-        const user = await userService.findById(userId);
-        if (!user) {
-          throw new NotFoundError('User', userId);
-        }
-
-        // Add role if not already present
-        const updatedRoles = user.roles.includes(role) 
-          ? user.roles 
-          : [...user.roles, role];
-
-        const updatedUser = await userService.update(userId, {
-          roles: updatedRoles,
-        });
-
-        securityLogger.authorizationFailure(context.user!.id, 'user_roles', 'assign', {
-          targetUserId: userId,
-          assignedRole: role,
-        });
-
-        return updatedUser;
-
-      } catch (error) {
-        throw error;
+      const user = await userService.findById(userId);
+      if (!user) {
+        throw new NotFoundError('User', userId);
       }
+
+      // Add role if not already present
+      const updatedRoles = user.roles.includes(role) 
+        ? user.roles 
+        : [...user.roles, role];
+
+      const updatedUser = await userService.update(userId, {
+        roles: updatedRoles,
+      });
+
+      securityLogger.authorizationFailure(context.user!.id, 'user_roles', 'assign', {
+        targetUserId: userId,
+        assignedRole: role,
+      });
+
+      return updatedUser;
     },
 
     /**
@@ -373,29 +358,24 @@ export const authResolvers = {
 
       const userService = context.dataSources.userService;
 
-      try {
-        const user = await userService.findById(userId);
-        if (!user) {
-          throw new NotFoundError('User', userId);
-        }
-
-        // Remove role
-        const updatedRoles = user.roles.filter(userRole => userRole !== role);
-
-        const updatedUser = await userService.update(userId, {
-          roles: updatedRoles,
-        });
-
-        securityLogger.authorizationFailure(context.user!.id, 'user_roles', 'remove', {
-          targetUserId: userId,
-          removedRole: role,
-        });
-
-        return updatedUser;
-
-      } catch (error) {
-        throw error;
+      const user = await userService.findById(userId);
+      if (!user) {
+        throw new NotFoundError('User', userId);
       }
+
+      // Remove role
+      const updatedRoles = user.roles.filter(userRole => userRole !== role);
+
+      const updatedUser = await userService.update(userId, {
+        roles: updatedRoles,
+      });
+
+      securityLogger.authorizationFailure(context.user!.id, 'user_roles', 'remove', {
+        targetUserId: userId,
+        removedRole: role,
+      });
+
+      return updatedUser;
     },
   },
 

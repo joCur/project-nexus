@@ -9,6 +9,7 @@ import { workspaceMemberResolvers } from './workspaceMemberResolvers';
 import { onboardingWorkflowResolvers } from './onboardingWorkflow';
 import { cardResolvers } from './cardResolvers';
 import { connectionResolvers } from './connectionResolvers';
+import { canvasResolvers } from '../graphql/canvasResolvers';
 
 /**
  * Merge all GraphQL resolvers into a single resolver object
@@ -23,5 +24,6 @@ export const resolvers = mergeResolvers([
   workspaceMemberResolvers,
   cardResolvers,
   connectionResolvers,
+  canvasResolvers,
   healthResolvers,
 ]);

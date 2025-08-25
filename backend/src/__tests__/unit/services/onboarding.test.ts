@@ -1,5 +1,8 @@
 import { OnboardingService, OnboardingProgress } from '@/services/onboarding';
 import { database } from '@/database/connection';
+
+// Import mocked knex for type casting
+const mockKnexDb = jest.requireMock('@/database/connection');
 import { ValidationError } from '@/utils/errors';
 
 // Mock database connection
@@ -62,7 +65,7 @@ describe('OnboardingService', () => {
         where: jest.fn().mockReturnThis(),
         first: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      mockKnexDb.knex.mockReturnValue(mockKnexQuery);
 
       mockDatabase.query.mockResolvedValue(mockDbOnboarding);
 
@@ -80,7 +83,7 @@ describe('OnboardingService', () => {
         where: jest.fn().mockReturnThis(),
         first: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      mockKnexDb.knex.mockReturnValue(mockKnexQuery);
 
       mockDatabase.query.mockResolvedValue(null);
 
@@ -94,7 +97,7 @@ describe('OnboardingService', () => {
         where: jest.fn().mockReturnThis(),
         first: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      mockKnexDb.knex.mockReturnValue(mockKnexQuery);
 
       const dbError = new Error('Database connection failed');
       mockDatabase.query.mockRejectedValue(dbError);
@@ -121,7 +124,7 @@ describe('OnboardingService', () => {
         update: jest.fn().mockReturnThis(),
         returning: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      mockKnexDb.knex.mockReturnValue(mockKnexQuery);
 
       const updatedMockDb = { ...mockDbOnboarding, current_step: 2 };
       mockDatabase.query.mockResolvedValue([updatedMockDb]);
@@ -144,7 +147,7 @@ describe('OnboardingService', () => {
         insert: jest.fn().mockReturnThis(),
         returning: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      mockKnexDb.knex.mockReturnValue(mockKnexQuery);
 
       const newMockDb = { ...mockDbOnboarding, current_step: 2 };
       mockDatabase.query.mockResolvedValue([newMockDb]);
@@ -201,7 +204,7 @@ describe('OnboardingService', () => {
         update: jest.fn().mockReturnThis(),
         returning: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      mockKnexDb.knex.mockReturnValue(mockKnexQuery);
 
       const completedMockDb = {
         ...mockDbOnboarding,
@@ -230,7 +233,7 @@ describe('OnboardingService', () => {
         insert: jest.fn().mockReturnThis(),
         returning: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      mockKnexDb.knex.mockReturnValue(mockKnexQuery);
 
       const completedMockDb = {
         ...mockDbOnboarding,
@@ -263,7 +266,7 @@ describe('OnboardingService', () => {
         update: jest.fn().mockReturnThis(),
         returning: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      mockKnexDb.knex.mockReturnValue(mockKnexQuery);
 
       const completedMockDb = {
         ...mockDbOnboarding,
@@ -337,7 +340,7 @@ describe('OnboardingService', () => {
         where: jest.fn().mockReturnThis(),
         update: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      mockKnexDb.knex.mockReturnValue(mockKnexQuery);
 
       mockDatabase.query.mockResolvedValue(undefined);
 
@@ -362,7 +365,7 @@ describe('OnboardingService', () => {
         where: jest.fn().mockReturnThis(),
         update: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      mockKnexDb.knex.mockReturnValue(mockKnexQuery);
 
       const dbError = new Error('Reset failed');
       mockDatabase.query.mockRejectedValue(dbError);
@@ -378,7 +381,7 @@ describe('OnboardingService', () => {
         where: jest.fn().mockReturnThis(),
         first: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      mockKnexDb.knex.mockReturnValue(mockKnexQuery);
 
       // Return malformed data without required fields
       const malformedDb = {
@@ -407,7 +410,7 @@ describe('OnboardingService', () => {
         insert: jest.fn().mockReturnThis(),
         returning: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      mockKnexDb.knex.mockReturnValue(mockKnexQuery);
 
       const newMockDb = { ...mockDbOnboarding, tutorial_progress: {} };
       mockDatabase.query.mockResolvedValue([newMockDb]);
@@ -429,7 +432,7 @@ describe('OnboardingService', () => {
         insert: jest.fn().mockReturnThis(),
         returning: jest.fn().mockReturnThis(),
       };
-      require('@/database/connection').knex.mockReturnValue(mockKnexQuery);
+      mockKnexDb.knex.mockReturnValue(mockKnexQuery);
 
       mockDatabase.query.mockResolvedValue([mockDbOnboarding]);
 

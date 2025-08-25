@@ -3,69 +3,12 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useMemo, useEffect } from 'react';
 import { announceToScreenReader } from '@/lib/utils';
 import { navigationUtils } from '@/lib/navigation';
+import { ExtendedUserProfile, LoginOptions, LogoutOptions, UseAuthReturn, AuthState } from '@/types/auth';
 
 /**
  * Extended user interface with custom claims from Auth0
  */
-export interface ExtendedUserProfile extends UserProfile {
-  // Custom claims from Auth0 Rules/Actions
-  roles?: string[];
-  permissions?: string[];
-  internalUserId?: string;
-  
-  // Standard Auth0 fields we explicitly use
-  sub: string;
-  email: string;
-  email_verified: boolean;
-  name?: string;
-  picture?: string;
-  updated_at?: string;
-}
 
-/**
- * Authentication state interface
- */
-export interface AuthState {
-  user: ExtendedUserProfile | null;
-  isLoading: boolean;
-  error?: Error;
-  isAuthenticated: boolean;
-}
-
-/**
- * Authentication actions interface
- */
-export interface AuthActions {
-  login: (options?: LoginOptions) => Promise<void>;
-  logout: (options?: LogoutOptions) => Promise<void>;
-  checkPermission: (permission: string) => boolean;
-  hasRole: (role: string) => boolean;
-  refreshUser: () => Promise<void>;
-  announceAuthStatus: (message: string, priority?: 'polite' | 'assertive') => void;
-}
-
-/**
- * Login options
- */
-export interface LoginOptions {
-  returnTo?: string;
-  organization?: string;
-  invitation?: string;
-  screen_hint?: 'login' | 'signup';
-}
-
-/**
- * Logout options  
- */
-export interface LogoutOptions {
-  returnTo?: string;
-  federated?: boolean;
-}
-
-/**
- * Complete authentication hook return type
- */
-export interface UseAuthReturn extends AuthState, AuthActions {}
 
 /**
  * Custom authentication hook that wraps Auth0's useUser hook
@@ -99,7 +42,6 @@ export function useAuth(): UseAuthReturn {
       // Spread user but handle null values
       sub: user.sub!,
       email: user.email!,
-      email_verified: user.email_verified ?? false,
       name: user.name ?? undefined,
       nickname: user.nickname ?? undefined,
       picture: user.picture ?? undefined,

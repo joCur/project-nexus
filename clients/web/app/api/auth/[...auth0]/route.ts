@@ -94,7 +94,9 @@ export const GET = handleAuth({
   login: handleLogin({
     authorizationParams: {
       prompt: 'login', // Force fresh login every time
-      max_age: 0       // Don't use cached authentication
+      max_age: 0,      // Don't use cached authentication
+      audience: process.env.AUTH0_AUDIENCE || 'https://api.nexus-app.de',
+      scope: 'openid profile email read:cards write:cards read:workspaces write:workspaces'
     }
   }),
   callback: handleCallback({

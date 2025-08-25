@@ -2,11 +2,11 @@ import { UserService } from '@/services/user';
 import { database, knex } from '@/database/connection';
 import {
   NotFoundError,
-  UniqueConstraintError,
+  UniqueConstraintError as _UniqueConstraintError,
   ValidationError,
 } from '@/utils/errors';
 import {
-  createMockUser,
+  createMockUser as _createMockUser,
   createMockDatabaseQuery,
   createMockKnex,
   ERROR_SCENARIOS,
@@ -35,7 +35,7 @@ describe('UserService', () => {
   let userService: UserService;
   let mockDatabaseQuery: jest.MockedFunction<any>;
   const mockDatabase = database as jest.Mocked<typeof database>;
-  const typedMockKnex = knex as jest.MockedFunction<typeof knex>;
+  const _typedMockKnex = knex as jest.MockedFunction<typeof knex>;
 
   beforeEach(() => {
     mockDatabaseQuery = createMockDatabaseQuery();

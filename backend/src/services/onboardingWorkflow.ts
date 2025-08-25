@@ -1,5 +1,5 @@
 import { 
-  ValidationError,
+  ValidationError as _ValidationError,
   TransactionError 
 } from '@/utils/errors';
 import { createContextLogger } from '@/utils/logger';

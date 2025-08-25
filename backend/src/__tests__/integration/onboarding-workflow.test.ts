@@ -2,7 +2,7 @@ import { OnboardingWorkflowService } from '@/services/onboardingWorkflow';
 import { UserProfileService } from '@/services/userProfile';
 import { OnboardingService } from '@/services/onboarding';
 import { WorkspaceService } from '@/services/workspace';
-import { ValidationError, TransactionError } from '@/utils/errors';
+import { TransactionError } from '@/utils/errors';
 
 // Mock services
 jest.mock('@/services/userProfile');

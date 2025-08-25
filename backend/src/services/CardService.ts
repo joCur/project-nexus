@@ -7,14 +7,14 @@ import {
   CardPositionUpdate,
   BatchCardUpdate,
   ImportCardData,
-  CardType,
+  CardType as _CardType,
   CardStatus,
   BatchOperationResult
 } from '@/types/CardTypes';
 import { 
   NotFoundError, 
   ValidationError,
-  UniqueConstraintError 
+  UniqueConstraintError as _UniqueConstraintError 
 } from '@/utils/errors';
 import { createContextLogger } from '@/utils/logger';
 import { CardValidator } from '@/validators/CardValidators';
@@ -39,6 +39,19 @@ export class CardService {
       // Validate input
       const validatedInput = CardValidator.validateCreateCard(input);
 
+      // Determine canvas ID - if not provided, use default canvas for workspace
+      let canvasId = validatedInput.canvasId;
+      if (!canvasId) {
+        // Import CanvasService only when needed to avoid circular imports
+        const { CanvasService } = await import('@/services/canvas');
+        const canvasService = new CanvasService();
+        const defaultCanvas = await canvasService.getDefaultCanvas(validatedInput.workspaceId);
+        if (!defaultCanvas) {
+          throw new ValidationError('No default canvas found for workspace. Please specify a canvasId.');
+        }
+        canvasId = defaultCanvas.id;
+      }
+
       // Sanitize content based on card type
       const sanitizedContent = CardValidator.sanitizeContent(
         validatedInput.content, 
@@ -47,6 +60,7 @@ export class CardService {
 
       const cardData = {
         workspace_id: validatedInput.workspaceId,
+        canvas_id: canvasId,
         type: validatedInput.type,
         title: validatedInput.title,
         content: sanitizedContent,
@@ -189,6 +203,64 @@ export class CardService {
     } catch (error) {
       logger.error('Failed to get workspace cards', {
         workspaceId,
+        filter,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get cards in canvas with optional filtering
+   */
+  async getCanvasCards(
+    canvasId: string, 
+    filter?: CardFilter,
+    limit: number = 100,
+    offset: number = 0
+  ): Promise<{ cards: Card[]; totalCount: number }> {
+    try {
+      let query = knex(this.tableName)
+        .where('canvas_id', canvasId)
+        .where('status', '!=', CardStatus.DELETED);
+
+      // Apply filters
+      if (filter) {
+        query = this.applyFilters(query, filter);
+      }
+
+      // Get total count
+      const [{ count }] = await database.query<[{ count: string }]>(
+        query.clone().count('id as count'),
+        'cards_canvas_count'
+      );
+
+      const totalCount = parseInt(count, 10);
+
+      // Get paginated results
+      const dbCards = await database.query<any[]>(
+        query
+          .orderBy('updated_at', 'desc')
+          .limit(limit)
+          .offset(offset),
+        'cards_canvas_list'
+      );
+
+      const cards = dbCards.map(dbCard => CardMapper.mapDbCardToCard(dbCard));
+
+      logger.debug('Canvas cards retrieved', {
+        canvasId,
+        cardCount: cards.length,
+        totalCount,
+        limit,
+        offset,
+      });
+
+      return { cards, totalCount };
+
+    } catch (error) {
+      logger.error('Failed to get canvas cards', {
+        canvasId,
         filter,
         error: error instanceof Error ? error.message : 'Unknown error',
       });
