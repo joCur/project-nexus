@@ -115,7 +115,7 @@ jobs:
         working-directory: backend
         env:
           DATABASE_URL: postgresql://postgres:test_password@localhost:5432/nexus_test
-        run: npm run db:migrate
+        run: npm run migrate
       
       - name: Run backend tests
         working-directory: backend
