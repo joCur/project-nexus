@@ -1,16 +1,16 @@
 import { CardService } from '@/services/CardService';
 import { CardValidator } from '@/validators/CardValidators';
-import { CardMapper, CardGeometry } from '@/utils/CardUtils';
-import { database, knex } from '@/database/connection';
+import { CardMapper } from '@/utils/CardUtils';
+import { database } from '@/database/connection';
 import { 
   CardType, 
   CardStatus, 
   CreateCardInput, 
   UpdateCardInput,
   CardPositionUpdate,
-  BatchCardUpdate 
+ 
 } from '@/types/CardTypes';
-import { NotFoundError, ValidationError } from '@/utils/errors';
+import { NotFoundError } from '@/utils/errors';
 
 // Mock dependencies
 jest.mock('@/database/connection', () => {

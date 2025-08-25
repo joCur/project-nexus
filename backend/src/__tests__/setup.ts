@@ -12,15 +12,7 @@ jest.mock('ioredis');
 
 // Global test setup
 beforeAll(async () => {
-  // Set test environment
-  process.env.NODE_ENV = 'test';
-  
-  // Override environment variables for testing
-  process.env.AUTH0_DOMAIN = 'test.auth0.com';
-  process.env.AUTH0_AUDIENCE = 'https://test-api.nexus-app.de';
-  process.env.JWT_SECRET = 'test-jwt-secret-key-for-testing-purposes-only';
-  process.env.POSTGRES_DB = 'nexus_test';
-  process.env.REDIS_DB = '1'; // Use different Redis DB for tests
+  // Additional test setup if needed
 });
 
 // Clean up after all tests

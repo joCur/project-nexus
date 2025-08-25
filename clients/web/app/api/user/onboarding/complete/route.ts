@@ -17,12 +17,12 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { completedAt, userProfile, tutorialProgress } = body;
+    const { completedAt, totalDuration, userChoices, persona, finalStep, tutorialProgress } = body;
 
     // Validate required fields
-    if (!completedAt || !userProfile?.fullName || !userProfile?.preferences?.workspaceName) {
+    if (!completedAt || !userChoices || !persona) {
       return NextResponse.json(
-        { error: 'Missing required profile information' },
+        { error: 'Missing required onboarding completion data' },
         { status: 400 }
       );
     }
@@ -36,50 +36,21 @@ export async function POST(request: NextRequest) {
       console.warn('Failed to get access token, using development mode:', error);
     }
 
-    // Call backend GraphQL API for complete onboarding workflow
+    // Call backend GraphQL API for onboarding completion
     const graphqlQuery = `
-      mutation CompleteOnboardingWorkflow($input: OnboardingWorkflowCompleteInput!) {
-        completeOnboardingWorkflow(input: $input) {
-          success
-          profile {
-            id
-            fullName
-            displayName
-            timezone
-            role
-            preferences
-          }
-          onboarding {
-            id
-            completed
-            completedAt
-            finalStep
-            tutorialProgress
-          }
-          workspace {
-            id
-            name
-            privacy
-            isDefault
-          }
+      mutation CompleteOnboarding($input: OnboardingCompleteInput!) {
+        completeOnboarding(input: $input) {
+          id
+          completed
+          completedAt
+          finalStep
+          tutorialProgress
         }
       }
     `;
 
     const graphqlVariables = {
       input: {
-        userProfile: {
-          fullName: userProfile.fullName,
-          displayName: userProfile.displayName,
-          timezone: userProfile.timezone,
-          ...(userProfile.role && { role: userProfile.role.toUpperCase() }),
-          preferences: {
-            ...userProfile.preferences,
-            ...(userProfile.preferences?.privacy && { 
-              privacy: userProfile.preferences.privacy.toUpperCase() 
-            }),
-          },
-        },
         tutorialProgress: tutorialProgress || {},
       },
     };
@@ -110,28 +81,24 @@ export async function POST(request: NextRequest) {
       throw new Error('GraphQL query failed');
     }
 
-    const workflowResult = result.data.completeOnboardingWorkflow;
+    const onboardingResult = result.data.completeOnboarding;
 
     console.log('Onboarding completed:', {
       userId: session.user.sub,
       completedAt,
-      userProfile,
+      totalDuration,
+      userChoices,
+      persona,
+      finalStep,
       tutorialProgress,
-      result: workflowResult,
+      result: onboardingResult,
     });
 
     return NextResponse.json({
-      success: workflowResult.success,
+      success: true,
       message: 'Onboarding completed successfully',
-      userProfile: {
-        fullName: workflowResult.profile.fullName,
-        displayName: workflowResult.profile.displayName,
-        workspaceName: workflowResult.workspace.name,
-      },
       data: {
-        profile: workflowResult.profile,
-        onboarding: workflowResult.onboarding,
-        workspace: workflowResult.workspace,
+        onboarding: onboardingResult,
       },
     });
 

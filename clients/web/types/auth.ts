@@ -14,7 +14,6 @@ import { UserProfile } from '@auth0/nextjs-auth0/client';
 export interface Auth0JWTPayload {
   sub: string; // Auth0 user ID
   email: string;
-  email_verified: boolean;
   name?: string;
   nickname?: string;
   picture?: string;
@@ -35,11 +34,10 @@ export interface Auth0JWTPayload {
  * Extended user profile with custom claims and type safety
  * Used throughout the application for authenticated user data
  */
-export interface ExtendedUserProfile extends UserProfile {
+export interface ExtendedUserProfile {
   // Required Auth0 fields
   sub: string;
   email: string;
-  email_verified: boolean;
   
   // Optional Auth0 fields
   name?: string;
@@ -179,7 +177,9 @@ export interface AuthActions {
 /**
  * Complete authentication hook return type
  */
-export interface UseAuthReturn extends AuthState, AuthActions {}
+export interface UseAuthReturn extends AuthState, AuthActions {
+  announceAuthStatus: (message: string, priority?: 'polite' | 'assertive') => void;
+}
 
 /**
  * Permission definitions

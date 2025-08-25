@@ -1,0 +1,242 @@
+name: Mobile CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'clients/app/**'
+      - '.github/workflows/mobile-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'clients/app/**'
+      - '.github/workflows/mobile-ci.yml'
+  workflow_dispatch:
+    inputs:
+      build_apk:
+        description: 'Build APK artifacts'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  flutter-analyze:
+    name: Flutter Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+      
+      - name: Verify Flutter installation
+        run: |
+          flutter --version
+          flutter doctor -v
+      
+      - name: Cache Flutter dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            clients/app/.dart_tool
+            clients/app/build
+          key: flutter-pub-${{ hashFiles('clients/app/pubspec.lock') }}
+          restore-keys: |
+            flutter-pub-
+      
+      - name: Install Flutter dependencies
+        working-directory: clients/app
+        run: flutter pub get
+      
+      - name: Verify dependencies
+        working-directory: clients/app
+        run: flutter pub deps
+      
+      - name: Generate code (if needed)
+        working-directory: clients/app
+        run: |
+          if grep -q "build_runner" pubspec.yaml; then
+            flutter packages pub run build_runner build --delete-conflicting-outputs
+          else
+            echo "No build_runner found, skipping code generation"
+          fi
+      
+      - name: Run Flutter analyze
+        working-directory: clients/app
+        run: flutter analyze . --no-fatal-infos --no-fatal-warnings
+
+  flutter-test:
+    name: Flutter Tests
+    runs-on: ubuntu-latest
+    needs: [flutter-analyze]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+      
+      - name: Cache Flutter dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            clients/app/.dart_tool
+            clients/app/build
+          key: flutter-pub-${{ hashFiles('clients/app/pubspec.lock') }}
+          restore-keys: |
+            flutter-pub-
+      
+      - name: Install Flutter dependencies
+        working-directory: clients/app
+        run: flutter pub get
+      
+      - name: Run Flutter tests
+        working-directory: clients/app
+        env:
+          AUTH0_DOMAIN: test.auth0.com
+          AUTH0_CLIENT_ID: test_client_id_for_flutter_testing
+          AUTH0_AUDIENCE: https://api.test.nexus.app
+        run: |
+          flutter test --coverage --reporter=expanded \
+            --dart-define=AUTH0_DOMAIN=test.auth0.com \
+            --dart-define=AUTH0_CLIENT_ID=test_client_id_for_flutter_testing \
+            --dart-define=AUTH0_AUDIENCE=https://api.test.nexus.app
+      
+      - name: Upload test coverage
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-coverage-${{ github.run_number }}
+          path: clients/app/coverage/lcov.info
+          retention-days: 7
+
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    needs: [flutter-test]
+    if: github.event.inputs.build_apk != 'false'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+      
+      - name: Cache Flutter dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            clients/app/.dart_tool
+            clients/app/build
+          key: flutter-pub-${{ hashFiles('clients/app/pubspec.lock') }}
+          restore-keys: |
+            flutter-pub-
+      
+      - name: Install Flutter dependencies
+        working-directory: clients/app
+        run: flutter pub get
+      
+      - name: Build Android APK (Debug)
+        working-directory: clients/app
+        run: |
+          flutter build apk --debug \
+            --build-name=1.0.0 \
+            --build-number=${{ github.run_number }} \
+            --dart-define=AUTH0_DOMAIN=test.auth0.com \
+            --dart-define=AUTH0_CLIENT_ID=test_client_id_for_flutter_testing \
+            --dart-define=AUTH0_AUDIENCE=https://api.test.nexus.app
+      
+      - name: Build Android APK (Release)
+        if: github.ref == 'refs/heads/main'
+        working-directory: clients/app
+        run: |
+          flutter build apk --release \
+            --build-name=1.0.0 \
+            --build-number=${{ github.run_number }} \
+            --dart-define=AUTH0_DOMAIN=test.auth0.com \
+            --dart-define=AUTH0_CLIENT_ID=test_client_id_for_flutter_testing \
+            --dart-define=AUTH0_AUDIENCE=https://api.test.nexus.app
+      
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-mobile-debug-${{ github.run_number }}
+          path: clients/app/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 30
+      
+      - name: Upload Release APK
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-mobile-release-${{ github.run_number }}
+          path: clients/app/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 90
+
+  mobile-summary:
+    name: Mobile Summary
+    runs-on: ubuntu-latest
+    needs: [flutter-analyze, flutter-test, build-android]
+    if: always()
+    
+    steps:
+      - name: Generate mobile summary
+        run: |
+          echo "## 📱 Mobile Pipeline Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Flutter Analysis**: ${{ needs.flutter-analyze.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Flutter Tests**: ${{ needs.flutter-test.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Android Build**: ${{ needs.build-android.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Number**: ${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Flutter Version**: $(flutter --version | head -1 || echo 'Not available')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ needs.flutter-analyze.result }}" == "success" && "${{ needs.flutter-test.result }}" == "success" ]]; then
+            echo "✅ **Mobile pipeline passed successfully!**" >> $GITHUB_STEP_SUMMARY
+            if [[ "${{ needs.build-android.result }}" == "success" ]]; then
+              echo "📦 **APK artifacts available for download**" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "❌ **Mobile pipeline failed. Check individual jobs for details.**" >> $GITHUB_STEP_SUMMARY
+          fi

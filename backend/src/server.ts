@@ -8,7 +8,7 @@ import { useServer } from 'graphql-ws/lib/use/ws';
 import { makeExecutableSchema } from '@graphql-tools/schema';
 
 // Configuration and utilities
-import { env, db, redis } from '@/config/environment';
+import { env, db as _db, redis as _redis } from '@/config/environment';
 import logger from '@/utils/logger';
 import { setupProcessErrorHandlers } from '@/middleware/error';
 
@@ -225,7 +225,7 @@ class NexusBackendServer {
       this.apolloServer = new ApolloServer({
         schema,
         introspection: env.NODE_ENV === 'development',
-        formatError: (formattedError, error) => {
+        formatError: (formattedError, _error) => {
           logger.error('GraphQL Error', {
             message: formattedError.message,
             locations: formattedError.locations,

@@ -1,98 +1,72 @@
 'use client';
 
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { useAuth } from '@/hooks/use-auth';
 import { useOnboardingStatus } from '@/hooks/use-onboarding-status';
+import { useWorkspaceStore } from '@/stores/workspaceStore';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { InfiniteCanvas } from '@/components/canvas/InfiniteCanvas';
 
+/**
+ * Legacy workspace page - redirects to new workspace structure
+ * 
+ * This page handles:
+ * 1. Onboarding completion check
+ * 2. Default workspace ID determination
+ * 3. Redirect to /workspace/[workspaceId] route
+ * 
+ * For now, we use a placeholder workspace ID until user management is implemented
+ */
 function WorkspaceContent() {
-  const { user, logout } = useAuth();
   const router = useRouter();
   const { status: onboardingStatus, isLoading: onboardingLoading } = useOnboardingStatus();
+  const context = useWorkspaceStore((state) => state.context);
+  const setCurrentWorkspace = useWorkspaceStore((state) => state.setCurrentWorkspace);
+  const isInitialized = useWorkspaceStore((state) => state.isInitialized);
 
   // Check onboarding status and redirect if needed
   useEffect(() => {
     if (!onboardingLoading && onboardingStatus && !onboardingStatus.isComplete) {
-      // Redirect to onboarding if not completed
       router.push('/onboarding');
+      return;
     }
-  }, [onboardingLoading, onboardingStatus, router]);
 
-  // Show loading while checking onboarding status
-  if (onboardingLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
-  }
+    // If onboarding is complete, redirect to workspace with default ID
+    if (onboardingStatus?.isComplete) {
+      // Sync workspace ID from onboarding status if not already in store
+      let workspaceId = context.currentWorkspaceId;
+      
+      if (!workspaceId && onboardingStatus.workspace?.id) {
+        // Update the store with the workspace info from onboarding status
+        workspaceId = onboardingStatus.workspace.id;
+        console.log('Syncing workspace ID from onboarding status:', workspaceId);
+        setCurrentWorkspace(workspaceId, onboardingStatus.workspace.name);
+      }
+      
+      // Use the stored workspace ID from onboarding if available
+      // Otherwise fall back to default-workspace for backwards compatibility
+      const defaultWorkspaceId = workspaceId || 'default-workspace';
+      
+      // Log for debugging workspace mismatch issues
+      if (defaultWorkspaceId === 'default-workspace') {
+        console.warn('Using fallback default-workspace - user may not have completed onboarding properly');
+        console.log('Store state for debugging:', { 
+          context, 
+          isInitialized, 
+          onboardingStatus,
+          workspaceFromOnboarding: onboardingStatus.workspace 
+        });
+      }
+      
+      router.replace(`/workspace/${defaultWorkspaceId}` as any);
+    }
+  }, [onboardingLoading, onboardingStatus, router, context.currentWorkspaceId, setCurrentWorkspace, isInitialized]);
 
-  // Don't render workspace content if onboarding is not complete
-  if (!onboardingStatus?.isComplete) {
-    return null; // The useEffect will handle redirection
-  }
-
+  // Show loading while checking onboarding status or redirecting
   return (
-    <div className="h-screen bg-gray-900 flex flex-col">
-      {/* Header */}
-      <div className="flex-none bg-white shadow-sm border-b border-gray-200">
-        <div className="px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-14">
-            <div className="flex items-center space-x-4">
-              <h1 className="text-lg font-semibold text-gray-900">Project Nexus</h1>
-              <div className="text-sm text-gray-500">Knowledge Workspace</div>
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              {/* User Info */}
-              <div className="flex items-center space-x-2">
-                {user?.picture && (
-                  <img
-                    src={user.picture}
-                    alt={user.name || user.email}
-                    className="h-8 w-8 rounded-full"
-                  />
-                )}
-                <span className="text-sm text-gray-700 hidden sm:block">
-                  {user?.name || user?.email}
-                </span>
-              </div>
-              
-              {/* Logout Button */}
-              <button
-                onClick={() => logout()}
-                className="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium hover:bg-gray-200 transition-colors"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Canvas Container */}
-      <div className="flex-1 relative">
-        <InfiniteCanvas
-          className="w-full h-full"
-          showGrid={true}
-          ariaLabel="Interactive knowledge workspace canvas"
-          ariaDescription="Navigate with arrow keys to pan, plus and minus keys to zoom, space to center view"
-        />
-        
-        {/* Welcome Message */}
-        <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-4 max-w-sm pointer-events-none">
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">
-            Welcome to Your Canvas!
-          </h2>
-          <div className="text-sm text-gray-600 space-y-1">
-            <p>• Use mouse wheel to zoom</p>
-            <p>• Click and drag to pan around</p>
-            <p>• Arrow keys for keyboard navigation</p>
-            <p>• Press Space to center view</p>
-          </div>
-        </div>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+        <p className="text-gray-600">Setting up workspace...</p>
       </div>
     </div>
   );

@@ -807,7 +807,7 @@ export const connectionResolvers = {
     /**
      * Resolve source card for Connection type
      */
-    sourceCard: async (connection: Connection, _: any, context: GraphQLContext) => {
+    sourceCard: async (connection: Connection, _: any, _context: GraphQLContext) => {
       const { CardService } = await import('@/services/CardService');
       const cardService = new CardService();
       return await cardService.getCard(connection.sourceCardId);
@@ -816,7 +816,7 @@ export const connectionResolvers = {
     /**
      * Resolve target card for Connection type
      */
-    targetCard: async (connection: Connection, _: any, context: GraphQLContext) => {
+    targetCard: async (connection: Connection, _: any, _context: GraphQLContext) => {
       const { CardService } = await import('@/services/CardService');
       const cardService = new CardService();
       return await cardService.getCard(connection.targetCardId);

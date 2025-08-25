@@ -29,8 +29,7 @@ describe('useAuth', () => {
   const mockAuth0User = {
     sub: 'auth0|test-user-id',
     email: 'test@example.com',
-    email_verified: true,
-    name: 'Test User',
+        name: 'Test User',
     picture: 'https://example.com/avatar.jpg',
     updated_at: '2023-01-01T00:00:00Z',
     'https://api.nexus-app.de/roles': ['user', 'premium'],
@@ -41,8 +40,7 @@ describe('useAuth', () => {
   const expectedExtendedUser = {
     sub: 'auth0|test-user-id',
     email: 'test@example.com',
-    email_verified: true,
-    name: 'Test User',
+        name: 'Test User',
     nickname: undefined,
     picture: 'https://example.com/avatar.jpg',
     updated_at: '2023-01-01T00:00:00Z',
@@ -123,8 +121,7 @@ describe('useAuth', () => {
       const userWithoutClaims = {
         sub: 'auth0|test-user-id',
         email: 'test@example.com',
-        email_verified: true,
-        name: 'Test User',
+                name: 'Test User',
       };
 
       mockUseUser.mockReturnValue({
@@ -143,21 +140,22 @@ describe('useAuth', () => {
       });
     });
 
-    it('should handle user with missing email_verified', () => {
-      const userWithoutEmailVerified = {
+    it('should handle user with complete profile', () => {
+      const userWithCompleteProfile = {
         ...mockAuth0User,
-        email_verified: undefined,
+        name: 'Complete User',
       };
 
       mockUseUser.mockReturnValue({
-        user: userWithoutEmailVerified,
+        user: userWithCompleteProfile,
         error: null,
         isLoading: false,
       });
 
       const { result } = renderHook(() => useAuth());
 
-      expect(result.current.user?.email_verified).toBe(false);
+      expect(result.current.user?.name).toBe('Complete User');
+      expect(result.current.user?.email).toBe(mockAuth0User.email);
     });
   });
 
@@ -478,8 +476,7 @@ describe('useAuthState', () => {
       user: {
         sub: 'auth0|test-user-id',
         email: 'test@example.com',
-        email_verified: true,
-      },
+              },
       error: null,
       isLoading: false,
     });
@@ -515,8 +512,7 @@ describe('useRequireAuth', () => {
     const mockUser = {
       sub: 'auth0|test-user-id',
       email: 'test@example.com',
-      email_verified: true,
-    };
+          };
 
     mockUseUser.mockReturnValue({
       user: mockUser,

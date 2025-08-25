@@ -16,6 +16,90 @@ import { gql } from 'apollo-server-express';
 
 export const canvasTypeDefs = gql`
   # ============================================================================
+  # CANVAS ENTITY TYPES (NEX-174)
+  # ============================================================================
+
+  # Canvas entity - represents a workspace canvas container
+  type Canvas {
+    id: ID!
+    workspaceId: ID!
+    name: String!
+    description: String
+    isDefault: Boolean!
+    position: Int!
+    createdBy: ID!
+    createdAt: DateTime!
+    updatedAt: DateTime!
+    
+    # Computed/resolved fields
+    workspace: Workspace!
+    createdByUser: User!
+    cardCount: Int!
+    connectionCount: Int!
+    cards: [Card!]!
+    connections: [Connection!]!
+    stats: CanvasStats!
+  }
+
+  # Canvas creation input
+  input CreateCanvasInput {
+    workspaceId: ID!
+    name: String!
+    description: String
+    isDefault: Boolean = false
+    position: Int
+  }
+
+  # Canvas update input
+  input UpdateCanvasInput {
+    name: String
+    description: String
+    isDefault: Boolean
+    position: Int
+  }
+
+  # Canvas duplication options
+  input DuplicateCanvasInput {
+    name: String!
+    description: String
+    includeCards: Boolean = true
+    includeConnections: Boolean = true
+    position: Int
+  }
+
+  # Canvas filter options
+  input CanvasFilter {
+    name: String
+    isDefault: Boolean
+    createdBy: ID
+    createdAfter: DateTime
+    createdBefore: DateTime
+    updatedAfter: DateTime
+    updatedBefore: DateTime
+  }
+
+  # Canvas statistics
+  type CanvasStats {
+    id: ID!
+    name: String!
+    cardCount: Int!
+    connectionCount: Int!
+    lastActivity: DateTime
+    createdAt: DateTime!
+  }
+
+  # Paginated canvas results
+  type CanvasConnection {
+    items: [Canvas!]!
+    totalCount: Int!
+    page: Int!
+    limit: Int!
+    totalPages: Int!
+    hasNextPage: Boolean!
+    hasPreviousPage: Boolean!
+  }
+
+  # ============================================================================
   # CORE CANVAS TYPES
   # ============================================================================
 
@@ -415,10 +499,20 @@ export const canvasTypeDefs = gql`
   # ============================================================================
 
   extend type Query {
+    # Canvas queries (NEX-174)
+    canvas(id: ID!): Canvas @auth
+    workspaceCanvases(
+      workspaceId: ID!
+      filter: CanvasFilter
+      pagination: PaginationInput
+    ): CanvasConnection! @auth
+    defaultCanvas(workspaceId: ID!): Canvas @auth
+    
     # Card queries (aligns with frontend CardActions)
     card(id: ID!): Card
     cards(
       workspaceId: ID!
+      canvasId: ID
       filter: CardFilter
       pagination: PaginationInput
     ): CardConnection! @auth
@@ -478,6 +572,13 @@ export const canvasTypeDefs = gql`
   # ============================================================================
 
   extend type Mutation {
+    # Canvas CRUD operations (NEX-174)
+    createCanvas(input: CreateCanvasInput!): Canvas! @auth
+    updateCanvas(id: ID!, input: UpdateCanvasInput!): Canvas! @auth
+    deleteCanvas(id: ID!): Boolean! @auth
+    setDefaultCanvas(id: ID!): Canvas! @auth
+    duplicateCanvas(id: ID!, input: DuplicateCanvasInput!): Canvas! @auth
+    
     # Card CRUD operations (aligns with frontend CardActions)
     createCard(input: CreateCardInput!): Card! @auth
     updateCard(id: ID!, input: UpdateCardInput!): Card! @auth
@@ -518,11 +619,16 @@ export const canvasTypeDefs = gql`
   # ============================================================================
 
   extend type Subscription {
+    # Canvas real-time updates (NEX-174)
+    canvasCreated(workspaceId: ID!): Canvas! @auth
+    canvasUpdated(workspaceId: ID!): Canvas! @auth
+    canvasDeleted(workspaceId: ID!): ID! @auth
+    
     # Card real-time updates (aligns with frontend card state management)
-    cardCreated(workspaceId: ID!): Card! @auth
-    cardUpdated(workspaceId: ID!): Card! @auth
-    cardDeleted(workspaceId: ID!): ID! @auth
-    cardMoved(workspaceId: ID!): Card! @auth
+    cardCreated(workspaceId: ID!, canvasId: ID): Card! @auth
+    cardUpdated(workspaceId: ID!, canvasId: ID): Card! @auth
+    cardDeleted(workspaceId: ID!, canvasId: ID): ID! @auth
+    cardMoved(workspaceId: ID!, canvasId: ID): Card! @auth
     
     # Connection real-time updates
     connectionCreated(workspaceId: ID!): Connection! @auth
