@@ -15,14 +15,11 @@ export interface Auth0User {
   exp: number; // expires at
   scope: string; // OAuth scopes
   
-  // Email can come from either custom claims (production) or standard field (tests)
-  email?: string; // For tests and some Auth0 configurations
-  'https://api.nexus-app.de/email'?: string; // Email from custom claims (production)
-  
-  // Custom claims (set via Auth0 Rules/Actions)
-  'https://api.nexus-app.de/roles'?: string[];
-  'https://api.nexus-app.de/permissions'?: string[];
-  'https://api.nexus-app.de/user_id'?: string; // Internal user ID
+  // Clean field names mapped from custom claims and standard fields
+  email?: string; // Email from custom claims or standard field
+  roles?: string[]; // User roles from custom claims
+  permissions?: string[]; // User permissions from custom claims
+  userId?: string; // Internal user ID from custom claims
 }
 
 export interface User {

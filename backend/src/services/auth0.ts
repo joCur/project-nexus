@@ -80,12 +80,11 @@ export class Auth0Service {
       // Email verification is handled by Auth0 during authentication
       // If we receive a valid JWT token, Auth0 has already enforced its verification requirements
 
-      // Map to Auth0User interface
+      // Map to Auth0User interface with clean field names
       const auth0User: Auth0User = {
         sub: payload.sub as string,
         username: payload.username as string,
         name: payload.name as string,
-        'https://api.nexus-app.de/email': payload['https://api.nexus-app.de/email'] as string,
         picture: payload.picture as string,
         updated_at: payload.updated_at as string,
         iss: payload.iss,
@@ -94,10 +93,11 @@ export class Auth0Service {
         exp: payload.exp,
         scope: payload.scope,
         
-        // Extract custom claims
-        'https://api.nexus-app.de/roles': payload['https://api.nexus-app.de/roles'] as string[] | undefined,
-        'https://api.nexus-app.de/permissions': payload['https://api.nexus-app.de/permissions'] as string[] | undefined,
-        'https://api.nexus-app.de/user_id': payload['https://api.nexus-app.de/user_id'] as string | undefined,
+        // Map custom claims to clean field names, with fallbacks to standard fields
+        email: payload['https://api.nexus-app.de/email'] as string || payload.email as string,
+        roles: payload['https://api.nexus-app.de/roles'] as string[] | undefined,
+        permissions: payload['https://api.nexus-app.de/permissions'] as string[] | undefined,
+        userId: payload['https://api.nexus-app.de/user_id'] as string | undefined,
       };
 
       const duration = Date.now() - startTime;
@@ -106,11 +106,11 @@ export class Auth0Service {
       });
 
       securityLogger.authSuccess(
-        auth0User['https://api.nexus-app.de/user_id'] || 'unknown',
+        auth0User.userId || 'unknown',
         auth0User.sub,
         { 
-          email: auth0User['https://api.nexus-app.de/email'] || auth0User.email,
-          roles: auth0User['https://api.nexus-app.de/roles'],
+          email: auth0User.email,
+          roles: auth0User.roles,
           tokenExp: new Date(auth0User.exp * 1000).toISOString(),
         }
       );
@@ -173,13 +173,13 @@ export class Auth0Service {
       const fallbackEmail = `${sanitizedAuth0Id}@nexus.local`;
       
       const userData = {
-        email: auth0User['https://api.nexus-app.de/email'] || auth0User.email || fallbackEmail,
+        email: auth0User.email || fallbackEmail,
         auth0UserId: auth0User.sub,
         emailVerified: true, // Since we're getting email from custom claims, assume verified
         displayName: auth0User.name || auth0User.username || 'User',
         avatarUrl: auth0User.picture,
-        roles: auth0User['https://api.nexus-app.de/roles'] || [],
-        permissions: auth0User['https://api.nexus-app.de/permissions'] || [],
+        roles: auth0User.roles || [],
+        permissions: auth0User.permissions || [],
         lastLogin: new Date(),
       };
 

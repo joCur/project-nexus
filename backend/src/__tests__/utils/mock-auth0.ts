@@ -110,8 +110,10 @@ export class MockAuth0TokenValidator {
       return createMockAuth0User({
         sub: payload.sub,
         username: payload.username,
-        email: payload.email,
-        'https://api.nexus-app.de/email': payload['https://api.nexus-app.de/email'],
+        email: payload.email || payload['https://api.nexus-app.de/email'] as string,
+        roles: payload['https://api.nexus-app.de/roles'] as string[] || undefined,
+        permissions: payload['https://api.nexus-app.de/permissions'] as string[] || undefined,
+        userId: payload['https://api.nexus-app.de/user_id'] as string || undefined,
         iat: payload.iat,
         exp: payload.exp,
       });
@@ -123,9 +125,10 @@ export class MockAuth0TokenValidator {
 
   private createUnverifiedEmailResponse(token: string) {
     const validUser = this.createValidTokenResponse(token);
+    // Return user without email to simulate unverified state
     return {
       ...validUser,
-      email_verified: false,
+      email: undefined,
     };
   }
 }

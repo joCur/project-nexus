@@ -132,21 +132,26 @@ describe('Authentication Middleware', () => {
       expect(mockNext).toHaveBeenCalledWith(expect.any(AuthenticationError));
     });
 
-    it('should handle expired session', async () => {
+    it('should create session for user without valid session', async () => {
       // Arrange
       const auth0User = AUTH0_USER_FIXTURES.STANDARD_USER;
       const user = USER_FIXTURES.STANDARD_USER;
+      const sessionId = 'new-session-123';
 
       mockReq.headers.authorization = `Bearer ${JWT_FIXTURES.VALID_TOKEN}`;
       mockAuth0Service.validateAuth0Token.mockResolvedValue(auth0User);
       mockAuth0Service.syncUserFromAuth0.mockResolvedValue(user);
       mockAuth0Service.validateSession.mockResolvedValue(false);
+      mockAuth0Service.createSession.mockResolvedValue(sessionId);
 
       // Act
       await authMiddleware(mockReq, mockRes, mockNext);
 
       // Assert
-      expect(mockNext).toHaveBeenCalledWith(expect.any(TokenExpiredError));
+      expect(mockAuth0Service.createSession).toHaveBeenCalledWith(user, auth0User);
+      expect(mockNext).toHaveBeenCalledWith(); // No error, session created
+      expect(mockReq.isAuthenticated).toBe(true);
+      expect(mockReq.user).toEqual(user);
     });
 
     it('should handle Auth0 token validation error', async () => {

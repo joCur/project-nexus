@@ -89,9 +89,9 @@ export const AUTH0_USER_FIXTURES = {
     email: 'john.doe@example.com',
     name: 'John Doe',
     picture: 'https://example.com/avatars/john.jpg',
-    'https://api.nexus-app.de/roles': ['user'],
-    'https://api.nexus-app.de/permissions': ['card:read', 'workspace:read'],
-    'https://api.nexus-app.de/user_id': 'user-123-uuid',
+    roles: ['user'],
+    permissions: ['card:read', 'workspace:read'],
+    userId: 'user-123-uuid',
   }),
 
   ADMIN_USER: createMockAuth0User({
@@ -100,13 +100,13 @@ export const AUTH0_USER_FIXTURES = {
     email: 'admin@example.com',
     name: 'Admin User',
     picture: 'https://example.com/avatars/admin.jpg',
-    'https://api.nexus-app.de/roles': ['super_admin'],
-    'https://api.nexus-app.de/permissions': [
+    roles: ['super_admin'],
+    permissions: [
       'card:create', 'card:read', 'card:update', 'card:delete',
       'workspace:create', 'workspace:read', 'workspace:update', 'workspace:delete',
       'admin:user_management', 'admin:system_settings'
     ],
-    'https://api.nexus-app.de/user_id': 'admin-456-uuid',
+    userId: 'admin-456-uuid',
   }),
 
   WORKSPACE_OWNER: createMockAuth0User({
@@ -115,12 +115,12 @@ export const AUTH0_USER_FIXTURES = {
     email: 'owner@example.com',
     name: 'Workspace Owner',
     picture: 'https://example.com/avatars/owner.jpg',
-    'https://api.nexus-app.de/roles': ['workspace_owner'],
-    'https://api.nexus-app.de/permissions': [
+    roles: ['workspace_owner'],
+    permissions: [
       'card:create', 'card:read', 'card:update', 'card:delete',
       'workspace:read', 'workspace:update', 'workspace:invite', 'workspace:manage_members'
     ],
-    'https://api.nexus-app.de/user_id': 'owner-789-uuid',
+    userId: 'owner-789-uuid',
   }),
 
   UNVERIFIED_USER: createMockAuth0User({
@@ -129,9 +129,9 @@ export const AUTH0_USER_FIXTURES = {
     email: 'unverified@example.com',
     name: 'Unverified User',
     picture: 'https://example.com/avatars/unverified.jpg',
-    'https://api.nexus-app.de/roles': ['user'],
-    'https://api.nexus-app.de/permissions': ['card:read', 'workspace:read'],
-    'https://api.nexus-app.de/user_id': 'unverified-555-uuid',
+    roles: ['user'],
+    permissions: ['card:read', 'workspace:read'],
+    userId: 'unverified-555-uuid',
   }),
 };
 

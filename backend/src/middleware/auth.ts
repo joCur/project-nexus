@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { 
   AuthenticationError, 
   AuthorizationError, 
+  TokenExpiredError,
   InvalidTokenError 
 } from '@/utils/errors';
 import { securityLogger } from '@/utils/logger';

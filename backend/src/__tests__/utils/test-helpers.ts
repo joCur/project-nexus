@@ -94,9 +94,9 @@ export function createMockAuth0User(overrides: Partial<Auth0User> = {}): Auth0Us
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + 3600,
     scope: 'openid profile email',
-    'https://api.nexus-app.de/roles': ['user'],
-    'https://api.nexus-app.de/permissions': ['card:read', 'workspace:read'],
-    'https://api.nexus-app.de/user_id': randomUUID(),
+    roles: ['user'],
+    permissions: ['card:read', 'workspace:read'],
+    userId: randomUUID(),
     ...overrides,
   };
 }

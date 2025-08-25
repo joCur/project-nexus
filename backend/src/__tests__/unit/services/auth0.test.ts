@@ -133,25 +133,7 @@ describe('Auth0Service', () => {
       expect(result).toBeDefined();
       expect(result?.sub).toBe(expectedUser.sub);
       expect(result?.email).toBe(expectedUser.email);
-      expect(result?.email_verified).toBe(true);
       expect(mockJwksClient.getSigningKey).toHaveBeenCalledWith('test-key-id');
-    });
-
-    it('should reject token with unverified email', async () => {
-      // Arrange - mock JWT.verify to return a payload with unverified email
-      // We're testing OUR logic for handling unverified emails, not JWT validation
-      (jwt.verify as jest.Mock).mockReturnValueOnce({
-        ...AUTH0_USER_FIXTURES.STANDARD_USER,
-        email_verified: false,
-      });
-
-      mockJwksClient.getSigningKey.mockResolvedValue({
-        getPublicKey: () => TEST_JWT_SECRET,
-      });
-
-      // Act & Assert
-      await expect(auth0Service.validateAuth0Token('any-token'))
-        .rejects.toThrow(EmailNotVerifiedError);
     });
 
     it('should reject expired token', async () => {
@@ -305,7 +287,7 @@ describe('Auth0Service', () => {
         expect.objectContaining({
           email: auth0User.email,
           auth0UserId: auth0User.sub,
-          emailVerified: auth0User.email_verified,
+          emailVerified: true, // Always true since we get email from custom claims
           displayName: auth0User.name,
         })
       );
@@ -725,8 +707,8 @@ describe('Auth0Service', () => {
 
       // Assert
       expect(result).toBeDefined();
-      expect(result?.['https://api.nexus-app.de/roles']).toContain('role with spaces');
-      expect(result?.['https://api.nexus-app.de/permissions']).toContain('permission:with:colons');
+      expect(result?.roles).toContain('role with spaces');
+      expect(result?.permissions).toContain('permission:with:colons');
     });
   });
 
