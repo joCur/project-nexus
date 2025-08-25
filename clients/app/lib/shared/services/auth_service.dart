@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:developer' as dev;
 
-import 'package:auth0_flutter/auth0_flutter.dart';
+import 'package:auth0_flutter/auth0_flutter.dart' as auth0;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -9,6 +9,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../core/errors/failures.dart';
 import '../../core/platform/environment.dart';
 import '../../core/utils/result.dart';
+import '../models/user_profile.dart';
 
 part 'auth_service.g.dart';
 
@@ -18,11 +19,11 @@ AuthService authService(Ref ref) {
 }
 
 class AuthService {
-  late final Auth0 _auth0;
+  late final auth0.Auth0 _auth0;
   late final FlutterSecureStorage _storage;
 
   AuthService() {
-    _auth0 = Auth0(
+    _auth0 = auth0.Auth0(
       AppEnvironment.auth0Domain,
       AppEnvironment.auth0ClientId,
     );
@@ -55,12 +56,24 @@ class AuthService {
 
       await _storeCredentials(credentials);
       
-      final user = await _auth0.api.userProfile(accessToken: credentials.accessToken);
+      final auth0User = await _auth0.api.userProfile(accessToken: credentials.accessToken);
+      
+      // Convert Auth0 User to our UserProfile
+      final user = UserProfile(
+        sub: auth0User.sub,
+        email: auth0User.email,
+        name: auth0User.name,
+        picture: auth0User.pictureUrl.toString(),
+        nickname: auth0User.nickname,
+        emailVerified: auth0User.isEmailVerified,
+        updatedAt: auth0User.updatedAt,
+      );
+      
       await _storeUserProfile(user);
 
       return Success(user);
     } catch (error) {
-      if (error is WebAuthenticationException) {
+      if (error is auth0.WebAuthenticationException) {
         if (error.code == 'a0.authentication_canceled' || error.code == 'a0.authentication_cancelled') {
           return Error(AuthFailure.loginCancelled());
         }
@@ -127,7 +140,7 @@ class AuthService {
   }
 
   /// Store credentials securely
-  Future<void> _storeCredentials(Credentials credentials) async {
+  Future<void> _storeCredentials(auth0.Credentials credentials) async {
     await Future.wait([
       _storage.write(key: _accessTokenKey, value: credentials.accessToken),
       if (credentials.refreshToken != null)

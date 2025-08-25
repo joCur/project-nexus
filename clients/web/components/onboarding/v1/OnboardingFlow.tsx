@@ -77,7 +77,7 @@ const TOTAL_STEPS = 3;
 
 export const OnboardingFlow: React.FC = () => {
   const router = useRouter();
-  const { user } = useAuth();
+  const { } = useAuth();
   const { setCurrentWorkspace } = useWorkspaceStore();
   const [updateOnboardingProgress] = useMutation(UPDATE_ONBOARDING_PROGRESS);
   const [completeOnboardingWorkflow] = useMutation(COMPLETE_ONBOARDING_WORKFLOW);
@@ -113,7 +113,7 @@ export const OnboardingFlow: React.FC = () => {
       ...prev,
       tutorialProgress: { ...prev.tutorialProgress, ...progress },
     }));
-  }, []);
+  }, [state]);
 
   const completeOnboarding = useCallback(async (currentState: OnboardingState) => {
     try {
@@ -239,7 +239,7 @@ export const OnboardingFlow: React.FC = () => {
                 Welcome to Project Nexus
               </h1>
               <p className="text-sm text-text-secondary">
-                Let's set up your knowledge workspace
+                Let&apos;s set up your knowledge workspace
               </p>
             </div>
             

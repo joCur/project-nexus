@@ -1,0 +1,208 @@
+name: Security CI
+
+on:
+  pull_request:
+    branches: [main]
+    # Run on all changes to ensure security coverage
+  push:
+    branches: [main]
+  schedule:
+    # Run weekly security scan on Sundays at 2 AM UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+    inputs:
+      deep_scan:
+        description: 'Run comprehensive security scan'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  vulnerability-scan:
+    name: Vulnerability Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '0'  # Don't fail the workflow on vulnerabilities
+      
+      - name: Run Trivy config scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-config-results.sarif'
+          exit-code: '0'
+        continue-on-error: true
+      
+      - name: Upload Trivy results to GitHub Security
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: github/codeql-action/upload-sarif@v3
+        continue-on-error: true
+        with:
+          sarif_file: 'trivy-results.sarif'
+          category: 'trivy-vulnerabilities'
+      
+      - name: Upload Trivy config results to GitHub Security
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: github/codeql-action/upload-sarif@v3
+        continue-on-error: true
+        with:
+          sarif_file: 'trivy-config-results.sarif'
+          category: 'trivy-configuration'
+
+  secret-scan:
+    name: Secret Detection
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for comprehensive scan
+      
+      - name: Check for secrets (Pull Request)
+        if: github.event_name == 'pull_request'
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.pull_request.base.sha }}
+          head: ${{ github.event.pull_request.head.sha }}
+          extra_args: --debug --only-verified
+      
+      - name: Check for secrets (Push)
+        if: github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000'
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.before }}
+          head: ${{ github.event.after }}
+          extra_args: --debug --only-verified
+      
+      - name: Check for secrets (Full Scan)
+        if: |
+          github.event_name == 'workflow_dispatch' ||
+          github.event_name == 'schedule' ||
+          (github.event_name == 'push' && github.event.before == '0000000000000000000000000000000000000000')
+        uses: trufflesecurity/trufflehog@main
+        continue-on-error: true
+        with:
+          path: ./
+          extra_args: --debug --only-verified
+
+  dependency-check:
+    name: Dependency Security
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        project: [backend, web]
+        include:
+          - project: backend
+            path: backend
+            node_version: '22'
+          - project: web
+            path: clients/web
+            node_version: '18'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node_version }}
+          cache: 'npm'
+          cache-dependency-path: ${{ matrix.path }}/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: ${{ matrix.path }}
+        run: npm ci --audit
+      
+      - name: Run npm audit
+        working-directory: ${{ matrix.path }}
+        run: |
+          npm audit --audit-level moderate || echo "Audit completed with findings"
+          npm audit --json > npm-audit-${{ matrix.project }}.json || true
+        continue-on-error: true
+      
+      - name: Upload audit results
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-audit-${{ matrix.project }}-${{ github.run_number }}
+          path: ${{ matrix.path }}/npm-audit-${{ matrix.project }}.json
+          retention-days: 30
+        continue-on-error: true
+
+  docker-security:
+    name: Docker Security Scan
+    runs-on: ubuntu-latest
+    if: github.event.inputs.deep_scan == 'true' || github.event_name == 'schedule'
+    strategy:
+      matrix:
+        dockerfile: [backend/Dockerfile, clients/web/Dockerfile]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Run Trivy on Dockerfile
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: ${{ matrix.dockerfile }}
+          format: 'sarif'
+          output: 'docker-${{ matrix.dockerfile }}-results.sarif'
+        continue-on-error: true
+      
+      - name: Upload Docker scan results
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-security-${{ hashFiles(matrix.dockerfile) }}-${{ github.run_number }}
+          path: 'docker-${{ matrix.dockerfile }}-results.sarif'
+          retention-days: 30
+        continue-on-error: true
+
+  security-summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    needs: [vulnerability-scan, secret-scan, dependency-check]
+    if: always()
+    
+    steps:
+      - name: Generate security summary
+        run: |
+          echo "## 🔒 Security Pipeline Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Vulnerability Scan**: ${{ needs.vulnerability-scan.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Secret Detection**: ${{ needs.secret-scan.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Dependency Check**: ${{ needs.dependency-check.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+            echo "🕐 **Scheduled weekly security scan completed**" >> $GITHUB_STEP_SUMMARY
+          elif [[ "${{ github.event.inputs.deep_scan }}" == "true" ]]; then
+            echo "🔍 **Deep security scan completed**" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Scan Date**: $(date --iso-8601=seconds)" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📊 **Security artifacts and SARIF reports uploaded to GitHub Security tab**" >> $GITHUB_STEP_SUMMARY

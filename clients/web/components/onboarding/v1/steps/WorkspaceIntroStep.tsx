@@ -19,7 +19,6 @@ interface WorkspaceIntroStepProps {
 
 export const WorkspaceIntroStep: React.FC<WorkspaceIntroStepProps> = ({
   workspaceName,
-  tutorialProgress,
   onProgressUpdate,
   onNext,
 }) => {
@@ -153,7 +152,7 @@ export const WorkspaceIntroStep: React.FC<WorkspaceIntroStepProps> = ({
           Welcome to {workspaceName}
         </h2>
         <p className="text-text-secondary">
-          Let's take a quick tour of your new workspace and its basic features.
+          Let&apos;s take a quick tour of your new workspace and its basic features.
         </p>
       </div>
 
@@ -204,7 +203,7 @@ export const WorkspaceIntroStep: React.FC<WorkspaceIntroStepProps> = ({
       {/* What's Available Now */}
       <div className="bg-success-50 border border-success-200 rounded-lg p-4 mb-6">
         <h3 className="font-semibold text-success-700 mb-2">
-          What's available in v1:
+          What&apos;s available in v1:
         </h3>
         <ul className="text-sm text-success-600 space-y-1">
           <li>• Create and edit text-based knowledge cards</li>
@@ -241,7 +240,7 @@ export const WorkspaceIntroStep: React.FC<WorkspaceIntroStepProps> = ({
           variant="primary"
           size="large"
         >
-          {hasCreatedCard ? 'Great! Let\'s Continue' : 'Continue to Workspace'}
+          {hasCreatedCard ? 'Great! Let&apos;s Continue' : 'Continue to Workspace'}
         </Button>
       </div>
     </div>

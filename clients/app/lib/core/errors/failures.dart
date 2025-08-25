@@ -3,59 +3,59 @@ abstract class Failure {
 }
 
 class ServerFailure extends Failure {
+  final String message;
+  final int? statusCode;
+
   const ServerFailure({
     required this.message,
     this.statusCode,
   });
-
-  final String message;
-  final int? statusCode;
 
   @override
   String toString() => 'ServerFailure(message: $message, statusCode: $statusCode)';
 }
 
 class NetworkFailure extends Failure {
+  final String message;
+
   const NetworkFailure({
     required this.message,
   });
-
-  final String message;
 
   @override
   String toString() => 'NetworkFailure(message: $message)';
 }
 
 class CacheFailure extends Failure {
+  final String message;
+
   const CacheFailure({
     required this.message,
   });
-
-  final String message;
 
   @override
   String toString() => 'CacheFailure(message: $message)';
 }
 
 class ValidationFailure extends Failure {
+  final String message;
+
   const ValidationFailure({
     required this.message,
   });
-
-  final String message;
 
   @override
   String toString() => 'ValidationFailure(message: $message)';
 }
 
 class AuthFailure extends Failure {
+  final String message;
+  final String code;
+
   const AuthFailure({
     required this.message,
     required this.code,
   });
-
-  final String message;
-  final String code;
 
   factory AuthFailure.loginFailed(String message) =>
       AuthFailure(message: 'Login failed: $message', code: 'login_failed');

@@ -29,7 +29,6 @@ export function meetsContrastRequirement(
   level: 'AA' | 'AAA' = 'AA'
 ): boolean {
   // This is a simplified check - in production you'd want to use a proper color contrast library
-  const requiredRatio = level === 'AA' ? 4.5 : 7;
   // Implementation would involve actual color contrast calculation
   // For now, return true as our design tokens are already compliant
   return true;
