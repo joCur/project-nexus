@@ -8,7 +8,7 @@ import { createContextLogger } from '@/utils/logger';
 import { GraphQLContext } from '@/types';
 import { CanvasService } from '@/services/canvas';
 import { CardService } from '@/services/CardService';
-import { ConnectionService } from '@/services/ConnectionService';
+import { ConnectionService as _ConnectionService } from '@/services/ConnectionService';
 import { 
   Canvas,
   CreateCanvasInput,

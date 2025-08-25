@@ -7,14 +7,14 @@ import {
   CardPositionUpdate,
   BatchCardUpdate,
   ImportCardData,
-  CardType,
+  CardType as _CardType,
   CardStatus,
   BatchOperationResult
 } from '@/types/CardTypes';
 import { 
   NotFoundError, 
   ValidationError,
-  UniqueConstraintError 
+  UniqueConstraintError as _UniqueConstraintError 
 } from '@/utils/errors';
 import { createContextLogger } from '@/utils/logger';
 import { CardValidator } from '@/validators/CardValidators';

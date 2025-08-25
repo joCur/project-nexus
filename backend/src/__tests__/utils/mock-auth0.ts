@@ -109,8 +109,9 @@ export class MockAuth0TokenValidator {
       const payload = decoded.payload as Auth0TokenPayload;
       return createMockAuth0User({
         sub: payload.sub,
+        username: payload.username,
         email: payload.email,
-        email_verified: payload.email_verified,
+        'https://api.nexus-app.de/email': payload['https://api.nexus-app.de/email'],
         iat: payload.iat,
         exp: payload.exp,
       });

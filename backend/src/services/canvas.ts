@@ -17,7 +17,7 @@ import {
 import { 
   NotFoundError, 
   ValidationError,
-  UniqueConstraintError,
+  UniqueConstraintError as _UniqueConstraintError,
   ConflictError
 } from '@/utils/errors';
 import { createContextLogger } from '@/utils/logger';
@@ -461,7 +461,7 @@ export class CanvasService {
       );
 
       // Create new canvas using transaction for atomicity
-      return await database.transaction(async (trx) => {
+      return await database.transaction(async (_trx) => {
         // Create the new canvas
         const newCanvas = await this.createCanvas({
           workspaceId: sourceCanvas.workspaceId,

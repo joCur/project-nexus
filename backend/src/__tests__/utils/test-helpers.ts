@@ -1,6 +1,11 @@
 import jwt from 'jsonwebtoken';
 import { Auth0User, Auth0TokenPayload, User } from '@/types/auth';
 import { randomUUID } from 'crypto';
+import express from 'express';
+import { ApolloServer } from '@apollo/server';
+import { expressMiddleware } from '@apollo/server/express4';
+import { typeDefs } from '@/graphql/typeDefs';
+import { resolvers } from '@/resolvers';
 
 /**
  * Test helper utilities for authentication testing
@@ -80,9 +85,8 @@ export function createMockAuth0User(overrides: Partial<Auth0User> = {}): Auth0Us
   return {
     sub: 'auth0|test_user_123',
     email: 'test@example.com',
-    email_verified: true,
+    username: 'testuser',
     name: 'Test User',
-    nickname: 'testuser',
     picture: 'https://example.com/avatar.jpg',
     updated_at: new Date().toISOString(),
     iss: TEST_AUTH0_CONFIG.issuer,
@@ -558,9 +562,7 @@ export const ERROR_SCENARIOS = {
 export let testMockServices: any = {};
 
 export async function createTestApp() {
-  const express = require('express');
-  const { ApolloServer } = require('@apollo/server');
-  const { expressMiddleware } = require('@apollo/server/express4');
+  // Using imported modules
   
   const app = express();
   app.use(express.json());
@@ -576,12 +578,10 @@ export async function createTestApp() {
     canvasService: createMockCanvasService(),
   };
   
-  // Import actual schema and resolvers
-  const { typeDefs } = require('@/graphql/typeDefs');
-  const { resolvers } = require('@/resolvers');
+  // Using imported schema and resolvers
   
   // Mock authentication middleware
-  app.use('/graphql', (req, res, next) => {
+  app.use('/graphql', (req: any, res: any, next: any) => {
     const auth = req.headers.authorization;
     const userSub = req.headers['x-user-sub'];
     const userEmail = req.headers['x-user-email'];
@@ -614,7 +614,7 @@ export async function createTestApp() {
   
   // GraphQL endpoint
   app.use('/graphql', expressMiddleware(server, {
-    context: async ({ req }) => ({
+    context: async ({ req }: { req: any }) => ({
       isAuthenticated: req.isAuthenticated,
       user: req.user,
       permissions: req.permissions,

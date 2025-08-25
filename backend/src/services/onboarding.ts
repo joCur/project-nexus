@@ -1,6 +1,6 @@
 import { database, knex } from '@/database/connection';
 import { 
-  NotFoundError, 
+  NotFoundError as _NotFoundError, 
   ValidationError 
 } from '@/utils/errors';
 import { createContextLogger } from '@/utils/logger';

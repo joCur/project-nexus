@@ -100,7 +100,7 @@ export const workspaceResolvers = {
       const ownedWorkspaces = await workspaceService.getWorkspacesByOwnerId(context.user!.id);
 
       // Get workspaces where user is a member (but not owner)
-      const memberWorkspaces = await authService.getWorkspaceMembers(''); // We'll need to implement this method
+      const _memberWorkspaces = await authService.getWorkspaceMembers(''); // We'll need to implement this method
       
       // For now, just return owned workspaces
       // TODO: Implement method to get all workspaces where user is a member

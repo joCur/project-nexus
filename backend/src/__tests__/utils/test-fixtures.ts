@@ -85,10 +85,9 @@ export const JWT_FIXTURES = {
 export const AUTH0_USER_FIXTURES = {
   STANDARD_USER: createMockAuth0User({
     sub: 'auth0|test_user_123',
+    username: 'johndoe',
     email: 'john.doe@example.com',
-    email_verified: true,
     name: 'John Doe',
-    nickname: 'johndoe',
     picture: 'https://example.com/avatars/john.jpg',
     'https://api.nexus-app.de/roles': ['user'],
     'https://api.nexus-app.de/permissions': ['card:read', 'workspace:read'],
@@ -97,10 +96,9 @@ export const AUTH0_USER_FIXTURES = {
 
   ADMIN_USER: createMockAuth0User({
     sub: 'auth0|admin_user_456',
+    username: 'admin',
     email: 'admin@example.com',
-    email_verified: true,
     name: 'Admin User',
-    nickname: 'admin',
     picture: 'https://example.com/avatars/admin.jpg',
     'https://api.nexus-app.de/roles': ['super_admin'],
     'https://api.nexus-app.de/permissions': [
@@ -113,10 +111,9 @@ export const AUTH0_USER_FIXTURES = {
 
   WORKSPACE_OWNER: createMockAuth0User({
     sub: 'auth0|workspace_owner_789',
+    username: 'owner',
     email: 'owner@example.com',
-    email_verified: true,
     name: 'Workspace Owner',
-    nickname: 'owner',
     picture: 'https://example.com/avatars/owner.jpg',
     'https://api.nexus-app.de/roles': ['workspace_owner'],
     'https://api.nexus-app.de/permissions': [
@@ -128,10 +125,9 @@ export const AUTH0_USER_FIXTURES = {
 
   UNVERIFIED_USER: createMockAuth0User({
     sub: 'auth0|unverified_user_555',
+    username: 'unverified',
     email: 'unverified@example.com',
-    email_verified: false,
     name: 'Unverified User',
-    nickname: 'unverified',
     picture: 'https://example.com/avatars/unverified.jpg',
     'https://api.nexus-app.de/roles': ['user'],
     'https://api.nexus-app.de/permissions': ['card:read', 'workspace:read'],
