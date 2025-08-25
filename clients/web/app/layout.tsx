@@ -1,5 +1,7 @@
 import { UserProvider } from '@auth0/nextjs-auth0/client';
 import { Inter } from 'next/font/google';
+import { ApolloProvider } from '@/components/providers/ApolloProvider';
+import { userProviderProps } from '@/lib/auth0-config';
 import '@/styles/globals.css';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -21,8 +23,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={inter.className}>
       <body className="bg-gray-50 text-gray-900 antialiased">
-        <UserProvider>
-          {children}
+        <UserProvider {...userProviderProps}>
+          <ApolloProvider>
+            {children}
+          </ApolloProvider>
         </UserProvider>
       </body>
     </html>

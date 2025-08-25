@@ -166,16 +166,16 @@ export const Modal: React.FC<ModalProps> = ({
     // Save current focus
     focusRestorerRef.current.save();
 
-    // Set up focus trapping
-    let cleanupFocusTrap: (() => void) | undefined;
-    if (modalRef.current) {
-      cleanupFocusTrap = trapFocus(modalRef.current);
-    }
-
-    // Focus initial element or first focusable element
+    // Focus initial element or specific element first
     const focusTarget = initialFocus?.current;
     if (focusTarget) {
       focusTarget.focus();
+    }
+
+    // Set up focus trapping (skip initial focus if we already focused something)
+    let cleanupFocusTrap: (() => void) | undefined;
+    if (modalRef.current) {
+      cleanupFocusTrap = trapFocus(modalRef.current, !!focusTarget);
     }
 
     // Add escape key listener

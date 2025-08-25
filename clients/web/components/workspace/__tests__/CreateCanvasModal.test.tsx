@@ -10,13 +10,27 @@ import { CreateCanvasModal } from '../CreateCanvasModal';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
 
 // Mock dependencies
-jest.mock('next/navigation');
+jest.mock('next/navigation', () => ({
+  useRouter: jest.fn(),
+}));
 jest.mock('@/stores/workspaceStore');
+jest.mock('@/hooks/use-canvas');
+jest.mock('@apollo/client', () => ({
+  ...jest.requireActual('@apollo/client'),
+  useQuery: jest.fn(),
+  useMutation: jest.fn(),
+}));
 
 // Mock UI components - simplified mocks for testing
 jest.mock('@/components/ui', () => {
-  const MockModal = ({ children, isOpen }: any) => 
-    isOpen ? <div data-testid="modal">{children}</div> : null;
+  const MockModal = ({ children, isOpen, initialFocus, size }: any) => {
+    React.useEffect(() => {
+      if (isOpen && initialFocus?.current) {
+        initialFocus.current.focus();
+      }
+    }, [isOpen, initialFocus]);
+    return isOpen ? <div data-testid="modal" data-size={size}>{children}</div> : null;
+  };
     
   const MockButton = ({ children, onClick, disabled, variant, type, ...props }: any) => (
     <button 
@@ -30,17 +44,20 @@ jest.mock('@/components/ui', () => {
     </button>
   );
   
-  const MockInput = ({ value, onChange, disabled, state, placeholder, id, ...props }: any) => (
+  const MockInput = React.forwardRef<HTMLInputElement, any>(({ value, onChange, onBlur, disabled, state, placeholder, id, ...props }, ref) => (
     <input
+      ref={ref}
       value={value}
       onChange={onChange}
+      onBlur={onBlur}
       disabled={disabled}
       data-state={state}
       placeholder={placeholder}
       id={id}
       {...props}
     />
-  );
+  ));
+  MockInput.displayName = 'MockInput';
 
   return {
     Modal: MockModal,
@@ -54,11 +71,15 @@ jest.mock('@/components/ui', () => {
 });
 
 const mockPush = jest.fn();
-const mockUseRouter = useRouter as jest.MockedFunction<typeof useRouter>;
+const mockUseRouter = useRouter as jest.Mock;
 const mockUseWorkspaceStore = useWorkspaceStore as jest.MockedFunction<typeof useWorkspaceStore>;
 
 const mockCreateCanvas = jest.fn();
 const mockSetDefaultCanvas = jest.fn();
+const mockSetCurrentCanvas = jest.fn();
+
+// Import and mock the canvas hooks after mocking
+require('@/hooks/use-canvas');
 
 describe('CreateCanvasModal', () => {
   const defaultProps = {
@@ -81,8 +102,7 @@ describe('CreateCanvasModal', () => {
 
     mockUseWorkspaceStore.mockImplementation((selector?: any) => {
       const mockStore = {
-        createCanvas: mockCreateCanvas,
-        setDefaultCanvas: mockSetDefaultCanvas,
+        setCurrentCanvas: mockSetCurrentCanvas,
         canvasManagement: {
           loadingStates: {
             creatingCanvas: false,
@@ -97,6 +117,26 @@ describe('CreateCanvasModal', () => {
       }
       
       return selector(mockStore);
+    });
+
+    // Mock canvas hooks
+    const { useCreateCanvas, useSetDefaultCanvas } = require('@/hooks/use-canvas');
+    
+    mockCreateCanvas.mockResolvedValue('canvas-123');
+    mockSetDefaultCanvas.mockResolvedValue(true);
+    
+    (useCreateCanvas as jest.Mock).mockReturnValue({
+      mutate: mockCreateCanvas,
+      loading: false,
+      error: null,
+      reset: jest.fn(),
+    });
+    
+    (useSetDefaultCanvas as jest.Mock).mockReturnValue({
+      mutate: mockSetDefaultCanvas,
+      loading: false,
+      error: null,
+      reset: jest.fn(),
     });
 
     mockCreateCanvas.mockResolvedValue('new-canvas-id');

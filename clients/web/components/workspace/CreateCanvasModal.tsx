@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
+import { useCreateCanvas, useSetDefaultCanvas } from '@/hooks/use-canvas';
 import { Modal, ModalHeader, ModalTitle, ModalContent, ModalFooter, Button, Input } from '@/components/ui';
 import type { EntityId } from '@/types/common.types';
 import type { CreateCanvasParams } from '@/types/workspace.types';
@@ -52,8 +53,10 @@ export const CreateCanvasModal: React.FC<CreateCanvasModalProps> = ({
   workspaceId,
 }) => {
   const router = useRouter();
-  const { createCanvas, setDefaultCanvas } = useWorkspaceStore();
-  const isCreating = useWorkspaceStore((state) => state.canvasManagement.loadingStates.creatingCanvas);
+  const { setCurrentCanvas } = useWorkspaceStore();
+  const { mutate: createCanvas, loading: isCreating } = useCreateCanvas();
+  const { mutate: setDefaultCanvas } = useSetDefaultCanvas();
+  const nameInputRef = useRef<HTMLInputElement>(null);
   
   const [formData, setFormData] = useState<FormData>({
     name: '',
@@ -89,6 +92,29 @@ export const CreateCanvasModal: React.FC<CreateCanvasModalProps> = ({
     // Clear field-specific error when user starts typing
     if (errors[field as keyof FormErrors]) {
       setErrors(prev => ({ ...prev, [field]: undefined }));
+    }
+  };
+
+  // Handle field blur (validation on blur)
+  const handleFieldBlur = (field: keyof FormData) => {
+    const fieldErrors: FormErrors = {};
+    
+    if (field === 'name') {
+      if (!formData.name.trim()) {
+        fieldErrors.name = 'Canvas name is required';
+      } else if (formData.name.trim().length > 100) {
+        fieldErrors.name = 'Canvas name must be 100 characters or less';
+      }
+    }
+    
+    if (field === 'description') {
+      if (formData.description.length > 500) {
+        fieldErrors.description = 'Description must be 500 characters or less';
+      }
+    }
+    
+    if (Object.keys(fieldErrors).length > 0) {
+      setErrors(prev => ({ ...prev, ...fieldErrors }));
     }
   };
 
@@ -131,6 +157,7 @@ export const CreateCanvasModal: React.FC<CreateCanvasModalProps> = ({
         },
       };
 
+      // Use GraphQL hook to create canvas
       const newCanvasId = await createCanvas(createParams);
       
       if (newCanvasId) {
@@ -138,6 +165,9 @@ export const CreateCanvasModal: React.FC<CreateCanvasModalProps> = ({
         if (formData.isDefault) {
           await setDefaultCanvas(workspaceId, newCanvasId);
         }
+        
+        // Update the current canvas context
+        setCurrentCanvas(newCanvasId, formData.name.trim());
         
         // Navigate to the new canvas
         router.push(`/workspace/${workspaceId}/canvas/${newCanvasId}` as any);
@@ -166,7 +196,7 @@ export const CreateCanvasModal: React.FC<CreateCanvasModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} size="medium">
+    <Modal isOpen={isOpen} onClose={handleClose} size="medium" initialFocus={nameInputRef}>
       <form onSubmit={handleSubmit}>
         <ModalHeader>
           <ModalTitle>Create New Canvas</ModalTitle>
@@ -193,10 +223,12 @@ export const CreateCanvasModal: React.FC<CreateCanvasModalProps> = ({
                 Canvas Name <span className="text-red-500" aria-label="required">*</span>
               </label>
               <Input
+                ref={nameInputRef}
                 id="canvas-name"
                 type="text"
                 value={formData.name}
                 onChange={(e) => handleInputChange('name', e.target.value)}
+                onBlur={() => handleFieldBlur('name')}
                 placeholder="Enter canvas name..."
                 state={errors.name ? 'error' : 'default'}
                 disabled={isCreating}
@@ -222,6 +254,7 @@ export const CreateCanvasModal: React.FC<CreateCanvasModalProps> = ({
                 id="canvas-description"
                 value={formData.description}
                 onChange={(e) => handleInputChange('description', e.target.value)}
+                onBlur={() => handleFieldBlur('description')}
                 placeholder="Describe what this canvas will be used for..."
                 rows={3}
                 className={`block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm ${
