@@ -11,7 +11,9 @@ import { useWorkspaceStore } from '@/stores/workspaceStore';
 import type { Canvas } from '@/types/workspace.types';
 
 // Mock dependencies
-jest.mock('next/navigation');
+jest.mock('next/navigation', () => ({
+  useRouter: jest.fn(),
+}));
 jest.mock('@/stores/workspaceStore');
 
 // Mock CreateCanvasModal
@@ -26,7 +28,7 @@ jest.mock('../CreateCanvasModal', () => ({
 }));
 
 const mockPush = jest.fn();
-const mockUseRouter = useRouter as jest.MockedFunction<typeof useRouter>;
+const mockUseRouter = useRouter as jest.Mock;
 const mockUseWorkspaceStore = useWorkspaceStore as jest.MockedFunction<typeof useWorkspaceStore>;
 
 // Sample canvas data
@@ -82,7 +84,7 @@ describe('CanvasSwitcher', () => {
       back: jest.fn(),
       forward: jest.fn(),
       refresh: jest.fn(),
-    } as any);
+    });
 
     // Create a mock store implementation
     const mockStore = {
@@ -141,7 +143,7 @@ describe('CanvasSwitcher', () => {
         return {
           id: mockStore.context.currentCanvasId,
           name: mockStore.context.canvasName,
-          canvas: sampleCanvases[0],
+          canvas: sampleCanvases.find(c => c.id === mockStore.context.currentCanvasId) || sampleCanvases[0],
         };
       }
       if (selector.toString().includes('getCanvasCount')) {
@@ -173,6 +175,23 @@ describe('CanvasSwitcher', () => {
 
     it('does not render when no workspace context is available', () => {
       mockUseWorkspaceStore.mockImplementation((selector?: any) => {
+        if (selector?.toString().includes('getCurrentCanvas')) {
+          return {
+            id: undefined,
+            name: undefined,
+            canvas: undefined,
+          };
+        }
+        if (selector?.toString().includes('getAllCanvases')) {
+          return [];
+        }
+        if (selector?.toString().includes('getCanvasCount')) {
+          return 0;
+        }
+        if (selector?.toString().includes('isLoading')) {
+          return false;
+        }
+        
         const mockStore = {
           context: { currentWorkspaceId: undefined },
         };
@@ -185,12 +204,35 @@ describe('CanvasSwitcher', () => {
 
     it('shows loading state when canvases are loading', () => {
       mockUseWorkspaceStore.mockImplementation((selector?: any) => {
+        const mockStore = {
+          context: { 
+            currentWorkspaceId: 'workspace-1', 
+            currentCanvasId: 'canvas-1',
+            workspaceName: 'Test Workspace',
+            canvasName: 'Main Canvas'
+          },
+        };
+
+        if (!selector) return mockStore;
+
         if (selector?.toString().includes('isLoading')) {
           return true;
         }
-        return {
-          context: { currentWorkspaceId: 'workspace-1' },
-        };
+        if (selector?.toString().includes('getCurrentCanvas')) {
+          return {
+            id: 'canvas-1',
+            name: 'Main Canvas',
+            canvas: sampleCanvases[0],
+          };
+        }
+        if (selector?.toString().includes('getAllCanvases')) {
+          return sampleCanvases;
+        }
+        if (selector?.toString().includes('getCanvasCount')) {
+          return 2;
+        }
+        
+        return selector(mockStore);
       });
 
       render(<CanvasSwitcher />);
@@ -244,8 +286,9 @@ describe('CanvasSwitcher', () => {
       
       fireEvent.click(screen.getByRole('button'));
       
-      expect(screen.getByText('Main Canvas')).toBeInTheDocument();
-      expect(screen.getByText('Secondary Canvas')).toBeInTheDocument();
+      // Use more specific queries for dropdown content
+      expect(screen.getByRole('option', { name: /Main Canvas/ })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: /Secondary Canvas/ })).toBeInTheDocument();
       expect(screen.getByText('Default')).toBeInTheDocument(); // Default badge
     });
   });
