@@ -14,7 +14,6 @@ import { UserProfile } from '@auth0/nextjs-auth0/client';
 export interface Auth0JWTPayload {
   sub: string; // Auth0 user ID
   email: string;
-  email_verified: boolean;
   name?: string;
   nickname?: string;
   picture?: string;
@@ -39,7 +38,6 @@ export interface ExtendedUserProfile extends UserProfile {
   // Required Auth0 fields
   sub: string;
   email: string;
-  email_verified: boolean;
   
   // Optional Auth0 fields
   name?: string;

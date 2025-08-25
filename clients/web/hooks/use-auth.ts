@@ -99,7 +99,6 @@ export function useAuth(): UseAuthReturn {
       // Spread user but handle null values
       sub: user.sub!,
       email: user.email!,
-      email_verified: user.email_verified ?? false,
       name: user.name ?? undefined,
       nickname: user.nickname ?? undefined,
       picture: user.picture ?? undefined,

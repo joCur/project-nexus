@@ -699,8 +699,8 @@ describe('End-to-End Authentication Flow Tests', () => {
       });
 
       const complexAuth0User = createMockAuth0User({
-        'https://api.nexus-app.de/permissions': complexUser.permissions,
-        'https://api.nexus-app.de/roles': complexUser.roles,
+        permissions: complexUser.permissions,
+        roles: complexUser.roles,
       });
 
       mockAuth0Service.validateAuth0Token.mockResolvedValue(complexAuth0User);

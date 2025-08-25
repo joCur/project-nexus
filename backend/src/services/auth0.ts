@@ -156,13 +156,13 @@ export class Auth0Service {
       // Debug logging to see what Auth0 user data we're receiving
       this.logger.debug('Auth0 user data received', {
         auth0UserId: auth0User.sub,
-        customEmail: auth0User['https://api.nexus-app.de/email'],
-        standardEmail: auth0User.email,
+        email: auth0User.email,
         username: auth0User.username,
         name: auth0User.name,
         picture: auth0User.picture,
-        hasCustomEmail: !!auth0User['https://api.nexus-app.de/email'],
-        hasStandardEmail: !!auth0User.email,
+        hasEmail: !!auth0User.email,
+        roles: auth0User.roles,
+        permissions: auth0User.permissions,
       });
 
       // Check if user exists in local database
@@ -210,7 +210,7 @@ export class Auth0Service {
         this.logger.info('New user created from Auth0', {
           userId: user.id,
           auth0UserId: auth0User.sub,
-          email: auth0User['https://api.nexus-app.de/email'] || auth0User.email,
+          email: auth0User.email,
           action: 'create',
         });
       }
@@ -258,7 +258,7 @@ export class Auth0Service {
 
       this.logger.error('Failed to sync user from Auth0', {
         auth0UserId: auth0User.sub,
-        email: auth0User['https://api.nexus-app.de/email'] || auth0User.email,
+        email: auth0User.email,
         error: error instanceof Error ? error.message : 'Unknown error',
         stack: error instanceof Error ? error.stack : undefined,
       });

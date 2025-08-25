@@ -263,8 +263,8 @@ describe('Security Testing Scenarios', () => {
 
       mockAuth0Service.validateAuth0Token.mockResolvedValue({
         ...AUTH0_USER_FIXTURES.STANDARD_USER,
-        'https://api.nexus-app.de/roles': SECURITY_FIXTURES.SQL_INJECTION_ATTEMPTS,
-        'https://api.nexus-app.de/permissions': SECURITY_FIXTURES.XSS_ATTEMPTS,
+        roles: SECURITY_FIXTURES.SQL_INJECTION_ATTEMPTS,
+        permissions: SECURITY_FIXTURES.XSS_ATTEMPTS,
       });
 
       mockAuth0Service.syncUserFromAuth0.mockResolvedValue({
