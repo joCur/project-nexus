@@ -10,7 +10,7 @@
  * - Viewport culling
  */
 
-import { useCallback, useMemo, useRef, useEffect } from 'react';
+import React, { useCallback, useMemo, useRef, useEffect } from 'react';
 import { debounce, throttle } from 'lodash-es';
 import type { CanvasId } from '@/types/workspace.types';
 import type { EntityId } from '@/types/common.types';
@@ -424,7 +424,7 @@ export const lazyLoadComponent = (importFn: () => Promise<any>) => {
   return React.lazy(() => {
     return importFn().catch(() => {
       // Fallback for failed imports
-      return { default: () => <div>Component failed to load</div> };
+      return { default: () => React.createElement('div', null, 'Component failed to load') };
     });
   });
 };
@@ -514,7 +514,7 @@ export const PerformanceProvider: React.FC<{ children: React.ReactNode }> = ({ c
     };
   }, []);
 
-  return <>{children}</>;
+  return React.createElement(React.Fragment, null, children);
 };
 
 export default {

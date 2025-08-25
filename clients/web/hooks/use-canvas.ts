@@ -22,11 +22,9 @@ import {
   DELETE_CANVAS,
   SET_DEFAULT_CANVAS,
   DUPLICATE_CANVAS,
-  UPDATE_CANVAS_SETTINGS,
   CANVAS_CREATED_SUBSCRIPTION,
   CANVAS_UPDATED_SUBSCRIPTION,
   CANVAS_DELETED_SUBSCRIPTION,
-  CANVAS_SETTINGS_CHANGED_SUBSCRIPTION,
   DEFAULT_CANVAS_CHANGED_SUBSCRIPTION,
   type CanvasResponse,
   type CanvasesConnectionResponse,
@@ -34,7 +32,6 @@ import {
   type CreateCanvasMutationVariables,
   type UpdateCanvasMutationVariables,
   type DuplicateCanvasMutationVariables,
-  type UpdateCanvasSettingsMutationVariables,
 } from '@/lib/graphql/canvasOperations';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
 import type { 
@@ -64,19 +61,28 @@ const transformBackendCanvasToFrontend = (backendCanvas: CanvasResponse): Canvas
     name: backendCanvas.name,
     description: backendCanvas.description,
     settings: {
-      isDefault: backendCanvas.settings.isDefault,
-      position: backendCanvas.settings.position,
-      zoom: backendCanvas.settings.zoom,
-      grid: backendCanvas.settings.grid,
-      background: backendCanvas.settings.background,
+      isDefault: backendCanvas.isDefault,
+      position: { x: 0, y: 0, z: 0 }, // Default position since backend doesn't store viewport
+      zoom: 1.0, // Default zoom
+      grid: {
+        enabled: true,
+        size: 20,
+        color: '#e5e7eb',
+        opacity: 0.3,
+      },
+      background: {
+        type: 'COLOR' as const,
+        color: '#ffffff',
+        opacity: 1.0,
+      },
     },
     status: 'active', // Default from backend
     priority: 'normal', // Default from backend
     tags: [], // Will be added when backend supports it
-    metadata: backendCanvas.metadata,
+    metadata: {}, // Default metadata
     createdAt: backendCanvas.createdAt,
     updatedAt: backendCanvas.updatedAt,
-    version: backendCanvas.version,
+    version: 1, // Default version since backend doesn't have this field yet
   };
 };
 
@@ -88,14 +94,8 @@ const transformCreateParamsToBackend = (params: CreateCanvasParams): CreateCanva
     workspaceId: params.workspaceId,
     name: params.name,
     description: params.description,
-    settings: params.settings ? {
-      isDefault: params.settings.isDefault,
-      position: params.settings.position,
-      zoom: params.settings.zoom,
-      grid: params.settings.grid,
-      background: params.settings.background,
-    } : undefined,
-    metadata: params.metadata || {},
+    isDefault: params.settings?.isDefault || false,
+    position: undefined, // Backend will auto-assign position
   };
 };
 
@@ -436,43 +436,7 @@ export const useDuplicateCanvas = (): UseCanvasMutationReturn => {
   };
 };
 
-/**
- * Hook for updating canvas settings (high-frequency operations)
- */
-export const useUpdateCanvasSettings = (): UseCanvasMutationReturn => {
-  const workspaceStore = useWorkspaceStore();
-  const [updateSettingsMutation, { loading, error, reset }] = useMutation(UPDATE_CANVAS_SETTINGS);
-
-  const mutate = useCallback(async (canvasId: CanvasId, settings: Partial<CanvasSettings>): Promise<boolean> => {
-    try {
-      // Optimistic update
-      await workspaceStore.updateCanvasSettings(canvasId, settings);
-
-      // Server mutation (debounced in practice)
-      const { data } = await updateSettingsMutation({ 
-        variables: { id: canvasId, settings } 
-      });
-
-      if (data?.updateCanvasSettings) {
-        const serverCanvas = transformBackendCanvasToFrontend(data.updateCanvasSettings);
-        workspaceStore.canvasManagement.canvases.set(serverCanvas.id, serverCanvas);
-        return true;
-      }
-
-      return false;
-    } catch (err) {
-      console.error('Failed to update canvas settings:', err);
-      return false;
-    }
-  }, [workspaceStore, updateSettingsMutation]);
-
-  return {
-    mutate,
-    loading,
-    error: error?.message,
-    reset,
-  };
-};
+// Note: Canvas settings hooks will be added when backend supports them
 
 /**
  * Hook for real-time canvas subscriptions
@@ -537,38 +501,7 @@ export const useCanvasSubscriptions = (workspaceId: EntityId | undefined) => {
   });
 };
 
-/**
- * Hook for canvas settings synchronization (viewport changes)
- */
-export const useCanvasSettingsSync = (canvasId: CanvasId | undefined) => {
-  const workspaceStore = useWorkspaceStore();
-
-  useSubscription(CANVAS_SETTINGS_CHANGED_SUBSCRIPTION, {
-    variables: { canvasId },
-    skip: !canvasId,
-    onData: ({ data }) => {
-      if (data?.data?.canvasSettingsChanged && canvasId) {
-        const settingsUpdate = data.data.canvasSettingsChanged;
-        const existingCanvas = workspaceStore.getCanvas(canvasId);
-        
-        if (existingCanvas && existingCanvas.version < settingsUpdate.version) {
-          // Update only the settings to avoid conflicts
-          workspaceStore.updateCanvas({
-            id: canvasId,
-            updates: {
-              settings: {
-                ...existingCanvas.settings,
-                position: settingsUpdate.settings.position,
-                zoom: settingsUpdate.settings.zoom,
-                grid: settingsUpdate.settings.grid,
-              },
-            },
-          });
-        }
-      }
-    },
-  });
-};
+// Note: Canvas settings sync hooks will be added when backend supports them
 
 // Export all hooks
 export {

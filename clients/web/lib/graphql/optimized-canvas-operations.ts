@@ -10,16 +10,24 @@
  */
 
 import { gql, TypedDocumentNode } from '@apollo/client';
-import { 
-  Canvas, 
-  Card, 
-  Connection,
-  PaginatedCanvasResponse,
-  CanvasFilter,
-  PaginationInput 
-} from '@/types/canvas.types';
+import { Canvas, CanvasFilter, CanvasId } from '@/types/workspace.types';
+import { Card } from '@/types/card.types';
+import { Connection } from '@/types/connection.types';
 import type { EntityId } from '@/types/common.types';
-import type { CanvasId } from '@/types/workspace.types';
+
+// Define missing GraphQL response types
+interface PaginatedCanvasResponse {
+  items: Canvas[];
+  totalCount: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
+interface PaginationInput {
+  limit?: number;
+  offset?: number;
+  page?: number;
+}
 
 // Optimized fragments for better caching
 export const CANVAS_CORE_FRAGMENT = gql`

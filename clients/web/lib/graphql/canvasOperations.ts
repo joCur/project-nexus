@@ -19,31 +19,11 @@ const CANVAS_CORE_FIELDS = gql`
     workspaceId
     name
     description
-    settings {
-      isDefault
-      position {
-        x
-        y
-        z
-      }
-      zoom
-      grid {
-        enabled
-        size
-        color
-        opacity
-      }
-      background {
-        type
-        color
-        imageUrl
-        opacity
-      }
-    }
-    metadata
+    isDefault
+    position
+    createdBy
     createdAt
     updatedAt
-    version
   }
 `;
 
@@ -214,18 +194,7 @@ export const DUPLICATE_CANVAS = gql`
   }
 `;
 
-/**
- * Update canvas settings (position, zoom, grid, etc.)
- * For high-frequency viewport updates
- */
-export const UPDATE_CANVAS_SETTINGS = gql`
-  ${CANVAS_CORE_FIELDS}
-  mutation UpdateCanvasSettings($id: ID!, $settings: CanvasSettingsInput!) {
-    updateCanvasSettings(id: $id, settings: $settings) {
-      ...CanvasCoreFields
-    }
-  }
-`;
+// Note: Canvas settings operations will be added when backend supports them
 
 // ============================================================================
 // SUBSCRIPTIONS
@@ -267,33 +236,7 @@ export const CANVAS_DELETED_SUBSCRIPTION = gql`
   }
 `;
 
-/**
- * Subscribe to canvas settings changed events
- * For high-frequency viewport synchronization
- */
-export const CANVAS_SETTINGS_CHANGED_SUBSCRIPTION = gql`
-  ${CANVAS_CORE_FIELDS}
-  subscription CanvasSettingsChanged($canvasId: ID!) {
-    canvasSettingsChanged(canvasId: $canvasId) {
-      id
-      settings {
-        position {
-          x
-          y
-          z
-        }
-        zoom
-        grid {
-          enabled
-          size
-          color
-          opacity
-        }
-      }
-      version
-    }
-  }
-`;
+// Note: Canvas settings subscriptions will be added when backend supports them
 
 /**
  * Subscribe to default canvas changed events
@@ -349,28 +292,8 @@ export interface CreateCanvasMutationVariables {
     workspaceId: string;
     name: string;
     description?: string;
-    settings?: {
-      isDefault?: boolean;
-      position?: {
-        x: number;
-        y: number;
-        z?: number;
-      };
-      zoom?: number;
-      grid?: {
-        enabled: boolean;
-        size: number;
-        color: string;
-        opacity: number;
-      };
-      background?: {
-        type: 'COLOR' | 'IMAGE';
-        color?: string;
-        imageUrl?: string;
-        opacity?: number;
-      };
-    };
-    metadata?: Record<string, any>;
+    isDefault?: boolean;
+    position?: number;
   };
 }
 
@@ -379,28 +302,8 @@ export interface UpdateCanvasMutationVariables {
   input: {
     name?: string;
     description?: string;
-    settings?: {
-      isDefault?: boolean;
-      position?: {
-        x: number;
-        y: number;
-        z?: number;
-      };
-      zoom?: number;
-      grid?: {
-        enabled: boolean;
-        size: number;
-        color: string;
-        opacity: number;
-      };
-      background?: {
-        type: 'COLOR' | 'IMAGE';
-        color?: string;
-        imageUrl?: string;
-        opacity?: number;
-      };
-    };
-    metadata?: Record<string, any>;
+    isDefault?: boolean;
+    position?: number;
   };
 }
 
@@ -423,29 +326,7 @@ export interface DuplicateCanvasMutationVariables {
   };
 }
 
-export interface UpdateCanvasSettingsMutationVariables {
-  id: string;
-  settings: {
-    position?: {
-      x: number;
-      y: number;
-      z?: number;
-    };
-    zoom?: number;
-    grid?: {
-      enabled: boolean;
-      size: number;
-      color: string;
-      opacity: number;
-    };
-    background?: {
-      type: 'COLOR' | 'IMAGE';
-      color?: string;
-      imageUrl?: string;
-      opacity?: number;
-    };
-  };
-}
+// Note: Canvas settings types will be added when backend supports them
 
 export interface CanvasSubscriptionVariables {
   workspaceId: string;
@@ -464,37 +345,17 @@ export interface CanvasResponse {
   workspaceId: string;
   name: string;
   description?: string;
-  settings: {
-    isDefault: boolean;
-    position: {
-      x: number;
-      y: number;
-      z: number;
-    };
-    zoom: number;
-    grid: {
-      enabled: boolean;
-      size: number;
-      color: string;
-      opacity: number;
-    };
-    background: {
-      type: 'COLOR' | 'IMAGE';
-      color?: string;
-      imageUrl?: string;
-      opacity: number;
-    };
-  };
-  metadata: Record<string, any>;
+  isDefault: boolean;
+  position: number;
+  createdBy: string;
   createdAt: string;
   updatedAt: string;
-  version: number;
   workspace?: {
     id: string;
     name: string;
     ownerId: string;
   };
-  owner?: {
+  createdByUser?: {
     id: string;
     email: string;
     displayName?: string;
