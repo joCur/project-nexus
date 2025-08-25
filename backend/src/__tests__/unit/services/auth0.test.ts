@@ -6,7 +6,6 @@ import { UserService } from '@/services/user';
 import {
   InvalidTokenError,
   TokenExpiredError,
-  EmailNotVerifiedError,
   Auth0ServiceError,
 } from '@/utils/errors';
 import {
