@@ -1,7 +1,8 @@
 'use client';
 
 import { withPageAuthRequired } from '@auth0/nextjs-auth0/client';
-import { useAuth, ExtendedUserProfile, Permissions, Roles } from '@/hooks/use-auth';
+import { useAuth } from '@/hooks/use-auth';
+import { ExtendedUserProfile, Permissions, Roles } from '@/types/auth';
 import { useRouter } from 'next/navigation';
 import { ReactNode, useEffect } from 'react';
 import { Card, CardContent, Button } from '@/components/ui';

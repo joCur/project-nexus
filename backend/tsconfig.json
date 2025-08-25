@@ -30,7 +30,8 @@
       "@/middleware/*": ["src/middleware/*"],
       "@/types/*": ["src/types/*"],
       "@/utils/*": ["src/utils/*"]
-    }
+    },
+    "types": ["node", "jest"]
   },
   "include": [
     "src/**/*"

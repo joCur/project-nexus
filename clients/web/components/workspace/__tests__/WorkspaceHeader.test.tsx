@@ -28,11 +28,17 @@ describe('WorkspaceHeader', () => {
     // Mock auth hook
     mockUseAuth.mockReturnValue({
       user: {
+        sub: 'auth0|123456',
         name: 'John Doe',
         email: 'john.doe@example.com',
         picture: 'https://example.com/avatar.jpg',
       },
+      login: jest.fn(),
       logout: mockLogout,
+      checkPermission: jest.fn().mockReturnValue(true),
+      hasRole: jest.fn().mockReturnValue(true),
+      refreshUser: jest.fn(),
+      announceAuthStatus: jest.fn(),
       isLoading: false,
       isAuthenticated: true,
     });
@@ -178,10 +184,16 @@ describe('WorkspaceHeader', () => {
     it('uses fallback alt text when user has no name', () => {
       mockUseAuth.mockReturnValue({
         user: {
+          sub: 'auth0|123456',
           email: 'test@example.com',
           picture: 'https://example.com/avatar.jpg',
         },
+        login: jest.fn(),
         logout: mockLogout,
+        checkPermission: jest.fn().mockReturnValue(true),
+        hasRole: jest.fn().mockReturnValue(true),
+        refreshUser: jest.fn(),
+        announceAuthStatus: jest.fn(),
         isLoading: false,
         isAuthenticated: true,
       });
@@ -195,10 +207,16 @@ describe('WorkspaceHeader', () => {
     it('does not render profile picture when none available', () => {
       mockUseAuth.mockReturnValue({
         user: {
+          sub: 'auth0|123456',
           name: 'John Doe',
           email: 'john.doe@example.com',
         },
+        login: jest.fn(),
         logout: mockLogout,
+        checkPermission: jest.fn().mockReturnValue(true),
+        hasRole: jest.fn().mockReturnValue(true),
+        refreshUser: jest.fn(),
+        announceAuthStatus: jest.fn(),
         isLoading: false,
         isAuthenticated: true,
       });
@@ -218,9 +236,15 @@ describe('WorkspaceHeader', () => {
     it('shows fallback name when user name is not available', () => {
       mockUseAuth.mockReturnValue({
         user: {
+          sub: 'auth0|123456',
           email: 'john.doe@example.com',
         },
+        login: jest.fn(),
         logout: mockLogout,
+        checkPermission: jest.fn().mockReturnValue(true),
+        hasRole: jest.fn().mockReturnValue(true),
+        refreshUser: jest.fn(),
+        announceAuthStatus: jest.fn(),
         isLoading: false,
         isAuthenticated: true,
       });

@@ -28,8 +28,13 @@ describe('WorkspaceLayout', () => {
   beforeEach(() => {
     // Mock auth
     mockUseAuth.mockReturnValue({
-      user: { name: 'Test User', email: 'test@example.com' },
+      user: { sub: 'auth0|123456', name: 'Test User', email: 'test@example.com' },
+      login: jest.fn(),
       logout: jest.fn(),
+      checkPermission: jest.fn().mockReturnValue(true),
+      hasRole: jest.fn().mockReturnValue(true),
+      refreshUser: jest.fn(),
+      announceAuthStatus: jest.fn(),
       isLoading: false,
       isAuthenticated: true,
     });

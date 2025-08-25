@@ -20,10 +20,13 @@ import type { EntityId } from '@/types/common.types';
 // Mock the createCanvasId function
 const mockCreateCanvasId = jest.fn((id: string) => id as any);
 
-jest.mock('@/types/workspace.types', () => ({
-  ...jest.requireActual('@/types/workspace.types'),
-  createCanvasId: mockCreateCanvasId,
-}));
+jest.mock('@/types/workspace.types', () => {
+  const actual = jest.requireActual('@/types/workspace.types') as any;
+  return {
+    ...actual,
+    createCanvasId: mockCreateCanvasId,
+  };
+});
 
 describe('WorkspaceStore', () => {
   beforeEach(() => {
