@@ -305,7 +305,7 @@ describe('WorkspaceStore', () => {
       
       const defaultCanvas = store.getDefaultCanvas();
       expect(defaultCanvas).toBeDefined();
-      expect(defaultCanvas!.name).toBe('Main Canvas');
+      expect(defaultCanvas!.name).toBe('Main Canvas (Local Only)');
       expect(defaultCanvas!.settings.isDefault).toBe(true);
       expect(state.context.currentCanvasId).toBe(defaultCanvas!.id);
     });

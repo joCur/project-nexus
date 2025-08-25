@@ -81,7 +81,8 @@ describe('WorkspaceHeader', () => {
     it('displays workspace name when available', () => {
       render(<WorkspaceHeader />);
       
-      expect(screen.getByText('Test Workspace')).toBeInTheDocument();
+      // Should find at least one instance of the workspace name (desktop or mobile view)
+      expect(screen.getAllByText('Test Workspace')).toHaveLength(2);
     });
 
     it('shows default workspace name when none provided', () => {
@@ -100,7 +101,8 @@ describe('WorkspaceHeader', () => {
 
       render(<WorkspaceHeader />);
       
-      expect(screen.getByText('Knowledge Workspace')).toBeInTheDocument();
+      // Should find at least one instance of the default workspace name (desktop or mobile view)
+      expect(screen.getAllByText('Knowledge Workspace')).toHaveLength(2);
     });
 
     it('renders canvas switcher when workspace context exists', () => {
