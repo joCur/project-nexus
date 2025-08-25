@@ -66,8 +66,47 @@ jobs:
         run: npx depcheck
         continue-on-error: true
 
-  test:
-    name: Backend Tests
+  unit-tests:
+    name: Backend Unit Tests
+    runs-on: ubuntu-latest
+    if: github.event.inputs.run_tests != 'false'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci --silent
+      
+      - name: Run unit tests
+        working-directory: backend
+        env:
+          NODE_ENV: test
+          AUTH0_DOMAIN: test.auth0.com
+          AUTH0_CLIENT_ID: test_client_id
+          AUTH0_CLIENT_SECRET: test_client_secret_for_testing_purposes
+          JWT_SECRET: test_jwt_secret_for_unit_tests_minimum_32_chars_required_by_validation
+          SESSION_SECRET: test_session_secret_for_testing_minimum_32_chars_required_validation
+        run: npm test -- --testPathPattern="unit|security" --coverage
+      
+      - name: Upload test coverage
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage-${{ github.run_number }}
+          path: backend/coverage/
+          retention-days: 7
+
+  integration-tests:
+    name: Backend Integration Tests
     runs-on: ubuntu-latest
     if: github.event.inputs.run_tests != 'false'
     
@@ -117,7 +156,7 @@ jobs:
           DATABASE_URL: postgresql://postgres:test_password@localhost:5432/nexus_test
         run: npm run migrate
       
-      - name: Run backend tests
+      - name: Run integration tests
         working-directory: backend
         env:
           NODE_ENV: test
@@ -131,20 +170,12 @@ jobs:
           AUTH0_CLIENT_SECRET: test_client_secret_for_testing_purposes
           JWT_SECRET: test_jwt_secret_for_unit_tests_minimum_32_chars_required_by_validation
           SESSION_SECRET: test_session_secret_for_testing_minimum_32_chars_required_validation
-        run: npm test -- --coverage
-      
-      - name: Upload test coverage
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-coverage-${{ github.run_number }}
-          path: backend/coverage/
-          retention-days: 7
+        run: npm test -- --testPathPattern="integration|migration"
 
   build-docker-image:
     name: Build Backend Docker Image
     runs-on: ubuntu-latest
-    needs: [code-quality, test]
+    needs: [code-quality, unit-tests, integration-tests]
     outputs:
       image: ${{ steps.meta.outputs.tags }}
       version: ${{ steps.version.outputs.version }}
@@ -200,7 +231,7 @@ jobs:
   backend-summary:
     name: Backend Summary
     runs-on: ubuntu-latest
-    needs: [code-quality, test, build-docker-image]
+    needs: [code-quality, unit-tests, integration-tests, build-docker-image]
     if: always()
     
     steps:
@@ -209,7 +240,8 @@ jobs:
           echo "## 🔧 Backend Pipeline Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Code Quality**: ${{ needs.code-quality.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Tests**: ${{ needs.test.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Unit Tests**: ${{ needs.unit-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Integration Tests**: ${{ needs.integration-tests.result }}" >> $GITHUB_STEP_SUMMARY
           echo "**Docker Build**: ${{ needs.build-docker-image.result }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           if [[ "${{ needs.build-docker-image.outputs.image }}" != "" ]]; then
@@ -221,8 +253,12 @@ jobs:
             fi
             echo "" >> $GITHUB_STEP_SUMMARY
           fi
-          if [[ "${{ needs.code-quality.result }}" == "success" && "${{ needs.test.result }}" == "success" && "${{ needs.build-docker-image.result }}" == "success" ]]; then
+          if [[ "${{ needs.code-quality.result }}" == "success" && "${{ needs.unit-tests.result }}" == "success" && "${{ needs.integration-tests.result }}" == "success" && "${{ needs.build-docker-image.result }}" == "success" ]]; then
             echo "✅ **Backend pipeline passed successfully!**" >> $GITHUB_STEP_SUMMARY
           else
             echo "❌ **Backend pipeline failed. Check individual jobs for details.**" >> $GITHUB_STEP_SUMMARY
+            echo "- **Code Quality**: ${{ needs.code-quality.result }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Unit Tests**: ${{ needs.unit-tests.result }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Integration Tests**: ${{ needs.integration-tests.result }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Docker Build**: ${{ needs.build-docker-image.result }}" >> $GITHUB_STEP_SUMMARY
           fi
