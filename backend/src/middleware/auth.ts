@@ -41,29 +41,69 @@ export function createAuthMiddleware(
       if (process.env.NODE_ENV === 'development' && req.headers['x-user-sub']) {
         const auth0UserId = req.headers['x-user-sub'] as string;
         const email = req.headers['x-user-email'] as string;
+        const requestId = `dev_auth_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         
-        // Create a mock user for development
-        const user = await userService.findByAuth0Id(auth0UserId) || 
-          await userService.create({
-            auth0UserId,
-            email: email || 'dev@example.com',
-            emailVerified: true,
-            displayName: 'Development User',
-            roles: [],
-            permissions: []
-          });
-
-        req.user = user;
-        req.permissions = user.permissions || [];
-        req.isAuthenticated = true;
-        
-        console.log('Development mode authentication:', {
-          userId: user.id,
-          auth0UserId,
-          email
+        securityLogger.authSuccess('development', auth0UserId, {
+          requestId,
+          email,
+          userAgent: req.headers['user-agent'],
+          ip: req.ip,
+          path: req.path,
+          method: req.method,
         });
         
-        return next();
+        try {
+          // Create a mock user for development with consistent user identification
+          let user = await userService.findByAuth0Id(auth0UserId);
+          
+          if (!user) {
+            user = await userService.create({
+              auth0UserId,
+              email: email || 'dev@example.com',
+              emailVerified: true,
+              displayName: 'Development User',
+              roles: [],
+              permissions: []
+            });
+            
+            securityLogger.authSuccess(user.id, auth0UserId, {
+              requestId,
+              action: 'dev_user_created',
+              email: user.email
+            });
+          } else {
+            // Update last login for existing dev user
+            await userService.updateLastLogin(user.id);
+          }
+
+          req.user = user;
+          req.permissions = user.permissions || [];
+          req.isAuthenticated = true;
+          
+          console.log('Development mode authentication:', {
+            requestId,
+            userId: user.id,
+            auth0UserId,
+            email,
+            consistent: true
+          });
+          
+          return next();
+        } catch (error) {
+          securityLogger.authFailure(
+            `Development authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            {
+              requestId,
+              auth0UserId,
+              email,
+              userAgent: req.headers['user-agent'],
+              ip: req.ip,
+            }
+          );
+          
+          next(new AuthenticationError('Development authentication failed'));
+          return;
+        }
       }
 
       // Extract token from Authorization header
@@ -81,13 +121,35 @@ export function createAuthMiddleware(
         throw new InvalidTokenError();
       }
 
-      // Sync user from Auth0
+      // Sync user from Auth0 with session consistency
       const user = await auth0Service.syncUserFromAuth0(auth0Payload);
-
-      // Validate session
-      const sessionValid = await auth0Service.validateSession(user.id);
+      
+      // Create or validate session for consistency across requests
+      let sessionValid = await auth0Service.validateSession(user.id);
       if (!sessionValid) {
-        throw new TokenExpiredError('Session expired');
+        // Create new session for first-time or expired sessions
+        try {
+          await auth0Service.createSession(user, auth0Payload);
+          sessionValid = true;
+          
+          securityLogger.sessionEvent('created', user.id, {
+            auth0UserId: auth0Payload.sub,
+            reason: 'session_expired_recreated',
+            userAgent: req.headers['user-agent'],
+            ip: req.ip,
+          });
+        } catch (sessionError) {
+          securityLogger.authFailure(
+            `Session creation failed: ${sessionError instanceof Error ? sessionError.message : 'Unknown error'}`,
+            {
+              userId: user.id,
+              auth0UserId: auth0Payload.sub,
+              userAgent: req.headers['user-agent'],
+              ip: req.ip,
+            }
+          );
+          throw new TokenExpiredError('Session management failed');
+        }
       }
 
       // Set authenticated context
@@ -116,6 +178,8 @@ export function createAuthMiddleware(
         ip: req.ip,
         path: req.path,
         method: req.method,
+        sessionValid,
+        userId: user.id, // Ensure consistent user identification
       });
 
       next();
