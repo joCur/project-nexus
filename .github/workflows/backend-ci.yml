@@ -153,7 +153,11 @@ jobs:
       - name: Run database migrations
         working-directory: backend
         env:
-          DATABASE_URL: postgresql://postgres:test_password@localhost:5432/nexus_test
+          NODE_ENV: test
+          POSTGRES_DB: nexus_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_PORT: 5432
         run: npm run migrate
       
       - name: Run integration tests
