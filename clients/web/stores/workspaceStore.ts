@@ -469,17 +469,24 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           }));
 
           try {
-            // This will be replaced by GraphQL query in hooks
-            // For now, we'll create a mock default canvas if none exist
+            // NOTE: This function is being called from React components
+            // We can't use hooks here, so this should be replaced with a direct GraphQL fetch
+            // For now, this remains as a placeholder until the workspace loading is refactored
+            
+            console.warn('loadWorkspaceCanvases: This should use GraphQL API instead of mock data');
+            console.log('TODO: Replace this with GraphQL fetch to /graphql endpoint');
+            
+            // Temporary: Create a mock canvas for development
+            // This should be removed once proper GraphQL integration is implemented
             const { canvasManagement } = get();
             
             if (canvasManagement.canvases.size === 0) {
-              const defaultCanvasId = createCanvasId(`default_${workspaceId}`);
+              const defaultCanvasId = createCanvasId(`temp_${workspaceId}_${Date.now()}`);
               const defaultCanvas: Canvas = {
                 id: defaultCanvasId,
                 workspaceId,
-                name: 'Main Canvas',
-                description: 'Default workspace canvas',
+                name: 'Main Canvas (Local Only)',
+                description: 'Temporary canvas - will be replaced with server data',
                 settings: {
                   isDefault: true,
                   position: { x: 0, y: 0, z: 0 },
@@ -499,7 +506,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
                 status: 'active',
                 priority: 'normal',
                 tags: [],
-                metadata: {},
+                metadata: { isTemporary: true },
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
                 version: 1,

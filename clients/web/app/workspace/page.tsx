@@ -20,6 +20,8 @@ function WorkspaceContent() {
   const router = useRouter();
   const { status: onboardingStatus, isLoading: onboardingLoading } = useOnboardingStatus();
   const context = useWorkspaceStore((state) => state.context);
+  const setCurrentWorkspace = useWorkspaceStore((state) => state.setCurrentWorkspace);
+  const isInitialized = useWorkspaceStore((state) => state.isInitialized);
 
   // Check onboarding status and redirect if needed
   useEffect(() => {
@@ -30,12 +32,34 @@ function WorkspaceContent() {
 
     // If onboarding is complete, redirect to workspace with default ID
     if (onboardingStatus?.isComplete) {
-      // For now, use a default workspace ID
-      // In production, this would come from user's default workspace or workspace list
-      const defaultWorkspaceId = context.currentWorkspaceId || 'default-workspace';
+      // Sync workspace ID from onboarding status if not already in store
+      let workspaceId = context.currentWorkspaceId;
+      
+      if (!workspaceId && onboardingStatus.workspace?.id) {
+        // Update the store with the workspace info from onboarding status
+        workspaceId = onboardingStatus.workspace.id;
+        console.log('Syncing workspace ID from onboarding status:', workspaceId);
+        setCurrentWorkspace(workspaceId, onboardingStatus.workspace.name);
+      }
+      
+      // Use the stored workspace ID from onboarding if available
+      // Otherwise fall back to default-workspace for backwards compatibility
+      const defaultWorkspaceId = workspaceId || 'default-workspace';
+      
+      // Log for debugging workspace mismatch issues
+      if (defaultWorkspaceId === 'default-workspace') {
+        console.warn('Using fallback default-workspace - user may not have completed onboarding properly');
+        console.log('Store state for debugging:', { 
+          context, 
+          isInitialized, 
+          onboardingStatus,
+          workspaceFromOnboarding: onboardingStatus.workspace 
+        });
+      }
+      
       router.replace(`/workspace/${defaultWorkspaceId}` as any);
     }
-  }, [onboardingLoading, onboardingStatus, router, context.currentWorkspaceId]);
+  }, [onboardingLoading, onboardingStatus, router, context.currentWorkspaceId, setCurrentWorkspace, isInitialized]);
 
   // Show loading while checking onboarding status or redirecting
   return (
