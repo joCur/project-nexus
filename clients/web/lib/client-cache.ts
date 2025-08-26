@@ -52,11 +52,33 @@ interface CacheOptions {
 }
 
 /**
- * Generic client-side cache with type safety and expiration
+ * Storage quota status and management
+ */
+interface StorageQuota {
+  available: boolean;
+  usedBytes: number;
+  quotaBytes?: number;
+  usagePercentage?: number;
+}
+
+/**
+ * Storage quota error types
+ */
+class StorageQuotaError extends Error {
+  constructor(message: string, public quotaInfo: StorageQuota) {
+    super(message);
+    this.name = 'StorageQuotaError';
+  }
+}
+
+/**
+ * Generic client-side cache with type safety, expiration, and quota management
  */
 class ClientCache {
   private storage: Storage | null = null;
   private isClient = typeof window !== 'undefined';
+  private quotaCheckCache: Map<string, { timestamp: number; available: boolean }> = new Map();
+  private readonly QUOTA_CHECK_TTL = 30 * 1000; // 30 seconds
 
   constructor(private defaultStorage: 'localStorage' | 'sessionStorage' = 'localStorage') {
     if (this.isClient) {
@@ -65,27 +87,68 @@ class ClientCache {
   }
 
   /**
-   * Set an item in cache with optional expiration
+   * Set an item in cache with optional expiration and quota checking
    */
   set<T>(key: string, data: T, options: CacheOptions = {}): boolean {
     if (!this.storage) return false;
 
+    const storage = options.storage 
+      ? (options.storage === 'localStorage' ? window.localStorage : window.sessionStorage)
+      : this.storage;
+
+    // Prepare the entry outside the try block so it's available in catch
+    const entry: CacheEntry<T> = {
+      data,
+      timestamp: Date.now(),
+      version: options.version || '1.0',
+      expiresAt: options.ttl ? Date.now() + options.ttl : undefined,
+    };
+
+    const serializedEntry = JSON.stringify(entry);
+
     try {
-      const entry: CacheEntry<T> = {
-        data,
-        timestamp: Date.now(),
-        version: options.version || '1.0',
-        expiresAt: options.ttl ? Date.now() + options.ttl : undefined,
-      };
+      // Check storage quota before attempting to write
+      const quotaInfo = this.checkStorageQuota(storage, serializedEntry.length);
+      if (!quotaInfo.available) {
+        console.warn(`Storage quota exceeded for key "${key}". Attempting cleanup...`);
+        
+        // Try to free up space by removing expired entries
+        const cleanedUp = this.cleanupExpiredEntries(storage);
+        if (cleanedUp > 0) {
+          // Retry quota check after cleanup
+          const retryQuota = this.checkStorageQuota(storage, serializedEntry.length);
+          if (!retryQuota.available) {
+            throw new StorageQuotaError('Storage quota exceeded even after cleanup', retryQuota);
+          }
+        } else {
+          throw new StorageQuotaError('Storage quota exceeded and no cleanup possible', quotaInfo);
+        }
+      }
 
-      const storage = options.storage 
-        ? (options.storage === 'localStorage' ? window.localStorage : window.sessionStorage)
-        : this.storage;
-
-      storage.setItem(key, JSON.stringify(entry));
+      storage.setItem(key, serializedEntry);
       return true;
     } catch (error) {
-      console.warn(`Failed to cache data for key "${key}":`, error);
+      if (error instanceof StorageQuotaError) {
+        console.error(`Storage quota error for key "${key}":`, {
+          message: error.message,
+          quotaInfo: error.quotaInfo
+        });
+      } else if (error instanceof Error && error.name === 'QuotaExceededError') {
+        // Fallback for browsers that don't support StorageManager API
+        console.error(`Storage quota exceeded for key "${key}". Attempting cleanup...`);
+        const cleaned = this.cleanupExpiredEntries(storage);
+        if (cleaned > 0) {
+          // Retry once after cleanup
+          try {
+            storage.setItem(key, serializedEntry);
+            return true;
+          } catch (retryError) {
+            console.error(`Storage quota exceeded for key "${key}" even after cleanup`);
+          }
+        }
+      } else {
+        console.warn(`Failed to cache data for key "${key}":`, error);
+      }
       return false;
     }
   }
@@ -172,6 +235,147 @@ class ClientCache {
   }
 
   /**
+   * Check storage quota availability
+   */
+  private checkStorageQuota(storage: Storage, additionalBytes: number = 0): StorageQuota {
+    const storageType = storage === window.localStorage ? 'localStorage' : 'sessionStorage';
+    const cacheKey = `quota-${storageType}`;
+    
+    // Check cache first to avoid expensive quota checks
+    const cached = this.quotaCheckCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < this.QUOTA_CHECK_TTL) {
+      return {
+        available: cached.available,
+        usedBytes: 0, // We don't cache exact bytes
+      };
+    }
+
+    try {
+      // Try modern StorageManager API first
+      if ('storage' in navigator && 'estimate' in navigator.storage) {
+        // Note: This is async but we need sync behavior, so we use cached results
+        // The async version would be better but requires API changes
+      }
+      
+      // Calculate current usage (rough estimate)
+      let usedBytes = 0;
+      for (let i = 0; i < storage.length; i++) {
+        const key = storage.key(i);
+        if (key) {
+          const value = storage.getItem(key);
+          if (value) {
+            usedBytes += key.length + value.length;
+          }
+        }
+      }
+      
+      // Estimate quota (browsers typically allow 5-10MB for localStorage)
+      const estimatedQuota = storageType === 'localStorage' ? 5 * 1024 * 1024 : 1024 * 1024; // 5MB for localStorage, 1MB for sessionStorage
+      const availableBytes = estimatedQuota - usedBytes;
+      const isAvailable = availableBytes > additionalBytes;
+      
+      const quotaInfo: StorageQuota = {
+        available: isAvailable,
+        usedBytes,
+        quotaBytes: estimatedQuota,
+        usagePercentage: (usedBytes / estimatedQuota) * 100,
+      };
+      
+      // Cache the result
+      this.quotaCheckCache.set(cacheKey, {
+        timestamp: Date.now(),
+        available: isAvailable,
+      });
+      
+      return quotaInfo;
+    } catch (error) {
+      console.warn('Failed to check storage quota:', error);
+      return {
+        available: true, // Assume available on error
+        usedBytes: 0,
+      };
+    }
+  }
+
+  /**
+   * Clean up expired cache entries to free up space
+   */
+  private cleanupExpiredEntries(storage: Storage): number {
+    let cleanedCount = 0;
+    const keysToRemove: string[] = [];
+    
+    try {
+      for (let i = 0; i < storage.length; i++) {
+        const key = storage.key(i);
+        if (key && key.startsWith('nexus:')) { // Only clean our cache entries
+          try {
+            const item = storage.getItem(key);
+            if (item) {
+              const entry: CacheEntry<unknown> = JSON.parse(item);
+              if (entry.expiresAt && Date.now() > entry.expiresAt) {
+                keysToRemove.push(key);
+              }
+            }
+          } catch (parseError) {
+            // Remove malformed entries
+            keysToRemove.push(key);
+          }
+        }
+      }
+      
+      keysToRemove.forEach(key => {
+        storage.removeItem(key);
+        cleanedCount++;
+      });
+      
+      if (cleanedCount > 0) {
+        console.log(`Cleaned up ${cleanedCount} expired cache entries`);
+        // Clear quota check cache after cleanup
+        this.quotaCheckCache.clear();
+      }
+      
+    } catch (error) {
+      console.warn('Failed to cleanup expired entries:', error);
+    }
+    
+    return cleanedCount;
+  }
+
+  /**
+   * Get storage quota information
+   */
+  async getQuotaInfo(storageType?: 'localStorage' | 'sessionStorage'): Promise<StorageQuota> {
+    const storage = storageType 
+      ? (storageType === 'localStorage' ? window.localStorage : window.sessionStorage)
+      : this.storage;
+      
+    if (!storage) {
+      return { available: false, usedBytes: 0 };
+    }
+
+    // Try modern API first
+    if ('storage' in navigator && 'estimate' in navigator.storage) {
+      try {
+        const estimate = await navigator.storage.estimate();
+        const usedBytes = estimate.usage || 0;
+        const quotaBytes = estimate.quota || 0;
+        
+        return {
+          available: quotaBytes > usedBytes,
+          usedBytes,
+          quotaBytes,
+          usagePercentage: quotaBytes > 0 ? (usedBytes / quotaBytes) * 100 : 0,
+        };
+      } catch (error) {
+        console.warn('StorageManager.estimate() failed:', error);
+      }
+    }
+
+    // Fallback to manual calculation
+    return this.checkStorageQuota(storage);
+  }
+
+  /**
    * Get cache statistics for debugging
    */
   getStats(): { isSupported: boolean; itemCount: number; storageType: string } {
@@ -227,5 +431,6 @@ export const CACHE_OPTIONS = {
   },
 } as const;
 
-// Export cache configuration for external use
-export { CACHE_CONFIG };
+// Export cache configuration and quota utilities for external use
+export { CACHE_CONFIG, StorageQuotaError };
+export type { StorageQuota };

@@ -3,6 +3,54 @@ import { useAuth } from './use-auth';
 import { localCache, CACHE_KEYS, CACHE_OPTIONS } from '@/lib/client-cache';
 import logger from '@/lib/logger';
 
+// Error types for robust error handling
+interface ApiError {
+  type: 'NETWORK_ERROR' | 'HTTP_ERROR' | 'VALIDATION_ERROR' | 'SERVER_ERROR' | 'UNKNOWN_ERROR';
+  statusCode?: number;
+  message: string;
+  cause?: Error;
+}
+
+class OnboardingApiError extends Error implements ApiError {
+  public type: ApiError['type'];
+  public statusCode?: number;
+  public cause?: Error;
+
+  constructor(type: ApiError['type'], message: string, statusCode?: number, cause?: Error) {
+    super(message);
+    this.name = 'OnboardingApiError';
+    this.type = type;
+    this.statusCode = statusCode;
+    this.cause = cause;
+  }
+
+  static fromFetchError(error: Error): OnboardingApiError {
+    // Network errors (fetch failures, no response)
+    if (error.message.includes('fetch') || error.name === 'TypeError') {
+      return new OnboardingApiError('NETWORK_ERROR', 'Network connection failed', undefined, error);
+    }
+    
+    // Default to unknown error
+    return new OnboardingApiError('UNKNOWN_ERROR', error.message, undefined, error);
+  }
+
+  static fromResponse(response: Response): OnboardingApiError {
+    if (response.status >= 500) {
+      return new OnboardingApiError('SERVER_ERROR', `Server error: ${response.statusText}`, response.status);
+    }
+    
+    if (response.status === 401) {
+      return new OnboardingApiError('HTTP_ERROR', 'Authentication required', response.status);
+    }
+    
+    if (response.status >= 400) {
+      return new OnboardingApiError('HTTP_ERROR', `Client error: ${response.statusText}`, response.status);
+    }
+    
+    return new OnboardingApiError('HTTP_ERROR', `HTTP error: ${response.statusText}`, response.status);
+  }
+}
+
 interface OnboardingStatus {
   isComplete: boolean;
   currentStep: number;
@@ -137,24 +185,29 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
         });
 
         if (!response.ok) {
-          if (response.status === 401) {
+          const apiError = OnboardingApiError.fromResponse(response);
+          
+          if (apiError.statusCode === 401) {
             // User is not authenticated, clear everything
             setStatus(null);
             clearCache();
             return;
           }
           
-          if (response.status >= 500) {
+          if (apiError.type === 'SERVER_ERROR') {
             // Server error - preserve existing status if we have one
             const currentStatus = status || loadFromCache();
             if (currentStatus) {
-              logger.warn('Server error, preserving existing onboarding status', { statusCode: response.status });
-              setError(`Server temporarily unavailable (${response.status})`);
+              logger.warn('Server error, preserving existing onboarding status', { 
+                statusCode: apiError.statusCode,
+                errorType: apiError.type 
+              });
+              setError(apiError.message);
               return;
             }
           }
           
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          throw apiError;
         }
 
         const data = await response.json();
@@ -168,25 +221,41 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
         saveToCache(data);
 
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-        logger.error('Failed to fetch onboarding status', { error: errorMessage });
-        setError(errorMessage);
+        // Convert unknown errors to our typed error system
+        const apiError = err instanceof OnboardingApiError 
+          ? err 
+          : err instanceof Error 
+            ? OnboardingApiError.fromFetchError(err)
+            : new OnboardingApiError('UNKNOWN_ERROR', 'An unknown error occurred');
         
-        // Preserve existing status if we have it, otherwise use safe defaults
-        const existingStatus = status || loadFromCache();
-        if (!existingStatus) {
-          // Only reset to defaults if we have no existing data
-          const defaultStatus: OnboardingStatus = {
-            isComplete: false,
-            currentStep: 1,
-            hasProfile: false,
-            hasWorkspace: false,
-          };
-          setStatus(defaultStatus);
-        } else {
-          // Keep existing status and let user know about the error
-          logger.warn('Preserving existing onboarding status due to fetch error');
+        logger.error('Failed to fetch onboarding status', { 
+          error: apiError.message,
+          errorType: apiError.type,
+          statusCode: apiError.statusCode
+        });
+        
+        setError(apiError.message);
+        
+        // Handle different error types appropriately
+        if (apiError.type === 'NETWORK_ERROR' || apiError.type === 'SERVER_ERROR') {
+          // For network/server errors, preserve existing status if we have it
+          const existingStatus = status || loadFromCache();
+          if (existingStatus) {
+            logger.warn('Preserving existing onboarding status due to connectivity/server error', {
+              errorType: apiError.type
+            });
+            return;
+          }
         }
+        
+        // For other error types or when we have no existing data, use safe defaults
+        const defaultStatus: OnboardingStatus = {
+          isComplete: false,
+          currentStep: 1,
+          hasProfile: false,
+          hasWorkspace: false,
+        };
+        setStatus(defaultStatus);
       } finally {
         setIsLoading(false);
         setIsInitialLoad(false);

@@ -25,7 +25,20 @@ const onboardingCompleteSchema = z.object({
   tutorialProgress: z.record(z.boolean()).optional().default({}),
 });
 
-// Types
+// Database model types (snake_case as returned from database)
+interface DbOnboardingRecord {
+  id: string;
+  user_id: string;
+  completed: boolean;
+  completed_at: string | null;
+  current_step: number;
+  final_step: number | null;
+  tutorial_progress: Record<string, boolean> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Application model types (camelCase for TypeScript)
 export interface OnboardingProgress {
   id: string;
   userId: string;
@@ -67,7 +80,7 @@ export class OnboardingService {
     try {
       const startTime = Date.now();
       
-      const onboarding = await database.query<any>(
+      const onboarding = await database.query<DbOnboardingRecord>(
         knex(this.tableName)
           .where('user_id', userId)
           .first(),
@@ -149,7 +162,7 @@ export class OnboardingService {
           .first()
           .forUpdate(); // Lock the row for update
         
-        const existing = await existingQuery;
+        const existing = await existingQuery as DbOnboardingRecord | undefined;
         
         logger.debug('Existing record check within transaction', {
           requestId,
@@ -170,7 +183,7 @@ export class OnboardingService {
           const [updated] = await trx(this.tableName)
             .where('user_id', validatedInput.userId)
             .update(updateData)
-            .returning('*');
+            .returning('*') as DbOnboardingRecord[];
 
           logger.info('Onboarding progress updated within transaction', {
             requestId,
@@ -192,7 +205,7 @@ export class OnboardingService {
 
           const [created] = await trx(this.tableName)
             .insert(createData)
-            .returning('*');
+            .returning('*') as DbOnboardingRecord[];
 
           logger.info('Onboarding progress created within transaction', {
             requestId,
@@ -270,7 +283,7 @@ export class OnboardingService {
         const existing = await trx(this.tableName)
           .where('user_id', validatedInput.userId)
           .first()
-          .forUpdate(); // Lock the row for update
+          .forUpdate() as DbOnboardingRecord | undefined; // Lock the row for update
         
         logger.debug('Existing record check for completion', {
           requestId,
@@ -306,7 +319,7 @@ export class OnboardingService {
           const [updated] = await trx(this.tableName)
             .where('user_id', validatedInput.userId)
             .update(updateData)
-            .returning('*');
+            .returning('*') as DbOnboardingRecord[];
 
           logger.info('Onboarding completed (updated existing record)', {
             requestId,
@@ -327,7 +340,7 @@ export class OnboardingService {
 
           const [created] = await trx(this.tableName)
             .insert(createData)
-            .returning('*');
+            .returning('*') as DbOnboardingRecord[];
 
           logger.info('Onboarding completed (created new completed record)', {
             requestId,
@@ -450,15 +463,21 @@ export class OnboardingService {
 
   /**
    * Map database onboarding record to OnboardingProgress interface
+   * Converts snake_case database fields to camelCase TypeScript interface
    */
-  private mapDbOnboardingToOnboarding(dbOnboarding: any): OnboardingProgress {
+  private mapDbOnboardingToOnboarding(dbOnboarding: DbOnboardingRecord): OnboardingProgress {
+    // Validate required fields
+    if (!dbOnboarding.id || !dbOnboarding.user_id) {
+      throw new Error('Invalid database record: missing required fields');
+    }
+    
     return {
       id: dbOnboarding.id,
       userId: dbOnboarding.user_id,
-      completed: dbOnboarding.completed,
+      completed: Boolean(dbOnboarding.completed),
       completedAt: dbOnboarding.completed_at ? new Date(dbOnboarding.completed_at) : undefined,
-      currentStep: dbOnboarding.current_step,
-      finalStep: dbOnboarding.final_step,
+      currentStep: Number(dbOnboarding.current_step) || 1,
+      finalStep: dbOnboarding.final_step ? Number(dbOnboarding.final_step) : undefined,
       tutorialProgress: dbOnboarding.tutorial_progress || {},
       createdAt: new Date(dbOnboarding.created_at),
       updatedAt: new Date(dbOnboarding.updated_at),
