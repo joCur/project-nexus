@@ -3,6 +3,30 @@
  * Provides type-safe storage with expiration and validation
  */
 
+// Configuration constants for cache TTL
+const CACHE_CONFIG = {
+  // Default TTL values in milliseconds
+  DEFAULT_ONBOARDING_TTL: 5 * 60 * 1000, // 5 minutes
+  DEFAULT_USER_PROFILE_TTL: 15 * 60 * 1000, // 15 minutes  
+  DEFAULT_SESSION_TTL: 60 * 1000, // 1 minute
+  
+  // Get configurable TTL from environment or use defaults
+  get ONBOARDING_TTL() {
+    const envTtl = process.env.NEXT_PUBLIC_CACHE_ONBOARDING_TTL;
+    return envTtl ? parseInt(envTtl, 10) * 1000 : this.DEFAULT_ONBOARDING_TTL;
+  },
+  
+  get USER_PROFILE_TTL() {
+    const envTtl = process.env.NEXT_PUBLIC_CACHE_USER_PROFILE_TTL;
+    return envTtl ? parseInt(envTtl, 10) * 1000 : this.DEFAULT_USER_PROFILE_TTL;
+  },
+  
+  get SESSION_TTL() {
+    const envTtl = process.env.NEXT_PUBLIC_CACHE_SESSION_TTL;
+    return envTtl ? parseInt(envTtl, 10) * 1000 : this.DEFAULT_SESSION_TTL;
+  },
+} as const;
+
 interface CacheEntry<T> {
   data: T;
   timestamp: number;
@@ -184,21 +208,24 @@ export const CACHE_VERSIONS = {
   AUTH_SESSION_V1: '1.0',
 } as const;
 
-// Common cache options
+// Common cache options with configurable TTL
 export const CACHE_OPTIONS = {
   ONBOARDING_STATUS: {
-    ttl: 5 * 60 * 1000, // 5 minutes
+    ttl: CACHE_CONFIG.ONBOARDING_TTL,
     version: CACHE_VERSIONS.ONBOARDING_V1,
     storage: 'localStorage' as const,
   },
   USER_PROFILE: {
-    ttl: 15 * 60 * 1000, // 15 minutes
+    ttl: CACHE_CONFIG.USER_PROFILE_TTL,
     version: CACHE_VERSIONS.USER_PROFILE_V1,
     storage: 'localStorage' as const,
   },
   SESSION_INFO: {
-    ttl: 60 * 1000, // 1 minute
+    ttl: CACHE_CONFIG.SESSION_TTL,
     version: CACHE_VERSIONS.AUTH_SESSION_V1,
     storage: 'sessionStorage' as const,
   },
 } as const;
+
+// Export cache configuration for external use
+export { CACHE_CONFIG };

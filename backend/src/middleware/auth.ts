@@ -79,11 +79,9 @@ export function createAuthMiddleware(
           req.permissions = user.permissions || [];
           req.isAuthenticated = true;
           
-          console.log('Development mode authentication:', {
+          securityLogger.authSuccess(user.id, auth0UserId, {
             requestId,
-            userId: user.id,
-            auth0UserId,
-            email,
+            action: 'dev_mode_auth',
             consistent: true
           });
           
@@ -148,7 +146,13 @@ export function createAuthMiddleware(
             }
           );
           // Don't throw error, continue with authentication but log the issue
-          console.error('Session creation failed but continuing auth:', sessionError);
+          securityLogger.authFailure(
+            `Session creation failed but continuing auth: ${sessionError instanceof Error ? sessionError.message : 'Unknown error'}`,
+            {
+              userId: user.id,
+              auth0UserId: auth0Payload.sub
+            }
+          );
         }
       }
 

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from './use-auth';
 import { localCache, CACHE_KEYS, CACHE_OPTIONS } from '@/lib/client-cache';
+import logger from '@/lib/logger';
 
 interface OnboardingStatus {
   isComplete: boolean;
@@ -147,7 +148,7 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
             // Server error - preserve existing status if we have one
             const currentStatus = status || loadFromCache();
             if (currentStatus) {
-              console.warn('Server error, preserving existing onboarding status:', response.status);
+              logger.warn('Server error, preserving existing onboarding status', { statusCode: response.status });
               setError(`Server temporarily unavailable (${response.status})`);
               return;
             }
@@ -167,8 +168,8 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
         saveToCache(data);
 
       } catch (err) {
-        console.error('Failed to fetch onboarding status:', err);
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        logger.error('Failed to fetch onboarding status', { error: errorMessage });
         setError(errorMessage);
         
         // Preserve existing status if we have it, otherwise use safe defaults
@@ -184,7 +185,7 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
           setStatus(defaultStatus);
         } else {
           // Keep existing status and let user know about the error
-          console.warn('Preserving existing onboarding status due to fetch error');
+          logger.warn('Preserving existing onboarding status due to fetch error');
         }
       } finally {
         setIsLoading(false);

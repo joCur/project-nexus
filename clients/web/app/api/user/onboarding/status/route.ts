@@ -92,7 +92,6 @@ export async function GET() {
           ...(accessToken && { 'Authorization': `Bearer ${accessToken}` }),
           // Add user context for development
           'X-User-Sub': session.user.sub,
-          'X-User-Email': session.user.email || '',
           'X-Request-ID': requestId,
         },
         body: JSON.stringify({

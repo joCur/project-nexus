@@ -5,6 +5,7 @@ import { useOnboardingStatus } from '@/hooks/use-onboarding-status';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import logger from '@/lib/logger';
 
 /**
  * Legacy workspace page - redirects to new workspace structure
@@ -33,7 +34,7 @@ function WorkspaceContent() {
     // Only redirect after we have a definitive status (not during initial load)
     // This prevents race conditions where users might be redirected incorrectly
     if (!onboardingLoading && !isInitialLoad && onboardingStatus && !onboardingStatus.isComplete) {
-      console.log('Redirecting to onboarding - user has not completed onboarding');
+      logger.info('Redirecting to onboarding - user has not completed onboarding');
       router.push('/onboarding');
       return;
     }
@@ -46,7 +47,7 @@ function WorkspaceContent() {
       if (!workspaceId && onboardingStatus.workspace?.id) {
         // Update the store with the workspace info from onboarding status
         workspaceId = onboardingStatus.workspace.id;
-        console.log('Syncing workspace ID from onboarding status:', workspaceId);
+        logger.info('Syncing workspace ID from onboarding status', { workspaceId });
         setCurrentWorkspace(workspaceId, onboardingStatus.workspace.name);
       }
       
@@ -56,12 +57,10 @@ function WorkspaceContent() {
       
       // Log for debugging workspace mismatch issues
       if (defaultWorkspaceId === 'default-workspace') {
-        console.warn('Using fallback default-workspace - user may not have completed onboarding properly');
-        console.log('Store state for debugging:', { 
-          context, 
-          isInitialized, 
-          onboardingStatus,
-          workspaceFromOnboarding: onboardingStatus.workspace 
+        logger.warn('Using fallback default-workspace - user may not have completed onboarding properly', {
+          contextWorkspaceId: context.currentWorkspaceId,
+          isInitialized,
+          hasOnboardingWorkspace: !!onboardingStatus.workspace
         });
       }
       
@@ -106,7 +105,7 @@ function WorkspaceContent() {
 
   // Show connection warning if we have cached data but current errors
   if (onboardingError && onboardingStatus?.isComplete) {
-    console.warn('Using cached onboarding status due to connection error:', onboardingError);
+    logger.warn('Using cached onboarding status due to connection error', { error: onboardingError });
     // Continue with redirect using cached data
   }
 
