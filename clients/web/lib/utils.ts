@@ -26,7 +26,7 @@ export function generateId(prefix = 'id'): string {
 export function meetsContrastRequirement(
   backgroundColor: string,
   textColor: string,
-  level: 'AA' | 'AAA' = 'AA'
+  level: 'AA' | 'AAA' = 'AA' // eslint-disable-line @typescript-eslint/no-unused-vars
 ): boolean {
   // This is a simplified check - in production you'd want to use a proper color contrast library
   // Implementation would involve actual color contrast calculation

@@ -547,12 +547,8 @@ describe('GET /api/user/onboarding/status - NEX-178 Enhanced Error Handling', ()
         expect(response.status).toBe(200);
       });
 
-      // Each should have a unique request ID
-      const requestIds = new Set();
+      // Each request should complete successfully
       responses.forEach(response => {
-        const body = response.body;
-        // In a real scenario, we'd extract the request ID from response headers
-        // Here we just verify all requests completed successfully
         expect(response.status).toBe(200);
       });
     });

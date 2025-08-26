@@ -206,7 +206,7 @@ function UnauthorizedAccess({
                 aria-live="assertive"
               >
                 <p className="mb-3">
-                  You don't have permission to access this resource. Please contact your administrator if you believe this is an error.
+                  You don&apos;t have permission to access this resource. Please contact your administrator if you believe this is an error.
                 </p>
                 
                 {requiredPermissions && requiredPermissions.length > 0 && (
