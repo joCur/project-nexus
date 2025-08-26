@@ -239,7 +239,7 @@ describe('useOnboardingStatus', () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it.skip('should re-fetch when user changes', async () => {
+  it('should re-fetch when user changes', async () => {
     const firstUser = { ...mockUser, sub: 'auth0|user-1' };
     const secondUser = { ...mockUser, sub: 'auth0|user-2' };
 

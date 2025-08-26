@@ -25,9 +25,17 @@ class OnboardingApiError extends Error implements ApiError {
   }
 
   static fromFetchError(error: Error): OnboardingApiError {
-    // Network errors (fetch failures, no response)
-    if (error.message.includes('fetch') || error.name === 'TypeError') {
-      return new OnboardingApiError('NETWORK_ERROR', 'Network connection failed', undefined, error);
+    // Network errors (fetch failures, no response, connection issues)
+    if (error.message.includes('fetch') || 
+        error.message.includes('Network') || 
+        error.message.includes('network') ||
+        error.name === 'TypeError') {
+      return new OnboardingApiError('NETWORK_ERROR', error.message, undefined, error);
+    }
+    
+    // Validation errors (malformed API responses)
+    if (error.message.includes('Invalid response format')) {
+      return new OnboardingApiError('VALIDATION_ERROR', error.message, undefined, error);
     }
     
     // Default to unknown error
@@ -36,7 +44,7 @@ class OnboardingApiError extends Error implements ApiError {
 
   static fromResponse(response: Response): OnboardingApiError {
     if (response.status >= 500) {
-      return new OnboardingApiError('SERVER_ERROR', `Server error: ${response.statusText}`, response.status);
+      return new OnboardingApiError('SERVER_ERROR', 'Server temporarily unavailable', response.status);
     }
     
     if (response.status === 401) {
@@ -102,6 +110,7 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
   const currentFetchPromiseRef = useRef<Promise<void> | null>(null);
   const sessionStableRef = useRef(false);
   const statusRef = useRef<OnboardingStatus | null>(null);
+  const previousUserIdRef = useRef<string | null>(null);
 
   /**
    * Load onboarding status from cache first, then optionally fetch fresh data
@@ -238,11 +247,11 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
         setError(apiError.message);
         
         // Handle different error types appropriately
-        if (apiError.type === 'NETWORK_ERROR' || apiError.type === 'SERVER_ERROR') {
-          // For network/server errors, preserve existing status if we have it
-          const existingStatus = status || loadFromCache();
+        if (apiError.type === 'NETWORK_ERROR' || apiError.type === 'SERVER_ERROR' || apiError.type === 'VALIDATION_ERROR') {
+          // For network/server/validation errors, preserve existing status if we have it
+          const existingStatus = statusRef.current || loadFromCache();
           if (existingStatus) {
-            logger.warn('Preserving existing onboarding status due to connectivity/server error', {
+            logger.warn('Preserving existing onboarding status due to connectivity/server/validation error', {
               errorType: apiError.type
             });
             return;
@@ -317,11 +326,27 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
   }, [authLoading, isAuthenticated, fetchStatus]);
 
   /**
-   * Clear cache when user changes (logout/login)
+   * Clear state when user changes (logout/login between different users)
    */
   useEffect(() => {
+    const currentUserId = user?.sub;
+    const previousUserId = previousUserIdRef.current;
+    
+    // Only clear state if switching between different actual users (not initial load)
+    if (previousUserId && currentUserId && previousUserId !== currentUserId) {
+      setStatus(null);
+      setError(null);
+      setIsLoading(true);
+      setIsInitialLoad(true);
+      statusRef.current = null;
+      sessionStableRef.current = false;
+    }
+    
+    // Update previous user ID
+    previousUserIdRef.current = currentUserId || null;
+    
     return () => {
-      // Reset session stable flag when component unmounts or user changes
+      // Reset session stable flag when component unmounts
       sessionStableRef.current = false;
     };
   }, [user?.sub]);

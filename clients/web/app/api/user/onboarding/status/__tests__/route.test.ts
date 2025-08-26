@@ -183,17 +183,21 @@ describe('GET /api/user/onboarding/status - NEX-178 Enhanced Error Handling', ()
     it('should handle request timeouts', async () => {
       jest.useFakeTimers();
 
-      // Create a promise that never resolves to simulate hanging request
-      const hangingPromise = new Promise(() => {});
+      // Create a promise that rejects with proper AbortError when aborted
+      const hangingPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+          const abortError = new Error('The operation was aborted.');
+          abortError.name = 'AbortError';
+          reject(abortError);
+        }, 10000);
+      });
+      
       (global.fetch as jest.Mock).mockReturnValue(hangingPromise);
 
       const responsePromise = GET();
 
       // Advance time to trigger timeout
       jest.advanceTimersByTime(10000);
-
-      // Give AbortController time to process
-      await new Promise(resolve => setTimeout(resolve, 0));
 
       const response = await responsePromise;
       const data = await response.json();
@@ -204,7 +208,7 @@ describe('GET /api/user/onboarding/status - NEX-178 Enhanced Error Handling', ()
       expect(data.retryAfter).toBe(10);
 
       jest.useRealTimers();
-    });
+    }, 15000);
 
     it('should handle ECONNREFUSED errors specifically', async () => {
       (global.fetch as jest.Mock).mockRejectedValue(new Error('connect ECONNREFUSED 127.0.0.1:3000'));

@@ -12,7 +12,7 @@ import { getSession, getAccessToken } from '@auth0/nextjs-auth0';
  * - Request timeout handling
  */
 export async function GET() {
-  const requestId = Math.random().toString(36).substring(7);
+  const requestId = Math.random().toString(36).substring(2, 9);
   const startTime = Date.now();
   
   console.log(`[${requestId}] Onboarding status request started`);
@@ -92,6 +92,7 @@ export async function GET() {
           ...(accessToken && { 'Authorization': `Bearer ${accessToken}` }),
           // Add user context for development
           'X-User-Sub': session.user.sub,
+          'X-User-Email': session.user.email,
           'X-Request-ID': requestId,
         },
         body: JSON.stringify({
