@@ -71,9 +71,9 @@ module.exports = {
     connection: {
       host: 'localhost', // Tests always run locally
       port: parseInt(process.env.POSTGRES_PORT) || 5432,
-      database: process.env.TEST_POSTGRES_DB || 'nexus_test_db',
-      user: process.env.POSTGRES_USER || 'nexus',
-      password: process.env.POSTGRES_PASSWORD || 'nexus_secure_2024',
+      database: process.env.POSTGRES_DB || process.env.TEST_POSTGRES_DB || 'nexus_test_db',
+      user: process.env.POSTGRES_USER || 'postgres',
+      password: process.env.POSTGRES_PASSWORD || 'test_password',
     },
     pool: {
       min: 1,

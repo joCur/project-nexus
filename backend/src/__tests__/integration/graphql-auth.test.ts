@@ -1,5 +1,3 @@
-import { ApolloServer } from '@apollo/server';
-import { buildSchema } from 'graphql';
 import { authResolvers } from '@/resolvers/auth';
 import { Auth0Service } from '@/services/auth0';
 import { UserService } from '@/services/user';
@@ -8,7 +6,6 @@ import {
   AuthenticationError,
   AuthorizationError,
   NotFoundError,
-  ValidationError,
 } from '@/utils/errors';
 import {
   createMockAuth0Service,
@@ -20,7 +17,6 @@ import {
   JWT_FIXTURES,
   AUTH0_USER_FIXTURES,
   USER_FIXTURES,
-  GRAPHQL_FIXTURES,
   SESSION_FIXTURES,
 } from '../utils/test-fixtures';
 
@@ -28,49 +24,6 @@ import {
 jest.mock('@/utils/logger');
 
 // GraphQL schema for testing
-const typeDefs = `
-  scalar DateTime
-  scalar JSON
-
-  type User {
-    id: ID!
-    email: String!
-    displayName: String
-    roles: [String!]!
-    permissions: [String!]!
-    lastLogin: DateTime
-    createdAt: DateTime!
-  }
-
-  type AuthPayload {
-    user: User!
-    sessionId: String!
-    expiresAt: DateTime!
-    permissions: [String!]!
-  }
-
-  type SessionData {
-    userId: String!
-    expiresAt: DateTime!
-    lastActivity: DateTime!
-  }
-
-  type Query {
-    me: User
-    validateSession: Boolean!
-    getUserPermissions(userId: String!): [String!]!
-  }
-
-  type Mutation {
-    syncUserFromAuth0(auth0Token: String!): AuthPayload!
-    refreshSession: SessionData!
-    logout: Boolean!
-    grantPermissions(userId: String!, permissions: [String!]!): User!
-    revokePermissions(userId: String!, permissions: [String!]!): User!
-    assignRole(userId: String!, role: String!): User!
-    removeRole(userId: String!, role: String!): User!
-  }
-`;
 
 describe('GraphQL Authentication Integration Tests', () => {
   let mockAuth0Service: jest.Mocked<Auth0Service>;
@@ -256,7 +209,7 @@ describe('GraphQL Authentication Integration Tests', () => {
       const auth0User = AUTH0_USER_FIXTURES.STANDARD_USER;
       const user = USER_FIXTURES.STANDARD_USER;
       const sessionId = 'session-123';
-      const expiresAt = new Date(Date.now() + 4 * 60 * 60 * 1000);
+      const _expiresAt = new Date(Date.now() + 4 * 60 * 60 * 1000);
 
       const context = createMockGraphQLContext({
         dataSources: { auth0Service: mockAuth0Service },

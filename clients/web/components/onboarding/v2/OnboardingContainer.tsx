@@ -361,7 +361,7 @@ export const OnboardingContainer: React.FC = () => {
     nextStep();
   }, [state.progress.currentStepId, nextStep]);
 
-  const completeOnboarding = useCallback(() => {
+  const completeOnboarding = useCallback(async () => {
     const completedAt = new Date().toISOString();
     const totalDuration = (Date.now() - new Date(state.progress.startedAt).getTime()) / 1000;
 
@@ -374,21 +374,64 @@ export const OnboardingContainer: React.FC = () => {
       },
     }));
 
-    // Save onboarding completion to localStorage
-    localStorage.setItem('nexus-onboarding-completed', JSON.stringify({
-      completedAt,
-      totalDuration,
-      userChoices: state.progress.userChoices,
-      persona: state.progress.userPersona,
-    }));
+    try {
+      // Save onboarding completion to server via API
+      const response = await fetch('/api/user/onboarding/complete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          completedAt,
+          totalDuration,
+          userChoices: state.progress.userChoices,
+          persona: state.progress.userPersona,
+          finalStep: state.progress.currentStepId,
+          tutorialProgress: {
+            profileSetup: true,
+            workspaceIntro: true,
+            firstCard: true,
+          },
+        }),
+      });
 
-    // Announce completion
-    announceAuthStatus('Onboarding completed successfully! Redirecting to workspace.', 'polite');
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
 
-    // Redirect to workspace after short delay
-    setTimeout(() => {
-      router.push('/workspace');
-    }, 2000);
+      // Also save to localStorage as backup
+      localStorage.setItem('nexus-onboarding-completed', JSON.stringify({
+        completedAt,
+        totalDuration,
+        userChoices: state.progress.userChoices,
+        persona: state.progress.userPersona,
+      }));
+
+      // Announce completion
+      announceAuthStatus('Onboarding completed successfully! Redirecting to workspace.', 'polite');
+
+      // Redirect to workspace after short delay
+      setTimeout(() => {
+        router.push('/workspace');
+      }, 2000);
+
+    } catch (error) {
+      console.error('Failed to complete onboarding on server:', error);
+      
+      // Still save to localStorage and redirect even if server call fails
+      localStorage.setItem('nexus-onboarding-completed', JSON.stringify({
+        completedAt,
+        totalDuration,
+        userChoices: state.progress.userChoices,
+        persona: state.progress.userPersona,
+      }));
+
+      announceAuthStatus('Onboarding completed! Redirecting to workspace.', 'polite');
+      
+      setTimeout(() => {
+        router.push('/workspace');
+      }, 2000);
+    }
   }, [state.progress, router, announceAuthStatus]);
 
   const exitOnboarding = useCallback(() => {

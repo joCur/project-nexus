@@ -8,7 +8,7 @@ import {
 } from '@/types';
 import { 
   NotFoundError, 
-  UniqueConstraintError, 
+  UniqueConstraintError as _UniqueConstraintError, 
   ValidationError 
 } from '@/utils/errors';
 import { createContextLogger } from '@/utils/logger';
@@ -64,8 +64,8 @@ export class UserService {
         email_verified: validatedInput.emailVerified,
         display_name: validatedInput.displayName,
         avatar_url: validatedInput.avatarUrl,
-        roles: validatedInput.roles,
-        permissions: validatedInput.permissions,
+        roles: JSON.stringify(validatedInput.roles || []),
+        permissions: JSON.stringify(validatedInput.permissions || []),
         metadata_synced_at: new Date(),
       };
 
@@ -194,11 +194,11 @@ export class UserService {
         updateData.avatar_url = validatedInput.avatarUrl;
       }
       if (validatedInput.roles !== undefined) {
-        updateData.roles = validatedInput.roles;
+        updateData.roles = JSON.stringify(validatedInput.roles);
         updateData.metadata_synced_at = new Date();
       }
       if (validatedInput.permissions !== undefined) {
-        updateData.permissions = validatedInput.permissions;
+        updateData.permissions = JSON.stringify(validatedInput.permissions);
         updateData.metadata_synced_at = new Date();
       }
       if (validatedInput.lastLogin !== undefined) {
@@ -400,8 +400,8 @@ export class UserService {
       auth0UpdatedAt: dbUser.auth0_updated_at ? new Date(dbUser.auth0_updated_at) : undefined,
       createdAt: new Date(dbUser.created_at),
       updatedAt: new Date(dbUser.updated_at),
-      roles: dbUser.roles || [],
-      permissions: dbUser.permissions || [],
+      roles: typeof dbUser.roles === 'string' ? JSON.parse(dbUser.roles) : (dbUser.roles || []),
+      permissions: typeof dbUser.permissions === 'string' ? JSON.parse(dbUser.permissions) : (dbUser.permissions || []),
       metadataSyncedAt: new Date(dbUser.metadata_synced_at),
     };
   }

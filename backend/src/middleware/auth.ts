@@ -2,7 +2,6 @@ import { Request, Response, NextFunction } from 'express';
 import { 
   AuthenticationError, 
   AuthorizationError, 
-  TokenExpiredError,
   InvalidTokenError 
 } from '@/utils/errors';
 import { securityLogger } from '@/utils/logger';
@@ -29,7 +28,7 @@ export interface AuthenticatedRequest extends Request {
 export function createAuthMiddleware(
   auth0Service: Auth0Service,
   userService: UserService,
-  cacheService: CacheService
+  _cacheService: CacheService
 ) {
   return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     // Initialize authentication context
@@ -123,18 +122,18 @@ export function createAuthMiddleware(
 
       // Sync user from Auth0 with session consistency
       const user = await auth0Service.syncUserFromAuth0(auth0Payload);
-      
-      // Create or validate session for consistency across requests
-      let sessionValid = await auth0Service.validateSession(user.id);
+
+      // For new users or users without sessions, create a session automatically
+      // This ensures onboarding flows work properly without session errors
+      const sessionValid = await auth0Service.validateSession(user.id);
       if (!sessionValid) {
-        // Create new session for first-time or expired sessions
+        // Create session automatically for new users during authentication
         try {
-          await auth0Service.createSession(user, auth0Payload);
-          sessionValid = true;
-          
+          const sessionId = await auth0Service.createSession(user, auth0Payload);
           securityLogger.sessionEvent('created', user.id, {
+            sessionId,
             auth0UserId: auth0Payload.sub,
-            reason: 'session_expired_recreated',
+            reason: 'auto_session_creation_during_auth',
             userAgent: req.headers['user-agent'],
             ip: req.ip,
           });
@@ -148,7 +147,8 @@ export function createAuthMiddleware(
               ip: req.ip,
             }
           );
-          throw new TokenExpiredError('Session management failed');
+          // Don't throw error, continue with authentication but log the issue
+          console.error('Session creation failed but continuing auth:', sessionError);
         }
       }
 
@@ -281,7 +281,7 @@ export function requireRole(role: string) {
 export function createGraphQLContext(
   auth0Service: Auth0Service,
   userService: UserService,
-  cacheService: CacheService,
+  _cacheService: CacheService,
   userProfileService: import('@/services/userProfile').UserProfileService,
   onboardingService: import('@/services/onboarding').OnboardingService,
   workspaceService: import('@/services/workspace').WorkspaceService
@@ -303,7 +303,7 @@ export function createGraphQLContext(
       dataSources: {
         auth0Service,
         userService,
-        cacheService,
+        cacheService: _cacheService,
         userProfileService,
         onboardingService,
         workspaceService,

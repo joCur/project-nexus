@@ -72,7 +72,7 @@ export function announceToScreenReader(
 /**
  * Traps focus within a container element
  */
-export function trapFocus(container: HTMLElement): () => void {
+export function trapFocus(container: HTMLElement, skipInitialFocus = false): () => void {
   const focusableElements = container.querySelectorAll(
     'a[href], button, textarea, input[type="text"], input[type="radio"], input[type="checkbox"], select, [tabindex]:not([tabindex="-1"])'
   );
@@ -98,8 +98,11 @@ export function trapFocus(container: HTMLElement): () => void {
 
   container.addEventListener('keydown', handleTabKey);
   
-  // Focus the first element
-  firstElement?.focus();
+  // Only focus the first element if not already focused within the container
+  // and skipInitialFocus is false
+  if (!skipInitialFocus && !container.contains(document.activeElement)) {
+    firstElement?.focus();
+  }
 
   // Return cleanup function
   return () => {

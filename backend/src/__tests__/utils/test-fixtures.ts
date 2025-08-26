@@ -1,10 +1,10 @@
-import { randomUUID } from 'crypto';
+import { randomUUID as _randomUUID } from 'crypto';
 import { 
   generateMockJWT, 
   generateExpiredJWT,
   createMockAuth0User,
   createMockUser,
-  TEST_AUTH0_CONFIG 
+  TEST_AUTH0_CONFIG as _TEST_AUTH0_CONFIG 
 } from './test-helpers';
 
 /**
@@ -85,57 +85,53 @@ export const JWT_FIXTURES = {
 export const AUTH0_USER_FIXTURES = {
   STANDARD_USER: createMockAuth0User({
     sub: 'auth0|test_user_123',
+    username: 'johndoe',
     email: 'john.doe@example.com',
-    email_verified: true,
     name: 'John Doe',
-    nickname: 'johndoe',
     picture: 'https://example.com/avatars/john.jpg',
-    'https://api.nexus-app.de/roles': ['user'],
-    'https://api.nexus-app.de/permissions': ['card:read', 'workspace:read'],
-    'https://api.nexus-app.de/user_id': 'user-123-uuid',
+    roles: ['user'],
+    permissions: ['card:read', 'workspace:read'],
+    userId: 'user-123-uuid',
   }),
 
   ADMIN_USER: createMockAuth0User({
     sub: 'auth0|admin_user_456',
+    username: 'admin',
     email: 'admin@example.com',
-    email_verified: true,
     name: 'Admin User',
-    nickname: 'admin',
     picture: 'https://example.com/avatars/admin.jpg',
-    'https://api.nexus-app.de/roles': ['super_admin'],
-    'https://api.nexus-app.de/permissions': [
+    roles: ['super_admin'],
+    permissions: [
       'card:create', 'card:read', 'card:update', 'card:delete',
       'workspace:create', 'workspace:read', 'workspace:update', 'workspace:delete',
       'admin:user_management', 'admin:system_settings'
     ],
-    'https://api.nexus-app.de/user_id': 'admin-456-uuid',
+    userId: 'admin-456-uuid',
   }),
 
   WORKSPACE_OWNER: createMockAuth0User({
     sub: 'auth0|workspace_owner_789',
+    username: 'owner',
     email: 'owner@example.com',
-    email_verified: true,
     name: 'Workspace Owner',
-    nickname: 'owner',
     picture: 'https://example.com/avatars/owner.jpg',
-    'https://api.nexus-app.de/roles': ['workspace_owner'],
-    'https://api.nexus-app.de/permissions': [
+    roles: ['workspace_owner'],
+    permissions: [
       'card:create', 'card:read', 'card:update', 'card:delete',
       'workspace:read', 'workspace:update', 'workspace:invite', 'workspace:manage_members'
     ],
-    'https://api.nexus-app.de/user_id': 'owner-789-uuid',
+    userId: 'owner-789-uuid',
   }),
 
   UNVERIFIED_USER: createMockAuth0User({
     sub: 'auth0|unverified_user_555',
+    username: 'unverified',
     email: 'unverified@example.com',
-    email_verified: false,
     name: 'Unverified User',
-    nickname: 'unverified',
     picture: 'https://example.com/avatars/unverified.jpg',
-    'https://api.nexus-app.de/roles': ['user'],
-    'https://api.nexus-app.de/permissions': ['card:read', 'workspace:read'],
-    'https://api.nexus-app.de/user_id': 'unverified-555-uuid',
+    roles: ['user'],
+    permissions: ['card:read', 'workspace:read'],
+    userId: 'unverified-555-uuid',
   }),
 };
 

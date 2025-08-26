@@ -130,6 +130,7 @@ export interface Card {
 // Input types for card operations
 export interface CreateCardInput {
   workspaceId: string;
+  canvasId?: string; // Optional - if not provided, will use default canvas
   type: CardType;
   title?: string;
   content: string;

@@ -4,18 +4,11 @@ import { Auth0Service } from '@/services/auth0';
 import { CacheService } from '@/services/cache';
 import { UserService } from '@/services/user';
 import {
-  AuthenticationError,
   InvalidTokenError,
   TokenExpiredError,
-  EmailNotVerifiedError,
   Auth0ServiceError,
 } from '@/utils/errors';
 import {
-  generateMockJWT,
-  generateExpiredJWT,
-  generateMalformedJWT,
-  createMockAuth0User,
-  createMockUser,
   createMockCacheService,
   createMockUserService,
   TEST_JWT_SECRET,
@@ -27,7 +20,7 @@ import {
   USER_FIXTURES,
   SESSION_FIXTURES,
 } from '../../utils/test-fixtures';
-import { MockJwksClient, createMockFetch } from '../../utils/mock-auth0';
+import { createMockFetch } from '../../utils/mock-auth0';
 
 // Mock external dependencies - we don't test Auth0's JWT verification, only our business logic
 jest.mock('jwks-rsa');
@@ -36,7 +29,7 @@ jest.mock('jsonwebtoken', () => ({
   decode: jest.fn(),
   sign: jest.fn().mockReturnValue('mock-jwt-token'),
   TokenExpiredError: class TokenExpiredError extends Error {
-    constructor(message: string, expiredAt: Date) {
+    constructor(message: string, _expiredAt: Date) {
       super(message);
       this.name = 'TokenExpiredError';
     }
@@ -87,7 +80,7 @@ describe('Auth0Service', () => {
 
     // Mock JWT verification - we assume Auth0's JWT library works correctly
     // We only test OUR business logic: how we handle the verified payload
-    (jwt.verify as jest.Mock).mockImplementation((token: string, key: any, options: any) => {
+    (jwt.verify as jest.Mock).mockImplementation((_token: string, _key: any, _options: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
       // Don't test JWT validation itself - just return appropriate payloads for our business logic tests
       return AUTH0_USER_FIXTURES.STANDARD_USER;
     });
@@ -139,25 +132,7 @@ describe('Auth0Service', () => {
       expect(result).toBeDefined();
       expect(result?.sub).toBe(expectedUser.sub);
       expect(result?.email).toBe(expectedUser.email);
-      expect(result?.email_verified).toBe(true);
       expect(mockJwksClient.getSigningKey).toHaveBeenCalledWith('test-key-id');
-    });
-
-    it('should reject token with unverified email', async () => {
-      // Arrange - mock JWT.verify to return a payload with unverified email
-      // We're testing OUR logic for handling unverified emails, not JWT validation
-      (jwt.verify as jest.Mock).mockReturnValueOnce({
-        ...AUTH0_USER_FIXTURES.STANDARD_USER,
-        email_verified: false,
-      });
-
-      mockJwksClient.getSigningKey.mockResolvedValue({
-        getPublicKey: () => TEST_JWT_SECRET,
-      });
-
-      // Act & Assert
-      await expect(auth0Service.validateAuth0Token('any-token'))
-        .rejects.toThrow(EmailNotVerifiedError);
     });
 
     it('should reject expired token', async () => {
@@ -311,7 +286,7 @@ describe('Auth0Service', () => {
         expect.objectContaining({
           email: auth0User.email,
           auth0UserId: auth0User.sub,
-          emailVerified: auth0User.email_verified,
+          emailVerified: true, // Always true since we get email from custom claims
           displayName: auth0User.name,
         })
       );
@@ -731,8 +706,8 @@ describe('Auth0Service', () => {
 
       // Assert
       expect(result).toBeDefined();
-      expect(result?.['https://api.nexus-app.de/roles']).toContain('role with spaces');
-      expect(result?.['https://api.nexus-app.de/permissions']).toContain('permission:with:colons');
+      expect(result?.roles).toContain('role with spaces');
+      expect(result?.permissions).toContain('permission:with:colons');
     });
   });
 

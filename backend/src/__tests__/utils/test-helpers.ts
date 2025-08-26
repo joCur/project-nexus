@@ -1,6 +1,11 @@
 import jwt from 'jsonwebtoken';
 import { Auth0User, Auth0TokenPayload, User } from '@/types/auth';
 import { randomUUID } from 'crypto';
+import express from 'express';
+import { ApolloServer } from '@apollo/server';
+import { expressMiddleware } from '@apollo/server/express4';
+import { typeDefs } from '@/graphql/typeDefs';
+import { resolvers } from '@/resolvers';
 
 /**
  * Test helper utilities for authentication testing
@@ -80,9 +85,8 @@ export function createMockAuth0User(overrides: Partial<Auth0User> = {}): Auth0Us
   return {
     sub: 'auth0|test_user_123',
     email: 'test@example.com',
-    email_verified: true,
+    username: 'testuser',
     name: 'Test User',
-    nickname: 'testuser',
     picture: 'https://example.com/avatar.jpg',
     updated_at: new Date().toISOString(),
     iss: TEST_AUTH0_CONFIG.issuer,
@@ -90,9 +94,9 @@ export function createMockAuth0User(overrides: Partial<Auth0User> = {}): Auth0Us
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + 3600,
     scope: 'openid profile email',
-    'https://api.nexus-app.de/roles': ['user'],
-    'https://api.nexus-app.de/permissions': ['card:read', 'workspace:read'],
-    'https://api.nexus-app.de/user_id': randomUUID(),
+    roles: ['user'],
+    permissions: ['card:read', 'workspace:read'],
+    userId: randomUUID(),
     ...overrides,
   };
 }
@@ -451,6 +455,25 @@ export function createMockWorkspaceService() {
 }
 
 /**
+ * Create mock canvas service
+ */
+export function createMockCanvasService() {
+  return {
+    getCanvasById: jest.fn(),
+    getWorkspaceCanvases: jest.fn(),
+    getCanvasesByWorkspace: jest.fn(),
+    getDefaultCanvas: jest.fn(),
+    createCanvas: jest.fn(),
+    updateCanvas: jest.fn(),
+    deleteCanvas: jest.fn(),
+    setDefaultCanvas: jest.fn(),
+    duplicateCanvas: jest.fn(),
+    getCanvasStats: jest.fn(),
+    getCanvasStatistics: jest.fn(),
+  } as any;
+}
+
+/**
  * Create mock Auth0 service
  */
 export function createMockAuth0Service() {
@@ -539,9 +562,7 @@ export const ERROR_SCENARIOS = {
 export let testMockServices: any = {};
 
 export async function createTestApp() {
-  const express = require('express');
-  const { ApolloServer } = require('@apollo/server');
-  const { expressMiddleware } = require('@apollo/server/express4');
+  // Using imported modules
   
   const app = express();
   app.use(express.json());
@@ -554,14 +575,13 @@ export async function createTestApp() {
     auth0Service: createMockAuth0Service(),
     userService: createMockUserService(),
     cacheService: createMockCacheService(),
+    canvasService: createMockCanvasService(),
   };
   
-  // Import actual schema and resolvers
-  const { typeDefs } = require('@/graphql/typeDefs');
-  const { resolvers } = require('@/resolvers');
+  // Using imported schema and resolvers
   
   // Mock authentication middleware
-  app.use('/graphql', (req, res, next) => {
+  app.use('/graphql', (req: any, res: any, next: any) => {
     const auth = req.headers.authorization;
     const userSub = req.headers['x-user-sub'];
     const userEmail = req.headers['x-user-email'];
@@ -594,7 +614,7 @@ export async function createTestApp() {
   
   // GraphQL endpoint
   app.use('/graphql', expressMiddleware(server, {
-    context: async ({ req }) => ({
+    context: async ({ req }: { req: any }) => ({
       isAuthenticated: req.isAuthenticated,
       user: req.user,
       permissions: req.permissions,

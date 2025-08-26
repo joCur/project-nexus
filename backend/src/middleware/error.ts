@@ -165,7 +165,7 @@ export const formatGraphQLError = (error: any) => {
 /**
  * Async error wrapper for route handlers
  */
-export const asyncHandler = (fn: Function) => {
+export const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => Promise<any> | any) => {
   return (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
@@ -198,31 +198,34 @@ export const databaseErrorHandler = (error: any, req: Request, res: Response, ne
   // Handle specific database errors
   if (error.code) {
     switch (error.code) {
-      case '23505': // Unique constraint violation
+      case '23505': { // Unique constraint violation
         const uniqueError = new AppError(
           'Resource already exists',
           409,
           'DUPLICATE_RESOURCE'
         );
         return next(uniqueError);
+      }
         
-      case '23503': // Foreign key constraint violation
+      case '23503': { // Foreign key constraint violation
         const foreignKeyError = new AppError(
           'Referenced resource not found',
           400,
           'INVALID_REFERENCE'
         );
         return next(foreignKeyError);
+      }
         
-      case '23502': // Not null constraint violation
+      case '23502': { // Not null constraint violation
         const notNullError = new AppError(
           'Required field missing',
           400,
           'MISSING_REQUIRED_FIELD'
         );
         return next(notNullError);
+      }
         
-      default:
+      default: {
         // Generic database error
         const dbError = new AppError(
           'Database operation failed',
@@ -230,6 +233,7 @@ export const databaseErrorHandler = (error: any, req: Request, res: Response, ne
           'DATABASE_ERROR'
         );
         return next(dbError);
+      }
     }
   }
 

@@ -29,6 +29,13 @@ export const CONNECTION_EVENTS = {
   CONNECTION_DELETED: 'CONNECTION_DELETED',
 } as const;
 
+// Event names for canvas subscriptions
+export const CANVAS_EVENTS = {
+  CANVAS_CREATED: 'CANVAS_CREATED',
+  CANVAS_UPDATED: 'CANVAS_UPDATED',
+  CANVAS_DELETED: 'CANVAS_DELETED',
+} as const;
+
 // Event names for workspace subscriptions
 export const WORKSPACE_EVENTS = {
   USER_JOINED_CANVAS: 'USER_JOINED_CANVAS',
@@ -38,6 +45,7 @@ export const WORKSPACE_EVENTS = {
 
 export type CardEventType = typeof CARD_EVENTS[keyof typeof CARD_EVENTS];
 export type ConnectionEventType = typeof CONNECTION_EVENTS[keyof typeof CONNECTION_EVENTS];
+export type CanvasEventType = typeof CANVAS_EVENTS[keyof typeof CANVAS_EVENTS];
 export type WorkspaceEventType = typeof WORKSPACE_EVENTS[keyof typeof WORKSPACE_EVENTS];
 
 /**
@@ -266,6 +274,74 @@ export class SubscriptionService {
     } catch (error) {
       logger.error('Failed to publish user left canvas event', {
         userId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  /**
+   * Publish canvas created event
+   */
+  static async publishCanvasCreated(canvas: any): Promise<void> {
+    try {
+      await pubSub.publish(CANVAS_EVENTS.CANVAS_CREATED, {
+        canvasCreated: canvas,
+        workspaceId: canvas.workspaceId,
+      });
+
+      logger.info('Canvas created event published', {
+        canvasId: canvas.id,
+        workspaceId: canvas.workspaceId,
+        name: canvas.name,
+      });
+    } catch (error) {
+      logger.error('Failed to publish canvas created event', {
+        canvasId: canvas.id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  /**
+   * Publish canvas updated event
+   */
+  static async publishCanvasUpdated(canvas: any): Promise<void> {
+    try {
+      await pubSub.publish(CANVAS_EVENTS.CANVAS_UPDATED, {
+        canvasUpdated: canvas,
+        workspaceId: canvas.workspaceId,
+      });
+
+      logger.info('Canvas updated event published', {
+        canvasId: canvas.id,
+        workspaceId: canvas.workspaceId,
+        name: canvas.name,
+      });
+    } catch (error) {
+      logger.error('Failed to publish canvas updated event', {
+        canvasId: canvas.id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
+  /**
+   * Publish canvas deleted event
+   */
+  static async publishCanvasDeleted(canvasId: string, workspaceId: string): Promise<void> {
+    try {
+      await pubSub.publish(CANVAS_EVENTS.CANVAS_DELETED, {
+        canvasDeleted: canvasId,
+        workspaceId,
+      });
+
+      logger.info('Canvas deleted event published', {
+        canvasId,
+        workspaceId,
+      });
+    } catch (error) {
+      logger.error('Failed to publish canvas deleted event', {
+        canvasId,
         error: error instanceof Error ? error.message : 'Unknown error',
       });
     }
