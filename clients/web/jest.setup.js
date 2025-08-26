@@ -26,6 +26,19 @@ jest.mock('next/navigation', () => ({
   },
 }));
 
+// Mock Next.js server APIs
+jest.mock('next/server', () => ({
+  NextResponse: {
+    json: jest.fn((data, init = {}) => ({
+      json: jest.fn().mockResolvedValue(data),
+      status: init.status || 200,
+      statusText: init.statusText || 'OK',
+      ok: (init.status || 200) >= 200 && (init.status || 200) < 300,
+      headers: init.headers || {},
+    })),
+  },
+}));
+
 // Make router mock available globally
 global.mockRouter = mockRouter;
 
@@ -85,6 +98,34 @@ Object.defineProperty(window, 'performance', {
 // Mock requestAnimationFrame
 global.requestAnimationFrame = jest.fn((cb) => setTimeout(cb, 16));
 global.cancelAnimationFrame = jest.fn((id) => clearTimeout(id));
+
+// Mock Web APIs that might not be available in Node.js test environment
+global.Request = class MockRequest {
+  constructor(input, init = {}) {
+    this.url = typeof input === 'string' ? input : input.url;
+    this.method = init.method || 'GET';
+    this.headers = init.headers || {};
+    this.body = init.body;
+  }
+};
+
+global.Response = class MockResponse {
+  constructor(body, init = {}) {
+    this.body = body;
+    this.status = init.status || 200;
+    this.statusText = init.statusText || 'OK';
+    this.ok = this.status >= 200 && this.status < 300;
+    this.headers = init.headers || {};
+  }
+  
+  async json() {
+    return JSON.parse(this.body);
+  }
+  
+  async text() {
+    return this.body;
+  }
+};
 
 // Mock localStorage and sessionStorage
 const mockStorage = () => {
