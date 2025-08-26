@@ -101,6 +101,7 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
   const [isFetching, setIsFetching] = useState(false);
   const currentFetchPromiseRef = useRef<Promise<void> | null>(null);
   const sessionStableRef = useRef(false);
+  const statusRef = useRef<OnboardingStatus | null>(null);
 
   /**
    * Load onboarding status from cache first, then optionally fetch fresh data
@@ -196,7 +197,7 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
           
           if (apiError.type === 'SERVER_ERROR') {
             // Server error - preserve existing status if we have one
-            const currentStatus = status || loadFromCache();
+            const currentStatus = statusRef.current || loadFromCache();
             if (currentStatus) {
               logger.warn('Server error, preserving existing onboarding status', { 
                 statusCode: apiError.statusCode,
@@ -266,7 +267,7 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
 
     currentFetchPromiseRef.current = fetchPromise;
     await fetchPromise;
-  }, [user?.sub, authLoading, isAuthenticated, isInitialLoad, status, loadFromCache, saveToCache, clearCache]);
+  }, [user?.sub, authLoading, isAuthenticated, isInitialLoad, loadFromCache, saveToCache, clearCache]);
 
   /**
    * Force refresh onboarding status from API
@@ -324,6 +325,11 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
       sessionStableRef.current = false;
     };
   }, [user?.sub]);
+
+  // Keep statusRef in sync with status
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
 
   return {
     status,

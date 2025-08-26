@@ -86,6 +86,40 @@ Object.defineProperty(window, 'performance', {
 global.requestAnimationFrame = jest.fn((cb) => setTimeout(cb, 16));
 global.cancelAnimationFrame = jest.fn((id) => clearTimeout(id));
 
+// Mock localStorage and sessionStorage
+const mockStorage = () => {
+  let store = {};
+  return {
+    getItem: jest.fn((key) => store[key] || null),
+    setItem: jest.fn((key, value) => {
+      store[key] = value.toString();
+    }),
+    removeItem: jest.fn((key) => {
+      delete store[key];
+    }),
+    clear: jest.fn(() => {
+      store = {};
+    }),
+    get length() {
+      return Object.keys(store).length;
+    },
+    key: jest.fn((index) => {
+      const keys = Object.keys(store);
+      return keys[index] || null;
+    }),
+  };
+};
+
+Object.defineProperty(window, 'localStorage', {
+  value: mockStorage(),
+  writable: true,
+});
+
+Object.defineProperty(window, 'sessionStorage', {
+  value: mockStorage(),
+  writable: true,
+});
+
 // Mock Auth0 NextJS SDK
 jest.mock('@auth0/nextjs-auth0/client', () => ({
   useUser: jest.fn(() => ({
@@ -132,6 +166,8 @@ global.mockFetchError = (error) => {
 beforeEach(() => {
   jest.clearAllMocks();
   global.fetch.mockClear();
+  window.localStorage.clear();
+  window.sessionStorage.clear();
 });
 
 // Console suppression for tests
