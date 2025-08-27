@@ -208,6 +208,14 @@ describe('useOnboardingStatus - NEX-178 Bug Fixes', () => {
 
       const { result } = renderHook(() => useOnboardingStatus());
 
+      // Should load from cache immediately (no error yet since no API call for completed status)
+      await waitFor(() => {
+        expect(result.current.status).toEqual(completedStatus);
+      });
+      
+      // Force a refresh to trigger API call and get the error
+      await result.current.refetch();
+
       await waitFor(() => {
         expect(result.current.error).toBeTruthy();
       });
@@ -253,6 +261,14 @@ describe('useOnboardingStatus - NEX-178 Bug Fixes', () => {
       (global.fetch as jest.Mock).mockRejectedValue(new Error('fetch failed'));
 
       const { result } = renderHook(() => useOnboardingStatus());
+
+      // Should load from cache immediately
+      await waitFor(() => {
+        expect(result.current.status).toEqual(completedStatus);
+      });
+      
+      // Force a refresh to trigger API call and get the network error
+      await result.current.refetch();
 
       await waitFor(() => {
         expect(result.current.error).toBeTruthy();

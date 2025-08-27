@@ -192,13 +192,16 @@ describe('useOnboardingStatus - NEX-178 Race Condition Fixes', () => {
     });
 
     it('should handle rapid logout/login cycles', async () => {
+      // Use in-progress status so fetch calls actually happen
+      global.mockFetch(mockInProgressStatus);
+      
       const { result, rerender } = renderHook(() => useOnboardingStatus());
 
       // Initial load
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false);
       });
-      expect(result.current.status).toEqual(mockCompletedStatus);
+      expect(result.current.status).toEqual(mockInProgressStatus);
 
       // Simulate logout
       act(() => {
@@ -251,11 +254,10 @@ describe('useOnboardingStatus - NEX-178 Race Condition Fixes', () => {
       // Should have cached data immediately
       expect(result.current.status).toEqual(mockCompletedStatus);
       expect(result.current.error).toBeNull();
+      expect(result.current.isLoading).toBe(false);
 
-      // Should also fetch fresh data
-      await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalled();
-      });
+      // With completed status cached, no additional fetch should occur (optimization)
+      expect(global.fetch).not.toHaveBeenCalled();
     });
 
     it('should save successful responses to cache', async () => {

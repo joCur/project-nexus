@@ -254,6 +254,7 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
             logger.warn('Preserving existing onboarding status due to connectivity/server/validation error', {
               errorType: apiError.type
             });
+            setStatus(existingStatus);
             return;
           }
         }
@@ -276,7 +277,7 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
 
     currentFetchPromiseRef.current = fetchPromise;
     await fetchPromise;
-  }, [user?.sub, authLoading, isAuthenticated, isInitialLoad, loadFromCache, saveToCache, clearCache]);
+  }, [user?.sub, authLoading, isAuthenticated, loadFromCache, saveToCache, clearCache]);
 
   /**
    * Force refresh onboarding status from API
@@ -286,14 +287,23 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
   }, [fetchStatus]);
 
   /**
-   * Initialize onboarding status when auth session becomes stable
+   * Initialize onboarding status when auth session becomes stable and fetch data
    */
   useEffect(() => {
-    // Mark session as stable after auth finishes loading
-    if (!authLoading && !sessionStableRef.current) {
-      sessionStableRef.current = true;
+    // Mark session as stable and fetch when auth is ready
+    if (!authLoading && isAuthenticated) {
+      if (!sessionStableRef.current) {
+        sessionStableRef.current = true;
+        fetchStatus();
+      }
+    } else if (!authLoading && !isAuthenticated) {
+      // User is not authenticated, clear everything
+      setStatus(null);
+      setIsLoading(false);
+      setIsInitialLoad(false);
+      setError(null);
     }
-  }, [authLoading]);
+  }, [authLoading, isAuthenticated, fetchStatus]);
 
   /**
    * Load cached data immediately on mount, then fetch fresh data when session is stable
@@ -311,21 +321,6 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
   }, [user?.sub, status, loadFromCache]);
 
   /**
-   * Fetch fresh data when session becomes stable
-   */
-  useEffect(() => {
-    if (sessionStableRef.current && !authLoading && isAuthenticated) {
-      fetchStatus();
-    } else if (!authLoading && !isAuthenticated) {
-      // User is not authenticated, clear everything
-      setStatus(null);
-      setIsLoading(false);
-      setIsInitialLoad(false);
-      setError(null);
-    }
-  }, [authLoading, isAuthenticated, fetchStatus]);
-
-  /**
    * Clear state when user changes (logout/login between different users)
    */
   useEffect(() => {
@@ -334,12 +329,19 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
     
     // Only clear state if switching between different actual users (not initial load)
     if (previousUserId && currentUserId && previousUserId !== currentUserId) {
+      // Clear cache for previous user for security/privacy
+      const oldCacheKey = `${CACHE_KEYS.ONBOARDING_STATUS}:${previousUserId}`;
+      localCache.remove(oldCacheKey, CACHE_OPTIONS.ONBOARDING_STATUS);
+      
       setStatus(null);
       setError(null);
       setIsLoading(true);
       setIsInitialLoad(true);
       statusRef.current = null;
       sessionStableRef.current = false;
+      
+      // Mark session as unstable and let the main auth effect handle re-fetch
+      // This prevents duplicate fetches and respects current auth state
     }
     
     // Update previous user ID
@@ -349,7 +351,7 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
       // Reset session stable flag when component unmounts
       sessionStableRef.current = false;
     };
-  }, [user?.sub]);
+  }, [user?.sub, authLoading, isAuthenticated, fetchStatus]);
 
   // Keep statusRef in sync with status
   useEffect(() => {

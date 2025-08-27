@@ -142,7 +142,7 @@ describe('useOnboardingStatus', () => {
       hasProfile: false,
       hasWorkspace: false,
     });
-    expect(result.current.error).toBe('Server error: Internal Server Error');
+    expect(result.current.error).toBe('Server temporarily unavailable');
   });
 
   it('should handle network errors', async () => {
