@@ -201,6 +201,9 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
             // User is not authenticated, clear everything
             setStatus(null);
             clearCache();
+            setIsLoading(false);
+            setIsInitialLoad(false);
+            setIsFetching(false);
             return;
           }
           
@@ -297,13 +300,16 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
         fetchStatus();
       }
     } else if (!authLoading && !isAuthenticated) {
-      // User is not authenticated, clear everything
+      // User is not authenticated, clear everything including cache
       setStatus(null);
       setIsLoading(false);
       setIsInitialLoad(false);
       setError(null);
+      statusRef.current = null;
+      sessionStableRef.current = false;
+      clearCache(); // Clear cache on logout for security and fresh data on login
     }
-  }, [authLoading, isAuthenticated, fetchStatus]);
+  }, [authLoading, isAuthenticated, fetchStatus, clearCache]);
 
   /**
    * Load cached data immediately on mount, then fetch fresh data when session is stable

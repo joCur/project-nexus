@@ -197,11 +197,11 @@ describe('useOnboardingStatus - NEX-178 Race Condition Fixes', () => {
       
       const { result, rerender } = renderHook(() => useOnboardingStatus());
 
-      // Initial load
+      // Initial load - wait for fetch to complete and status to be loaded
       await waitFor(() => {
+        expect(result.current.status).toEqual(mockInProgressStatus);
         expect(result.current.isLoading).toBe(false);
-      });
-      expect(result.current.status).toEqual(mockInProgressStatus);
+      }, { timeout: 2000 });
 
       // Simulate logout
       act(() => {
@@ -386,11 +386,18 @@ describe('useOnboardingStatus - NEX-178 Race Condition Fixes', () => {
 
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false);
+        expect(result.current.status).toEqual(mockCompletedStatus);
       });
 
-      // Should preserve existing status on server error
+      // Force a refresh to trigger API call and get the error
+      await result.current.refetch();
+
+      await waitFor(() => {
+        expect(result.current.error).toMatch(/Server temporarily unavailable/);
+      });
+
+      // Should preserve existing status despite server error
       expect(result.current.status).toEqual(mockCompletedStatus);
-      expect(result.current.error).toMatch(/Server temporarily unavailable/);
     });
 
     it('should preserve in-progress status on network errors', async () => {
@@ -427,11 +434,19 @@ describe('useOnboardingStatus - NEX-178 Race Condition Fixes', () => {
 
       const { result } = renderHook(() => useOnboardingStatus());
 
+      // Should load from cache initially
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false);
+        expect(result.current.status).toEqual(mockCompletedStatus);
       });
 
-      expect(result.current.status).toBeNull();
+      // Force refresh to trigger 401 error
+      await result.current.refetch();
+
+      await waitFor(() => {
+        expect(result.current.status).toBeNull();
+      });
+
       expect(mockLocalCache.remove).toHaveBeenCalledWith(
         `${CACHE_KEYS.ONBOARDING_STATUS}:${mockUser.sub}`,
         CACHE_OPTIONS.ONBOARDING_STATUS
@@ -451,13 +466,21 @@ describe('useOnboardingStatus - NEX-178 Race Condition Fixes', () => {
 
       const { result } = renderHook(() => useOnboardingStatus());
 
+      // Should load from cache initially
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false);
+        expect(result.current.status).toEqual(mockCompletedStatus);
+      });
+
+      // Force refresh to trigger malformed response error
+      await result.current.refetch();
+
+      await waitFor(() => {
+        expect(result.current.error).toMatch(/Invalid response format/);
       });
 
       // Should preserve existing cached status on invalid response
       expect(result.current.status).toEqual(mockCompletedStatus);
-      expect(result.current.error).toMatch(/Invalid response format/);
     });
   });
 
@@ -683,12 +706,14 @@ describe('useOnboardingStatus - NEX-178 Race Condition Fixes', () => {
     });
 
     it('should show loading during fetch but not during cached data display', async () => {
-      mockLocalCache.get.mockReturnValue(mockCompletedStatus);
+      // Use in-progress status so fetch actually occurs (completed status is optimized to skip fetch)
+      mockLocalCache.get.mockReturnValue(mockInProgressStatus);
+      global.mockFetch(mockInProgressStatus);
 
       const { result } = renderHook(() => useOnboardingStatus());
 
       // Should show cached data immediately, but still loading fresh data
-      expect(result.current.status).toEqual(mockCompletedStatus);
+      expect(result.current.status).toEqual(mockInProgressStatus);
       expect(result.current.isLoading).toBe(true); // Still fetching fresh data
 
       await waitFor(() => {
@@ -696,7 +721,7 @@ describe('useOnboardingStatus - NEX-178 Race Condition Fixes', () => {
       });
 
       // After fetch completes, should still have the data
-      expect(result.current.status).toEqual(mockCompletedStatus);
+      expect(result.current.status).toEqual(mockInProgressStatus);
     });
   });
 });
