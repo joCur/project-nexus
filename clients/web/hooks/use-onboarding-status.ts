@@ -200,10 +200,12 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
           if (apiError.statusCode === 401) {
             // User is not authenticated, clear everything
             setStatus(null);
+            statusRef.current = null;
             clearCache();
             setIsLoading(false);
             setIsInitialLoad(false);
             setIsFetching(false);
+            setError(null); // 401 is not an error - it's handled by auth system
             return;
           }
           
@@ -345,9 +347,6 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
       setIsInitialLoad(true);
       statusRef.current = null;
       sessionStableRef.current = false;
-      
-      // Mark session as unstable and let the main auth effect handle re-fetch
-      // This prevents duplicate fetches and respects current auth state
     }
     
     // Update previous user ID
@@ -357,7 +356,7 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
       // Reset session stable flag when component unmounts
       sessionStableRef.current = false;
     };
-  }, [user?.sub, authLoading, isAuthenticated, fetchStatus]);
+  }, [user?.sub]); // Only depend on user ID changes
 
   // Keep statusRef in sync with status
   useEffect(() => {

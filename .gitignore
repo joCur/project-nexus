@@ -58,3 +58,7 @@ tmp/
 temp/
 
 data/
+.env*
+.flaskenv*
+!.env.project
+!.env.vault
