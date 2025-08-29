@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:developer' as dev;
 import 'dart:io';
 
@@ -26,7 +27,7 @@ DatabaseService databaseService(Ref ref) {
 /// - Error handling and recovery
 class DatabaseService {
   Database? _database;
-  bool _isInitializing = false;
+  Completer<Database>? _initializationCompleter;
 
   /// Get the database instance, initializing if necessary
   Future<Database> get database async {
@@ -34,14 +35,9 @@ class DatabaseService {
       return _database!;
     }
     
-    if (_isInitializing) {
-      // Wait for initialization to complete
-      while (_isInitializing) {
-        await Future.delayed(const Duration(milliseconds: 100));
-      }
-      if (_database != null && _database!.isOpen) {
-        return _database!;
-      }
+    // If initialization is already in progress, wait for it
+    if (_initializationCompleter != null && !_initializationCompleter!.isCompleted) {
+      return await _initializationCompleter!.future;
     }
 
     return await _initDatabase();
@@ -49,11 +45,13 @@ class DatabaseService {
 
   /// Initialize the database
   Future<Database> _initDatabase() async {
-    if (_isInitializing) {
-      throw StateError('Database is already being initialized');
+    // Check if initialization is already in progress
+    if (_initializationCompleter != null && !_initializationCompleter!.isCompleted) {
+      return await _initializationCompleter!.future;
     }
 
-    _isInitializing = true;
+    // Create a new completer for this initialization
+    _initializationCompleter = Completer<Database>();
     
     try {
       dev.log('Initializing Project Nexus database', name: 'DatabaseService');
@@ -80,6 +78,9 @@ class DatabaseService {
       );
 
       dev.log('Database initialized successfully at: $databasePath', name: 'DatabaseService');
+      
+      // Complete the initialization
+      _initializationCompleter!.complete(_database!);
       return _database!;
       
     } catch (error, stackTrace) {
@@ -89,9 +90,10 @@ class DatabaseService {
         error: error,
         stackTrace: stackTrace,
       );
+      
+      // Complete with error
+      _initializationCompleter!.completeError(error, stackTrace);
       rethrow;
-    } finally {
-      _isInitializing = false;
     }
   }
 

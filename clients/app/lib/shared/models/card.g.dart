@@ -161,7 +161,6 @@ Card _$CardFromJson(Map<String, dynamic> json) => Card(
         ),
   contentHash: json['contentHash'] as String?,
   isEncrypted: json['isEncrypted'] as bool? ?? false,
-  encryptionKey: json['encryptionKey'] as String?,
 );
 
 Map<String, dynamic> _$CardToJson(Card instance) => <String, dynamic>{
@@ -195,7 +194,6 @@ Map<String, dynamic> _$CardToJson(Card instance) => <String, dynamic>{
   'analysisResults': instance.analysisResults,
   'contentHash': instance.contentHash,
   'isEncrypted': instance.isEncrypted,
-  'encryptionKey': instance.encryptionKey,
 };
 
 const _$CardTypeEnumMap = {

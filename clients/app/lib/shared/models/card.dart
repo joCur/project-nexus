@@ -323,7 +323,6 @@ class Card {
   final String? contentHash;
   @JsonKey(defaultValue: false)
   final bool isEncrypted;
-  final String? encryptionKey;
 
   const Card({
     required this.id,
@@ -356,7 +355,6 @@ class Card {
     this.analysisResults,
     this.contentHash,
     this.isEncrypted = false,
-    this.encryptionKey,
   });
 
   factory Card.fromJson(Map<String, dynamic> json) => _$CardFromJson(json);
@@ -435,7 +433,6 @@ class Card {
     CardAnalysisResult? analysisResults,
     String? contentHash,
     bool? isEncrypted,
-    String? encryptionKey,
   }) {
     return Card(
       id: id ?? this.id,
@@ -468,7 +465,6 @@ class Card {
       analysisResults: analysisResults ?? this.analysisResults,
       contentHash: contentHash ?? this.contentHash,
       isEncrypted: isEncrypted ?? this.isEncrypted,
-      encryptionKey: encryptionKey ?? this.encryptionKey,
     );
   }
 
@@ -525,7 +521,6 @@ class Card {
       'analysis_results': analysisResults != null ? jsonEncode(analysisResults!.toJson()) : null,
       'content_hash': contentHash,
       'is_encrypted': isEncrypted ? 1 : 0,
-      'encryption_key': encryptionKey,
     };
   }
 
@@ -583,7 +578,6 @@ class Card {
           : null,
       contentHash: map['content_hash'],
       isEncrypted: (map['is_encrypted'] ?? 0) == 1,
-      encryptionKey: map['encryption_key'],
     );
   }
 

@@ -197,6 +197,36 @@ class AutoSaveService {
     dev.log('Auto-save cancelled: $cardId', name: 'AutoSaveService');
   }
 
+  /// Clean up auto-save state for deleted cards
+  /// This prevents memory leaks by removing cards from internal maps
+  void cleanupDeletedCard(String cardId) {
+    dev.log('Cleaning up deleted card: $cardId', name: 'AutoSaveService');
+    
+    // Cancel any pending timer
+    _saveTimers[cardId]?.cancel();
+    _saveTimers.remove(cardId);
+    
+    // Remove from pending cards
+    _pendingCards.remove(cardId);
+    
+    // Complete any waiting operations with error
+    final completer = _saveCompleters.remove(cardId);
+    if (completer != null && !completer.isCompleted) {
+      completer.completeError(StateError('Card was deleted: $cardId'));
+    }
+    
+    dev.log('Cleanup completed for deleted card: $cardId', name: 'AutoSaveService');
+  }
+
+  /// Clean up multiple deleted cards at once
+  void cleanupDeletedCards(List<String> cardIds) {
+    dev.log('Cleaning up ${cardIds.length} deleted cards', name: 'AutoSaveService');
+    
+    for (final cardId in cardIds) {
+      cleanupDeletedCard(cardId);
+    }
+  }
+
   /// Perform the actual auto-save operation
   Future<void> _performAutoSave(
     String cardId, 
@@ -298,18 +328,92 @@ class AutoSaveService {
     );
   }
 
-  /// Mark auto-save operation as failed
+  /// Mark auto-save operation as failed with retry logic
   Future<void> _markAutoSaveFailed(String autoSaveId, String errorMessage) async {
+    const maxRetries = 3;
+    const retryDelays = [1000, 2000, 4000]; // Exponential backoff in ms
+    
+    // Get current attempt count
+    final records = await _databaseService.query(
+      AutoSaveTable.tableName,
+      where: '${AutoSaveTable.id} = ?',
+      whereArgs: [autoSaveId],
+    );
+    
+    if (records.isEmpty) return;
+    
+    final currentAttempts = (records.first[AutoSaveTable.attempts] as int? ?? 0) + 1;
+    final shouldRetry = currentAttempts < maxRetries;
+    
     await _databaseService.update(
       AutoSaveTable.tableName,
       {
-        AutoSaveTable.status: 'FAILED',
-        AutoSaveTable.attempts: 1, // TODO: Implement retry logic
+        AutoSaveTable.status: shouldRetry ? 'RETRY' : 'FAILED',
+        AutoSaveTable.attempts: currentAttempts,
         AutoSaveTable.lastAttempt: DateTime.now().millisecondsSinceEpoch,
+        'error_message': errorMessage,
       },
       where: '${AutoSaveTable.id} = ?',
       whereArgs: [autoSaveId],
     );
+    
+    // Schedule retry if not exceeded max attempts
+    if (shouldRetry && currentAttempts <= retryDelays.length) {
+      final delay = Duration(milliseconds: retryDelays[currentAttempts - 1]);
+      Timer(delay, () => _retryAutoSave(autoSaveId));
+    }
+  }
+
+  /// Retry a failed auto-save operation
+  Future<void> _retryAutoSave(String autoSaveId) async {
+    try {
+      // Get the auto-save record
+      final records = await _databaseService.query(
+        AutoSaveTable.tableName,
+        where: '${AutoSaveTable.id} = ? AND ${AutoSaveTable.status} = ?',
+        whereArgs: [autoSaveId, 'RETRY'],
+      );
+      
+      if (records.isEmpty) return;
+      
+      final record = records.first;
+      final cardId = record[AutoSaveTable.cardId] as String;
+      final userId = record[AutoSaveTable.userId] as String;
+      
+      dev.log('Retrying auto-save: $cardId (attempt ${record[AutoSaveTable.attempts]})', 
+              name: 'AutoSaveService');
+      
+      // Get current card data
+      final card = await _cardStorageService.getCard(cardId);
+      if (card == null) {
+        dev.log('Card not found for retry: $cardId', name: 'AutoSaveService');
+        await _databaseService.update(
+          AutoSaveTable.tableName,
+          {AutoSaveTable.status: 'FAILED'},
+          where: '${AutoSaveTable.id} = ?',
+          whereArgs: [autoSaveId],
+        );
+        return;
+      }
+      
+      // Update status to pending
+      await _databaseService.update(
+        AutoSaveTable.tableName,
+        {AutoSaveTable.status: 'PENDING'},
+        where: '${AutoSaveTable.id} = ?',
+        whereArgs: [autoSaveId],
+      );
+      
+      // Retry the save operation
+      await _cardStorageService.updateCard(card, lastModifiedBy: userId);
+      await _cardStorageService.markCardClean(cardId);
+      await _markAutoSaveCompleted(autoSaveId);
+      
+      dev.log('Auto-save retry successful: $cardId', name: 'AutoSaveService');
+    } catch (error) {
+      dev.log('Auto-save retry failed: $autoSaveId - $error', name: 'AutoSaveService');
+      await _markAutoSaveFailed(autoSaveId, error.toString());
+    }
   }
 
   /// Generate changes summary for auto-save record

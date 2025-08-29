@@ -84,7 +84,6 @@ class CardTable {
   
   // Encryption
   static const String isEncrypted = 'is_encrypted';
-  static const String encryptionKey = 'encryption_key';
 }
 
 /// Table and column definitions for Sync Queue
@@ -184,11 +183,16 @@ class DatabaseSchema {
       ${CardTable.analysisResults} TEXT, -- JSON object
       ${CardTable.contentHash} TEXT,
       ${CardTable.isEncrypted} INTEGER DEFAULT 0,
-      ${CardTable.encryptionKey} TEXT
+      CHECK (${CardTable.type} IN ('text', 'image', 'link', 'code', 'file', 'drawing')),
+      CHECK (${CardTable.status} IN ('draft', 'active', 'archived', 'deleted')),
+      CHECK (${CardTable.priority} IN ('low', 'normal', 'high', 'urgent')),
+      CHECK (${CardTable.version} >= 1),
+      CHECK (${CardTable.width} > 0 AND ${CardTable.height} > 0),
+      CHECK (${CardTable.isEncrypted} IN (0, 1))
     )
   ''';
 
-  // Sync queue table creation
+  // Sync queue table creation  
   static const String createSyncQueueTable = '''
     CREATE TABLE IF NOT EXISTS ${SyncQueueTable.tableName} (
       ${SyncQueueTable.id} TEXT PRIMARY KEY,
@@ -202,7 +206,10 @@ class DatabaseSchema {
       ${SyncQueueTable.status} TEXT DEFAULT 'PENDING',
       ${SyncQueueTable.errorMessage} TEXT,
       ${SyncQueueTable.priority} INTEGER DEFAULT 0,
-      ${SyncQueueTable.userId} TEXT NOT NULL
+      ${SyncQueueTable.userId} TEXT NOT NULL,
+      CHECK (${SyncQueueTable.entityType} IN ('CARD', 'WORKSPACE', 'CANVAS')),
+      CHECK (${SyncQueueTable.operation} IN ('CREATE', 'UPDATE', 'DELETE')),
+      CHECK (${SyncQueueTable.status} IN ('PENDING', 'IN_PROGRESS', 'COMPLETED', 'FAILED'))
     )
   ''';
 
@@ -244,7 +251,8 @@ class DatabaseSchema {
       ${AutoSaveTable.attempts} INTEGER DEFAULT 0,
       ${AutoSaveTable.lastAttempt} INTEGER,
       ${AutoSaveTable.status} TEXT DEFAULT 'PENDING',
-      ${AutoSaveTable.userId} TEXT NOT NULL
+      ${AutoSaveTable.userId} TEXT NOT NULL,
+      FOREIGN KEY (${AutoSaveTable.cardId}) REFERENCES ${CardTable.tableName}(${CardTable.id}) ON DELETE CASCADE
     )
   ''';
 
