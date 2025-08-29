@@ -180,3 +180,7 @@ gh pr merge 19 --squash --delete-branch
 - [Product Manager Documentation](./project-documentation/product-manager-output.md)
 - [Technical Architecture](./project-documentation/technical-architecture.md)
 - [Testing Guide](./TESTING.md)
+
+## Memory
+
+- never implement development versions of features that mock the real implementation, unless otherwise stated.
