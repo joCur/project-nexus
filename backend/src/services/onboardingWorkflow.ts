@@ -168,6 +168,12 @@ export class OnboardingWorkflowService {
     isComplete: boolean;
   }> {
     try {
+      logger.info('Fetching onboarding status from services', {
+        userId,
+        userIdType: typeof userId,
+        userIdLength: userId?.length,
+      });
+
       // Get all onboarding-related data
       const [profile, onboarding, defaultWorkspace] = await Promise.all([
         this.userProfileService.getProfileByUserId(userId),
@@ -176,6 +182,17 @@ export class OnboardingWorkflowService {
       ]);
 
       const isComplete = onboarding?.completed || false;
+
+      logger.info('Onboarding status fetched from services', {
+        userId,
+        hasProfile: !!profile,
+        hasOnboarding: !!onboarding,
+        hasDefaultWorkspace: !!defaultWorkspace,
+        isComplete,
+        onboardingCompleted: onboarding?.completed,
+        onboardingId: onboarding?.id,
+        profileId: profile?.id,
+      });
 
       return {
         profile,

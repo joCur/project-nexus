@@ -224,6 +224,60 @@ describe('useOnboardingStatus - NEX-178 Bug Fixes', () => {
       expect(result.current.error).toContain('Server temporarily unavailable');
     });
 
+    it('should preserve cache during logout/login for same user (NEX-178 fix)', async () => {
+      const completedStatus = { ...mockOnboardingStatus, isComplete: true };
+      mockCache.get.mockReturnValue(completedStatus);
+
+      // Start authenticated
+      mockUseAuth.mockReturnValue({
+        user: mockUser,
+        isLoading: false,
+        isAuthenticated: true,
+      });
+
+      const { result, rerender } = renderHook(() => useOnboardingStatus());
+
+      await waitFor(() => {
+        expect(result.current.status).toEqual(completedStatus);
+      });
+
+      // Simulate logout - user becomes null but cache should not be cleared
+      mockUseAuth.mockReturnValue({
+        user: null,
+        isLoading: false,
+        isAuthenticated: false,
+      });
+
+      rerender();
+
+      await waitFor(() => {
+        expect(result.current.status).toBeNull(); // State cleared but cache preserved
+      });
+
+      // Verify cache was NOT cleared for same user
+      expect(mockCache.remove).not.toHaveBeenCalledWith(
+        `${CACHE_KEYS.ONBOARDING_STATUS}:${mockUser.sub}`,
+        CACHE_OPTIONS.ONBOARDING_STATUS
+      );
+
+      // Simulate login with same user
+      mockCache.get.mockReturnValue(completedStatus); // Cache still has data
+      mockUseAuth.mockReturnValue({
+        user: mockUser,
+        isLoading: false,
+        isAuthenticated: true,
+      });
+
+      rerender();
+
+      // Should load from cache immediately, preventing onboarding flash
+      await waitFor(() => {
+        expect(result.current.status).toEqual(completedStatus);
+      });
+
+      expect(result.current.status?.isComplete).toBe(true);
+    });
+
     it('should return proper error codes for different failure types', async () => {
       mockUseAuth.mockReturnValue({
         user: mockUser,

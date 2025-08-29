@@ -2,11 +2,15 @@
 
 import { useAuth } from '@/hooks/use-auth';
 import { useOnboardingStatus } from '@/hooks/use-onboarding-status';
+import { useEffect } from 'react';
 import Link from 'next/link';
 
 export default function HomePage() {
   const { user, isLoading, login, logout } = useAuth();
   const { status: onboardingStatus, isLoading: onboardingLoading } = useOnboardingStatus();
+
+  // Note: Removed automatic redirect after login to improve UX
+  // Users now stay on the landing page and can manually navigate via buttons
 
   if (isLoading || onboardingLoading) {
     return (
@@ -54,7 +58,7 @@ export default function HomePage() {
               </>
             ) : (
               <button
-                onClick={() => login({ returnTo: onboardingStatus?.isComplete ? '/workspace' : '/onboarding' })}
+                onClick={() => login({ returnTo: '/' })}
                 className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-primary-700"
               >
                 Sign In
@@ -82,7 +86,7 @@ export default function HomePage() {
                 </Link>
               ) : (
                 <button
-                  onClick={() => login({ returnTo: onboardingStatus?.isComplete ? '/workspace' : '/onboarding' })}
+                  onClick={() => login({ returnTo: '/' })}
                   className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 md:py-4 md:text-lg md:px-10"
                 >
                   Get Started

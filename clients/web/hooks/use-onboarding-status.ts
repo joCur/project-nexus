@@ -316,16 +316,17 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
         fetchStatus();
       }
     } else if (!authLoading && !isAuthenticated) {
-      // User is not authenticated, clear everything including cache
+      // User is not authenticated, clear state but preserve cache for same user
       setStatus(null);
       setIsLoading(false);
       setIsInitialLoad(false);
       setError(null);
       statusRef.current = null;
       sessionStableRef.current = false;
-      clearCache(); // Clear cache on logout for security and fresh data on login
+      // Note: Don't clear cache here - let user change effect handle cache clearing
+      // This preserves onboarding status for same user during logout/login cycles
     }
-  }, [authLoading, isAuthenticated, fetchStatus, clearCache]);
+  }, [authLoading, isAuthenticated, fetchStatus]);
 
   /**
    * Load cached data immediately on mount, then fetch fresh data when session is stable
@@ -361,6 +362,10 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
       setIsInitialLoad(true);
       statusRef.current = null;
       sessionStableRef.current = false;
+    } else if (previousUserId && !currentUserId) {
+      // User logged out - clear cache only if we're certain they won't log back in as same user
+      // For now, preserve cache to handle quick logout/login cycles
+      // Cache will expire naturally based on TTL (5 minutes by default)
     }
     
     // Update previous user ID
