@@ -325,9 +325,7 @@ export class WorkspaceAuthorizationService {
         .returning('*');
 
       // Clear cache
-      const cacheKey = `workspace_member:${workspaceId}:${userId}`;
-      await this.cacheService.del(cacheKey);
-      await this.cacheService.del(CacheKeys.WORKSPACE_MEMBERS(workspaceId));
+      await this.invalidatePermissionCaches(userId, workspaceId);
 
       logger.info('Added workspace member', {
         workspaceId,
@@ -393,9 +391,7 @@ export class WorkspaceAuthorizationService {
         });
 
       // Clear cache
-      const cacheKey = `workspace_member:${workspaceId}:${userId}`;
-      await this.cacheService.del(cacheKey);
-      await this.cacheService.del(CacheKeys.WORKSPACE_MEMBERS(workspaceId));
+      await this.invalidatePermissionCaches(userId, workspaceId);
 
       logger.info('Updated member role', {
         workspaceId,
@@ -444,9 +440,7 @@ export class WorkspaceAuthorizationService {
         });
 
       // Clear cache
-      const cacheKey = `workspace_member:${workspaceId}:${userId}`;
-      await this.cacheService.del(cacheKey);
-      await this.cacheService.del(CacheKeys.WORKSPACE_MEMBERS(workspaceId));
+      await this.invalidatePermissionCaches(userId, workspaceId);
 
       logger.info('Removed workspace member', {
         workspaceId,
@@ -513,6 +507,37 @@ export class WorkspaceAuthorizationService {
   }
 
   /**
+   * Invalidate all permission-related caches for a user and workspace
+   */
+  private async invalidatePermissionCaches(userId: string, workspaceId: string): Promise<void> {
+    try {
+      const cacheKeys = [
+        // Existing caches
+        `workspace_member:${workspaceId}:${userId}`,
+        CacheKeys.WORKSPACE_MEMBERS(workspaceId),
+        
+        // New permission-specific caches
+        `user_permissions:${userId}:${workspaceId}`,
+        `user_context_permissions:${userId}`
+      ];
+
+      await Promise.all(cacheKeys.map(key => this.cacheService.del(key)));
+
+      logger.debug('Invalidated permission caches', {
+        userId,
+        workspaceId,
+        cacheKeys: cacheKeys.length
+      });
+    } catch (error) {
+      logger.warn('Failed to invalidate permission caches', {
+        userId,
+        workspaceId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  /**
    * Validate permission requirements
    */
   async requirePermission(
@@ -542,5 +567,209 @@ export class WorkspaceAuthorizationService {
     }
 
     return member;
+  }
+
+  /**
+   * Get all permissions for a user in a specific workspace
+   * 
+   * Resolves role-based permissions combined with any custom permissions.
+   * Handles both workspace members and owners (who might not be in workspace_members table).
+   * Results are cached in Redis with appropriate TTL.
+   * 
+   * @param userId - The user's ID
+   * @param workspaceId - The workspace ID
+   * @returns Promise resolving to array of permission strings, or empty array if not a member
+   */
+  async getUserPermissionsInWorkspace(userId: string, workspaceId: string): Promise<string[]> {
+    // Check cache first
+    const cacheKey = `user_permissions:${userId}:${workspaceId}`;
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached) {
+      return cached as unknown as string[];
+    }
+
+    try {
+      const member = await this.getWorkspaceMember(userId, workspaceId);
+      
+      if (!member || !member.isActive) {
+        // Cache empty result briefly to avoid repeated DB queries
+        await this.cacheService.set(cacheKey, [], 60); // 1 minute TTL for non-members
+        return [];
+      }
+
+      // Get role-based permissions
+      const rolePermissions = this.getRolePermissions(member.role);
+      
+      // Combine with custom permissions, ensuring no duplicates
+      const allPermissions = Array.from(new Set([
+        ...rolePermissions,
+        ...(member.permissions || [])
+      ]));
+
+      // Cache the result
+      await this.cacheService.set(cacheKey, allPermissions, this.CACHE_TTL);
+
+      logger.debug('Resolved user permissions in workspace', {
+        userId,
+        workspaceId,
+        role: member.role,
+        permissionCount: allPermissions.length
+      });
+
+      return allPermissions;
+    } catch (error) {
+      logger.error('Failed to get user permissions in workspace', {
+        userId,
+        workspaceId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      return [];
+    }
+  }
+
+  /**
+   * Get user's role in a workspace
+   * 
+   * Returns the user's workspace role, handling both workspace members
+   * and owners who might not be in the workspace_members table.
+   * 
+   * @param userId - The user's ID
+   * @param workspaceId - The workspace ID
+   * @returns Promise resolving to WorkspaceRole or null if user is not a member
+   */
+  async getUserWorkspaceRole(userId: string, workspaceId: string): Promise<WorkspaceRole | null> {
+    try {
+      const member = await this.getWorkspaceMember(userId, workspaceId);
+      
+      if (!member || !member.isActive) {
+        return null;
+      }
+
+      logger.debug('Resolved user workspace role', {
+        userId,
+        workspaceId,
+        role: member.role
+      });
+
+      return member.role;
+    } catch (error) {
+      logger.error('Failed to get user workspace role', {
+        userId,
+        workspaceId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Check if user has specific permission in workspace
+   * 
+   * More efficient than getUserPermissionsInWorkspace when checking a single permission.
+   * Uses role-based permissions combined with custom permissions.
+   * 
+   * @param userId - The user's ID
+   * @param workspaceId - The workspace ID
+   * @param permission - The permission to check for
+   * @returns Promise resolving to true if user has the permission, false otherwise
+   */
+  async hasPermissionInWorkspace(userId: string, workspaceId: string, permission: string): Promise<boolean> {
+    try {
+      const member = await this.getWorkspaceMember(userId, workspaceId);
+      
+      if (!member || !member.isActive) {
+        return false;
+      }
+
+      const hasPermission = this.hasPermission(member, permission);
+
+      logger.debug('Checked permission in workspace', {
+        userId,
+        workspaceId,
+        permission,
+        hasPermission,
+        role: member.role
+      });
+
+      return hasPermission;
+    } catch (error) {
+      logger.error('Failed to check permission in workspace', {
+        userId,
+        workspaceId,
+        permission,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Get permissions across all user's workspaces
+   * 
+   * Returns a mapping of workspace IDs to permission arrays for all workspaces
+   * the user has access to. This is used for GraphQL context resolution and
+   * efficient permission checking across multiple workspaces.
+   * 
+   * @param userId - The user's ID
+   * @returns Promise resolving to object mapping workspaceId to permissions array
+   */
+  async getUserPermissionsForContext(userId: string): Promise<{ [workspaceId: string]: string[] }> {
+    // Check cache first
+    const cacheKey = `user_context_permissions:${userId}`;
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached) {
+      return cached as unknown as { [workspaceId: string]: string[] };
+    }
+
+    try {
+      // Get all workspaces user is a member of
+      const memberWorkspaces = await this.db('workspace_members')
+        .select('workspace_id', 'role', 'permissions')
+        .where({
+          user_id: userId,
+          is_active: true
+        });
+
+      // Get all workspaces user owns
+      const ownedWorkspaces = await this.db('workspaces')
+        .select('id')
+        .where({ owner_id: userId });
+
+      const permissionsMap: { [workspaceId: string]: string[] } = {};
+
+      // Process member workspaces
+      for (const member of memberWorkspaces) {
+        const rolePermissions = this.getRolePermissions(member.role);
+        const customPermissions = member.permissions || [];
+        
+        permissionsMap[member.workspace_id] = Array.from(new Set([
+          ...rolePermissions,
+          ...customPermissions
+        ]));
+      }
+
+      // Process owned workspaces (in case owner is not in members table)
+      for (const workspace of ownedWorkspaces) {
+        if (!permissionsMap[workspace.id]) {
+          permissionsMap[workspace.id] = [...WorkspacePermissions.OWNER];
+        }
+      }
+
+      // Cache the result with shorter TTL since this is more dynamic
+      await this.cacheService.set(cacheKey, permissionsMap, this.CACHE_TTL);
+
+      logger.debug('Resolved user permissions for context', {
+        userId,
+        workspaceCount: Object.keys(permissionsMap).length
+      });
+
+      return permissionsMap;
+    } catch (error) {
+      logger.error('Failed to get user permissions for context', {
+        userId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      return {};
+    }
   }
 }

@@ -1,24 +1,24 @@
 {
-    "mcpServers": {
-        "playwright": {
-            "type": "stdio",
-            "command": "npx",
-            "args": [
-            "@playwright/mcp@latest"
-            ],
-            "env": {}
-        },
-        "context7": {
-            "type": "http",
-            "url": "https://mcp.context7.com/mcp"
-        },
-        "semgrep": {
-            "type": "http",
-            "url": "https://mcp.semgrep.ai/mcp"
-        },
-        "linear-server": {
-            "command": "npx",
-            "args": ["-y", "mcp-remote", "https://mcp.linear.app/sse"]
-        }
+  "mcpServers": {
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest"
+      ],
+      "env": {}
+    },
+    "context7": {
+      "type": "http",
+      "url": "https://mcp.context7.com/mcp"
+    },
+    "semgrep": {
+      "type": "http",
+      "url": "https://mcp.semgrep.ai/mcp"
+    },
+    "linear-server": {
+        "command": "npx",
+        "args": ["-y", "mcp-remote", "https://mcp.linear.app/sse"]
     }
+  }
 }
