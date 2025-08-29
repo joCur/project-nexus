@@ -1,5 +1,63 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from './use-auth';
+import { localCache, CACHE_KEYS, CACHE_OPTIONS } from '@/lib/client-cache';
+import logger from '@/lib/logger';
+
+// Error types for robust error handling
+interface ApiError {
+  type: 'NETWORK_ERROR' | 'HTTP_ERROR' | 'VALIDATION_ERROR' | 'SERVER_ERROR' | 'UNKNOWN_ERROR';
+  statusCode?: number;
+  message: string;
+  cause?: Error;
+}
+
+class OnboardingApiError extends Error implements ApiError {
+  public type: ApiError['type'];
+  public statusCode?: number;
+  public cause?: Error;
+
+  constructor(type: ApiError['type'], message: string, statusCode?: number, cause?: Error) {
+    super(message);
+    this.name = 'OnboardingApiError';
+    this.type = type;
+    this.statusCode = statusCode;
+    this.cause = cause;
+  }
+
+  static fromFetchError(error: Error): OnboardingApiError {
+    // Network errors (fetch failures, no response, connection issues)
+    if (error.message.includes('fetch') || 
+        error.message.includes('Network') || 
+        error.message.includes('network') ||
+        error.name === 'TypeError') {
+      return new OnboardingApiError('NETWORK_ERROR', error.message, undefined, error);
+    }
+    
+    // Validation errors (malformed API responses)
+    if (error.message.includes('Invalid response format')) {
+      return new OnboardingApiError('VALIDATION_ERROR', error.message, undefined, error);
+    }
+    
+    // Default to unknown error
+    return new OnboardingApiError('UNKNOWN_ERROR', error.message, undefined, error);
+  }
+
+  static fromResponse(response: Response): OnboardingApiError {
+    if (response.status >= 500) {
+      return new OnboardingApiError('SERVER_ERROR', 'Server temporarily unavailable', response.status);
+    }
+    
+    if (response.status === 401) {
+      return new OnboardingApiError('HTTP_ERROR', 'Authentication required', response.status);
+    }
+    
+    if (response.status >= 400) {
+      return new OnboardingApiError('HTTP_ERROR', `Client error: ${response.statusText}`, response.status);
+    }
+    
+    return new OnboardingApiError('HTTP_ERROR', `HTTP error: ${response.statusText}`, response.status);
+  }
+}
 
 interface OnboardingStatus {
   isComplete: boolean;
@@ -30,20 +88,72 @@ interface UseOnboardingStatusResult {
   isLoading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
+  isInitialLoad: boolean;
 }
 
+/**
+ * Enhanced onboarding status hook with race condition prevention and client-side caching
+ * 
+ * Key improvements:
+ * - Waits for Auth0 session to stabilize before making API calls
+ * - Implements client-side caching to persist state across refreshes
+ * - Provides better error handling that doesn't reset completed status
+ * - Tracks initial load state separately from subsequent fetches
+ */
 export function useOnboardingStatus(): UseOnboardingStatusResult {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading, isAuthenticated } = useAuth();
   const [status, setStatus] = useState<OnboardingStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isFetching, setIsFetching] = useState(false);
   const currentFetchPromiseRef = useRef<Promise<void> | null>(null);
+  const sessionStableRef = useRef(false);
+  const statusRef = useRef<OnboardingStatus | null>(null);
+  const previousUserIdRef = useRef<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  const fetchStatus = useCallback(async () => {
-    if (!user) {
-      setStatus(null);
-      setIsLoading(false);
+  /**
+   * Load onboarding status from cache first, then optionally fetch fresh data
+   */
+  const loadFromCache = useCallback((): OnboardingStatus | null => {
+    if (!user?.sub) return null;
+    
+    const cacheKey = `${CACHE_KEYS.ONBOARDING_STATUS}:${user.sub}`;
+    return localCache.get<OnboardingStatus>(cacheKey, CACHE_OPTIONS.ONBOARDING_STATUS);
+  }, [user?.sub]);
+
+  /**
+   * Save onboarding status to cache
+   */
+  const saveToCache = useCallback((data: OnboardingStatus) => {
+    if (!user?.sub) return;
+    
+    const cacheKey = `${CACHE_KEYS.ONBOARDING_STATUS}:${user.sub}`;
+    localCache.set(cacheKey, data, CACHE_OPTIONS.ONBOARDING_STATUS);
+  }, [user?.sub]);
+
+  /**
+   * Clear cached onboarding status for current user
+   */
+  const clearCache = useCallback(() => {
+    if (!user?.sub) return;
+    
+    const cacheKey = `${CACHE_KEYS.ONBOARDING_STATUS}:${user.sub}`;
+    localCache.remove(cacheKey, CACHE_OPTIONS.ONBOARDING_STATUS);
+  }, [user?.sub]);
+
+  /**
+   * Fetch onboarding status from API with improved error handling and caching
+   */
+  const fetchStatus = useCallback(async (forceRefresh = false) => {
+    // Don't fetch if auth is still loading or user is not authenticated
+    if (authLoading || !isAuthenticated || !user?.sub) {
+      if (!authLoading) {
+        setStatus(null);
+        setIsLoading(false);
+        setIsInitialLoad(false);
+      }
       return;
     }
 
@@ -53,41 +163,132 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
       return;
     }
 
+    // Load from cache first if not forcing refresh
+    if (!forceRefresh) {
+      const cachedStatus = loadFromCache();
+      if (cachedStatus) {
+        setStatus(cachedStatus);
+        setIsLoading(false);
+        setIsInitialLoad(false);
+        setError(null);
+        
+        // If onboarding is complete, we can trust cached data longer
+        if (cachedStatus.isComplete) {
+          return;
+        }
+      }
+    }
+
+    // Cancel any existing fetch
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new abort controller for this fetch
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     const fetchPromise = (async () => {
       try {
         setIsFetching(true);
-        setIsLoading(true);
+        if (isInitialLoad) {
+          setIsLoading(true);
+        }
         setError(null);
 
         const response = await fetch('/api/user/onboarding/status', {
           method: 'GET',
           credentials: 'include',
+          signal: abortController.signal,
         });
 
         if (!response.ok) {
-          if (response.status === 401) {
+          const apiError = OnboardingApiError.fromResponse(response);
+          
+          if (apiError.statusCode === 401) {
+            // User is not authenticated, clear everything
             setStatus(null);
+            statusRef.current = null;
+            clearCache();
+            setIsLoading(false);
+            setIsInitialLoad(false);
+            setIsFetching(false);
+            setError(null); // 401 is not an error - it's handled by auth system
             return;
           }
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          
+          if (apiError.type === 'SERVER_ERROR') {
+            // Server error - preserve existing status if we have one
+            const currentStatus = statusRef.current || loadFromCache();
+            if (currentStatus) {
+              logger.warn('Server error, preserving existing onboarding status', { 
+                statusCode: apiError.statusCode,
+                errorType: apiError.type 
+              });
+              setError(apiError.message);
+              return;
+            }
+          }
+          
+          throw apiError;
         }
 
         const data = await response.json();
+        
+        // Validate the response data
+        if (typeof data.isComplete !== 'boolean') {
+          throw new Error('Invalid response format: missing isComplete');
+        }
+
         setStatus(data);
+        saveToCache(data);
 
       } catch (err) {
-        console.error('Failed to fetch onboarding status:', err);
-        setError(err instanceof Error ? err.message : 'Unknown error');
+        // Check if the fetch was aborted
+        if (err instanceof Error && err.name === 'AbortError') {
+          // Fetch was aborted, this is expected when component unmounts or user changes
+          return;
+        }
+
+        // Convert unknown errors to our typed error system
+        const apiError = err instanceof OnboardingApiError 
+          ? err 
+          : err instanceof Error 
+            ? OnboardingApiError.fromFetchError(err)
+            : new OnboardingApiError('UNKNOWN_ERROR', 'An unknown error occurred');
         
-        // Provide safe defaults on error
-        setStatus({
+        logger.error('Failed to fetch onboarding status', { 
+          error: apiError.message,
+          errorType: apiError.type,
+          statusCode: apiError.statusCode
+        });
+        
+        setError(apiError.message);
+        
+        // Handle different error types appropriately
+        if (apiError.type === 'NETWORK_ERROR' || apiError.type === 'SERVER_ERROR' || apiError.type === 'VALIDATION_ERROR') {
+          // For network/server/validation errors, preserve existing status if we have it
+          const existingStatus = statusRef.current || loadFromCache();
+          if (existingStatus) {
+            logger.warn('Preserving existing onboarding status due to connectivity/server/validation error', {
+              errorType: apiError.type
+            });
+            setStatus(existingStatus);
+            return;
+          }
+        }
+        
+        // For other error types or when we have no existing data, use safe defaults
+        const defaultStatus: OnboardingStatus = {
           isComplete: false,
           currentStep: 1,
           hasProfile: false,
           hasWorkspace: false,
-        });
+        };
+        setStatus(defaultStatus);
       } finally {
         setIsLoading(false);
+        setIsInitialLoad(false);
         setIsFetching(false);
         currentFetchPromiseRef.current = null;
       }
@@ -95,22 +296,113 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
 
     currentFetchPromiseRef.current = fetchPromise;
     await fetchPromise;
-  }, [user]);
+  }, [user?.sub, authLoading, isAuthenticated, loadFromCache, saveToCache, clearCache]);
 
+  /**
+   * Force refresh onboarding status from API
+   */
   const refetch = useCallback(async () => {
-    return fetchStatus();
+    return fetchStatus(true); // Force refresh bypasses cache
   }, [fetchStatus]);
 
+  /**
+   * Initialize onboarding status when auth session becomes stable and fetch data
+   */
   useEffect(() => {
-    if (!authLoading) {
-      fetchStatus();
+    // Mark session as stable and fetch when auth is ready
+    if (!authLoading && isAuthenticated) {
+      if (!sessionStableRef.current) {
+        sessionStableRef.current = true;
+        fetchStatus();
+      }
+    } else if (!authLoading && !isAuthenticated) {
+      // User is not authenticated, clear state but preserve cache for same user
+      setStatus(null);
+      setIsLoading(false);
+      setIsInitialLoad(false);
+      setError(null);
+      statusRef.current = null;
+      sessionStableRef.current = false;
+      // Note: Don't clear cache here - let user change effect handle cache clearing
+      // This preserves onboarding status for same user during logout/login cycles
     }
-  }, [fetchStatus, authLoading]);
+  }, [authLoading, isAuthenticated, fetchStatus]);
+
+  /**
+   * Load cached data immediately on mount, then fetch fresh data when session is stable
+   */
+  useEffect(() => {
+    // Try to load from cache immediately to prevent flash
+    if (user?.sub && !status) {
+      const cachedStatus = loadFromCache();
+      if (cachedStatus) {
+        setStatus(cachedStatus);
+        setError(null);
+        // Don't set loading to false yet - we still want to fetch fresh data
+      }
+    }
+  }, [user?.sub, status, loadFromCache]);
+
+  /**
+   * Clear state when user changes (logout/login between different users)
+   */
+  useEffect(() => {
+    const currentUserId = user?.sub;
+    const previousUserId = previousUserIdRef.current;
+    
+    // Only clear state if switching between different actual users (not initial load)
+    if (previousUserId && currentUserId && previousUserId !== currentUserId) {
+      // Clear cache for previous user for security/privacy
+      const oldCacheKey = `${CACHE_KEYS.ONBOARDING_STATUS}:${previousUserId}`;
+      localCache.remove(oldCacheKey, CACHE_OPTIONS.ONBOARDING_STATUS);
+      
+      setStatus(null);
+      setError(null);
+      setIsLoading(true);
+      setIsInitialLoad(true);
+      statusRef.current = null;
+      sessionStableRef.current = false;
+    } else if (previousUserId && !currentUserId) {
+      // User logged out - clear cache only if we're certain they won't log back in as same user
+      // For now, preserve cache to handle quick logout/login cycles
+      // Cache will expire naturally based on TTL (5 minutes by default)
+    }
+    
+    // Update previous user ID
+    previousUserIdRef.current = currentUserId || null;
+    
+    return () => {
+      // Reset session stable flag when component unmounts
+      sessionStableRef.current = false;
+    };
+  }, [user?.sub]); // Only depend on user ID changes
+
+  // Keep statusRef in sync with status
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Abort any pending fetch when component unmounts
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      // Clear refs to prevent memory leaks
+      currentFetchPromiseRef.current = null;
+      sessionStableRef.current = false;
+      statusRef.current = null;
+      previousUserIdRef.current = null;
+    };
+  }, []);
 
   return {
     status,
     isLoading: isLoading || authLoading,
     error,
     refetch,
+    isInitialLoad,
   };
 }

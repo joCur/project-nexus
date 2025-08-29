@@ -9,6 +9,7 @@ import { ValidationError } from '@/utils/errors';
 jest.mock('@/database/connection', () => ({
   database: {
     query: jest.fn(),
+    transaction: jest.fn(),
   },
   knex: jest.fn(),
 }));
@@ -47,7 +48,7 @@ describe('OnboardingService', () => {
     completed: false,
     completedAt: undefined,
     currentStep: 1,
-    finalStep: null,
+    finalStep: undefined,
     tutorialProgress: { profileSetup: false },
     createdAt: new Date('2023-01-01'),
     updatedAt: new Date('2023-01-01'),
@@ -56,6 +57,11 @@ describe('OnboardingService', () => {
   beforeEach(() => {
     onboardingService = new OnboardingService();
     jest.clearAllMocks();
+    
+    // Reset all mock implementations
+    mockDatabase.query.mockClear();
+    mockDatabase.transaction.mockClear();
+    mockKnexDb.knex.mockClear();
   });
 
   describe('getProgress', () => {
@@ -115,50 +121,95 @@ describe('OnboardingService', () => {
     };
 
     it('should update existing onboarding progress', async () => {
-      // Mock getProgress to return existing onboarding
-      jest.spyOn(onboardingService, 'getProgress').mockResolvedValue(expectedOnboarding);
-
-      // Mock knex update query
-      const mockKnexQuery = {
-        where: jest.fn().mockReturnThis(),
-        update: jest.fn().mockReturnThis(),
-        returning: jest.fn().mockReturnThis(),
+      // Create a chainable mock query builder using recursive mocking
+      const mockQueryBuilder = {
+        where: jest.fn(),
+        first: jest.fn(), 
+        forUpdate: jest.fn(),
+        update: jest.fn(),
+        returning: jest.fn(),
+        insert: jest.fn(),
       };
-      mockKnexDb.knex.mockReturnValue(mockKnexQuery);
+      
+      // Make all the chainable methods return the same object
+      mockQueryBuilder.where.mockReturnValue(mockQueryBuilder);
+      mockQueryBuilder.first.mockReturnValue(mockQueryBuilder);
+      mockQueryBuilder.forUpdate.mockReturnValue(mockQueryBuilder);
+      mockQueryBuilder.update.mockReturnValue(mockQueryBuilder);
+      mockQueryBuilder.insert.mockReturnValue(mockQueryBuilder);
+      
+      // Mock the transaction function that returns the query builder  
+      const mockTrx = jest.fn(() => mockQueryBuilder);
+      
+      // Mock knex to return query builder for non-transaction queries
+      const mockKnexQuery = jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnThis(),
+        first: jest.fn().mockReturnThis(),
+      });
+      mockKnexDb.knex.mockImplementation(mockKnexQuery);
 
       const updatedMockDb = { ...mockDbOnboarding, current_step: 2 };
-      mockDatabase.query.mockResolvedValue([updatedMockDb]);
+      
+      // Mock the transaction callback execution
+      mockDatabase.transaction.mockImplementation(async (callback) => {
+        // Mock finding existing record - forUpdate should also be chainable
+        mockQueryBuilder.forUpdate.mockResolvedValue(mockDbOnboarding);
+        // Mock update returning updated record  
+        mockQueryBuilder.returning.mockResolvedValue([updatedMockDb]);
+        
+        return callback(mockTrx as any);
+      });
 
       const result = await onboardingService.updateProgress(validInput);
 
       expect(result.currentStep).toBe(2);
-      expect(mockDatabase.query).toHaveBeenCalledWith(
-        mockKnexQuery,
-        'onboarding_update_progress'
-      );
+      expect(mockDatabase.transaction).toHaveBeenCalled();
     });
 
     it('should create new onboarding progress when none exists', async () => {
-      // Mock getProgress to return null
-      jest.spyOn(onboardingService, 'getProgress').mockResolvedValue(null);
-
-      // Mock knex insert query
-      const mockKnexQuery = {
-        insert: jest.fn().mockReturnThis(),
-        returning: jest.fn().mockReturnThis(),
+      // Create a chainable mock query builder using recursive mocking
+      const mockQueryBuilder = {
+        where: jest.fn(),
+        first: jest.fn(), 
+        forUpdate: jest.fn(),
+        update: jest.fn(),
+        returning: jest.fn(),
+        insert: jest.fn(),
       };
-      mockKnexDb.knex.mockReturnValue(mockKnexQuery);
+      
+      // Make all the chainable methods return the same object
+      mockQueryBuilder.where.mockReturnValue(mockQueryBuilder);
+      mockQueryBuilder.first.mockReturnValue(mockQueryBuilder);
+      mockQueryBuilder.forUpdate.mockReturnValue(mockQueryBuilder);
+      mockQueryBuilder.update.mockReturnValue(mockQueryBuilder);
+      mockQueryBuilder.insert.mockReturnValue(mockQueryBuilder);
+      
+      // Mock the transaction function that returns the query builder  
+      const mockTrx = jest.fn(() => mockQueryBuilder);
+      
+      // Mock knex to return query builder for non-transaction queries
+      const mockKnexQuery = jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnThis(),
+        first: jest.fn().mockReturnThis(),
+      });
+      mockKnexDb.knex.mockImplementation(mockKnexQuery);
 
       const newMockDb = { ...mockDbOnboarding, current_step: 2 };
-      mockDatabase.query.mockResolvedValue([newMockDb]);
+      
+      // Mock the transaction callback execution
+      mockDatabase.transaction.mockImplementation(async (callback) => {
+        // Mock finding no existing record - forUpdate should also be chainable
+        mockQueryBuilder.forUpdate.mockResolvedValue(undefined);
+        // Mock insert returning new record
+        mockQueryBuilder.returning.mockResolvedValue([newMockDb]);
+        
+        return callback(mockTrx as any);
+      });
 
       const result = await onboardingService.updateProgress(validInput);
 
       expect(result.currentStep).toBe(2);
-      expect(mockDatabase.query).toHaveBeenCalledWith(
-        mockKnexQuery,
-        'onboarding_create_progress'
-      );
+      expect(mockDatabase.transaction).toHaveBeenCalled();
     });
 
     it('should validate input parameters', async () => {
@@ -195,16 +246,32 @@ describe('OnboardingService', () => {
     };
 
     it('should complete existing onboarding', async () => {
-      // Mock getProgress to return existing onboarding
-      jest.spyOn(onboardingService, 'getProgress').mockResolvedValue(expectedOnboarding);
-
-      // Mock knex update query
-      const mockKnexQuery = {
-        where: jest.fn().mockReturnThis(),
-        update: jest.fn().mockReturnThis(),
-        returning: jest.fn().mockReturnThis(),
+      // Create a chainable mock query builder using recursive mocking
+      const mockQueryBuilder = {
+        where: jest.fn(),
+        first: jest.fn(), 
+        forUpdate: jest.fn(),
+        update: jest.fn(),
+        returning: jest.fn(),
+        insert: jest.fn(),
       };
-      mockKnexDb.knex.mockReturnValue(mockKnexQuery);
+      
+      // Make all the chainable methods return the same object
+      mockQueryBuilder.where.mockReturnValue(mockQueryBuilder);
+      mockQueryBuilder.first.mockReturnValue(mockQueryBuilder);
+      mockQueryBuilder.forUpdate.mockReturnValue(mockQueryBuilder);
+      mockQueryBuilder.update.mockReturnValue(mockQueryBuilder);
+      mockQueryBuilder.insert.mockReturnValue(mockQueryBuilder);
+      
+      // Mock the transaction function that returns the query builder  
+      const mockTrx = jest.fn(() => mockQueryBuilder);
+      
+      // Mock knex to return query builder for non-transaction queries
+      const mockKnexQuery = jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnThis(),
+        first: jest.fn().mockReturnThis(),
+      });
+      mockKnexDb.knex.mockImplementation(mockKnexQuery);
 
       const completedMockDb = {
         ...mockDbOnboarding,
@@ -212,28 +279,51 @@ describe('OnboardingService', () => {
         completed_at: new Date(),
         final_step: 1,
       };
-      mockDatabase.query.mockResolvedValue([completedMockDb]);
+      
+      // Mock the transaction callback execution
+      mockDatabase.transaction.mockImplementation(async (callback) => {
+        // Mock finding existing record - forUpdate should also be chainable
+        mockQueryBuilder.forUpdate.mockResolvedValue(mockDbOnboarding);
+        // Mock update returning completed record
+        mockQueryBuilder.returning.mockResolvedValue([completedMockDb]);
+        
+        return callback(mockTrx as any);
+      });
 
       const result = await onboardingService.completeOnboarding(validCompleteInput);
 
       expect(result.completed).toBe(true);
       expect(result.completedAt).toBeDefined();
-      expect(mockDatabase.query).toHaveBeenCalledWith(
-        mockKnexQuery,
-        'onboarding_complete'
-      );
+      expect(mockDatabase.transaction).toHaveBeenCalled();
     });
 
     it('should create and complete new onboarding when none exists', async () => {
-      // Mock getProgress to return null
-      jest.spyOn(onboardingService, 'getProgress').mockResolvedValue(null);
-
-      // Mock knex insert query
-      const mockKnexQuery = {
-        insert: jest.fn().mockReturnThis(),
-        returning: jest.fn().mockReturnThis(),
+      // Create a chainable mock query builder using recursive mocking
+      const mockQueryBuilder = {
+        where: jest.fn(),
+        first: jest.fn(), 
+        forUpdate: jest.fn(),
+        update: jest.fn(),
+        returning: jest.fn(),
+        insert: jest.fn(),
       };
-      mockKnexDb.knex.mockReturnValue(mockKnexQuery);
+      
+      // Make all the chainable methods return the same object
+      mockQueryBuilder.where.mockReturnValue(mockQueryBuilder);
+      mockQueryBuilder.first.mockReturnValue(mockQueryBuilder);
+      mockQueryBuilder.forUpdate.mockReturnValue(mockQueryBuilder);
+      mockQueryBuilder.update.mockReturnValue(mockQueryBuilder);
+      mockQueryBuilder.insert.mockReturnValue(mockQueryBuilder);
+      
+      // Mock the transaction function that returns the query builder  
+      const mockTrx = jest.fn(() => mockQueryBuilder);
+      
+      // Mock knex to return query builder for non-transaction queries
+      const mockKnexQuery = jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnThis(),
+        first: jest.fn().mockReturnThis(),
+      });
+      mockKnexDb.knex.mockImplementation(mockKnexQuery);
 
       const completedMockDb = {
         ...mockDbOnboarding,
@@ -242,31 +332,56 @@ describe('OnboardingService', () => {
         completed_at: new Date(),
         final_step: 3,
       };
-      mockDatabase.query.mockResolvedValue([completedMockDb]);
+      
+      // Mock the transaction callback execution
+      mockDatabase.transaction.mockImplementation(async (callback) => {
+        // Mock finding no existing record - forUpdate should also be chainable
+        mockQueryBuilder.forUpdate.mockResolvedValue(undefined);
+        // Mock insert returning completed record
+        mockQueryBuilder.returning.mockResolvedValue([completedMockDb]);
+        
+        return callback(mockTrx as any);
+      });
 
       const result = await onboardingService.completeOnboarding(validCompleteInput);
 
       expect(result.completed).toBe(true);
       expect(result.currentStep).toBe(3);
-      expect(mockDatabase.query).toHaveBeenCalledWith(
-        mockKnexQuery,
-        'onboarding_complete_new'
-      );
+      expect(mockDatabase.transaction).toHaveBeenCalled();
     });
 
     it('should merge tutorial progress with existing progress', async () => {
-      const existingOnboarding = {
-        ...expectedOnboarding,
-        tutorialProgress: { profileSetup: true, workspaceIntro: false },
+      // Create a chainable mock query builder using recursive mocking
+      const mockQueryBuilder = {
+        where: jest.fn(),
+        first: jest.fn(), 
+        forUpdate: jest.fn(),
+        update: jest.fn(),
+        returning: jest.fn(),
+        insert: jest.fn(),
       };
-      jest.spyOn(onboardingService, 'getProgress').mockResolvedValue(existingOnboarding);
-
-      const mockKnexQuery = {
+      
+      // Make all the chainable methods return the same object
+      mockQueryBuilder.where.mockReturnValue(mockQueryBuilder);
+      mockQueryBuilder.first.mockReturnValue(mockQueryBuilder);
+      mockQueryBuilder.forUpdate.mockReturnValue(mockQueryBuilder);
+      mockQueryBuilder.update.mockReturnValue(mockQueryBuilder);
+      mockQueryBuilder.insert.mockReturnValue(mockQueryBuilder);
+      
+      // Mock the transaction function that returns the query builder  
+      const mockTrx = jest.fn(() => mockQueryBuilder);
+      
+      // Mock knex to return query builder for non-transaction queries
+      const mockKnexQuery = jest.fn().mockReturnValue({
         where: jest.fn().mockReturnThis(),
-        update: jest.fn().mockReturnThis(),
-        returning: jest.fn().mockReturnThis(),
+        first: jest.fn().mockReturnThis(),
+      });
+      mockKnexDb.knex.mockImplementation(mockKnexQuery);
+
+      const existingDbRecord = {
+        ...mockDbOnboarding,
+        tutorial_progress: { profileSetup: true, workspaceIntro: false },
       };
-      mockKnexDb.knex.mockReturnValue(mockKnexQuery);
 
       const completedMockDb = {
         ...mockDbOnboarding,
@@ -277,7 +392,16 @@ describe('OnboardingService', () => {
           firstCard: true,
         },
       };
-      mockDatabase.query.mockResolvedValue([completedMockDb]);
+      
+      // Mock the transaction callback execution
+      mockDatabase.transaction.mockImplementation(async (callback) => {
+        // Mock finding existing record with partial progress - forUpdate should also be chainable
+        mockQueryBuilder.forUpdate.mockResolvedValue(existingDbRecord);
+        // Mock update returning completed record with merged progress
+        mockQueryBuilder.returning.mockResolvedValue([completedMockDb]);
+        
+        return callback(mockTrx as any);
+      });
 
       const result = await onboardingService.completeOnboarding(validCompleteInput);
 
@@ -383,18 +507,16 @@ describe('OnboardingService', () => {
       };
       mockKnexDb.knex.mockReturnValue(mockKnexQuery);
 
-      // Return malformed data without required fields
+      // Return malformed data without required fields (missing user_id)
       const malformedDb = {
         id: 'test',
-        // Missing required fields
+        // Missing user_id and other required fields
       };
       mockDatabase.query.mockResolvedValue(malformedDb);
 
-      const result = await onboardingService.getProgress(testUserId);
-
-      expect(result).toBeDefined();
-      expect(result?.id).toBe('test');
-      expect(result?.tutorialProgress).toEqual({});
+      // The service now throws an error for malformed records
+      await expect(onboardingService.getProgress(testUserId))
+        .rejects.toThrow('Invalid database record: missing required fields');
     });
 
     it('should handle empty tutorial progress gracefully', async () => {
@@ -404,16 +526,44 @@ describe('OnboardingService', () => {
         // No tutorialProgress provided
       };
 
-      jest.spyOn(onboardingService, 'getProgress').mockResolvedValue(null);
-
-      const mockKnexQuery = {
-        insert: jest.fn().mockReturnThis(),
-        returning: jest.fn().mockReturnThis(),
+      // Create a chainable mock query builder using recursive mocking
+      const mockQueryBuilder = {
+        where: jest.fn(),
+        first: jest.fn(), 
+        forUpdate: jest.fn(),
+        update: jest.fn(),
+        returning: jest.fn(),
+        insert: jest.fn(),
       };
-      mockKnexDb.knex.mockReturnValue(mockKnexQuery);
+      
+      // Make all the chainable methods return the same object
+      mockQueryBuilder.where.mockReturnValue(mockQueryBuilder);
+      mockQueryBuilder.first.mockReturnValue(mockQueryBuilder);
+      mockQueryBuilder.forUpdate.mockReturnValue(mockQueryBuilder);
+      mockQueryBuilder.update.mockReturnValue(mockQueryBuilder);
+      mockQueryBuilder.insert.mockReturnValue(mockQueryBuilder);
+      
+      // Mock the transaction function that returns the query builder  
+      const mockTrx = jest.fn(() => mockQueryBuilder);
+      
+      // Mock knex to return query builder for non-transaction queries
+      const mockKnexQuery = jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnThis(),
+        first: jest.fn().mockReturnThis(),
+      });
+      mockKnexDb.knex.mockImplementation(mockKnexQuery);
 
       const newMockDb = { ...mockDbOnboarding, tutorial_progress: {} };
-      mockDatabase.query.mockResolvedValue([newMockDb]);
+      
+      // Mock the transaction callback execution
+      mockDatabase.transaction.mockImplementation(async (callback) => {
+        // Mock finding no existing record - forUpdate should also be chainable
+        mockQueryBuilder.forUpdate.mockResolvedValue(undefined);
+        // Mock insert returning new record with empty progress
+        mockQueryBuilder.returning.mockResolvedValue([newMockDb]);
+        
+        return callback(mockTrx as any);
+      });
 
       const result = await onboardingService.updateProgress(validInput);
 
@@ -421,20 +571,42 @@ describe('OnboardingService', () => {
     });
 
     it('should handle concurrent modification scenarios', async () => {
-      // Simulate a scenario where onboarding gets created between getProgress and update
-      let callCount = 0;
-      jest.spyOn(onboardingService, 'getProgress').mockImplementation(async () => {
-        callCount++;
-        return callCount === 1 ? null : expectedOnboarding;
-      });
-
-      const mockKnexQuery = {
-        insert: jest.fn().mockReturnThis(),
-        returning: jest.fn().mockReturnThis(),
+      // Create a chainable mock query builder using recursive mocking
+      const mockQueryBuilder = {
+        where: jest.fn(),
+        first: jest.fn(), 
+        forUpdate: jest.fn(),
+        update: jest.fn(),
+        returning: jest.fn(),
+        insert: jest.fn(),
       };
-      mockKnexDb.knex.mockReturnValue(mockKnexQuery);
+      
+      // Make all the chainable methods return the same object
+      mockQueryBuilder.where.mockReturnValue(mockQueryBuilder);
+      mockQueryBuilder.first.mockReturnValue(mockQueryBuilder);
+      mockQueryBuilder.forUpdate.mockReturnValue(mockQueryBuilder);
+      mockQueryBuilder.update.mockReturnValue(mockQueryBuilder);
+      mockQueryBuilder.insert.mockReturnValue(mockQueryBuilder);
+      
+      // Mock the transaction function that returns the query builder  
+      const mockTrx = jest.fn(() => mockQueryBuilder);
+      
+      // Mock knex to return query builder for non-transaction queries
+      const mockKnexQuery = jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnThis(),
+        first: jest.fn().mockReturnThis(),
+      });
+      mockKnexDb.knex.mockImplementation(mockKnexQuery);
 
-      mockDatabase.query.mockResolvedValue([mockDbOnboarding]);
+      // Mock the transaction callback execution to simulate finding an existing record
+      mockDatabase.transaction.mockImplementation(async (callback) => {
+        // Mock finding existing record (concurrent creation scenario) - forUpdate should also be chainable
+        mockQueryBuilder.forUpdate.mockResolvedValue(mockDbOnboarding);
+        // Mock update returning record
+        mockQueryBuilder.returning.mockResolvedValue([{ ...mockDbOnboarding, current_step: 2 }]);
+        
+        return callback(mockTrx as any);
+      });
 
       const validInput = {
         userId: testUserId,

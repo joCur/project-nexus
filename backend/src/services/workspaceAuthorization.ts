@@ -52,6 +52,7 @@ export const WorkspacePermissions = {
     'connection:update',
     'connection:delete',
     'canvas:read',
+    'canvas:create',
     'canvas:update'
   ],
   
@@ -70,6 +71,7 @@ export const WorkspacePermissions = {
     'connection:update',
     'connection:delete',
     'canvas:read',
+    'canvas:create',
     'canvas:update'
   ],
   
@@ -90,6 +92,7 @@ export const WorkspacePermissions = {
     'connection:update',
     'connection:delete',
     'canvas:read',
+    'canvas:create',
     'canvas:update'
   ]
 } as const;

@@ -15,8 +15,25 @@ jest.mock('@/stores/workspaceStore', () => ({
   }),
 }));
 
-const mockUseAuth = jest.fn();
-(require('@/hooks/use-auth') as any).useAuth = mockUseAuth;
+// Mock useAuth hook  
+jest.mock('@/hooks/use-auth');
+import { useAuth } from '@/hooks/use-auth';
+
+const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
+
+// Helper function to create a complete UseAuthReturn mock
+const createAuthMock = (overrides: Partial<ReturnType<typeof useAuth>> = {}): ReturnType<typeof useAuth> => ({
+  user: null,
+  isLoading: false,
+  isAuthenticated: false,
+  announceAuthStatus: jest.fn(),
+  login: jest.fn(),
+  logout: jest.fn(),
+  checkPermission: jest.fn(),
+  hasRole: jest.fn(),
+  refreshUser: jest.fn(),
+  ...overrides,
+});
 
 // Mock step components
 jest.mock('../steps/ProfileSetupStep', () => ({
@@ -222,11 +239,11 @@ describe('OnboardingFlow', () => {
     global.mockRouter.replace.mockClear();
     global.mockRouter.refresh.mockClear();
     
-    mockUseAuth.mockReturnValue({
+    mockUseAuth.mockReturnValue(createAuthMock({
       user: defaultUser,
       isLoading: false,
       isAuthenticated: true,
-    });
+    }));
 
     // Default successful fetch mock
     global.mockFetch({ success: true });
@@ -531,9 +548,9 @@ describe('OnboardingFlow', () => {
     });
 
     it('should handle missing user gracefully', () => {
-      mockUseAuth.mockReturnValue({
+      mockUseAuth.mockReturnValue(createAuthMock({
         user: null,
-      });
+      }));
 
       render(<OnboardingFlow />, { wrapper: TestWrapper });
 

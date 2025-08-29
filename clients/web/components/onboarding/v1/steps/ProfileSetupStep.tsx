@@ -126,7 +126,7 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
     <div>
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold text-text-primary mb-2">
-          Let's Set Up Your Profile
+          Let&apos;s Set Up Your Profile
         </h2>
         <p className="text-text-secondary">
           Tell us a bit about yourself to personalize your workspace experience.
@@ -166,10 +166,10 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
             value={formData.displayName}
             onChange={(e) => updateField('displayName', e.target.value)}
             className="w-full px-4 py-3 border border-border-default rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            placeholder="How you'd like to be called"
+            placeholder="How you&apos;d like to be called"
           />
           <p className="text-text-tertiary text-sm mt-1">
-            This is how you'll appear in the workspace
+            This is how you&apos;ll appear in the workspace
           </p>
         </div>
 

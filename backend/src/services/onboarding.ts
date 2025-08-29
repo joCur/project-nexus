@@ -25,7 +25,20 @@ const onboardingCompleteSchema = z.object({
   tutorialProgress: z.record(z.boolean()).optional().default({}),
 });
 
-// Types
+// Database model types (snake_case as returned from database)
+interface DbOnboardingRecord {
+  id: string;
+  user_id: string;
+  completed: boolean;
+  completed_at: string | null;
+  current_step: number;
+  final_step: number | null;
+  tutorial_progress: Record<string, boolean> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Application model types (camelCase for TypeScript)
 export interface OnboardingProgress {
   id: string;
   userId: string;
@@ -56,20 +69,62 @@ export class OnboardingService {
    * Get onboarding progress for a user
    */
   async getProgress(userId: string): Promise<OnboardingProgress | null> {
+    const requestId = `get_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    logger.debug('Getting onboarding progress', {
+      requestId,
+      userId,
+      timestamp: new Date().toISOString()
+    });
+    
     try {
-      const onboarding = await database.query<any>(
+      const startTime = Date.now();
+      
+      const onboarding = await database.query<DbOnboardingRecord>(
         knex(this.tableName)
           .where('user_id', userId)
           .first(),
         'onboarding_get_progress'
       );
+      
+      const duration = Date.now() - startTime;
+      
+      logger.debug('Database query completed for onboarding progress', {
+        requestId,
+        userId,
+        found: !!onboarding,
+        duration,
+        timestamp: new Date().toISOString()
+      });
 
-      return onboarding ? this.mapDbOnboardingToOnboarding(onboarding) : null;
+      if (onboarding) {
+        const progress = this.mapDbOnboardingToOnboarding(onboarding);
+        
+        logger.debug('Successfully retrieved onboarding progress', {
+          requestId,
+          userId,
+          completed: progress.completed,
+          currentStep: progress.currentStep,
+          lastUpdated: progress.updatedAt.toISOString()
+        });
+        
+        return progress;
+      }
+      
+      logger.debug('No onboarding progress found for user', {
+        requestId,
+        userId
+      });
+      
+      return null;
 
     } catch (error) {
       logger.error('Failed to get onboarding progress', {
+        requestId,
         userId,
         error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        timestamp: new Date().toISOString()
       });
       throw error;
     }
@@ -79,69 +134,121 @@ export class OnboardingService {
    * Update onboarding progress
    */
   async updateProgress(input: OnboardingUpdateInput): Promise<OnboardingProgress> {
+    const requestId = `update_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    logger.info('Starting onboarding progress update', {
+      requestId,
+      userId: input.userId,
+      currentStep: input.currentStep,
+      tutorialProgress: input.tutorialProgress,
+      timestamp: new Date().toISOString()
+    });
+    
     try {
       // Validate input
       const validatedInput = onboardingProgressSchema.parse(input);
+      
+      logger.debug('Input validation successful', {
+        requestId,
+        userId: validatedInput.userId,
+        currentStep: validatedInput.currentStep
+      });
 
-      // Check if onboarding record exists
-      const existing = await this.getProgress(validatedInput.userId);
+      // Use a transaction to prevent race conditions
+      const result = await database.transaction(async (trx) => {
+        // Check if onboarding record exists within transaction
+        const existingQuery = trx(this.tableName)
+          .where('user_id', validatedInput.userId)
+          .first()
+          .forUpdate(); // Lock the row for update
+        
+        const existing = await existingQuery as DbOnboardingRecord | undefined;
+        
+        logger.debug('Existing record check within transaction', {
+          requestId,
+          userId: validatedInput.userId,
+          hasExisting: !!existing,
+          existingStep: existing?.current_step,
+          existingCompleted: existing?.completed
+        });
 
-      if (existing) {
-        // Update existing record
-        const updateData = {
-          current_step: validatedInput.currentStep,
-          tutorial_progress: validatedInput.tutorialProgress,
-          updated_at: new Date(),
-        };
+        if (existing) {
+          // Update existing record
+          const updateData = {
+            current_step: validatedInput.currentStep,
+            tutorial_progress: validatedInput.tutorialProgress,
+            updated_at: new Date(),
+          };
 
-        const [updated] = await database.query<any[]>(
-          knex(this.tableName)
+          const [updated] = await trx(this.tableName)
             .where('user_id', validatedInput.userId)
             .update(updateData)
-            .returning('*'),
-          'onboarding_update_progress'
-        );
+            .returning('*') as DbOnboardingRecord[];
 
-        logger.info('Onboarding progress updated', {
-          userId: validatedInput.userId,
-          currentStep: validatedInput.currentStep,
-        });
+          logger.info('Onboarding progress updated within transaction', {
+            requestId,
+            userId: validatedInput.userId,
+            oldStep: existing.current_step,
+            newStep: validatedInput.currentStep,
+            completed: updated.completed
+          });
 
-        return this.mapDbOnboardingToOnboarding(updated);
+          return updated;
+        } else {
+          // Create new record
+          const createData = {
+            user_id: validatedInput.userId,
+            current_step: validatedInput.currentStep,
+            tutorial_progress: validatedInput.tutorialProgress,
+            completed: false,
+          };
 
-      } else {
-        // Create new record
-        const createData = {
-          user_id: validatedInput.userId,
-          current_step: validatedInput.currentStep,
-          tutorial_progress: validatedInput.tutorialProgress,
-          completed: false,
-        };
-
-        const [created] = await database.query<any[]>(
-          knex(this.tableName)
+          const [created] = await trx(this.tableName)
             .insert(createData)
-            .returning('*'),
-          'onboarding_create_progress'
-        );
+            .returning('*') as DbOnboardingRecord[];
 
-        logger.info('Onboarding progress created', {
-          userId: validatedInput.userId,
-          currentStep: validatedInput.currentStep,
-        });
+          logger.info('Onboarding progress created within transaction', {
+            requestId,
+            userId: validatedInput.userId,
+            currentStep: validatedInput.currentStep,
+            id: created.id
+          });
 
-        return this.mapDbOnboardingToOnboarding(created);
-      }
+          return created;
+        }
+      });
+      
+      const progress = this.mapDbOnboardingToOnboarding(result);
+      
+      logger.info('Onboarding progress update completed successfully', {
+        requestId,
+        userId: validatedInput.userId,
+        currentStep: progress.currentStep,
+        completed: progress.completed,
+        progressId: progress.id,
+        timestamp: new Date().toISOString()
+      });
+      
+      return progress;
 
     } catch (error) {
       if (error instanceof z.ZodError) {
+        logger.error('Validation error in onboarding update', {
+          requestId,
+          userId: input.userId,
+          validationErrors: error.errors,
+          timestamp: new Date().toISOString()
+        });
         throw new ValidationError(error.errors[0]?.message || 'Validation failed');
       }
 
       logger.error('Failed to update onboarding progress', {
+        requestId,
         userId: input.userId,
         currentStep: input.currentStep,
         error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        timestamp: new Date().toISOString()
       });
 
       throw error;
@@ -152,72 +259,132 @@ export class OnboardingService {
    * Complete onboarding
    */
   async completeOnboarding(input: OnboardingCompleteInput): Promise<OnboardingProgress> {
+    const requestId = `complete_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    logger.info('Starting onboarding completion', {
+      requestId,
+      userId: input.userId,
+      tutorialProgress: input.tutorialProgress,
+      timestamp: new Date().toISOString()
+    });
+    
     try {
       // Validate input
       const validatedInput = onboardingCompleteSchema.parse(input);
+      
+      logger.debug('Input validation successful for completion', {
+        requestId,
+        userId: validatedInput.userId
+      });
 
-      // Check if onboarding record exists
-      const existing = await this.getProgress(validatedInput.userId);
-
-      const updateData = {
-        completed: true,
-        completed_at: new Date(),
-        final_step: existing?.currentStep || 3, // Default to 3 for v1 onboarding
-        tutorial_progress: {
-          ...existing?.tutorialProgress,
-          ...validatedInput.tutorialProgress,
-        },
-        updated_at: new Date(),
-      };
-
-      if (existing) {
-        // Update existing record
-        const [updated] = await database.query<any[]>(
-          knex(this.tableName)
-            .where('user_id', validatedInput.userId)
-            .update(updateData)
-            .returning('*'),
-          'onboarding_complete'
-        );
-
-        logger.info('Onboarding completed (updated)', {
+      // Use a transaction to ensure consistency
+      const result = await database.transaction(async (trx) => {
+        // Check if onboarding record exists within transaction
+        const existing = await trx(this.tableName)
+          .where('user_id', validatedInput.userId)
+          .first()
+          .forUpdate() as DbOnboardingRecord | undefined; // Lock the row for update
+        
+        logger.debug('Existing record check for completion', {
+          requestId,
           userId: validatedInput.userId,
-          finalStep: updateData.final_step,
+          hasExisting: !!existing,
+          existingCompleted: existing?.completed,
+          existingStep: existing?.current_step
         });
+        
+        // Prevent double completion
+        if (existing?.completed) {
+          logger.warn('Attempting to complete already completed onboarding', {
+            requestId,
+            userId: validatedInput.userId,
+            completedAt: existing.completed_at
+          });
+          return existing;
+        }
 
-        return this.mapDbOnboardingToOnboarding(updated);
-
-      } else {
-        // Create new record as completed
-        const createData = {
-          user_id: validatedInput.userId,
-          current_step: 3, // All steps completed
-          ...updateData,
+        const updateData = {
+          completed: true,
+          completed_at: new Date(),
+          final_step: existing?.current_step || 3, // Default to 3 for v1 onboarding
+          tutorial_progress: {
+            ...existing?.tutorial_progress,
+            ...validatedInput.tutorialProgress,
+          },
+          updated_at: new Date(),
         };
 
-        const [created] = await database.query<any[]>(
-          knex(this.tableName)
+        if (existing) {
+          // Update existing record
+          const [updated] = await trx(this.tableName)
+            .where('user_id', validatedInput.userId)
+            .update(updateData)
+            .returning('*') as DbOnboardingRecord[];
+
+          logger.info('Onboarding completed (updated existing record)', {
+            requestId,
+            userId: validatedInput.userId,
+            finalStep: updateData.final_step,
+            previousStep: existing.current_step,
+            completedAt: updateData.completed_at
+          });
+
+          return updated;
+        } else {
+          // Create new record as completed
+          const createData = {
+            user_id: validatedInput.userId,
+            current_step: 3, // All steps completed
+            ...updateData,
+          };
+
+          const [created] = await trx(this.tableName)
             .insert(createData)
-            .returning('*'),
-          'onboarding_complete_new'
-        );
+            .returning('*') as DbOnboardingRecord[];
 
-        logger.info('Onboarding completed (new)', {
-          userId: validatedInput.userId,
-          finalStep: createData.final_step,
-        });
+          logger.info('Onboarding completed (created new completed record)', {
+            requestId,
+            userId: validatedInput.userId,
+            finalStep: createData.final_step,
+            completedAt: createData.completed_at,
+            id: created.id
+          });
 
-        return this.mapDbOnboardingToOnboarding(created);
-      }
+          return created;
+        }
+      });
+      
+      const progress = this.mapDbOnboardingToOnboarding(result);
+      
+      logger.info('Onboarding completion process finished successfully', {
+        requestId,
+        userId: validatedInput.userId,
+        completed: progress.completed,
+        completedAt: progress.completedAt?.toISOString(),
+        finalStep: progress.finalStep,
+        progressId: progress.id,
+        timestamp: new Date().toISOString()
+      });
+      
+      return progress;
 
     } catch (error) {
       if (error instanceof z.ZodError) {
+        logger.error('Validation error in onboarding completion', {
+          requestId,
+          userId: input.userId,
+          validationErrors: error.errors,
+          timestamp: new Date().toISOString()
+        });
         throw new ValidationError(error.errors[0]?.message || 'Validation failed');
       }
 
       logger.error('Failed to complete onboarding', {
+        requestId,
         userId: input.userId,
         error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        timestamp: new Date().toISOString()
       });
 
       throw error;
@@ -228,15 +395,38 @@ export class OnboardingService {
    * Check if user has completed onboarding
    */
   async isOnboardingComplete(userId: string): Promise<boolean> {
+    const requestId = `check_complete_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    logger.debug('Checking onboarding completion status', {
+      requestId,
+      userId,
+      timestamp: new Date().toISOString()
+    });
+    
     try {
       const onboarding = await this.getProgress(userId);
-      return onboarding?.completed || false;
+      const isComplete = onboarding?.completed || false;
+      
+      logger.debug('Onboarding completion check result', {
+        requestId,
+        userId,
+        isComplete,
+        hasProgress: !!onboarding,
+        currentStep: onboarding?.currentStep,
+        completedAt: onboarding?.completedAt?.toISOString()
+      });
+      
+      return isComplete;
 
     } catch (error) {
       logger.error('Failed to check onboarding completion', {
+        requestId,
         userId,
         error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        timestamp: new Date().toISOString()
       });
+      // Return false instead of throwing to allow graceful degradation
       return false;
     }
   }
@@ -273,15 +463,21 @@ export class OnboardingService {
 
   /**
    * Map database onboarding record to OnboardingProgress interface
+   * Converts snake_case database fields to camelCase TypeScript interface
    */
-  private mapDbOnboardingToOnboarding(dbOnboarding: any): OnboardingProgress {
+  private mapDbOnboardingToOnboarding(dbOnboarding: DbOnboardingRecord): OnboardingProgress {
+    // Validate required fields
+    if (!dbOnboarding.id || !dbOnboarding.user_id) {
+      throw new Error('Invalid database record: missing required fields');
+    }
+    
     return {
       id: dbOnboarding.id,
       userId: dbOnboarding.user_id,
-      completed: dbOnboarding.completed,
+      completed: Boolean(dbOnboarding.completed),
       completedAt: dbOnboarding.completed_at ? new Date(dbOnboarding.completed_at) : undefined,
-      currentStep: dbOnboarding.current_step,
-      finalStep: dbOnboarding.final_step,
+      currentStep: Number(dbOnboarding.current_step) || 1,
+      finalStep: dbOnboarding.final_step ? Number(dbOnboarding.final_step) : undefined,
       tutorialProgress: dbOnboarding.tutorial_progress || {},
       createdAt: new Date(dbOnboarding.created_at),
       updatedAt: new Date(dbOnboarding.updated_at),

@@ -33,7 +33,23 @@ export const onboardingWorkflowResolvers = {
       );
 
       try {
+        logger.info('Getting onboarding status for user', {
+          userId: context.user!.id,
+          auth0UserId: context.user!.auth0UserId,
+          email: context.user!.email,
+        });
+
         const status = await workflowService.getOnboardingStatus(context.user!.id);
+
+        logger.info('Onboarding status retrieved', {
+          userId: context.user!.id,
+          isComplete: status.isComplete,
+          hasProfile: !!status.profile,
+          hasOnboarding: !!status.onboarding,
+          hasWorkspace: !!status.defaultWorkspace,
+          onboardingId: status.onboarding?.id,
+          profileId: status.profile?.id,
+        });
 
         return {
           profile: status.profile,

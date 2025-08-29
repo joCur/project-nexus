@@ -50,11 +50,34 @@ export const onboardingResolvers = {
       context: GraphQLContext
     ) => {
       if (!context.isAuthenticated) {
+        logger.warn('Unauthenticated request to myOnboardingProgress');
         throw new AuthenticationError();
       }
 
+      const userId = context.user!.id;
+      logger.info('Fetching onboarding progress', { userId });
+      
       const onboardingService = context.dataSources.onboardingService;
-      return await onboardingService.getProgress(context.user!.id);
+      
+      try {
+        const progress = await onboardingService.getProgress(userId);
+        
+        logger.info('Successfully retrieved onboarding progress', {
+          userId,
+          hasProgress: !!progress,
+          completed: progress?.completed,
+          currentStep: progress?.currentStep
+        });
+        
+        return progress;
+      } catch (error) {
+        logger.error('Failed to get onboarding progress', {
+          userId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : undefined
+        });
+        throw error;
+      }
     },
 
     /**
@@ -66,11 +89,17 @@ export const onboardingResolvers = {
       context: GraphQLContext
     ) => {
       if (!context.isAuthenticated) {
+        logger.warn('Unauthenticated request to isOnboardingComplete', { requestedUserId: userId });
         throw new AuthenticationError();
       }
 
       // Users can only check their own onboarding unless they have admin permissions
       if (context.user?.id !== userId && !context.permissions.includes('admin:user_management')) {
+        logger.warn('Unauthorized access attempt to onboarding completion check', {
+          requestingUserId: context.user?.id,
+          targetUserId: userId,
+          permissions: context.permissions
+        });
         throw new AuthorizationError(
           undefined, // Use default "Insufficient permissions" message
           'INSUFFICIENT_PERMISSIONS',
@@ -79,8 +108,32 @@ export const onboardingResolvers = {
         );
       }
 
+      logger.info('Checking onboarding completion status', {
+        userId,
+        requestingUserId: context.user?.id
+      });
+      
       const onboardingService = context.dataSources.onboardingService;
-      return await onboardingService.isOnboardingComplete(userId);
+      
+      try {
+        const isComplete = await onboardingService.isOnboardingComplete(userId);
+        
+        logger.info('Onboarding completion check result', {
+          userId,
+          isComplete,
+          requestingUserId: context.user?.id
+        });
+        
+        return isComplete;
+      } catch (error) {
+        logger.error('Failed to check onboarding completion', {
+          userId,
+          requestingUserId: context.user?.id,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : undefined
+        });
+        throw error;
+      }
     },
   },
 
@@ -94,8 +147,20 @@ export const onboardingResolvers = {
       context: GraphQLContext
     ) => {
       if (!context.isAuthenticated) {
+        logger.warn('Unauthenticated request to updateOnboardingProgress');
         throw new AuthenticationError();
       }
+
+      const userId = context.user!.id;
+      const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      logger.info('Starting onboarding progress update', {
+        requestId,
+        userId,
+        currentStep: input.currentStep,
+        tutorialProgress: input.tutorialProgress,
+        timestamp: new Date().toISOString()
+      });
 
       const onboardingService = context.dataSources.onboardingService;
 
@@ -103,23 +168,45 @@ export const onboardingResolvers = {
         // Add current user's ID to the input
         const progressInput = {
           ...input,
-          userId: context.user!.id,
+          userId,
         };
 
-        const progress = await onboardingService.updateProgress(progressInput);
+        // Check if there's already an onboarding record for race condition debugging
+        const existingProgress = await onboardingService.getProgress(userId);
+        logger.info('Existing progress state before update', {
+          requestId,
+          userId,
+          existingProgress: existingProgress ? {
+            completed: existingProgress.completed,
+            currentStep: existingProgress.currentStep,
+            updatedAt: existingProgress.updatedAt
+          } : null
+        });
 
-        logger.info('Onboarding progress updated via GraphQL', {
-          userId: context.user!.id,
+        const startTime = Date.now();
+        const progress = await onboardingService.updateProgress(progressInput);
+        const duration = Date.now() - startTime;
+
+        logger.info('Onboarding progress updated successfully via GraphQL', {
+          requestId,
+          userId,
           currentStep: input.currentStep,
+          newCurrentStep: progress.currentStep,
+          completed: progress.completed,
+          duration,
+          timestamp: new Date().toISOString()
         });
 
         return progress;
 
       } catch (error) {
         logger.error('Failed to update onboarding progress via GraphQL', {
+          requestId,
           input,
-          userId: context.user!.id,
+          userId,
           error: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : undefined,
+          timestamp: new Date().toISOString()
         });
         throw error;
       }
@@ -134,32 +221,65 @@ export const onboardingResolvers = {
       context: GraphQLContext
     ) => {
       if (!context.isAuthenticated) {
+        logger.warn('Unauthenticated request to completeOnboarding');
         throw new AuthenticationError();
       }
+
+      const userId = context.user!.id;
+      const requestId = `complete_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      logger.info('Starting onboarding completion', {
+        requestId,
+        userId,
+        tutorialProgress: input.tutorialProgress,
+        timestamp: new Date().toISOString()
+      });
 
       const onboardingService = context.dataSources.onboardingService;
 
       try {
+        // Check current state before completion
+        const existingProgress = await onboardingService.getProgress(userId);
+        logger.info('Current progress state before completion', {
+          requestId,
+          userId,
+          existingProgress: existingProgress ? {
+            completed: existingProgress.completed,
+            currentStep: existingProgress.currentStep,
+            updatedAt: existingProgress.updatedAt
+          } : null
+        });
+
         // Add current user's ID to the input
         const completeInput = {
           ...input,
-          userId: context.user!.id,
+          userId,
         };
 
+        const startTime = Date.now();
         const progress = await onboardingService.completeOnboarding(completeInput);
+        const duration = Date.now() - startTime;
 
-        logger.info('Onboarding completed via GraphQL', {
-          userId: context.user!.id,
+        logger.info('Onboarding completed successfully via GraphQL', {
+          requestId,
+          userId,
           finalStep: progress.finalStep,
+          completed: progress.completed,
+          completedAt: progress.completedAt,
+          duration,
+          timestamp: new Date().toISOString()
         });
 
         return progress;
 
       } catch (error) {
         logger.error('Failed to complete onboarding via GraphQL', {
+          requestId,
           input,
-          userId: context.user!.id,
+          userId,
           error: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : undefined,
+          timestamp: new Date().toISOString()
         });
         throw error;
       }
@@ -216,8 +336,32 @@ export const onboardingResolvers = {
      * Resolve onboarding progress for User type
      */
     onboarding: async (user: any, _: any, context: GraphQLContext) => {
+      logger.debug('Resolving onboarding progress for User field', {
+        userId: user.id,
+        requestingUserId: context.user?.id
+      });
+      
       const onboardingService = context.dataSources.onboardingService;
-      return await onboardingService.getProgress(user.id);
+      
+      try {
+        const progress = await onboardingService.getProgress(user.id);
+        
+        logger.debug('User.onboarding field resolved successfully', {
+          userId: user.id,
+          hasProgress: !!progress,
+          completed: progress?.completed
+        });
+        
+        return progress;
+      } catch (error) {
+        logger.error('Failed to resolve User.onboarding field', {
+          userId: user.id,
+          requestingUserId: context.user?.id,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : undefined
+        });
+        throw error;
+      }
     },
   },
 };

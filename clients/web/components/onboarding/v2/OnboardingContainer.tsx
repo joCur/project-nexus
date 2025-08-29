@@ -9,11 +9,8 @@ import {
   OnboardingState,
   OnboardingStepId,
   OnboardingProgress,
-  OnboardingUserChoices,
   OnboardingStep,
   OnboardingStepProps,
-  OnboardingError,
-  UserPersona,
 } from '@/types/onboarding';
 
 // Import step components (will create these next)

@@ -101,7 +101,7 @@ export const WelcomeStep: React.FC<WelcomeStepProps> = ({
       {/* Workspace Ready */}
       <div className="bg-primary-50 border border-primary-200 rounded-lg p-6 mb-6">
         <h3 className="font-semibold text-primary-700 mb-3">
-          "{workspaceName}" is ready!
+          &ldquo;{workspaceName}&rdquo; is ready!
         </h3>
         
         <div className="grid gap-3 text-left">

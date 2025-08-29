@@ -26,6 +26,19 @@ jest.mock('next/navigation', () => ({
   },
 }));
 
+// Mock Next.js server APIs
+jest.mock('next/server', () => ({
+  NextResponse: {
+    json: jest.fn((data, init = {}) => ({
+      json: jest.fn().mockResolvedValue(data),
+      status: init.status || 200,
+      statusText: init.statusText || 'OK',
+      ok: (init.status || 200) >= 200 && (init.status || 200) < 300,
+      headers: init.headers || {},
+    })),
+  },
+}));
+
 // Make router mock available globally
 global.mockRouter = mockRouter;
 
@@ -86,6 +99,68 @@ Object.defineProperty(window, 'performance', {
 global.requestAnimationFrame = jest.fn((cb) => setTimeout(cb, 16));
 global.cancelAnimationFrame = jest.fn((id) => clearTimeout(id));
 
+// Mock Web APIs that might not be available in Node.js test environment
+global.Request = class MockRequest {
+  constructor(input, init = {}) {
+    this.url = typeof input === 'string' ? input : input.url;
+    this.method = init.method || 'GET';
+    this.headers = init.headers || {};
+    this.body = init.body;
+  }
+};
+
+global.Response = class MockResponse {
+  constructor(body, init = {}) {
+    this.body = body;
+    this.status = init.status || 200;
+    this.statusText = init.statusText || 'OK';
+    this.ok = this.status >= 200 && this.status < 300;
+    this.headers = init.headers || {};
+  }
+  
+  async json() {
+    return JSON.parse(this.body);
+  }
+  
+  async text() {
+    return this.body;
+  }
+};
+
+// Mock localStorage and sessionStorage
+const mockStorage = () => {
+  let store = {};
+  return {
+    getItem: jest.fn((key) => store[key] || null),
+    setItem: jest.fn((key, value) => {
+      store[key] = value.toString();
+    }),
+    removeItem: jest.fn((key) => {
+      delete store[key];
+    }),
+    clear: jest.fn(() => {
+      store = {};
+    }),
+    get length() {
+      return Object.keys(store).length;
+    },
+    key: jest.fn((index) => {
+      const keys = Object.keys(store);
+      return keys[index] || null;
+    }),
+  };
+};
+
+Object.defineProperty(window, 'localStorage', {
+  value: mockStorage(),
+  writable: true,
+});
+
+Object.defineProperty(window, 'sessionStorage', {
+  value: mockStorage(),
+  writable: true,
+});
+
 // Mock Auth0 NextJS SDK
 jest.mock('@auth0/nextjs-auth0/client', () => ({
   useUser: jest.fn(() => ({
@@ -132,6 +207,8 @@ global.mockFetchError = (error) => {
 beforeEach(() => {
   jest.clearAllMocks();
   global.fetch.mockClear();
+  window.localStorage.clear();
+  window.sessionStorage.clear();
 });
 
 // Console suppression for tests

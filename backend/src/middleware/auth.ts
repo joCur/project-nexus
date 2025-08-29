@@ -36,6 +36,7 @@ export function createAuthMiddleware(
     req.permissions = [];
 
     try {
+
       // Extract token from Authorization header
       const authHeader = req.headers.authorization;
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -51,7 +52,7 @@ export function createAuthMiddleware(
         throw new InvalidTokenError();
       }
 
-      // Sync user from Auth0
+      // Sync user from Auth0 with session consistency
       const user = await auth0Service.syncUserFromAuth0(auth0Payload);
 
       // For new users or users without sessions, create a session automatically
@@ -59,12 +60,34 @@ export function createAuthMiddleware(
       const sessionValid = await auth0Service.validateSession(user.id);
       if (!sessionValid) {
         // Create session automatically for new users during authentication
-        const sessionId = await auth0Service.createSession(user, auth0Payload);
-        securityLogger.sessionEvent('created', user.id, {
-          sessionId,
-          auth0UserId: auth0Payload.sub,
-          reason: 'auto_session_creation_during_auth',
-        });
+        try {
+          const sessionId = await auth0Service.createSession(user, auth0Payload);
+          securityLogger.sessionEvent('created', user.id, {
+            sessionId,
+            auth0UserId: auth0Payload.sub,
+            reason: 'auto_session_creation_during_auth',
+            userAgent: req.headers['user-agent'],
+            ip: req.ip,
+          });
+        } catch (sessionError) {
+          securityLogger.authFailure(
+            `Session creation failed: ${sessionError instanceof Error ? sessionError.message : 'Unknown error'}`,
+            {
+              userId: user.id,
+              auth0UserId: auth0Payload.sub,
+              userAgent: req.headers['user-agent'],
+              ip: req.ip,
+            }
+          );
+          // Don't throw error, continue with authentication but log the issue
+          securityLogger.authFailure(
+            `Session creation failed but continuing auth: ${sessionError instanceof Error ? sessionError.message : 'Unknown error'}`,
+            {
+              userId: user.id,
+              auth0UserId: auth0Payload.sub
+            }
+          );
+        }
       }
 
       // Set authenticated context
@@ -93,6 +116,8 @@ export function createAuthMiddleware(
         ip: req.ip,
         path: req.path,
         method: req.method,
+        sessionValid,
+        userId: user.id, // Ensure consistent user identification
       });
 
       next();
