@@ -131,9 +131,7 @@ describe('useOnboardingStatus - NEX-178 Bug Fixes', () => {
       expect(global.fetch).toHaveBeenCalledWith('/api/user/onboarding/status', {
         method: 'GET',
         credentials: 'include',
-        headers: {
-          'Cache-Control': 'max-age=300',
-        },
+        signal: expect.any(AbortSignal),
       });
     });
   });
@@ -233,9 +231,9 @@ describe('useOnboardingStatus - NEX-178 Bug Fixes', () => {
         isAuthenticated: true,
       });
 
-      // Test timeout error
+      // Test timeout error (not AbortError since we now ignore those)
       (global.fetch as jest.Mock).mockRejectedValue(
-        Object.assign(new Error('Request timeout'), { name: 'AbortError' })
+        Object.assign(new Error('Request timeout'), { name: 'TimeoutError' })
       );
 
       const { result } = renderHook(() => useOnboardingStatus());
@@ -304,13 +302,11 @@ describe('useOnboardingStatus - NEX-178 Bug Fixes', () => {
         await result.current.refetch();
       });
 
-      // Should make API call with no-cache header
+      // Should make API call with AbortSignal
       expect(global.fetch).toHaveBeenCalledWith('/api/user/onboarding/status', {
         method: 'GET',
         credentials: 'include',
-        headers: {
-          'Cache-Control': 'no-cache',
-        },
+        signal: expect.any(AbortSignal),
       });
 
       expect(result.current.status).toEqual(freshStatus);

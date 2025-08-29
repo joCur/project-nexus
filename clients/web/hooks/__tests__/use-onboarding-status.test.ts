@@ -77,9 +77,7 @@ describe('useOnboardingStatus', () => {
     expect(global.fetch).toHaveBeenCalledWith('/api/user/onboarding/status', {
       method: 'GET',
       credentials: 'include',
-      headers: {
-        'Cache-Control': 'max-age=300',
-      },
+      signal: expect.any(AbortSignal),
     });
   });
 
@@ -213,13 +211,11 @@ describe('useOnboardingStatus', () => {
     const finalCallCount = (global.fetch as jest.Mock).mock.calls.length;
     expect(finalCallCount).toBe(initialCallCount + 1);
     
-    // Verify the last call uses no-cache header for force refresh
+    // Verify the last call for force refresh
     expect(global.fetch).toHaveBeenNthCalledWith(finalCallCount, '/api/user/onboarding/status', {
       method: 'GET',
       credentials: 'include',
-      headers: {
-        'Cache-Control': 'no-cache',
-      },
+      signal: expect.any(AbortSignal),
     });
     
     await waitFor(() => {

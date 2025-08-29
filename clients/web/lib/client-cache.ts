@@ -253,8 +253,11 @@ class ClientCache {
     try {
       // Try modern StorageManager API first
       if ('storage' in navigator && 'estimate' in navigator.storage) {
-        // Note: This is async but we need sync behavior, so we use cached results
-        // The async version would be better but requires API changes
+        // Note: StorageManager.estimate() is async but we need sync behavior here
+        // because this method is called synchronously from cache operations.
+        // Future enhancement: Refactor the cache API to support async operations,
+        // allowing us to await navigator.storage.estimate() for accurate quota info.
+        // Current approach uses a fallback estimation method below.
       }
       
       // Calculate current usage (rough estimate)

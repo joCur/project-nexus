@@ -111,6 +111,7 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
   const sessionStableRef = useRef(false);
   const statusRef = useRef<OnboardingStatus | null>(null);
   const previousUserIdRef = useRef<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   /**
    * Load onboarding status from cache first, then optionally fetch fresh data
@@ -178,6 +179,15 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
       }
     }
 
+    // Cancel any existing fetch
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new abort controller for this fetch
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     const fetchPromise = (async () => {
       try {
         setIsFetching(true);
@@ -189,9 +199,7 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
         const response = await fetch('/api/user/onboarding/status', {
           method: 'GET',
           credentials: 'include',
-          headers: {
-            'Cache-Control': forceRefresh ? 'no-cache' : 'max-age=300', // 5 min cache for non-force requests
-          },
+          signal: abortController.signal,
         });
 
         if (!response.ok) {
@@ -236,6 +244,12 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
         saveToCache(data);
 
       } catch (err) {
+        // Check if the fetch was aborted
+        if (err instanceof Error && err.name === 'AbortError') {
+          // Fetch was aborted, this is expected when component unmounts or user changes
+          return;
+        }
+
         // Convert unknown errors to our typed error system
         const apiError = err instanceof OnboardingApiError 
           ? err 
@@ -362,6 +376,22 @@ export function useOnboardingStatus(): UseOnboardingStatusResult {
   useEffect(() => {
     statusRef.current = status;
   }, [status]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Abort any pending fetch when component unmounts
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      // Clear refs to prevent memory leaks
+      currentFetchPromiseRef.current = null;
+      sessionStableRef.current = false;
+      statusRef.current = null;
+      previousUserIdRef.current = null;
+    };
+  }, []);
 
   return {
     status,

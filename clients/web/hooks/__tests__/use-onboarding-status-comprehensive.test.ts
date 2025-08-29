@@ -659,12 +659,10 @@ describe('useOnboardingStatus - NEX-178 Race Condition Fixes', () => {
         expect(result.current.status).toEqual(mockCompletedStatus);
       });
 
-      // Should have called fetch with no-cache header
+      // Should have called fetch with AbortSignal
       expect(global.fetch).toHaveBeenCalledWith('/api/user/onboarding/status', 
         expect.objectContaining({
-          headers: expect.objectContaining({
-            'Cache-Control': 'no-cache'
-          })
+          signal: expect.any(AbortSignal)
         })
       );
     });
