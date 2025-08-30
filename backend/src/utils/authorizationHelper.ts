@@ -59,18 +59,37 @@ class RequestPermissionCache {
 const requestPermissionCache = new RequestPermissionCache();
 
 /**
- * Clear the permission cache - should be called at the start of each request
+ * Clear the permission cache - MUST be called at the start of each request
+ * Security-critical: Prevents permission leakage between requests
  */
 export const clearPermissionCache = (): void => {
   const stats = requestPermissionCache.getStats();
+  const cacheSize = requestPermissionCache.size();
+  
+  // Always clear the cache regardless of stats
+  requestPermissionCache.clear();
+  
+  // Log cache clearing for security auditing (but not sensitive data)
   if (stats.hits + stats.misses > 0) {
-    safeLog('debug', 'Permission cache cleared', {
+    safeLog('debug', 'Permission cache cleared for new request', {
       event: 'cache_cleared',
-      stats,
-      cacheSize: requestPermissionCache.size()
+      previousCacheSize: cacheSize,
+      cacheHits: stats.hits,
+      cacheMisses: stats.misses,
+      timestamp: new Date().toISOString()
     });
   }
-  requestPermissionCache.clear();
+  
+  // Security validation: Ensure cache is truly empty
+  if (requestPermissionCache.size() > 0) {
+    safeLog('error', 'SECURITY WARNING: Permission cache not properly cleared', {
+      event: 'cache_clear_failed',
+      remainingCacheSize: requestPermissionCache.size(),
+      timestamp: new Date().toISOString()
+    });
+    // Force clear again
+    requestPermissionCache.clear();
+  }
 };
 
 /**
@@ -309,23 +328,25 @@ export class AuthorizationHelper {
    * Check if user has permission in a specific workspace with caching
    */
   async hasWorkspacePermission(workspaceId: string, permission: string): Promise<boolean> {
-    // Input validation
-    if (!workspaceId || typeof workspaceId !== 'string') {
+    // Enhanced input validation with security checks
+    if (!isValidWorkspaceId(workspaceId)) {
       safeLog('warn', 'Invalid workspaceId provided to hasWorkspacePermission', {
         userId: this.userId,
-        workspaceId,
-        permission,
-        workspaceIdType: typeof workspaceId
+        // Don't log potentially malicious input
+        workspaceIdLength: (workspaceId as any)?.length || 'unknown',
+        workspaceIdType: typeof workspaceId,
+        timestamp: new Date().toISOString()
       });
       return false;
     }
 
-    if (!permission || typeof permission !== 'string') {
+    if (!isValidPermission(permission)) {
       safeLog('warn', 'Invalid permission provided to hasWorkspacePermission', {
         userId: this.userId,
-        workspaceId,
-        permission,
-        permissionType: typeof permission
+        workspaceId: workspaceId.substring(0, 8) + '...', // Partial logging
+        permissionLength: (permission as any)?.length || 'unknown',
+        permissionType: typeof permission,
+        timestamp: new Date().toISOString()
       });
       return false;
     }
@@ -391,19 +412,20 @@ export class AuthorizationHelper {
     resource = 'system',
     action = 'access'
   ): Promise<void> {
-    // Input validation
-    if (!permission || typeof permission !== 'string') {
+    // Enhanced input validation with security checks
+    if (!isValidPermission(permission)) {
       const error = new AuthorizationError(
-        'Invalid permission provided',
+        'Invalid request parameters', // Generic error - don't expose details
         'INVALID_PERMISSION',
-        permission,
+        'redacted', // Don't leak potentially malicious input
         []
       );
       
       securityLogger.authorizationFailure(this.userId, resource, action, {
-        error: 'Invalid permission',
-        requiredPermission: permission,
-        userPermissions: []
+        error: 'Invalid permission format',
+        // Don't log the actual invalid permission to prevent log injection
+        permissionLength: (permission as any)?.length || 'unknown',
+        permissionType: typeof permission
       });
       
       throw error;
@@ -424,10 +446,10 @@ export class AuthorizationHelper {
       });
 
       throw new AuthorizationError(
-        fullErrorMessage,
+        'Insufficient permissions', // Generic error message - don't expose specific permission
         'INSUFFICIENT_PERMISSIONS',
         permission,
-        flatPermissions
+        [] // Don't expose user's actual permissions in error
       );
     }
 
@@ -449,38 +471,38 @@ export class AuthorizationHelper {
     resource = 'workspace',
     action = 'access'
   ): Promise<void> {
-    // Input validation
-    if (!workspaceId || typeof workspaceId !== 'string') {
+    // Enhanced input validation with security checks
+    if (!isValidWorkspaceId(workspaceId)) {
       const error = new AuthorizationError(
-        'Invalid workspace ID provided',
+        'Invalid request parameters', // Generic error
         'INVALID_WORKSPACE_ID',
-        permission,
+        'redacted',
         []
       );
       
       securityLogger.authorizationFailure(this.userId, resource, action, {
-        error: 'Invalid workspace ID',
-        workspaceId,
-        requiredPermission: permission,
-        userPermissions: []
+        error: 'Invalid workspace ID format',
+        // Don't log potentially malicious input
+        workspaceIdLength: (workspaceId as any)?.length || 'unknown',
+        workspaceIdType: typeof workspaceId
       });
       
       throw error;
     }
 
-    if (!permission || typeof permission !== 'string') {
+    if (!isValidPermission(permission)) {
       const error = new AuthorizationError(
-        'Invalid permission provided',
+        'Invalid request parameters', // Generic error
         'INVALID_PERMISSION',
-        permission,
+        'redacted',
         []
       );
       
       securityLogger.authorizationFailure(this.userId, resource, action, {
-        error: 'Invalid permission',
-        workspaceId,
-        requiredPermission: permission,
-        userPermissions: []
+        error: 'Invalid permission format',
+        workspaceId: workspaceId.substring(0, 8) + '...', // Partial logging for debugging
+        permissionLength: (permission as any)?.length || 'unknown',
+        permissionType: typeof permission
       });
       
       throw error;
@@ -513,10 +535,10 @@ export class AuthorizationHelper {
       });
 
       throw new AuthorizationError(
-        fullErrorMessage,
-        'INSUFFICIENT_PERMISSIONS',
+        'Insufficient permissions for workspace access', // Generic error message
+        'INSUFFICIENT_PERMISSIONS', 
         permission,
-        userPermissions
+        [] // Don't expose user's actual permissions in error
       );
     }
 
@@ -551,19 +573,20 @@ export class AuthorizationHelper {
     resource = 'user_data',
     action = 'access'
   ): Promise<void> {
-    // Input validation
-    if (!targetUserId || typeof targetUserId !== 'string') {
+    // Enhanced input validation with security checks
+    if (!targetUserId || typeof targetUserId !== 'string' || targetUserId.trim().length === 0) {
       const error = new AuthorizationError(
-        'Invalid target user ID provided',
+        'Invalid request parameters', // Generic error
         'INVALID_USER_ID',
         'admin:user_management',
         []
       );
       
       securityLogger.authorizationFailure(this.userId, resource, action, {
-        error: 'Invalid target user ID',
-        targetUserId,
-        userPermissions: []
+        error: 'Invalid target user ID format',
+        // Don't log potentially malicious input
+        targetUserIdLength: (targetUserId as any)?.length || 'unknown',
+        targetUserIdType: typeof targetUserId
       });
       
       throw error;
@@ -585,10 +608,10 @@ export class AuthorizationHelper {
       });
 
       throw new AuthorizationError(
-        fullErrorMessage,
+        'Access denied', // Generic error message
         'INSUFFICIENT_PERMISSIONS',
-        'admin:user_management',
-        flatPermissions
+        'admin:user_management', 
+        [] // Don't expose user's actual permissions in error
       );
     }
 
@@ -614,12 +637,13 @@ export class AuthorizationHelper {
    * Get user permissions in a specific workspace with null safety
    */
   async getUserWorkspacePermissions(workspaceId: string): Promise<string[]> {
-    // Input validation
-    if (!workspaceId || typeof workspaceId !== 'string') {
+    // Enhanced input validation with security checks
+    if (!isValidWorkspaceId(workspaceId)) {
       safeLog('warn', 'Invalid workspaceId provided to getUserWorkspacePermissions', {
         userId: this.userId,
-        workspaceId,
-        workspaceIdType: typeof workspaceId
+        workspaceIdLength: (workspaceId as any)?.length || 'unknown',
+        workspaceIdType: typeof workspaceId,
+        timestamp: new Date().toISOString()
       });
       return [];
     }
@@ -731,18 +755,71 @@ export const getPermissionCacheStats = () => {
   };
 };
 
-/**
- * Utility function to validate workspace ID format
- */
-export const isValidWorkspaceId = (workspaceId: unknown): workspaceId is string => {
-  return typeof workspaceId === 'string' && workspaceId.length > 0;
-};
 
 /**
  * Utility function to validate permission format
+ * Security: Prevents injection attacks through malformed permissions
  */
 export const isValidPermission = (permission: unknown): permission is string => {
-  return typeof permission === 'string' && 
-         permission.length > 0 && 
-         /^[a-zA-Z0-9_:]+$/.test(permission); // Basic permission format validation
+  if (typeof permission !== 'string') {
+    return false;
+  }
+  
+  // Security validations
+  const trimmedPermission = permission.trim();
+  
+  // Must not be empty after trimming
+  if (trimmedPermission.length === 0) {
+    return false;
+  }
+  
+  // Must be reasonable length (prevent DoS attacks)
+  if (trimmedPermission.length > 100) {
+    return false;
+  }
+  
+  // Only allow alphanumeric, underscore, colon, and dash
+  if (!/^[a-zA-Z0-9_:-]+$/.test(trimmedPermission)) {
+    return false;
+  }
+  
+  // Must not start or end with special characters
+  if (/^[_:-]|[_:-]$/.test(trimmedPermission)) {
+    return false;
+  }
+  
+  // Must not have consecutive special characters  
+  if (/[_:-]{2,}/.test(trimmedPermission)) {
+    return false;
+  }
+  
+  return true;
+};
+
+/**
+ * Enhanced workspace ID validation with security checks
+ */
+export const isValidWorkspaceId = (workspaceId: unknown): workspaceId is string => {
+  if (typeof workspaceId !== 'string') {
+    return false;
+  }
+  
+  const trimmedId = workspaceId.trim();
+  
+  // Must not be empty
+  if (trimmedId.length === 0) {
+    return false;
+  }
+  
+  // Must be reasonable length
+  if (trimmedId.length > 100) {
+    return false;
+  }
+  
+  // For UUIDs or similar safe formats
+  if (/^[a-zA-Z0-9_-]+$/.test(trimmedId)) {
+    return true;
+  }
+  
+  return false;
 };
