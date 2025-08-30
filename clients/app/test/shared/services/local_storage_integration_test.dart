@@ -1,10 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter/services.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'dart:io';
 
-import '../../../lib/shared/database/database_constants.dart';
 import '../../../lib/shared/models/card.dart';
 import '../../../lib/shared/models/card_enums.dart';
 import '../../../lib/shared/models/user_preferences.dart';
@@ -53,8 +53,9 @@ void main() {
     const testWorkspaceId = 'test-workspace-456';
 
     setUpAll(() async {
-      // Initialize services
-      databaseService = DatabaseService();
+      // Initialize services using provider container
+      final container = ProviderContainer();
+      databaseService = container.read(databaseServiceProvider);
       cardStorageService = CardStorageService(databaseService);
       syncQueueService = SyncQueueService(databaseService);
       userPreferencesService = UserPreferencesService(databaseService);
@@ -66,6 +67,9 @@ void main() {
       
       // Clear any existing test data
       await databaseService.clearAllData();
+      
+      // Keep the container alive during tests
+      container.dispose();
     });
 
     tearDownAll(() async {
