@@ -3,6 +3,7 @@ import 'dart:developer' as dev;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../performance/performance_manager.dart';
+import '../errors/initialization_errors.dart';
 import '../../shared/services/auth_service.dart';
 import '../../shared/services/database_service.dart';
 import '../../shared/services/secure_storage_service.dart';
@@ -59,8 +60,25 @@ class InitializationManager {
     try {
       final tasks = _phases[phase]!;
       if (tasks.isNotEmpty) {
-        // Run all tasks in this phase concurrently
-        await Future.wait(tasks.map((task) => task()));
+        // Run all tasks in this phase concurrently with detailed error tracking
+        final taskFutures = tasks.asMap().entries.map((entry) {
+          final index = entry.key;
+          final task = entry.value;
+          return task().catchError((error, stackTrace) {
+            // Wrap the error with detailed context
+            final wrappedError = InitializationErrorHandler.wrapError(
+              error: error,
+              stackTrace: stackTrace,
+              phase: phase,
+              taskName: 'task_$index',
+              taskIndex: index,
+              totalTasks: tasks.length,
+            );
+            throw wrappedError;
+          });
+        });
+        
+        await Future.wait(taskFutures);
         dev.log('✅ ${phase.name} phase completed (${tasks.length} tasks)', 
                 name: 'Initialization');
       }
@@ -69,12 +87,23 @@ class InitializationManager {
       if (!_phaseCompleters[phase]!.isCompleted) {
         _phaseCompleters[phase]!.complete();
       }
-    } catch (error) {
-      dev.log('❌ ${phase.name} phase failed: $error', name: 'Initialization');
+    } catch (error, stackTrace) {
+      final initError = error is InitializationError 
+          ? error 
+          : InitializationErrorHandler.wrapError(
+              error: error,
+              stackTrace: stackTrace,
+              phase: phase,
+            );
+      
+      final logMessage = InitializationErrorHandler.formatForLogging(initError);
+      dev.log(logMessage, name: 'Initialization');
+      
       if (!_phaseCompleters[phase]!.isCompleted) {
-        _phaseCompleters[phase]!.completeError(error);
+        _phaseCompleters[phase]!.completeError(initError);
       }
-      rethrow;
+      
+      throw initError;
     } finally {
       performance.endOperation(phaseName);
     }
@@ -84,14 +113,25 @@ class InitializationManager {
   Future<void> initializeAll() async {
     await initializePhase(InitializationPhase.critical);
     
-    // Start essential and background phases concurrently
-    // but don't wait for background to complete
+    // Start essential and background phases with proper error handling
     unawaited(initializePhase(InitializationPhase.essential).then((_) {
-      // Start background phase after essential completes
-      unawaited(initializePhase(InitializationPhase.background));
+      // Start background phase after essential completes with error recovery
+      unawaited(initializePhase(InitializationPhase.background).catchError((error) {
+        dev.log('⚠️ Background phase initialization failed: $error', 
+                name: 'Initialization');
+        dev.log('✅ App remains functional despite background initialization failure',
+                name: 'Initialization');
+        // Don't rethrow - background phase failures shouldn't affect app functionality
+      }));
+    }).catchError((error) {
+      dev.log('❌ Essential phase initialization failed: $error', 
+              name: 'Initialization');
+      // Essential phase errors should still be propagated
+      // but we log them for better debugging
+      rethrow;
     }));
     
-    // Only wait for essential phase, background continues async
+    // Only wait for essential phase, background continues async with error recovery
     await waitForPhase(InitializationPhase.essential);
   }
 

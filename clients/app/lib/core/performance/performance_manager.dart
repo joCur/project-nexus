@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:developer' as dev;
 
-/// Performance monitoring and timing utilities
+/// Performance monitoring and timing utilities with automatic memory management
 class PerformanceManager {
   static final PerformanceManager _instance = PerformanceManager._internal();
   factory PerformanceManager() => _instance;
-  PerformanceManager._internal();
+  PerformanceManager._internal() {
+    _schedulePeriodicCleanup();
+  }
 
   final Map<String, DateTime> _operationStartTimes = {};
   final Map<String, int> _operationDurations = {};
@@ -13,6 +15,12 @@ class PerformanceManager {
   DateTime? _appLaunchStart;
   DateTime? _firstFrameTime;
   DateTime? _interactiveTime;
+  
+  Timer? _cleanupTimer;
+  
+  // Memory management configuration
+  static const int maxOperationEntries = 100;
+  static const Duration cleanupInterval = Duration(minutes: 5);
 
   /// Mark the start of app launch timing
   void markAppLaunchStart() {
@@ -106,13 +114,65 @@ class PerformanceManager {
     dev.log(buffer.toString(), name: 'Performance');
   }
 
-  /// Reset all performance tracking
+  /// Schedule periodic cleanup to prevent memory growth
+  void _schedulePeriodicCleanup() {
+    _cleanupTimer = Timer.periodic(cleanupInterval, (_) {
+      _performPeriodicCleanup();
+    });
+  }
+
+  /// Perform periodic cleanup of performance tracking data
+  void _performPeriodicCleanup() {
+    // Clean up old operation start times (orphaned operations)
+    final now = DateTime.now();
+    final staleThreshold = now.subtract(const Duration(minutes: 10));
+    
+    _operationStartTimes.removeWhere((key, startTime) {
+      final isStale = startTime.isBefore(staleThreshold);
+      if (isStale) {
+        dev.log('🧹 Cleaned up stale operation: $key', name: 'Performance');
+      }
+      return isStale;
+    });
+    
+    // Limit operation durations to prevent unbounded growth
+    if (_operationDurations.length > maxOperationEntries) {
+      final excess = _operationDurations.length - maxOperationEntries;
+      final keysToRemove = _operationDurations.keys.take(excess).toList();
+      
+      for (final key in keysToRemove) {
+        _operationDurations.remove(key);
+      }
+      
+      dev.log('🧹 Cleaned up $excess old operation duration entries', name: 'Performance');
+    }
+  }
+
+  /// Get current memory usage statistics
+  Map<String, int> getMemoryStats() {
+    return {
+      'operationStartTimes': _operationStartTimes.length,
+      'operationDurations': _operationDurations.length,
+      'totalEntries': _operationStartTimes.length + _operationDurations.length,
+    };
+  }
+
+  /// Reset all performance tracking and cleanup timer
   void reset() {
+    _cleanupTimer?.cancel();
     _operationStartTimes.clear();
     _operationDurations.clear();
     _appLaunchStart = null;
     _firstFrameTime = null;
     _interactiveTime = null;
+    _schedulePeriodicCleanup();
+  }
+
+  /// Dispose of the performance manager and cleanup resources
+  void dispose() {
+    _cleanupTimer?.cancel();
+    _operationStartTimes.clear();
+    _operationDurations.clear();
   }
 }
 
