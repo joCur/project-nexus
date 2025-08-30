@@ -5,6 +5,20 @@ import { WorkspaceAuthorizationService } from '@/services/workspaceAuthorization
 
 const logger = createContextLogger({ service: 'AuthorizationHelper' });
 
+// Safe logger wrapper to prevent undefined access in tests
+const safeLogger = {
+  debug: (message: string, meta?: any) => {
+    if (logger && safeLogger.debug) {
+      safeLogger.debug(message, meta);
+    }
+  },
+  error: (message: string, meta?: any) => {
+    if (logger && logger.error) {
+      logger.error(message, meta);
+    }
+  }
+};
+
 /**
  * Cache to prevent N+1 queries for permission checks within a single request
  * Key format: `${userId}:permissions` or `${userId}:${workspaceId}:permission:${permission}`
@@ -57,7 +71,7 @@ const requestPermissionCache = new RequestPermissionCache();
 export const clearPermissionCache = (): void => {
   const stats = requestPermissionCache.getStats();
   if (stats.hits + stats.misses > 0) {
-    logger.debug('Permission cache cleared', {
+    safeLogger.debug('Permission cache cleared', {
       event: 'cache_cleared',
       stats,
       cacheSize: requestPermissionCache.size()
@@ -85,13 +99,13 @@ export const extendedSecurityLogger = {
     };
 
     if (logLevel === 'debug') {
-      logger.debug('Authorization successful', logData);
+      safeLogger.debug('Authorization successful', logData);
     } else {
       logger.info('Authorization successful', logData);
     }
   },
   authorizationCacheHit: (userId: string, cacheType: string, metadata?: Record<string, unknown>) => {
-    logger.debug('Authorization cache hit', {
+    safeLogger.debug('Authorization cache hit', {
       event: 'authorization_cache_hit',
       userId,
       cacheType,
@@ -100,7 +114,7 @@ export const extendedSecurityLogger = {
     });
   },
   authorizationCacheMiss: (userId: string, cacheType: string, metadata?: Record<string, unknown>) => {
-    logger.debug('Authorization cache miss', {
+    safeLogger.debug('Authorization cache miss', {
       event: 'authorization_cache_miss',
       userId,
       cacheType,
@@ -146,7 +160,7 @@ export class AuthorizationHelper {
     
     if (requestPermissionCache.has(cacheKey)) {
       const cached = requestPermissionCache.get(cacheKey);
-      logger.debug('Permission cache hit', {
+      safeLogger.debug('Permission cache hit', {
         userId: this.userId,
         cacheKey,
         workspaceCount: Object.keys(cached || {}).length
@@ -170,15 +184,13 @@ export class AuthorizationHelper {
       }
 
       if (typeof permissions !== 'object' || Array.isArray(permissions)) {
-        if (logger && logger.error) {
-          logger.error('Invalid permissions structure returned - expected object with workspace IDs as keys', {
+        safeLogger.error('Invalid permissions structure returned - expected object with workspace IDs as keys', {
             userId: this.userId,
             permissionsType: typeof permissions,
             isArray: Array.isArray(permissions),
             service: 'WorkspaceAuthorizationService',
             method: 'getUserPermissionsForContext'
           });
-        }
         const emptyPermissions = {};
         requestPermissionCache.set(cacheKey, emptyPermissions);
         return emptyPermissions;
@@ -217,12 +229,11 @@ export class AuthorizationHelper {
             originalCount: workspacePermissions.length,
             validCount: validPermissions.length
           });
-        }
 
         validatedPermissions[workspaceId] = validPermissions;
       }
 
-      logger.debug('Permission cache miss - fetched from service', {
+      safeLogger.debug('Permission cache miss - fetched from service', {
         userId: this.userId,
         cacheKey,
         workspaceCount: Object.keys(validatedPermissions).length,
@@ -232,15 +243,13 @@ export class AuthorizationHelper {
       requestPermissionCache.set(cacheKey, validatedPermissions);
       return validatedPermissions;
     } catch (error) {
-      if (logger && logger.error) {
-        logger.error('Failed to get user permissions', {
+      safeLogger.error('Failed to get user permissions', {
           userId: this.userId,
           error: error instanceof Error ? error.message : 'Unknown error',
           errorStack: error instanceof Error ? error.stack : undefined,
           service: 'WorkspaceAuthorizationService',
           method: 'getUserPermissionsForContext'
         });
-      }
       const emptyPermissions = {};
       requestPermissionCache.set(cacheKey, emptyPermissions);
       return emptyPermissions;
@@ -279,7 +288,7 @@ export class AuthorizationHelper {
     // Remove duplicates while preserving order using Set
     const uniquePermissions = [...new Set(flatPermissions)];
     
-    logger.debug('Flattened permissions computed', {
+    safeLogger.debug('Flattened permissions computed', {
       userId: this.userId,
       workspaceCount: Object.keys(permissionsByWorkspace).length,
       totalPermissions: flatPermissions.length,
@@ -327,7 +336,7 @@ export class AuthorizationHelper {
     
     if (requestPermissionCache.has(cacheKey)) {
       const cached = requestPermissionCache.get(cacheKey);
-      logger.debug('Workspace permission cache hit', {
+      safeLogger.debug('Workspace permission cache hit', {
         userId: this.userId,
         workspaceId,
         permission,
@@ -346,7 +355,7 @@ export class AuthorizationHelper {
       // Ensure we get a boolean result
       const booleanResult = Boolean(hasPermission);
       
-      logger.debug('Workspace permission cache miss - fetched from service', {
+      safeLogger.debug('Workspace permission cache miss - fetched from service', {
         userId: this.userId,
         workspaceId,
         permission,
@@ -358,8 +367,7 @@ export class AuthorizationHelper {
       requestPermissionCache.set(cacheKey, booleanResult);
       return booleanResult;
     } catch (error) {
-      if (logger && logger.error) {
-        logger.error('Failed to check workspace permission', {
+      safeLogger.error('Failed to check workspace permission', {
           userId: this.userId,
           workspaceId,
           permission,
@@ -368,7 +376,6 @@ export class AuthorizationHelper {
           service: 'WorkspaceAuthorizationService',
           method: 'hasPermissionInWorkspace'
         });
-      }
       // Cache false result to prevent repeated failed calls
       requestPermissionCache.set(cacheKey, false);
       return false;
@@ -493,7 +500,6 @@ export class AuthorizationHelper {
           workspaceId,
           error: permError instanceof Error ? permError.message : 'Unknown error'
         });
-      }
       
       const fullErrorMessage = errorMessage || `Missing required permission: ${permission} in workspace ${workspaceId}`;
       
@@ -594,7 +600,7 @@ export class AuthorizationHelper {
       });
     } else {
       // Log self-access for audit purposes (at debug level)
-      logger.debug('User accessing own data', {
+      safeLogger.debug('User accessing own data', {
         userId: this.userId,
         resource,
         action,
@@ -621,7 +627,7 @@ export class AuthorizationHelper {
     
     if (requestPermissionCache.has(cacheKey)) {
       const cached = requestPermissionCache.get(cacheKey);
-      logger.debug('Workspace permissions cache hit', {
+      safeLogger.debug('Workspace permissions cache hit', {
         userId: this.userId,
         workspaceId,
         permissionCount: cached?.length || 0
@@ -634,7 +640,7 @@ export class AuthorizationHelper {
       
       // Enhanced null safety and validation
       if (!permissions) {
-        logger.debug('No permissions returned for user in workspace', {
+        safeLogger.debug('No permissions returned for user in workspace', {
           userId: this.userId,
           workspaceId,
           service: 'WorkspaceAuthorizationService',
@@ -646,15 +652,13 @@ export class AuthorizationHelper {
       }
 
       if (!Array.isArray(permissions)) {
-        if (logger && logger.error) {
-          logger.error('Invalid permissions format - expected array', {
+        safeLogger.error('Invalid permissions format - expected array', {
             userId: this.userId,
             workspaceId,
             permissionsType: typeof permissions,
             service: 'WorkspaceAuthorizationService',
             method: 'getUserPermissionsInWorkspace'
           });
-        }
         const emptyPermissions: string[] = [];
         requestPermissionCache.set(cacheKey, emptyPermissions);
         return emptyPermissions;
@@ -673,9 +677,8 @@ export class AuthorizationHelper {
           validCount: validPermissions.length,
           invalidPermissions: permissions.filter(perm => typeof perm !== 'string' || perm.length === 0)
         });
-      }
 
-      logger.debug('Workspace permissions cache miss - fetched from service', {
+      safeLogger.debug('Workspace permissions cache miss - fetched from service', {
         userId: this.userId,
         workspaceId,
         permissionCount: validPermissions.length,
@@ -686,8 +689,7 @@ export class AuthorizationHelper {
       requestPermissionCache.set(cacheKey, validPermissions);
       return validPermissions;
     } catch (error) {
-      if (logger && logger.error) {
-        logger.error('Failed to get workspace permissions', {
+      safeLogger.error('Failed to get workspace permissions', {
           userId: this.userId,
           workspaceId,
           error: error instanceof Error ? error.message : 'Unknown error',
@@ -695,7 +697,6 @@ export class AuthorizationHelper {
           service: 'WorkspaceAuthorizationService',
           method: 'getUserPermissionsInWorkspace'
         });
-      }
       const emptyPermissions: string[] = [];
       requestPermissionCache.set(cacheKey, emptyPermissions);
       return emptyPermissions;
