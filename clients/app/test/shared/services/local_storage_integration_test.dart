@@ -458,7 +458,7 @@ void main() {
 
         // Check pending saves
         expect(autoSaveService.hasPendingSave(testCard.id), isTrue);
-        expect(autoSaveService.pendingCards, containsKey(testCard.id));
+        expect(autoSaveService.pendingCards.containsKey(testCard.id), isTrue);
 
         // Flush pending saves
         await autoSaveService.flushPendingSaves();

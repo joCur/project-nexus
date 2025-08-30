@@ -5,6 +5,7 @@
 /// - Column definitions
 /// - Schema versions
 /// - Storage limits and constraints
+library;
 
 class DatabaseConstants {
   // Database configuration

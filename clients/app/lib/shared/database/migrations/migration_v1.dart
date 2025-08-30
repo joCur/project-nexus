@@ -41,7 +41,7 @@ class MigrationV1 extends Migration {
       });
 
       dev.log('Initial database schema created successfully', name: 'MigrationV1');
-    } catch (error, stackTrace) {
+    } catch (error) {
       throw MigrationException(
         'Failed to create initial database schema',
         version,
