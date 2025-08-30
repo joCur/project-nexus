@@ -521,7 +521,7 @@ export class WorkspaceAuthorizationService {
         return [...WorkspacePermissions.OWNER];
       case 'admin':
         return [...WorkspacePermissions.ADMIN];
-      case 'member': // 'member' is mapped to 'editor' permissions
+      case 'member': // Database stores 'member' role but maps to EDITOR permissions for backward compatibility
         return [...WorkspacePermissions.EDITOR];
       case 'viewer':
         return [...WorkspacePermissions.VIEWER];
@@ -764,6 +764,9 @@ export class WorkspaceAuthorizationService {
     }
 
     try {
+      // TODO: Consider optimizing with a single JOIN query for better performance at scale
+      // Current approach uses two separate queries for clarity and maintainability
+      
       // Get all workspaces user is a member of
       const memberWorkspaces = await this.db('workspace_members')
         .select('workspace_id', 'role', 'permissions')
