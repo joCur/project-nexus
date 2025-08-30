@@ -10,9 +10,6 @@
       "Bash(flutter build:*)",
       "Bash(flutter packages:*)",
       "Bash(flutter test:*)"
-    ],
-    "additionalDirectories": [
-      "C:\\c\\Users\\curth\\Documents\\git\\project-nexus"
     ]
   },
   "enableAllProjectMcpServers": true,
@@ -20,6 +17,6 @@
     "playwright",
     "context7",
     "semgrep",
-    "linear"
+    "linear-server"
   ]
 }

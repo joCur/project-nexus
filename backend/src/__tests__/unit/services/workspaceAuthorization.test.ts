@@ -189,4 +189,180 @@ describe('WorkspaceAuthorizationService', () => {
       });
     });
   });
+
+  describe('new permission resolution methods', () => {
+    describe('getUserPermissionsInWorkspace', () => {
+      test('returns cached permissions when available', async () => {
+        const cachedPermissions = ['workspace:read', 'card:read', 'card:create'];
+        mockCacheService.get.mockResolvedValue(cachedPermissions);
+
+        const result = await authService.getUserPermissionsInWorkspace('user-1', 'ws-1');
+        
+        expect(mockCacheService.get).toHaveBeenCalledWith('user_permissions:user-1:ws-1');
+        expect(result).toEqual(cachedPermissions);
+      });
+
+      test('returns empty array for non-member', async () => {
+        mockCacheService.get.mockResolvedValue(null);
+        // Mock getWorkspaceMember to return null (not a member)
+        jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(null);
+
+        const result = await authService.getUserPermissionsInWorkspace('user-1', 'ws-1');
+        
+        expect(result).toEqual([]);
+        expect(mockCacheService.set).toHaveBeenCalledWith('user_permissions:user-1:ws-1', [], 60);
+      });
+
+      test('combines role and custom permissions', async () => {
+        mockCacheService.get.mockResolvedValue(null);
+        
+        const mockMember = {
+          id: 'member-1',
+          workspaceId: 'ws-1',
+          userId: 'user-1',
+          role: 'viewer' as WorkspaceRole,
+          permissions: ['custom:permission'],
+          joinedAt: new Date(),
+          isActive: true
+        };
+        
+        jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+
+        const result = await authService.getUserPermissionsInWorkspace('user-1', 'ws-1');
+        
+        expect(result).toContain('workspace:read'); // Role permission
+        expect(result).toContain('card:read'); // Role permission
+        expect(result).toContain('custom:permission'); // Custom permission
+        expect(mockCacheService.set).toHaveBeenCalled();
+      });
+    });
+
+    describe('getUserWorkspaceRole', () => {
+      test('returns user role when member exists', async () => {
+        const mockMember = {
+          id: 'member-1',
+          workspaceId: 'ws-1',
+          userId: 'user-1',
+          role: 'admin' as WorkspaceRole,
+          permissions: [],
+          joinedAt: new Date(),
+          isActive: true
+        };
+        
+        jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+
+        const result = await authService.getUserWorkspaceRole('user-1', 'ws-1');
+        
+        expect(result).toBe('admin');
+      });
+
+      test('returns null when user is not a member', async () => {
+        jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(null);
+
+        const result = await authService.getUserWorkspaceRole('user-1', 'ws-1');
+        
+        expect(result).toBeNull();
+      });
+    });
+
+    describe('hasPermissionInWorkspace', () => {
+      test('returns true when user has permission', async () => {
+        const mockMember = {
+          id: 'member-1',
+          workspaceId: 'ws-1',
+          userId: 'user-1',
+          role: 'member' as WorkspaceRole,
+          permissions: [],
+          joinedAt: new Date(),
+          isActive: true
+        };
+        
+        jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+
+        const result = await authService.hasPermissionInWorkspace('user-1', 'ws-1', 'card:create');
+        
+        expect(result).toBe(true);
+      });
+
+      test('returns false when user does not have permission', async () => {
+        const mockMember = {
+          id: 'member-1',
+          workspaceId: 'ws-1',
+          userId: 'user-1',
+          role: 'viewer' as WorkspaceRole,
+          permissions: [],
+          joinedAt: new Date(),
+          isActive: true
+        };
+        
+        jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+
+        const result = await authService.hasPermissionInWorkspace('user-1', 'ws-1', 'card:create');
+        
+        expect(result).toBe(false);
+      });
+
+      test('returns false when user is not a member', async () => {
+        jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(null);
+
+        const result = await authService.hasPermissionInWorkspace('user-1', 'ws-1', 'card:create');
+        
+        expect(result).toBe(false);
+      });
+    });
+
+    describe('getUserPermissionsForContext', () => {
+      test('returns cached permissions when available', async () => {
+        const cachedContext = { 'ws-1': ['workspace:read'], 'ws-2': ['workspace:read', 'card:create'] };
+        mockCacheService.get.mockResolvedValue(cachedContext);
+
+        const result = await authService.getUserPermissionsForContext('user-1');
+        
+        expect(mockCacheService.get).toHaveBeenCalledWith('user_context_permissions:user-1');
+        expect(result).toEqual(cachedContext);
+      });
+
+      test('combines member and owned workspaces', async () => {
+        mockCacheService.get.mockResolvedValue(null);
+        
+        // Mock member workspaces query
+        const memberWorkspaces = [
+          { workspace_id: 'ws-1', role: 'member', permissions: ['custom:permission'] },
+          { workspace_id: 'ws-2', role: 'viewer', permissions: null }
+        ];
+        
+        // Mock owned workspaces query
+        const ownedWorkspaces = [
+          { id: 'ws-3' }
+        ];
+
+        mockDb = jest.fn((table) => {
+          if (table === 'workspace_members') {
+            return {
+              select: jest.fn(() => ({
+                where: jest.fn(() => Promise.resolve(memberWorkspaces))
+              }))
+            };
+          } else if (table === 'workspaces') {
+            return {
+              select: jest.fn(() => ({
+                where: jest.fn(() => Promise.resolve(ownedWorkspaces))
+              }))
+            };
+          }
+        });
+        
+        (authService as any).db = mockDb;
+
+        const result = await authService.getUserPermissionsForContext('user-1');
+        
+        expect(result['ws-1']).toContain('workspace:read'); // Editor permissions
+        expect(result['ws-1']).toContain('card:create'); // Editor permissions
+        expect(result['ws-1']).toContain('custom:permission'); // Custom permission
+        expect(result['ws-2']).toContain('workspace:read'); // Viewer permissions
+        expect(result['ws-3']).toContain('workspace:delete'); // Owner permissions
+        expect(mockCacheService.set).toHaveBeenCalled();
+      });
+    });
+  });
 });
