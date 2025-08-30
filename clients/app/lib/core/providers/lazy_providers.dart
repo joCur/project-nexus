@@ -32,6 +32,12 @@ class InitializationManager {
     InitializationPhase.essential: false,
     InitializationPhase.background: false,
   };
+  
+  final Map<InitializationPhase, bool> _phaseInProgress = {
+    InitializationPhase.critical: false,
+    InitializationPhase.essential: false,
+    InitializationPhase.background: false,
+  };
 
   final Map<InitializationPhase, Completer<void>> _phaseCompleters = {
     InitializationPhase.critical: Completer<void>(),
@@ -52,6 +58,14 @@ class InitializationManager {
   /// Initialize a specific phase
   Future<void> initializePhase(InitializationPhase phase) async {
     if (_phaseCompleted[phase] == true) return;
+    
+    // If already in progress, wait for it to complete
+    if (_phaseInProgress[phase] == true) {
+      return _phaseCompleters[phase]!.future;
+    }
+    
+    // Mark as in progress
+    _phaseInProgress[phase] = true;
 
     final performance = PerformanceManager();
     final phaseName = '${phase.name}_phase';
@@ -140,6 +154,7 @@ class InitializationManager {
       list.clear();
     }
     _phaseCompleted.updateAll((key, value) => false);
+    _phaseInProgress.updateAll((key, value) => false);
     _phaseCompleters.updateAll((key, value) => Completer<void>());
   }
 }

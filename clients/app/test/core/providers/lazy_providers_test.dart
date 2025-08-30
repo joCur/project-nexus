@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'dart:async';
 
 import '../../../lib/core/providers/lazy_providers.dart';
+import '../../../lib/core/errors/initialization_errors.dart';
 
 void main() {
   group('InitializationManager', () {
@@ -77,24 +78,32 @@ void main() {
 
     group('Error Handling', () {
       test('should handle task failures in critical phase', () async {
-        manager.addTask(InitializationPhase.critical, () async {
+        // Create fresh manager instance for this test
+        final testManager = InitializationManager();
+        testManager.reset(); // Ensure clean state
+        
+        testManager.addTask(InitializationPhase.critical, () async {
           throw Exception('Critical phase failure');
         });
 
         expect(
-          () async => await manager.initializePhase(InitializationPhase.critical),
-          throwsException,
+          () async => await testManager.initializePhase(InitializationPhase.critical),
+          throwsA(isA<InitializationError>()),
         );
       });
 
       test('should handle task failures in essential phase', () async {
-        manager.addTask(InitializationPhase.essential, () async {
+        // Create fresh manager instance for this test
+        final testManager = InitializationManager();
+        testManager.reset(); // Ensure clean state
+        
+        testManager.addTask(InitializationPhase.essential, () async {
           throw Exception('Essential phase failure');
         });
 
         expect(
-          () async => await manager.initializePhase(InitializationPhase.essential),
-          throwsException,
+          () async => await testManager.initializePhase(InitializationPhase.essential),
+          throwsA(isA<InitializationError>()),
         );
       });
 
@@ -125,29 +134,43 @@ void main() {
       });
 
       test('should handle multiple task failures in same phase', () async {
-        manager.addTask(InitializationPhase.critical, () async {
+        // Create fresh manager instance for this test
+        final testManager = InitializationManager();
+        testManager.reset(); // Ensure clean state
+        
+        testManager.addTask(InitializationPhase.critical, () async {
           throw Exception('First task failure');
         });
         
-        manager.addTask(InitializationPhase.critical, () async {
+        testManager.addTask(InitializationPhase.critical, () async {
           throw Exception('Second task failure');
         });
 
         expect(
-          () async => await manager.initializePhase(InitializationPhase.critical),
-          throwsException,
+          () async => await testManager.initializePhase(InitializationPhase.critical),
+          throwsA(isA<InitializationError>()),
         );
       });
 
       test('should complete completer even when error occurs', () async {
-        manager.addTask(InitializationPhase.essential, () async {
+        // Create fresh manager instance for this test
+        final testManager = InitializationManager();
+        testManager.reset(); // Ensure clean state
+        
+        testManager.addTask(InitializationPhase.essential, () async {
           throw Exception('Task failure');
         });
 
-        // This should complete with error, not hang
+        // Start the phase initialization that will fail
         expect(
-          () async => await manager.waitForPhase(InitializationPhase.essential),
-          throwsException,
+          () async => await testManager.initializePhase(InitializationPhase.essential),
+          throwsA(isA<InitializationError>()),
+        );
+        
+        // The completer should now be completed with error
+        expect(
+          () async => await testManager.waitForPhase(InitializationPhase.essential),
+          throwsA(isA<InitializationError>()),
         );
       });
     });
@@ -156,21 +179,26 @@ void main() {
       test('should handle concurrent phase initializations', () async {
         var executionCount = 0;
         
-        manager.addTask(InitializationPhase.essential, () async {
+        // Create fresh manager instance for this test
+        final testManager = InitializationManager();
+        testManager.reset(); // Ensure clean state
+        
+        testManager.addTask(InitializationPhase.essential, () async {
           await Future.delayed(const Duration(milliseconds: 20));
           executionCount++;
         });
 
         // Start multiple initializations concurrently
         final futures = [
-          manager.initializePhase(InitializationPhase.essential),
-          manager.initializePhase(InitializationPhase.essential),
-          manager.initializePhase(InitializationPhase.essential),
+          testManager.initializePhase(InitializationPhase.essential),
+          testManager.initializePhase(InitializationPhase.essential),
+          testManager.initializePhase(InitializationPhase.essential),
         ];
 
         await Future.wait(futures);
         
         // Should only execute once despite multiple concurrent calls
+        // (all calls share the same phase completion)
         expect(executionCount, equals(1));
       });
 
