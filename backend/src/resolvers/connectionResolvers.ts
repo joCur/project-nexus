@@ -54,10 +54,10 @@ export const connectionResolvers = {
         }
 
         // Authorization check - users can only access connections where both cards are in their workspaces
-        const workspaceAuth = new WorkspaceAuthorizationService();
+        const workspaceAuth = context.dataSources.workspaceAuthorizationService;
         const [sourceCard, targetCard] = await Promise.all([
-          connectionService['getCardById'](connection.sourceCardId),
-          connectionService['getCardById'](connection.targetCardId)
+          connectionService.getCardById(connection.sourceCardId),
+          connectionService.getCardById(connection.targetCardId)
         ]);
 
         if (!sourceCard || !targetCard) {
@@ -206,7 +206,7 @@ export const connectionResolvers = {
         const connectionService = new ConnectionService();
         
         // Get card to check workspace access
-        const card = await connectionService['getCardById'](cardId);
+        const card = await connectionService.getCardById(cardId);
         if (!card) {
           throw new NotFoundError('Card', cardId);
         }
@@ -328,8 +328,8 @@ export const connectionResolvers = {
 
         // Get both cards to validate workspace access
         const [sourceCard, targetCard] = await Promise.all([
-          connectionService['getCardById'](input.sourceCardId),
-          connectionService['getCardById'](input.targetCardId)
+          connectionService.getCardById(input.sourceCardId),
+          connectionService.getCardById(input.targetCardId)
         ]);
 
         if (!sourceCard || !targetCard) {
@@ -428,8 +428,8 @@ export const connectionResolvers = {
         }
 
         const [sourceCard, targetCard] = await Promise.all([
-          connectionService['getCardById'](existingConnection.sourceCardId),
-          connectionService['getCardById'](existingConnection.targetCardId)
+          connectionService.getCardById(existingConnection.sourceCardId),
+          connectionService.getCardById(existingConnection.targetCardId)
         ]);
 
         if (!sourceCard || !targetCard) {
@@ -524,8 +524,8 @@ export const connectionResolvers = {
         }
 
         const [sourceCard, targetCard] = await Promise.all([
-          connectionService['getCardById'](existingConnection.sourceCardId),
-          connectionService['getCardById'](existingConnection.targetCardId)
+          connectionService.getCardById(existingConnection.sourceCardId),
+          connectionService.getCardById(existingConnection.targetCardId)
         ]);
 
         if (!sourceCard || !targetCard) {
@@ -620,7 +620,7 @@ export const connectionResolvers = {
           const workspaceGroups: { [workspaceId: string]: Connection[] } = {};
           
           for (const connection of result.successful) {
-            const sourceCard = await connectionService['getCardById'](connection.sourceCardId);
+            const sourceCard = await connectionService.getCardById(connection.sourceCardId);
             if (sourceCard) {
               if (!workspaceGroups[sourceCard.workspace_id]) {
                 workspaceGroups[sourceCard.workspace_id] = [];
@@ -686,7 +686,7 @@ export const connectionResolvers = {
         // Publish real-time events for successful updates
         if (result.successful.length > 0) {
           for (const connection of result.successful) {
-            const sourceCard = await connectionService['getCardById'](connection.sourceCardId);
+            const sourceCard = await connectionService.getCardById(connection.sourceCardId);
             if (sourceCard) {
               await pubSub.publish(CONNECTION_EVENTS.CONNECTION_UPDATED, {
                 connectionUpdated: connection,
