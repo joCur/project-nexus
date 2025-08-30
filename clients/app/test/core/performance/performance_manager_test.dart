@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'dart:async';
 
 import '../../../lib/core/performance/performance_manager.dart';
+import '../../../lib/core/state/app_initialization_state.dart';
 
 void main() {
   group('PerformanceManager', () {

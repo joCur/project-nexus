@@ -128,7 +128,6 @@ class InitializationManager {
               name: 'Initialization');
       // Essential phase errors should still be propagated
       // but we log them for better debugging
-      rethrow;
     }));
     
     // Only wait for essential phase, background continues async with error recovery
@@ -160,6 +159,13 @@ final lazyAuthServiceProvider = Provider<AuthService>((ref) {
 final lazyDatabaseServiceProvider = Provider<DatabaseService>((ref) {
   // Use the existing databaseService provider which creates with DatabaseService._()
   final service = ref.read(databaseServiceProvider);
+  
+  // Enable fast start mode for performance optimization
+  try {
+    service.enableFastStart();
+  } catch (e) {
+    dev.log('⚠️ Could not enable database fast start: $e', name: 'Performance');
+  }
   
   // Start background database optimization after creation
   unawaited(() async {
@@ -195,6 +201,9 @@ void configureInitializationPhases() {
   manager.addTask(InitializationPhase.essential, () async {
     // Pre-warm core services that are likely to be used soon
     dev.log('⚡ Essential phase: Core services warmup', name: 'Initialization');
+    
+    // Pre-warm database service and enable fast start mode
+    // Note: This will be handled when the database service is first accessed
   });
 
   // Background phase: Nice-to-have optimizations

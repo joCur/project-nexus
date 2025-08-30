@@ -5,6 +5,7 @@ import 'dart:io';
 
 import '../../lib/core/performance/performance_manager.dart';
 import '../../lib/core/providers/lazy_providers.dart';
+import '../../lib/core/state/app_initialization_state.dart';
 import '../../lib/shared/services/auth_service.dart';
 import '../../lib/shared/services/database_service.dart';
 

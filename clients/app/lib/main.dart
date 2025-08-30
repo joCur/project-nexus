@@ -8,26 +8,7 @@ import 'features/auth/presentation/screens/auth_loading_screen.dart';
 import 'shared/theme/app_theme.dart';
 import 'core/performance/performance_manager.dart';
 import 'core/providers/lazy_providers.dart';
-
-/// Global initialization status tracker
-class AppInitializationState {
-  static bool _hiveInitialized = false;
-  static bool _routerInitialized = false;
-  
-  static bool get isHiveInitialized => _hiveInitialized;
-  static bool get isRouterInitialized => _routerInitialized;
-  
-  static Future<void> initializeHive() async {
-    if (!_hiveInitialized) {
-      await initHiveForFlutter().timed('hive_initialization');
-      _hiveInitialized = true;
-    }
-  }
-  
-  static void markRouterInitialized() {
-    _routerInitialized = true;
-  }
-}
+import 'core/state/app_initialization_state.dart';
 
 void main() {
   // Start performance monitoring immediately
@@ -53,23 +34,27 @@ void main() {
   ));
 }
 
-/// Initialize heavy services after UI is shown
+/// Initialize heavy services after UI is shown with proper state management
 Future<void> _initializeInBackground(ProviderContainer container) async {
   final perfManager = PerformanceManager();
   final initManager = InitializationManager();
+  final initNotifier = container.read(appInitializationProvider.notifier);
   
   try {
     // Initialize critical services first
-    await AppInitializationState.initializeHive();
+    await initNotifier.initializeHive();
     
     // Initialize router after Hive is ready
+    initNotifier.markRouterInitializing();
     perfManager.startOperation('router_initialization');
     initializeRouter(container);
-    AppInitializationState.markRouterInitialized();
+    initNotifier.markRouterInitialized();
     perfManager.endOperation('router_initialization');
     
     // Run phased initialization in background
+    initNotifier.markServicesInitializing();
     await initManager.initializeAll().timed('phased_initialization');
+    initNotifier.markServicesInitialized();
     
     // Mark app as interactive
     perfManager.markInteractive();
@@ -90,8 +75,11 @@ class NexusApp extends ConsumerWidget {
       PerformanceManager().markFirstFrame();
     });
     
-    // Show immediate loading screen while heavy services initialize
-    if (!AppInitializationState.isHiveInitialized || !AppInitializationState.isRouterInitialized) {
+    // Watch initialization state
+    final initState = ref.watch(appInitializationProvider);
+    
+    // Show immediate loading screen while critical services initialize
+    if (!initState.isCriticalInitialized) {
       return MaterialApp(
         title: 'Nexus Mobile',
         theme: AppTheme.lightTheme,

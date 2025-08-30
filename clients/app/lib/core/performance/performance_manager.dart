@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:developer' as dev;
 
 /// Performance monitoring and timing utilities with automatic memory management
@@ -9,8 +10,8 @@ class PerformanceManager {
     _schedulePeriodicCleanup();
   }
 
-  final Map<String, DateTime> _operationStartTimes = {};
-  final Map<String, int> _operationDurations = {};
+  final LinkedHashMap<String, DateTime> _operationStartTimes = LinkedHashMap<String, DateTime>();
+  final LinkedHashMap<String, int> _operationDurations = LinkedHashMap<String, int>();
   
   DateTime? _appLaunchStart;
   DateTime? _firstFrameTime;
@@ -63,9 +64,13 @@ class PerformanceManager {
     }
   }
 
-  /// Get the duration of a completed operation
+  /// Get the duration of a completed operation (maintains LRU order)
   int? getOperationDuration(String operationName) {
-    return _operationDurations[operationName];
+    final duration = _operationDurations[operationName];
+    if (duration != null) {
+      _touchOperation(operationName); // Maintain LRU order
+    }
+    return duration;
   }
 
   /// Get total launch time
@@ -148,6 +153,15 @@ class PerformanceManager {
     }
   }
 
+  /// Maintain LRU order by moving accessed operations to end
+  void _touchOperation(String operationName) {
+    // Move to end of LinkedHashMap to maintain LRU order for durations
+    if (_operationDurations.containsKey(operationName)) {
+      final value = _operationDurations.remove(operationName)!;
+      _operationDurations[operationName] = value;
+    }
+  }
+
   /// Get current memory usage statistics
   Map<String, int> getMemoryStats() {
     return {
@@ -177,18 +191,4 @@ class PerformanceManager {
 }
 
 /// Extension to easily time async operations
-extension TimedOperation<T> on Future<T> {
-  /// Time this future operation with a given name
-  Future<T> timed(String operationName) async {
-    final performance = PerformanceManager();
-    performance.startOperation(operationName);
-    try {
-      final result = await this;
-      performance.endOperation(operationName);
-      return result;
-    } catch (e) {
-      performance.endOperation(operationName);
-      rethrow;
-    }
-  }
-}
+// TimedOperation extension moved to core/state/app_initialization_state.dart
