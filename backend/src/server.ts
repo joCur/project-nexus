@@ -23,6 +23,7 @@ import { Auth0Service } from '@/services/auth0';
 import { UserProfileService } from '@/services/userProfile';
 import { OnboardingService } from '@/services/onboarding';
 import { WorkspaceService } from '@/services/workspace';
+import { WorkspaceAuthorizationService } from '@/services/workspaceAuthorization';
 
 // Middleware
 import { applySecurityMiddleware } from '@/middleware/security';
@@ -53,6 +54,7 @@ class NexusBackendServer {
   private userProfileService: UserProfileService;
   private onboardingService: OnboardingService;
   private workspaceService: WorkspaceService;
+  private workspaceAuthorizationService: WorkspaceAuthorizationService;
 
   constructor() {
     this.app = express();
@@ -64,6 +66,7 @@ class NexusBackendServer {
     this.userProfileService = new UserProfileService();
     this.onboardingService = new OnboardingService();
     this.workspaceService = new WorkspaceService();
+    this.workspaceAuthorizationService = new WorkspaceAuthorizationService();
     
     // Setup process error handlers
     setupProcessErrorHandlers();
@@ -286,7 +289,8 @@ class NexusBackendServer {
             this.cacheService,
             this.userProfileService,
             this.onboardingService,
-            this.workspaceService
+            this.workspaceService,
+            this.workspaceAuthorizationService
           ),
         })
       );

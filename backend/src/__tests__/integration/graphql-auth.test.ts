@@ -231,7 +231,7 @@ describe('GraphQL Authentication Integration Tests', () => {
         user,
         sessionId,
         expiresAt: expect.any(Date),
-        permissions: user.permissions,
+        permissions: [], // Empty initially, will be resolved dynamically using WorkspaceAuthorizationService
       });
       expect(mockAuth0Service.validateAuth0Token).toHaveBeenCalledWith(auth0Token);
       expect(mockAuth0Service.syncUserFromAuth0).toHaveBeenCalledWith(auth0User);

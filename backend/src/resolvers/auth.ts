@@ -112,7 +112,7 @@ export const authResolvers = {
           user,
           sessionId,
           expiresAt,
-          permissions: user.permissions,
+          permissions: [], // Empty initially, will be resolved dynamically using WorkspaceAuthorizationService in NEX-182
         };
 
       } catch (error) {
@@ -397,6 +397,10 @@ export const authResolvers = {
     workspaces: async (parent: any, _: any, context: GraphQLContext) => {
       const userService = context.dataSources.userService;
       return await userService.getUserWorkspaces(parent.id);
+    },
+    permissions: () => {
+      // Return empty permissions array - will be resolved dynamically using WorkspaceAuthorizationService in NEX-182
+      return [];
     },
   },
 };

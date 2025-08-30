@@ -93,7 +93,7 @@ export function createAuthMiddleware(
       // Set authenticated context
       req.user = user;
       req.auth0Payload = auth0Payload;
-      req.permissions = user.permissions;
+      // req.permissions already initialized as [] above - will be resolved dynamically in GraphQL context using WorkspaceAuthorizationService
       req.isAuthenticated = true;
 
       // Update last activity (non-critical operation)
@@ -222,13 +222,14 @@ export function createGraphQLContext(
   _cacheService: CacheService,
   userProfileService: import('@/services/userProfile').UserProfileService,
   onboardingService: import('@/services/onboarding').OnboardingService,
-  workspaceService: import('@/services/workspace').WorkspaceService
+  workspaceService: import('@/services/workspace').WorkspaceService,
+  workspaceAuthorizationService: import('@/services/workspaceAuthorization').WorkspaceAuthorizationService
 ) {
   return async ({ req, res }: { req: AuthenticatedRequest; res: Response }) => {
     // Get user from request (set by auth middleware)
     const user = req.user;
     const auth0Payload = req.auth0Payload;
-    const permissions = req.permissions || [];
+    const permissions = req.permissions || []; // Empty initially, permissions will be resolved dynamically using WorkspaceAuthorizationService
     const isAuthenticated = req.isAuthenticated || false;
 
     return {
@@ -245,6 +246,7 @@ export function createGraphQLContext(
         userProfileService,
         onboardingService,
         workspaceService,
+        workspaceAuthorizationService,
       },
     };
   };

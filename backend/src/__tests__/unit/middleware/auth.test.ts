@@ -84,7 +84,7 @@ describe('Authentication Middleware', () => {
       expect(mockReq.isAuthenticated).toBe(true);
       expect(mockReq.user).toBe(user);
       expect(mockReq.auth0Payload).toBe(auth0User);
-      expect(mockReq.permissions).toBe(user.permissions);
+      expect(mockReq.permissions).toEqual([]); // Empty initially, will be resolved dynamically using WorkspaceAuthorizationService
       expect(mockNext).toHaveBeenCalledWith();
       expect(mockAuth0Service.validateAuth0Token).toHaveBeenCalledWith(JWT_FIXTURES.VALID_TOKEN);
       expect(mockAuth0Service.syncUserFromAuth0).toHaveBeenCalledWith(auth0User);
@@ -375,12 +375,13 @@ describe('Authentication Middleware', () => {
         mockCacheService,
         {} as any, // userProfileService
         {} as any, // onboardingService
-        {} as any  // workspaceService
+        {} as any, // workspaceService
+        {} as any  // workspaceAuthorizationService
       );
 
       mockReq.user = USER_FIXTURES.STANDARD_USER;
       mockReq.auth0Payload = AUTH0_USER_FIXTURES.STANDARD_USER;
-      mockReq.permissions = USER_FIXTURES.STANDARD_USER.permissions;
+      mockReq.permissions = []; // Empty initially, will be resolved dynamically using WorkspaceAuthorizationService
       mockReq.isAuthenticated = true;
 
       // Act
@@ -389,7 +390,7 @@ describe('Authentication Middleware', () => {
       // Assert
       expect(context.user).toBe(USER_FIXTURES.STANDARD_USER);
       expect(context.auth0Payload).toBe(AUTH0_USER_FIXTURES.STANDARD_USER);
-      expect(context.permissions).toBe(USER_FIXTURES.STANDARD_USER.permissions);
+      expect(context.permissions).toEqual([]); // Empty initially, will be resolved dynamically using WorkspaceAuthorizationService
       expect(context.isAuthenticated).toBe(true);
       expect(context.dataSources.auth0Service).toBe(mockAuth0Service);
       expect(context.dataSources.userService).toBe(mockUserService);
@@ -404,7 +405,8 @@ describe('Authentication Middleware', () => {
         mockCacheService,
         {} as any, // userProfileService
         {} as any, // onboardingService
-        {} as any  // workspaceService
+        {} as any, // workspaceService
+        {} as any  // workspaceAuthorizationService
       );
 
       mockReq.isAuthenticated = false;
