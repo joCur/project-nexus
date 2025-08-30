@@ -1,6 +1,7 @@
 import { OnboardingService, OnboardingProgress } from '@/services/onboarding';
 import { database } from '@/database/connection';
 import { ValidationError } from '@/utils/errors';
+import { Knex } from 'knex';
 
 // Mock database connection with transaction support
 jest.mock('@/database/connection', () => ({
@@ -24,6 +25,29 @@ jest.mock('@/utils/logger', () => ({
 describe('OnboardingService - Race Condition Prevention (NEX-178)', () => {
   let onboardingService: OnboardingService;
   const mockDatabase = database as jest.Mocked<typeof database>;
+
+  // Helper to create a proper transaction mock
+  const createMockTransaction = (): any => {
+    const mockTrx = {
+      where: jest.fn().mockReturnThis(),
+      first: jest.fn().mockReturnThis(),
+      forUpdate: jest.fn().mockReturnThis(),
+      update: jest.fn().mockReturnThis(),
+      returning: jest.fn().mockReturnThis(),
+      insert: jest.fn().mockReturnThis(),
+      // Add essential transaction properties
+      isCompleted: false,
+      query: jest.fn(),
+      raw: jest.fn(),
+      select: jest.fn().mockReturnThis(),
+      from: jest.fn().mockReturnThis(),
+      commit: jest.fn(),
+      rollback: jest.fn(),
+      savepoint: jest.fn(),
+      executionPromise: Promise.resolve([]),
+    };
+    return mockTrx;
+  };
 
   // Test data
   const testUserId = '123e4567-e89b-12d3-a456-426614174000';
@@ -62,13 +86,7 @@ describe('OnboardingService - Race Condition Prevention (NEX-178)', () => {
 
   describe('Transaction-Based Race Condition Prevention', () => {
     it('should use transactions with row locking for updateProgress', async () => {
-      const mockTrx = {
-        where: jest.fn().mockReturnThis(),
-        first: jest.fn().mockReturnThis(),
-        forUpdate: jest.fn().mockReturnThis(),
-        update: jest.fn().mockReturnThis(),
-        returning: jest.fn().mockReturnThis(),
-      };
+      const mockTrx = createMockTransaction();
 
       // Mock transaction callback
       mockDatabase.transaction.mockImplementation(async (callback) => {
@@ -96,13 +114,7 @@ describe('OnboardingService - Race Condition Prevention (NEX-178)', () => {
     });
 
     it('should create new record within transaction if none exists', async () => {
-      const mockTrx = {
-        where: jest.fn().mockReturnThis(),
-        first: jest.fn().mockReturnThis(),
-        forUpdate: jest.fn().mockReturnThis(),
-        insert: jest.fn().mockReturnThis(),
-        returning: jest.fn().mockReturnThis(),
-      };
+      const mockTrx = createMockTransaction();
 
       mockDatabase.transaction.mockImplementation(async (callback) => {
         // Mock that no record exists
@@ -134,13 +146,7 @@ describe('OnboardingService - Race Condition Prevention (NEX-178)', () => {
     });
 
     it('should use transactions with row locking for completeOnboarding', async () => {
-      const mockTrx = {
-        where: jest.fn().mockReturnThis(),
-        first: jest.fn().mockReturnThis(),
-        forUpdate: jest.fn().mockReturnThis(),
-        update: jest.fn().mockReturnThis(),
-        returning: jest.fn().mockReturnThis(),
-      };
+      const mockTrx = createMockTransaction();
 
       mockDatabase.transaction.mockImplementation(async (callback) => {
         // Mock incomplete record exists
@@ -171,11 +177,7 @@ describe('OnboardingService - Race Condition Prevention (NEX-178)', () => {
     });
 
     it('should prevent double completion within transaction', async () => {
-      const mockTrx = {
-        where: jest.fn().mockReturnThis(),
-        first: jest.fn().mockReturnThis(),
-        forUpdate: jest.fn().mockReturnThis(),
-      };
+      const mockTrx = createMockTransaction();
 
       mockDatabase.transaction.mockImplementation(async (callback) => {
         // Mock already completed record
@@ -203,14 +205,10 @@ describe('OnboardingService - Race Condition Prevention (NEX-178)', () => {
       const transactionError = new Error('Transaction failed');
 
       mockDatabase.transaction.mockImplementation(async (callback) => {
-        const mockTrx = {
-          where: jest.fn().mockReturnThis(),
-          first: jest.fn().mockReturnThis(),
-          forUpdate: jest.fn().mockReturnThis(),
-        };
+        const mockTrx = createMockTransaction();
 
         // Simulate transaction failure
-        mockTrx.first.mockRejectedValue(transactionError);
+        mockTrx.first!.mockRejectedValue(transactionError);
         require('@/database/connection').knex.mockReturnValue(mockTrx);
         
         return await callback(mockTrx);
@@ -230,13 +228,7 @@ describe('OnboardingService - Race Condition Prevention (NEX-178)', () => {
   describe('Concurrent Modification Scenarios', () => {
     it('should handle concurrent updateProgress calls correctly', async () => {
       let transactionCount = 0;
-      const mockTrx = {
-        where: jest.fn().mockReturnThis(),
-        first: jest.fn().mockReturnThis(),
-        forUpdate: jest.fn().mockReturnThis(),
-        update: jest.fn().mockReturnThis(),
-        returning: jest.fn().mockReturnThis(),
-      };
+      const mockTrx = createMockTransaction();
 
       mockDatabase.transaction.mockImplementation(async (callback) => {
         transactionCount++;
@@ -283,13 +275,7 @@ describe('OnboardingService - Race Condition Prevention (NEX-178)', () => {
 
     it('should handle concurrent completion attempts', async () => {
       let completionCount = 0;
-      const mockTrx = {
-        where: jest.fn().mockReturnThis(),
-        first: jest.fn().mockReturnThis(),
-        forUpdate: jest.fn().mockReturnThis(),
-        update: jest.fn().mockReturnThis(),
-        returning: jest.fn().mockReturnThis(),
-      };
+      const mockTrx = createMockTransaction();
 
       mockDatabase.transaction.mockImplementation(async (callback) => {
         completionCount++;
@@ -329,14 +315,7 @@ describe('OnboardingService - Race Condition Prevention (NEX-178)', () => {
 
     it('should handle mixed concurrent operations (update and complete)', async () => {
       let operationCount = 0;
-      const mockTrx = {
-        where: jest.fn().mockReturnThis(),
-        first: jest.fn().mockReturnThis(),
-        forUpdate: jest.fn().mockReturnThis(),
-        update: jest.fn().mockReturnThis(),
-        returning: jest.fn().mockReturnThis(),
-        insert: jest.fn().mockReturnThis(),
-      };
+      const mockTrx = createMockTransaction();
 
       mockDatabase.transaction.mockImplementation(async (callback) => {
         operationCount++;
@@ -383,13 +362,7 @@ describe('OnboardingService - Race Condition Prevention (NEX-178)', () => {
 
   describe('Enhanced Error Handling and Logging', () => {
     it('should log detailed information for transaction operations', async () => {
-      const mockTrx = {
-        where: jest.fn().mockReturnThis(),
-        first: jest.fn().mockReturnThis(),
-        forUpdate: jest.fn().mockReturnThis(),
-        update: jest.fn().mockReturnThis(),
-        returning: jest.fn().mockReturnThis(),
-      };
+      const mockTrx = createMockTransaction();
 
       mockDatabase.transaction.mockImplementation(async (callback) => {
         mockTrx.first.mockResolvedValue(mockDbOnboarding);
@@ -457,13 +430,7 @@ describe('OnboardingService - Race Condition Prevention (NEX-178)', () => {
     });
 
     it('should log transaction-specific operations', async () => {
-      const mockTrx = {
-        where: jest.fn().mockReturnThis(),
-        first: jest.fn().mockReturnThis(),
-        forUpdate: jest.fn().mockReturnThis(),
-        update: jest.fn().mockReturnThis(),
-        returning: jest.fn().mockReturnThis(),
-      };
+      const mockTrx = createMockTransaction();
 
       mockDatabase.transaction.mockImplementation(async (callback) => {
         mockTrx.first.mockResolvedValue(mockDbOnboarding);
@@ -537,13 +504,7 @@ describe('OnboardingService - Race Condition Prevention (NEX-178)', () => {
   describe('Onboarding Status Consistency', () => {
     it('should maintain consistent state during rapid status changes', async () => {
       let callCount = 0;
-      const mockTrx = {
-        where: jest.fn().mockReturnThis(),
-        first: jest.fn().mockReturnThis(),
-        forUpdate: jest.fn().mockReturnThis(),
-        update: jest.fn().mockReturnThis(),
-        returning: jest.fn().mockReturnThis(),
-      };
+      const mockTrx = createMockTransaction();
 
       mockDatabase.transaction.mockImplementation(async (callback) => {
         callCount++;
@@ -591,19 +552,13 @@ describe('OnboardingService - Race Condition Prevention (NEX-178)', () => {
 
     it('should handle user switching scenarios correctly', async () => {
       let userOperations: { [key: string]: number } = {};
-      const mockTrx = {
-        where: jest.fn().mockReturnThis(),
-        first: jest.fn().mockReturnThis(),
-        forUpdate: jest.fn().mockReturnThis(),
-        update: jest.fn().mockReturnThis(),
-        returning: jest.fn().mockReturnThis(),
-      };
+      const mockTrx = createMockTransaction();
 
       mockDatabase.transaction.mockImplementation(async (callback) => {
         require('@/database/connection').knex.mockReturnValue(mockTrx);
         
         // Track operations per user
-        const userId = mockTrx.where.mock.calls[0]?.[1] || testUserId;
+        const userId = (mockTrx.where as jest.Mock).mock.calls[0]?.[1] || testUserId;
         userOperations[userId] = (userOperations[userId] || 0) + 1;
         
         mockTrx.first.mockResolvedValue({
@@ -643,13 +598,7 @@ describe('OnboardingService - Race Condition Prevention (NEX-178)', () => {
 
     it('should prevent completion state corruption during concurrent operations', async () => {
       let completionAttempts = 0;
-      const mockTrx = {
-        where: jest.fn().mockReturnThis(),
-        first: jest.fn().mockReturnThis(),
-        forUpdate: jest.fn().mockReturnThis(),
-        update: jest.fn().mockReturnThis(),
-        returning: jest.fn().mockReturnThis(),
-      };
+      const mockTrx = createMockTransaction();
 
       mockDatabase.transaction.mockImplementation(async (callback) => {
         completionAttempts++;

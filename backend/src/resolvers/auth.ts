@@ -65,10 +65,9 @@ export const authResolvers = {
       // Check if user is requesting their own permissions
       if (context.user?.id === userId) {
         // User can access their own permissions across all workspaces
-        const workspaceAuthService = context.dataSources.workspaceAuthorizationService;
-        const permissionsByWorkspace = await workspaceAuthService.getUserPermissionsForContext(userId);
-        // Flatten permissions from all workspaces
-        return Object.values(permissionsByWorkspace).flat();
+        const authHelper = createAuthorizationHelper(context);
+        const permissions = await authHelper.getFlatPermissions();
+        return permissions;
       }
 
       // For accessing other user permissions, check admin permission in user's context

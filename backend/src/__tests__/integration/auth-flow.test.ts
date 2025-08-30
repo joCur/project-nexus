@@ -11,6 +11,7 @@ import {
   createMockAuth0Service,
   createMockUserService,
   createMockCacheService,
+  createMockWorkspaceAuthorizationService,
   generateMockJWT,
   createMockUser,
   createMockAuth0User,
@@ -79,15 +80,22 @@ describe('End-to-End Authentication Flow Tests', () => {
   let mockAuth0Service: jest.Mocked<Auth0Service>;
   let mockUserService: jest.Mocked<UserService>;
   let mockCacheService: jest.Mocked<CacheService>;
+  let mockWorkspaceAuthService: any;
 
   beforeEach(async () => {
     // Create mock services
     mockAuth0Service = createMockAuth0Service() as jest.Mocked<Auth0Service>;
     mockUserService = createMockUserService() as jest.Mocked<UserService>;
     mockCacheService = createMockCacheService() as jest.Mocked<CacheService>;
+    mockWorkspaceAuthService = createMockWorkspaceAuthorizationService();
     
     // Setup User.workspaces field resolver mock
     mockUserService.getUserWorkspaces = jest.fn().mockResolvedValue([]);
+    
+    // Setup workspace authorization service defaults
+    mockWorkspaceAuthService.getUserPermissionsForContext.mockResolvedValue({});
+    mockWorkspaceAuthService.getUserPermissionsInWorkspace.mockResolvedValue([]);
+    mockWorkspaceAuthService.hasPermissionInWorkspace.mockResolvedValue(false);
 
     // Create Express app
     app = express();
@@ -121,7 +129,7 @@ describe('End-to-End Authentication Flow Tests', () => {
             {} as any, // userProfileService // eslint-disable-line @typescript-eslint/no-explicit-any
             {} as any, // onboardingService // eslint-disable-line @typescript-eslint/no-explicit-any
             {} as any, // workspaceService // eslint-disable-line @typescript-eslint/no-explicit-any
-            {} as any  // workspaceAuthorizationService // eslint-disable-line @typescript-eslint/no-explicit-any
+            mockWorkspaceAuthService
           )({ req, res });
           
           
@@ -398,6 +406,11 @@ describe('End-to-End Authentication Flow Tests', () => {
       mockAuth0Service.validateAuth0Token.mockResolvedValue(auth0User);
       mockAuth0Service.syncUserFromAuth0.mockResolvedValue(user);
       mockAuth0Service.validateSession.mockResolvedValue(true);
+      
+      // Mock user has no admin permissions across workspaces
+      mockWorkspaceAuthService.getUserPermissionsForContext.mockResolvedValue({
+        'workspace-1': ['card:read'], // Regular user permissions
+      });
 
       const response = await request(app)
         .post('/graphql')
@@ -411,8 +424,12 @@ describe('End-to-End Authentication Flow Tests', () => {
         });
 
       expect(response.status).toBe(200);
-      expect(response.body.errors).toBeDefined();
-      expect(response.body.errors[0].message).toContain('Insufficient permissions');
+      if (response.body.errors) {
+        expect(response.body.errors[0].message).toContain('Missing required permission: admin:user_management');
+      } else {
+        console.log('Unexpected response body:', JSON.stringify(response.body, null, 2));
+        throw new Error('Expected errors but got none');
+      }
     });
 
     it('should allow users to access their own data', async () => {
@@ -422,7 +439,12 @@ describe('End-to-End Authentication Flow Tests', () => {
       mockAuth0Service.validateAuth0Token.mockResolvedValue(auth0User);
       mockAuth0Service.syncUserFromAuth0.mockResolvedValue(user);
       mockAuth0Service.validateSession.mockResolvedValue(true);
-      mockAuth0Service.getUserPermissions.mockResolvedValue(user.permissions);
+      
+      // Mock user's own permissions across workspaces
+      mockWorkspaceAuthService.getUserPermissionsForContext.mockResolvedValue({
+        'workspace-1': ['card:read', 'card:write'],
+        'workspace-2': ['workspace:read'],
+      });
 
       const response = await request(app)
         .post('/graphql')
@@ -433,7 +455,7 @@ describe('End-to-End Authentication Flow Tests', () => {
         });
 
       expect(response.status).toBe(200);
-      expect(response.body.data.getUserPermissions).toEqual(user.permissions);
+      expect(response.body.data.getUserPermissions).toEqual(['card:read', 'card:write', 'workspace:read']);
     });
 
     it('should deny users access to other users data without admin permissions', async () => {
@@ -443,6 +465,11 @@ describe('End-to-End Authentication Flow Tests', () => {
       mockAuth0Service.validateAuth0Token.mockResolvedValue(auth0User);
       mockAuth0Service.syncUserFromAuth0.mockResolvedValue(user);
       mockAuth0Service.validateSession.mockResolvedValue(true);
+      
+      // Mock user has no admin permissions across workspaces
+      mockWorkspaceAuthService.getUserPermissionsForContext.mockResolvedValue({
+        'workspace-1': ['card:read'], // Regular user permissions, no admin
+      });
 
       const response = await request(app)
         .post('/graphql')

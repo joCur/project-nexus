@@ -37,6 +37,11 @@ describe('GraphQL Authentication Integration Tests', () => {
     mockUserService = createMockUserService() as jest.Mocked<UserService>;
     mockCacheService = createMockCacheService() as jest.Mocked<CacheService>;
     mockWorkspaceAuthService = createMockWorkspaceAuthorizationService();
+    
+    // Setup basic mocks - specific tests will override as needed
+    mockWorkspaceAuthService.getUserPermissionsForContext.mockImplementation(() => Promise.resolve({}));
+    mockWorkspaceAuthService.getUserPermissionsInWorkspace.mockImplementation(() => Promise.resolve([]));
+    mockWorkspaceAuthService.hasPermissionInWorkspace.mockImplementation(() => Promise.resolve(false));
   });
 
   afterEach(() => {
@@ -138,10 +143,10 @@ describe('GraphQL Authentication Integration Tests', () => {
         },
       });
 
-      // Mock workspace authorization service to return user permissions
-      mockWorkspaceAuthService.getUserPermissionsForContext.mockResolvedValue({
+      // Mock workspace authorization service to return user permissions with duplicates to test deduplication
+      mockWorkspaceAuthService.getUserPermissionsForContext.mockResolvedValueOnce({
         'workspace-1': ['perm1', 'perm2'],
-        'workspace-2': ['perm2', 'perm3']
+        'workspace-2': ['perm2', 'perm3'] // perm2 is duplicate
       });
 
       // Act
@@ -172,11 +177,10 @@ describe('GraphQL Authentication Integration Tests', () => {
       // Mock admin user having admin permissions across workspaces
       mockWorkspaceAuthService.getUserPermissionsForContext
         .mockResolvedValueOnce({
-          'workspace-1': ['admin:user_management'], // Admin user permissions
+          'workspace-1': ['admin:user_management'], // Admin user permissions for authorization check
         })
         .mockResolvedValueOnce({
-          'workspace-1': ['perm1'],
-          'workspace-2': ['perm2'] // Target user permissions
+          'workspace-1': ['perm1', 'perm2'], // Target user permissions
         });
 
       // Act
@@ -439,13 +443,21 @@ describe('GraphQL Authentication Integration Tests', () => {
         isAuthenticated: true,
         user: USER_FIXTURES.ADMIN_USER,
         permissions: ['admin:user_management'],
-        dataSources: { userService: mockUserService },
+        dataSources: { 
+          userService: mockUserService,
+          workspaceAuthorizationService: mockWorkspaceAuthService
+        },
       });
 
       const updatedUser = {
         ...USER_FIXTURES.STANDARD_USER,
         permissions: [...USER_FIXTURES.STANDARD_USER.permissions, ...newPermissions],
       };
+
+      // Mock admin user has admin permissions across workspaces
+      mockWorkspaceAuthService.getUserPermissionsForContext.mockResolvedValueOnce({
+        'workspace-1': ['admin:user_management'], // Admin user permissions for authorization check
+      });
 
       mockUserService.findById.mockResolvedValue(USER_FIXTURES.STANDARD_USER);
       mockUserService.update.mockResolvedValue(updatedUser);
@@ -508,7 +520,10 @@ describe('GraphQL Authentication Integration Tests', () => {
         isAuthenticated: true,
         user: USER_FIXTURES.ADMIN_USER,
         permissions: ['admin:user_management'],
-        dataSources: { userService: mockUserService },
+        dataSources: { 
+          userService: mockUserService,
+          workspaceAuthorizationService: mockWorkspaceAuthService
+        },
       });
 
       mockUserService.findById.mockResolvedValue(null);
@@ -533,7 +548,10 @@ describe('GraphQL Authentication Integration Tests', () => {
         isAuthenticated: true,
         user: USER_FIXTURES.ADMIN_USER,
         permissions: ['admin:user_management'],
-        dataSources: { userService: mockUserService },
+        dataSources: { 
+          userService: mockUserService,
+          workspaceAuthorizationService: mockWorkspaceAuthService
+        },
       });
 
       const updatedUser = {
@@ -573,7 +591,10 @@ describe('GraphQL Authentication Integration Tests', () => {
         isAuthenticated: true,
         user: USER_FIXTURES.ADMIN_USER,
         permissions: ['admin:user_management'],
-        dataSources: { userService: mockUserService },
+        dataSources: { 
+          userService: mockUserService,
+          workspaceAuthorizationService: mockWorkspaceAuthService
+        },
       });
 
       const updatedUser = {
@@ -609,7 +630,10 @@ describe('GraphQL Authentication Integration Tests', () => {
         isAuthenticated: true,
         user: USER_FIXTURES.ADMIN_USER,
         permissions: ['admin:user_management'],
-        dataSources: { userService: mockUserService },
+        dataSources: { 
+          userService: mockUserService,
+          workspaceAuthorizationService: mockWorkspaceAuthService
+        },
       });
 
       mockUserService.findById.mockResolvedValue(USER_FIXTURES.STANDARD_USER);
@@ -642,7 +666,10 @@ describe('GraphQL Authentication Integration Tests', () => {
         isAuthenticated: true,
         user: USER_FIXTURES.ADMIN_USER,
         permissions: ['admin:user_management'],
-        dataSources: { userService: mockUserService },
+        dataSources: { 
+          userService: mockUserService,
+          workspaceAuthorizationService: mockWorkspaceAuthService
+        },
       });
 
       const updatedUser = {
@@ -724,7 +751,10 @@ describe('GraphQL Authentication Integration Tests', () => {
       const user = USER_FIXTURES.STANDARD_USER;
       const workspaces = ['workspace-1', 'workspace-2'];
       const context = createMockGraphQLContext({
-        dataSources: { userService: mockUserService },
+        dataSources: { 
+          userService: mockUserService,
+          workspaceAuthorizationService: mockWorkspaceAuthService
+        },
       });
 
       mockUserService.getUserWorkspaces.mockResolvedValue(workspaces);
@@ -790,7 +820,10 @@ describe('GraphQL Authentication Integration Tests', () => {
         isAuthenticated: true,
         user: USER_FIXTURES.ADMIN_USER,
         permissions: ['admin:user_management'],
-        dataSources: { userService: mockUserService },
+        dataSources: { 
+          userService: mockUserService,
+          workspaceAuthorizationService: mockWorkspaceAuthService
+        },
       });
 
       // Act & Assert
@@ -809,7 +842,10 @@ describe('GraphQL Authentication Integration Tests', () => {
         isAuthenticated: true,
         user: USER_FIXTURES.ADMIN_USER,
         permissions: ['admin:user_management'],
-        dataSources: { userService: mockUserService },
+        dataSources: { 
+          userService: mockUserService,
+          workspaceAuthorizationService: mockWorkspaceAuthService
+        },
       });
 
       mockUserService.findById.mockResolvedValue(USER_FIXTURES.STANDARD_USER);
@@ -856,7 +892,10 @@ describe('GraphQL Authentication Integration Tests', () => {
         isAuthenticated: true,
         user: USER_FIXTURES.ADMIN_USER,
         permissions: ['admin:user_management'],
-        dataSources: { userService: mockUserService },
+        dataSources: { 
+          userService: mockUserService,
+          workspaceAuthorizationService: mockWorkspaceAuthService
+        },
       });
 
       const updatedUser = {

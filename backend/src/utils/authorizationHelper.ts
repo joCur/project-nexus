@@ -258,19 +258,29 @@ export class AuthorizationHelper {
       return [];
     }
 
-    const flatPermissions = Object.values(permissionsByWorkspace)
-      .filter(Array.isArray) // Ensure we only flatten arrays
-      .flat()
-      .filter((perm): perm is string => typeof perm === 'string' && perm.length > 0);
+    const allPermissions = Object.values(permissionsByWorkspace);
+    const flatPermissions: string[] = [];
     
-    // Remove duplicates while preserving order
-    const uniquePermissions = Array.from(new Set(flatPermissions));
+    // Safely flatten permissions from all workspaces
+    for (const workspacePermissions of allPermissions) {
+      if (Array.isArray(workspacePermissions)) {
+        for (const perm of workspacePermissions) {
+          if (typeof perm === 'string' && perm.length > 0) {
+            flatPermissions.push(perm);
+          }
+        }
+      }
+    }
+    
+    // Remove duplicates while preserving order using Set
+    const uniquePermissions = [...new Set(flatPermissions)];
     
     logger.debug('Flattened permissions computed', {
       userId: this.userId,
       workspaceCount: Object.keys(permissionsByWorkspace).length,
       totalPermissions: flatPermissions.length,
-      uniquePermissions: uniquePermissions.length
+      uniquePermissions: uniquePermissions.length,
+      duplicatesRemoved: flatPermissions.length - uniquePermissions.length
     });
 
     return uniquePermissions;
