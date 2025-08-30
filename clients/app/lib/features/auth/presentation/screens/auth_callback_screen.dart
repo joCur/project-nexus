@@ -18,6 +18,9 @@ class _AuthCallbackScreenState extends ConsumerState<AuthCallbackScreen> {
     // Refresh auth state after callback
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(authNotifierProvider.notifier).refresh().then((_) {
+        // Check if widget is still mounted before using context
+        if (!mounted) return;
+        
         // Navigate to intended route or default route after auth check
         final authState = ref.read(authNotifierProvider);
         if (authState.isAuthenticated) {

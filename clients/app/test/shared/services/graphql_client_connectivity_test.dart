@@ -5,7 +5,6 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 
 import '../../../lib/shared/services/auth_service.dart';
 import '../../../lib/shared/services/graphql_client.dart';
-import '../../../lib/shared/services/api_client.dart';
 
 // Mock classes
 class MockAuthService extends Mock implements AuthService {}

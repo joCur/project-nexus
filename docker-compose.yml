@@ -13,6 +13,8 @@ services:
       context: ./clients/web
       dockerfile: Dockerfile
       target: ${DOCKER_TARGET:-production}
+      args:
+        - NODE_ENV=${NODE_ENV:-production}
     container_name: nexus-web
     restart: unless-stopped
     ports:
@@ -38,20 +40,10 @@ services:
       - API_BASE_URL=${API_BASE_URL:-http://backend:3000}
       
     volumes:
-      # Development hot-reload (only in development)
-      - ./clients/web/app:/app/app
-      - ./clients/web/components:/app/components
-      - ./clients/web/hooks:/app/hooks
-      - ./clients/web/lib:/app/lib
-      - ./clients/web/styles:/app/styles
-      - ./clients/web/types:/app/types
-      - ./clients/web/package.json:/app/package.json:ro
-      - ./clients/web/next.config.js:/app/next.config.js:ro
-      - ./clients/web/tailwind.config.js:/app/tailwind.config.js:ro
-      - ./clients/web/tsconfig.json:/app/tsconfig.json:ro
-      # Next.js build cache and node_modules for hot reload
-      - /app/.next
-      - /app/node_modules
+      # Production volumes are minimal - development overrides will add hot-reload volumes
+      # Build cache and node_modules persistence for production
+      - nexus_web_build_cache:/app/.next
+      - nexus_web_prod_modules:/app/node_modules
     depends_on:
       backend:
         condition: service_healthy
@@ -71,7 +63,9 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-      target: ${DOCKER_TARGET:-development}
+      target: ${DOCKER_TARGET:-production}
+      args:
+        - NODE_ENV=${NODE_ENV:-production}
     container_name: nexus-backend
     restart: unless-stopped
     ports:
@@ -127,12 +121,11 @@ services:
       - SESSION_SECRET=${SESSION_SECRET:-your-session-secret-change-in-production}
       
     volumes:
-      # Development hot-reload (only in development)
-      - ./backend/src:/app/src:ro
-      - ./backend/package.json:/app/package.json:ro
-      - ./backend/tsconfig.json:/app/tsconfig.json:ro
+      # Production volumes are minimal - development overrides will add hot-reload volumes
       # Logs persistence
       - nexus_logs:/app/logs
+      # Production node_modules persistence
+      - nexus_backend_prod_modules:/app/node_modules
     depends_on:
       postgres:
         condition: service_healthy
@@ -285,6 +278,7 @@ networks:
 # Volumes
 #######################
 volumes:
+  # Database and cache persistence
   nexus_postgres_data:
     driver: local
     driver_opts:
@@ -305,3 +299,11 @@ volumes:
       type: none
       o: bind
       device: ${DATA_DIR:-./data}/logs
+  
+  # Production build caches and dependencies
+  nexus_web_build_cache:
+    driver: local
+  nexus_web_prod_modules:
+    driver: local
+  nexus_backend_prod_modules:
+    driver: local
