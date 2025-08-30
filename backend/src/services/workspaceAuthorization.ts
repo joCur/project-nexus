@@ -100,14 +100,55 @@ export const WorkspacePermissions = {
 /**
  * Service for handling workspace authorization and member management
  */
+/**
+ * Cache configuration constants for permission system
+ */
+const PERMISSION_CACHE_CONFIG = {
+  MEMBER_PERMISSIONS_TTL: 300, // 5 minutes
+  NON_MEMBER_TTL: 60,          // 1 minute
+  WORKSPACE_MEMBER_TTL: 300    // 5 minutes (existing)
+} as const;
+
 export class WorkspaceAuthorizationService {
   private db: Knex;
   private cacheService: CacheService;
-  private readonly CACHE_TTL = 300; // 5 minutes
+  private readonly CACHE_TTL = PERMISSION_CACHE_CONFIG.WORKSPACE_MEMBER_TTL;
 
   constructor() {
     this.db = knex;
     this.cacheService = new CacheService();
+  }
+
+  /**
+   * Type-safe cache getter for permission arrays
+   */
+  private async getCachedPermissions(key: string): Promise<string[] | null> {
+    try {
+      const cached = await this.cacheService.get(key);
+      if (cached && Array.isArray(cached)) {
+        return cached as string[];
+      }
+      return null;
+    } catch (error) {
+      // Cache error shouldn't break permission resolution
+      return null;
+    }
+  }
+
+  /**
+   * Type-safe cache getter for permission context map
+   */
+  private async getCachedPermissionContext(key: string): Promise<{ [workspaceId: string]: string[] } | null> {
+    try {
+      const cached = await this.cacheService.get(key);
+      if (cached && typeof cached === 'object' && cached !== null) {
+        return cached as { [workspaceId: string]: string[] };
+      }
+      return null;
+    } catch (error) {
+      // Cache error shouldn't break permission resolution
+      return null;
+    }
   }
 
   /**
@@ -583,9 +624,9 @@ export class WorkspaceAuthorizationService {
   async getUserPermissionsInWorkspace(userId: string, workspaceId: string): Promise<string[]> {
     // Check cache first
     const cacheKey = `user_permissions:${userId}:${workspaceId}`;
-    const cached = await this.cacheService.get(cacheKey);
+    const cached = await this.getCachedPermissions(cacheKey);
     if (cached) {
-      return cached as unknown as string[];
+      return cached;
     }
 
     try {
@@ -593,21 +634,22 @@ export class WorkspaceAuthorizationService {
       
       if (!member || !member.isActive) {
         // Cache empty result briefly to avoid repeated DB queries
-        await this.cacheService.set(cacheKey, [], 60); // 1 minute TTL for non-members
+        await this.cacheService.set(cacheKey, [], PERMISSION_CACHE_CONFIG.NON_MEMBER_TTL);
         return [];
       }
 
       // Get role-based permissions
       const rolePermissions = this.getRolePermissions(member.role);
       
-      // Combine with custom permissions, ensuring no duplicates
+      // Combine role-based permissions with custom permissions
+      // Use Set to automatically deduplicate permissions that may exist in both role and custom arrays
       const allPermissions = Array.from(new Set([
         ...rolePermissions,
         ...(member.permissions || [])
       ]));
 
       // Cache the result
-      await this.cacheService.set(cacheKey, allPermissions, this.CACHE_TTL);
+      await this.cacheService.set(cacheKey, allPermissions, PERMISSION_CACHE_CONFIG.MEMBER_PERMISSIONS_TTL);
 
       logger.debug('Resolved user permissions in workspace', {
         userId,
@@ -716,9 +758,9 @@ export class WorkspaceAuthorizationService {
   async getUserPermissionsForContext(userId: string): Promise<{ [workspaceId: string]: string[] }> {
     // Check cache first
     const cacheKey = `user_context_permissions:${userId}`;
-    const cached = await this.cacheService.get(cacheKey);
+    const cached = await this.getCachedPermissionContext(cacheKey);
     if (cached) {
-      return cached as unknown as { [workspaceId: string]: string[] };
+      return cached;
     }
 
     try {
@@ -756,7 +798,7 @@ export class WorkspaceAuthorizationService {
       }
 
       // Cache the result with shorter TTL since this is more dynamic
-      await this.cacheService.set(cacheKey, permissionsMap, this.CACHE_TTL);
+      await this.cacheService.set(cacheKey, permissionsMap, PERMISSION_CACHE_CONFIG.MEMBER_PERMISSIONS_TTL);
 
       logger.debug('Resolved user permissions for context', {
         userId,
