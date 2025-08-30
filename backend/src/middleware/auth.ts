@@ -93,7 +93,7 @@ export function createAuthMiddleware(
       // Set authenticated context
       req.user = user;
       req.auth0Payload = auth0Payload;
-      req.permissions = []; // Empty initially, will be resolved dynamically in GraphQL context using WorkspaceAuthorizationService
+      // req.permissions already initialized as [] above - will be resolved dynamically in GraphQL context using WorkspaceAuthorizationService
       req.isAuthenticated = true;
 
       // Update last activity (non-critical operation)
