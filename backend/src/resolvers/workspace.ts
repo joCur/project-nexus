@@ -93,12 +93,29 @@ export const workspaceResolvers = {
       const ownedWorkspaces = await workspaceService.getWorkspacesByOwnerId(context.user!.id);
 
       // Get workspaces where user is a member (but not owner)
-      // TODO: Implement method to get all workspaces where user is a member
-      // const _memberWorkspaces = await workspaceAuthService.getUserWorkspaces(context.user!.id);
+      const userPermissionsByWorkspace = await workspaceAuthService.getUserPermissionsForContext(context.user!.id);
+      const memberWorkspaceIds = Object.keys(userPermissionsByWorkspace);
       
-      // For now, just return owned workspaces
-      // TODO: Implement method to get all workspaces where user is a member
-      return ownedWorkspaces;
+      // Get full workspace details for workspaces where user has permissions
+      const memberWorkspaces = await Promise.all(
+        memberWorkspaceIds.map(async (workspaceId) => {
+          try {
+            return await workspaceService.getWorkspaceById(workspaceId);
+          } catch (error) {
+            // Skip workspaces that can't be fetched (might have been deleted)
+            logger.debug('Could not fetch workspace details', { workspaceId, error });
+            return null;
+          }
+        })
+      );
+      
+      // Filter out nulls and duplicates (user might own some workspaces they're also a member of)
+      const validMemberWorkspaces = memberWorkspaces.filter(Boolean);
+      const ownedWorkspaceIds = new Set(ownedWorkspaces.map(w => w.id));
+      const uniqueMemberWorkspaces = validMemberWorkspaces.filter(w => !ownedWorkspaceIds.has(w!.id));
+      
+      // Return both owned and member workspaces
+      return [...ownedWorkspaces, ...uniqueMemberWorkspaces];
     },
 
     /**

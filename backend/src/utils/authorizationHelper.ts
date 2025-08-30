@@ -66,16 +66,23 @@ export const clearPermissionCache = (): void => {
   const stats = requestPermissionCache.getStats();
   const cacheSize = requestPermissionCache.size();
   
+  // Log performance metrics before clearing (for production monitoring)
+  if (stats.hits + stats.misses >= 10) { // Only log if there was significant activity
+    logCachePerformance();
+  }
+  
   // Always clear the cache regardless of stats
   requestPermissionCache.clear();
   
   // Log cache clearing for security auditing (but not sensitive data)
   if (stats.hits + stats.misses > 0) {
+    const hitRate = stats.hits / (stats.hits + stats.misses);
     safeLog('debug', 'Permission cache cleared for new request', {
       event: 'cache_cleared',
       previousCacheSize: cacheSize,
       cacheHits: stats.hits,
       cacheMisses: stats.misses,
+      hitRatePercent: parseFloat((hitRate * 100).toFixed(2)),
       timestamp: new Date().toISOString()
     });
   }
@@ -749,10 +756,61 @@ export const createAuthorizationHelper = (context: GraphQLContext): Authorizatio
  * Get permission cache statistics for monitoring
  */
 export const getPermissionCacheStats = () => {
+  const stats = requestPermissionCache.getStats();
+  const size = requestPermissionCache.size();
+  const hitRate = stats.hits + stats.misses > 0 ? stats.hits / (stats.hits + stats.misses) : 0;
+  
   return {
-    ...requestPermissionCache.getStats(),
-    size: requestPermissionCache.size()
+    ...stats,
+    size,
+    hitRate: parseFloat((hitRate * 100).toFixed(2)), // Convert to percentage
+    efficiency: {
+      cacheUtilization: size > 0 ? 'active' : 'empty',
+      performance: hitRate > 0.7 ? 'excellent' : hitRate > 0.5 ? 'good' : hitRate > 0.3 ? 'fair' : 'poor'
+    }
   };
+};
+
+/**
+ * Log cache performance metrics for monitoring
+ */
+export const logCachePerformance = (): void => {
+  const stats = getPermissionCacheStats();
+  
+  // Only log if there's been activity
+  if (stats.hits + stats.misses > 0) {
+    safeLog('info', 'Permission cache performance metrics', {
+      event: 'cache_performance',
+      metrics: stats,
+      recommendations: generateCacheRecommendations(stats),
+      timestamp: new Date().toISOString()
+    });
+  }
+};
+
+/**
+ * Generate performance recommendations based on cache stats
+ */
+const generateCacheRecommendations = (stats: any): string[] => {
+  const recommendations: string[] = [];
+  
+  if (stats.hitRate < 30) {
+    recommendations.push('Low cache hit rate - consider reviewing caching strategy');
+  }
+  
+  if (stats.size > 100) {
+    recommendations.push('Large cache size - monitor memory usage');
+  }
+  
+  if (stats.hits > 1000) {
+    recommendations.push('High cache usage - performing well');
+  }
+  
+  if (stats.efficiency.performance === 'poor') {
+    recommendations.push('Poor cache performance - investigate query patterns');
+  }
+  
+  return recommendations;
 };
 
 
