@@ -11,6 +11,7 @@ import {
   createMockAuth0Service,
   createMockUserService,
   createMockCacheService,
+  createMockWorkspaceAuthorizationService,
   createMockGraphQLContext,
 } from '../utils/test-helpers';
 import {
@@ -29,11 +30,13 @@ describe('GraphQL Authentication Integration Tests', () => {
   let mockAuth0Service: jest.Mocked<Auth0Service>;
   let mockUserService: jest.Mocked<UserService>;
   let mockCacheService: jest.Mocked<CacheService>;
+  let mockWorkspaceAuthService: any;
 
   beforeEach(() => {
     mockAuth0Service = createMockAuth0Service() as jest.Mocked<Auth0Service>;
     mockUserService = createMockUserService() as jest.Mocked<UserService>;
     mockCacheService = createMockCacheService() as jest.Mocked<CacheService>;
+    mockWorkspaceAuthService = createMockWorkspaceAuthorizationService();
   });
 
   afterEach(() => {
@@ -129,12 +132,17 @@ describe('GraphQL Authentication Integration Tests', () => {
       const context = createMockGraphQLContext({
         isAuthenticated: true,
         user: USER_FIXTURES.STANDARD_USER,
-        dataSources: { auth0Service: mockAuth0Service },
+        dataSources: { 
+          auth0Service: mockAuth0Service,
+          workspaceAuthorizationService: mockWorkspaceAuthService
+        },
       });
 
-      mockAuth0Service.getUserPermissions.mockResolvedValue(
-        USER_FIXTURES.STANDARD_USER.permissions
-      );
+      // Mock workspace authorization service to return user permissions
+      mockWorkspaceAuthService.getUserPermissionsForContext.mockResolvedValue({
+        'workspace-1': ['perm1', 'perm2'],
+        'workspace-2': ['perm2', 'perm3']
+      });
 
       // Act
       const result = await authResolvers.Query.getUserPermissions(
@@ -144,8 +152,8 @@ describe('GraphQL Authentication Integration Tests', () => {
       );
 
       // Assert
-      expect(result).toEqual(USER_FIXTURES.STANDARD_USER.permissions);
-      expect(mockAuth0Service.getUserPermissions).toHaveBeenCalledWith(userId);
+      expect(result).toEqual(['perm1', 'perm2', 'perm3']); // Should be flattened and deduplicated
+      expect(mockWorkspaceAuthService.getUserPermissionsForContext).toHaveBeenCalledWith(userId);
     });
 
     it('should return permissions for admin accessing other user', async () => {
@@ -155,12 +163,21 @@ describe('GraphQL Authentication Integration Tests', () => {
         isAuthenticated: true,
         user: USER_FIXTURES.ADMIN_USER,
         permissions: ['admin:user_management'],
-        dataSources: { auth0Service: mockAuth0Service },
+        dataSources: { 
+          auth0Service: mockAuth0Service,
+          workspaceAuthorizationService: mockWorkspaceAuthService
+        },
       });
 
-      mockAuth0Service.getUserPermissions.mockResolvedValue(
-        USER_FIXTURES.STANDARD_USER.permissions
-      );
+      // Mock admin user having admin permissions across workspaces
+      mockWorkspaceAuthService.getUserPermissionsForContext
+        .mockResolvedValueOnce({
+          'workspace-1': ['admin:user_management'], // Admin user permissions
+        })
+        .mockResolvedValueOnce({
+          'workspace-1': ['perm1'],
+          'workspace-2': ['perm2'] // Target user permissions
+        });
 
       // Act
       const result = await authResolvers.Query.getUserPermissions(
@@ -170,7 +187,8 @@ describe('GraphQL Authentication Integration Tests', () => {
       );
 
       // Assert
-      expect(result).toEqual(USER_FIXTURES.STANDARD_USER.permissions);
+      expect(result).toEqual(['perm1', 'perm2']); // Target user's permissions flattened
+      expect(mockWorkspaceAuthService.getUserPermissionsForContext).toHaveBeenCalledTimes(2);
     });
 
     it('should throw AuthenticationError when not authenticated', async () => {

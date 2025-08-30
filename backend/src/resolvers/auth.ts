@@ -9,6 +9,7 @@ import { GraphQLContext } from '@/types';
 import { UserService as _UserService } from '@/services/user';
 import { Auth0Service as _Auth0Service } from '@/services/auth0';
 import { CacheService as _CacheService } from '@/services/cache';
+import { createAuthorizationHelper, extendedSecurityLogger } from '@/utils/authorizationHelper';
 
 /**
  * GraphQL resolvers for authentication operations
@@ -71,22 +72,23 @@ export const authResolvers = {
       }
 
       // For accessing other user permissions, check admin permission in user's context
-      const workspaceAuthService = context.dataSources.workspaceAuthorizationService;
-      const userPermissionsByWorkspace = await workspaceAuthService.getUserPermissionsForContext(context.user!.id);
-      const flatUserPermissions = Object.values(userPermissionsByWorkspace).flat();
-      
-      if (!flatUserPermissions.includes('admin:user_management')) {
-        throw new AuthorizationError(
-          'Cannot access other user permissions',
-          'INSUFFICIENT_PERMISSIONS',
-          'admin:user_management',
-          flatUserPermissions
-        );
-      }
+      const authHelper = createAuthorizationHelper(context);
+      await authHelper.requireGlobalPermission(
+        'admin:user_management',
+        'Cannot access other user permissions',
+        'user_permissions',
+        'access'
+      );
 
+      const workspaceAuthService = context.dataSources.workspaceAuthorizationService;
       const targetPermissionsByWorkspace = await workspaceAuthService.getUserPermissionsForContext(userId);
+      
+      if (!targetPermissionsByWorkspace || typeof targetPermissionsByWorkspace !== 'object') {
+        return [];
+      }
+      
       // Flatten permissions from all workspaces
-      return Object.values(targetPermissionsByWorkspace).flat();
+      return Object.values(targetPermissionsByWorkspace).flat().filter(Boolean);
     },
   },
 
@@ -230,18 +232,13 @@ export const authResolvers = {
       }
 
       // Check admin permission in user's context
-      const workspaceAuthService = context.dataSources.workspaceAuthorizationService;
-      const userPermissionsByWorkspace = await workspaceAuthService.getUserPermissionsForContext(context.user!.id);
-      const flatUserPermissions = Object.values(userPermissionsByWorkspace).flat();
-      
-      if (!flatUserPermissions.includes('admin:user_management')) {
-        throw new AuthorizationError(
-          'Insufficient permissions to grant permissions',
-          'INSUFFICIENT_PERMISSIONS',
-          'admin:user_management',
-          flatUserPermissions
-        );
-      }
+      const authHelper = createAuthorizationHelper(context);
+      await authHelper.requireGlobalPermission(
+        'admin:user_management',
+        'Insufficient permissions to grant permissions',
+        'user_permissions',
+        'grant'
+      );
 
       const userService = context.dataSources.userService;
 
@@ -257,7 +254,7 @@ export const authResolvers = {
         permissions: updatedPermissions,
       });
 
-      securityLogger.authorizationFailure(context.user!.id, 'user_permissions', 'grant', {
+      extendedSecurityLogger.authorizationSuccess(context.user!.id, 'user_permissions', 'grant', {
         targetUserId: userId,
         grantedPermissions: permissions,
       });
@@ -278,18 +275,13 @@ export const authResolvers = {
       }
 
       // Check admin permission in user's context
-      const workspaceAuthService = context.dataSources.workspaceAuthorizationService;
-      const userPermissionsByWorkspace = await workspaceAuthService.getUserPermissionsForContext(context.user!.id);
-      const flatUserPermissions = Object.values(userPermissionsByWorkspace).flat();
-      
-      if (!flatUserPermissions.includes('admin:user_management')) {
-        throw new AuthorizationError(
-          'Insufficient permissions to revoke permissions',
-          'INSUFFICIENT_PERMISSIONS',
-          'admin:user_management',
-          flatUserPermissions
-        );
-      }
+      const authHelper = createAuthorizationHelper(context);
+      await authHelper.requireGlobalPermission(
+        'admin:user_management',
+        'Insufficient permissions to revoke permissions',
+        'user_permissions',
+        'revoke'
+      );
 
       const userService = context.dataSources.userService;
 
@@ -307,7 +299,7 @@ export const authResolvers = {
         permissions: updatedPermissions,
       });
 
-      securityLogger.authorizationFailure(context.user!.id, 'user_permissions', 'revoke', {
+      extendedSecurityLogger.authorizationSuccess(context.user!.id, 'user_permissions', 'revoke', {
         targetUserId: userId,
         revokedPermissions: permissions,
       });
@@ -328,18 +320,13 @@ export const authResolvers = {
       }
 
       // Check admin permission in user's context
-      const workspaceAuthService = context.dataSources.workspaceAuthorizationService;
-      const userPermissionsByWorkspace = await workspaceAuthService.getUserPermissionsForContext(context.user!.id);
-      const flatUserPermissions = Object.values(userPermissionsByWorkspace).flat();
-      
-      if (!flatUserPermissions.includes('admin:user_management')) {
-        throw new AuthorizationError(
-          'Insufficient permissions to assign roles',
-          'INSUFFICIENT_PERMISSIONS',
-          'admin:user_management',
-          flatUserPermissions
-        );
-      }
+      const authHelper = createAuthorizationHelper(context);
+      await authHelper.requireGlobalPermission(
+        'admin:user_management',
+        'Insufficient permissions to assign roles',
+        'user_roles',
+        'assign'
+      );
 
       const userService = context.dataSources.userService;
 
@@ -357,7 +344,7 @@ export const authResolvers = {
         roles: updatedRoles,
       });
 
-      securityLogger.authorizationFailure(context.user!.id, 'user_roles', 'assign', {
+      extendedSecurityLogger.authorizationSuccess(context.user!.id, 'user_roles', 'assign', {
         targetUserId: userId,
         assignedRole: role,
       });
@@ -378,18 +365,13 @@ export const authResolvers = {
       }
 
       // Check admin permission in user's context
-      const workspaceAuthService = context.dataSources.workspaceAuthorizationService;
-      const userPermissionsByWorkspace = await workspaceAuthService.getUserPermissionsForContext(context.user!.id);
-      const flatUserPermissions = Object.values(userPermissionsByWorkspace).flat();
-      
-      if (!flatUserPermissions.includes('admin:user_management')) {
-        throw new AuthorizationError(
-          'Insufficient permissions to remove roles',
-          'INSUFFICIENT_PERMISSIONS',
-          'admin:user_management',
-          flatUserPermissions
-        );
-      }
+      const authHelper = createAuthorizationHelper(context);
+      await authHelper.requireGlobalPermission(
+        'admin:user_management',
+        'Insufficient permissions to remove roles',
+        'user_roles',
+        'remove'
+      );
 
       const userService = context.dataSources.userService;
 
@@ -405,7 +387,7 @@ export const authResolvers = {
         roles: updatedRoles,
       });
 
-      securityLogger.authorizationFailure(context.user!.id, 'user_roles', 'remove', {
+      extendedSecurityLogger.authorizationSuccess(context.user!.id, 'user_roles', 'remove', {
         targetUserId: userId,
         removedRole: role,
       });
