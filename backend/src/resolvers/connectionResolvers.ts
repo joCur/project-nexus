@@ -65,23 +65,26 @@ export const connectionResolvers = {
         }
 
         // Check access to both card workspaces
-        const hasSourceAccess = await workspaceAuth.hasWorkspaceAccess(
+        const hasSourceAccess = await workspaceAuth.hasPermissionInWorkspace(
           context.user!.id,
           sourceCard.workspace_id,
           'connection:read'
         );
-        const hasTargetAccess = await workspaceAuth.hasWorkspaceAccess(
+        const hasTargetAccess = await workspaceAuth.hasPermissionInWorkspace(
           context.user!.id,
           targetCard.workspace_id,
           'connection:read'
         );
 
         if (!hasSourceAccess || !hasTargetAccess) {
+          // Get user permissions for error reporting
+          const userPermissionsByWorkspace = await workspaceAuth.getUserPermissionsForContext(context.user!.id);
+          const flatUserPermissions = Object.values(userPermissionsByWorkspace).flat();
           throw new AuthorizationError(
             'Cannot access connections between cards in other user workspaces',
             'INSUFFICIENT_PERMISSIONS',
             'connection:read',
-            context.permissions
+            flatUserPermissions
           );
         }
 
@@ -126,13 +129,22 @@ export const connectionResolvers = {
 
       try {
         // Authorization check - users can only access their own workspaces
-        const workspaceAuth = new WorkspaceAuthorizationService();
-        await workspaceAuth.requirePermission(
+        const workspaceAuth = context.dataSources.workspaceAuthorizationService;
+        const hasAccess = await workspaceAuth.hasPermissionInWorkspace(
           context.user!.id,
           workspaceId,
-          'connection:read',
-          'Cannot access connections in other user workspaces'
+          'connection:read'
         );
+        
+        if (!hasAccess) {
+          const userPermissions = await workspaceAuth.getUserPermissionsInWorkspace(context.user!.id, workspaceId);
+          throw new AuthorizationError(
+            'Cannot access connections in other user workspaces',
+            'INSUFFICIENT_PERMISSIONS',
+            'connection:read',
+            userPermissions
+          );
+        }
 
         const connectionService = new ConnectionService();
         const page = pagination?.page || 1;
@@ -200,13 +212,22 @@ export const connectionResolvers = {
         }
 
         // Authorization check
-        const workspaceAuth = new WorkspaceAuthorizationService();
-        await workspaceAuth.requirePermission(
+        const workspaceAuth = context.dataSources.workspaceAuthorizationService;
+        const hasAccess = await workspaceAuth.hasPermissionInWorkspace(
           context.user!.id,
           card.workspace_id,
-          'connection:read',
-          'Cannot access connections for cards in other user workspaces'
+          'connection:read'
         );
+        
+        if (!hasAccess) {
+          const userPermissions = await workspaceAuth.getUserPermissionsInWorkspace(context.user!.id, card.workspace_id);
+          throw new AuthorizationError(
+            'Cannot access connections for cards in other user workspaces',
+            'INSUFFICIENT_PERMISSIONS',
+            'connection:read',
+            userPermissions
+          );
+        }
 
         const connections = await connectionService.getConnectionsByCardId(cardId, {
           includeBidirectional: true,
@@ -245,13 +266,22 @@ export const connectionResolvers = {
 
       try {
         // Authorization check
-        const workspaceAuth = new WorkspaceAuthorizationService();
-        await workspaceAuth.requirePermission(
+        const workspaceAuth = context.dataSources.workspaceAuthorizationService;
+        const hasAccess = await workspaceAuth.hasPermissionInWorkspace(
           context.user!.id,
           workspaceId,
-          'connection:read',
-          'Cannot access connection count for other user workspaces'
+          'connection:read'
         );
+        
+        if (!hasAccess) {
+          const userPermissions = await workspaceAuth.getUserPermissionsInWorkspace(context.user!.id, workspaceId);
+          throw new AuthorizationError(
+            'Cannot access connection count for other user workspaces',
+            'INSUFFICIENT_PERMISSIONS',
+            'connection:read',
+            userPermissions
+          );
+        }
 
         const connectionService = new ConnectionService();
         const { totalCount } = await connectionService.getConnectionsInWorkspace(
@@ -294,7 +324,7 @@ export const connectionResolvers = {
 
       try {
         const connectionService = new ConnectionService();
-        const workspaceAuth = new WorkspaceAuthorizationService();
+        const workspaceAuth = context.dataSources.workspaceAuthorizationService;
 
         // Get both cards to validate workspace access
         const [sourceCard, targetCard] = await Promise.all([
@@ -310,20 +340,38 @@ export const connectionResolvers = {
         }
 
         // Validate workspace access for both cards
-        await Promise.all([
-          workspaceAuth.requirePermission(
+        const [hasSourceAccess, hasTargetAccess] = await Promise.all([
+          workspaceAuth.hasPermissionInWorkspace(
             context.user!.id,
             sourceCard.workspace_id,
-            'connection:create',
-            'Cannot create connection in source card workspace'
+            'connection:create'
           ),
-          workspaceAuth.requirePermission(
+          workspaceAuth.hasPermissionInWorkspace(
             context.user!.id,
             targetCard.workspace_id,
-            'connection:create',
-            'Cannot create connection in target card workspace'
+            'connection:create'
           )
         ]);
+        
+        if (!hasSourceAccess) {
+          const userPermissions = await workspaceAuth.getUserPermissionsInWorkspace(context.user!.id, sourceCard.workspace_id);
+          throw new AuthorizationError(
+            'Cannot create connection in source card workspace',
+            'INSUFFICIENT_PERMISSIONS',
+            'connection:create',
+            userPermissions
+          );
+        }
+        
+        if (!hasTargetAccess) {
+          const userPermissions = await workspaceAuth.getUserPermissionsInWorkspace(context.user!.id, targetCard.workspace_id);
+          throw new AuthorizationError(
+            'Cannot create connection in target card workspace',
+            'INSUFFICIENT_PERMISSIONS',
+            'connection:create',
+            userPermissions
+          );
+        }
 
         const connection = await connectionService.createConnection(input, context.user!.id);
 
@@ -371,7 +419,7 @@ export const connectionResolvers = {
 
       try {
         const connectionService = new ConnectionService();
-        const workspaceAuth = new WorkspaceAuthorizationService();
+        const workspaceAuth = context.dataSources.workspaceAuthorizationService;
         
         // Check if connection exists and get associated cards
         const existingConnection = await connectionService.getConnection(id);
@@ -389,20 +437,38 @@ export const connectionResolvers = {
         }
 
         // Validate workspace access for both cards
-        await Promise.all([
-          workspaceAuth.requirePermission(
+        const [hasSourceAccess, hasTargetAccess] = await Promise.all([
+          workspaceAuth.hasPermissionInWorkspace(
             context.user!.id,
             sourceCard.workspace_id,
-            'connection:update',
-            'Cannot update connection in source card workspace'
+            'connection:update'
           ),
-          workspaceAuth.requirePermission(
+          workspaceAuth.hasPermissionInWorkspace(
             context.user!.id,
             targetCard.workspace_id,
-            'connection:update',
-            'Cannot update connection in target card workspace'
+            'connection:update'
           )
         ]);
+        
+        if (!hasSourceAccess) {
+          const userPermissions = await workspaceAuth.getUserPermissionsInWorkspace(context.user!.id, sourceCard.workspace_id);
+          throw new AuthorizationError(
+            'Cannot update connection in source card workspace',
+            'INSUFFICIENT_PERMISSIONS',
+            'connection:update',
+            userPermissions
+          );
+        }
+        
+        if (!hasTargetAccess) {
+          const userPermissions = await workspaceAuth.getUserPermissionsInWorkspace(context.user!.id, targetCard.workspace_id);
+          throw new AuthorizationError(
+            'Cannot update connection in target card workspace',
+            'INSUFFICIENT_PERMISSIONS',
+            'connection:update',
+            userPermissions
+          );
+        }
 
         const updatedConnection = await connectionService.updateConnection(id, input, context.user!.id);
 
@@ -449,7 +515,7 @@ export const connectionResolvers = {
 
       try {
         const connectionService = new ConnectionService();
-        const workspaceAuth = new WorkspaceAuthorizationService();
+        const workspaceAuth = context.dataSources.workspaceAuthorizationService;
         
         // Check if connection exists and get associated cards
         const existingConnection = await connectionService.getConnection(id);
@@ -467,20 +533,38 @@ export const connectionResolvers = {
         }
 
         // Validate workspace access for both cards
-        await Promise.all([
-          workspaceAuth.requirePermission(
+        const [hasSourceAccess, hasTargetAccess] = await Promise.all([
+          workspaceAuth.hasPermissionInWorkspace(
             context.user!.id,
             sourceCard.workspace_id,
-            'connection:delete',
-            'Cannot delete connection in source card workspace'
+            'connection:delete'
           ),
-          workspaceAuth.requirePermission(
+          workspaceAuth.hasPermissionInWorkspace(
             context.user!.id,
             targetCard.workspace_id,
-            'connection:delete',
-            'Cannot delete connection in target card workspace'
+            'connection:delete'
           )
         ]);
+        
+        if (!hasSourceAccess) {
+          const userPermissions = await workspaceAuth.getUserPermissionsInWorkspace(context.user!.id, sourceCard.workspace_id);
+          throw new AuthorizationError(
+            'Cannot delete connection in source card workspace',
+            'INSUFFICIENT_PERMISSIONS',
+            'connection:delete',
+            userPermissions
+          );
+        }
+        
+        if (!hasTargetAccess) {
+          const userPermissions = await workspaceAuth.getUserPermissionsInWorkspace(context.user!.id, targetCard.workspace_id);
+          throw new AuthorizationError(
+            'Cannot delete connection in target card workspace',
+            'INSUFFICIENT_PERMISSIONS',
+            'connection:delete',
+            userPermissions
+          );
+        }
 
         const success = await connectionService.deleteConnection(id, context.user!.id);
 
@@ -678,14 +762,23 @@ export const connectionResolvers = {
         const workspaceIds = [...new Set(cards.map(card => card.workspaceId))];
         
         // Validate workspace access for all affected workspaces
-        const authService = new WorkspaceAuthorizationService();
+        const authService = context.dataSources.workspaceAuthorizationService;
         for (const workspaceId of workspaceIds) {
-          await authService.requirePermission(
+          const hasAccess = await authService.hasPermissionInWorkspace(
             context.user!.id,
             workspaceId,
-            'connection:delete',
-            `Cannot delete connections in workspace ${workspaceId}`
+            'connection:delete'
           );
+          
+          if (!hasAccess) {
+            const userPermissions = await authService.getUserPermissionsInWorkspace(context.user!.id, workspaceId);
+            throw new AuthorizationError(
+              `Cannot delete connections in workspace ${workspaceId}`,
+              'INSUFFICIENT_PERMISSIONS',
+              'connection:delete',
+              userPermissions
+            );
+          }
         }
 
         const result = await connectionService.batchDeleteConnections(connectionIds, context.user!.id);

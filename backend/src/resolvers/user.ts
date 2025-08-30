@@ -28,13 +28,20 @@ export const userResolvers = {
       }
 
       // Users can only view their own profile unless they have admin permissions
-      if (context.user?.id !== id && !context.permissions.includes('admin:user_management')) {
-        throw new AuthorizationError(
-          'Cannot access other user profiles',
-          'INSUFFICIENT_PERMISSIONS',
-          'admin:user_management',
-          context.permissions
-        );
+      if (context.user?.id !== id) {
+        const workspaceAuthService = context.dataSources.workspaceAuthorizationService;
+        const userPermissionsByWorkspace = await workspaceAuthService.getUserPermissionsForContext(context.user!.id);
+        const flatUserPermissions = Object.values(userPermissionsByWorkspace).flat();
+        const hasAdminPermission = flatUserPermissions.includes('admin:user_management');
+        
+        if (!hasAdminPermission) {
+          throw new AuthorizationError(
+            'Cannot access other user profiles',
+            'INSUFFICIENT_PERMISSIONS',
+            'admin:user_management',
+            flatUserPermissions
+          );
+        }
       }
 
       const userService = context.dataSources.userService;
@@ -59,12 +66,17 @@ export const userResolvers = {
         throw new AuthenticationError();
       }
 
-      if (!context.permissions.includes('admin:user_management')) {
+      const workspaceAuthService = context.dataSources.workspaceAuthorizationService;
+      const userPermissionsByWorkspace = await workspaceAuthService.getUserPermissionsForContext(context.user!.id);
+      const flatUserPermissions = Object.values(userPermissionsByWorkspace).flat();
+      const hasAdminPermission = flatUserPermissions.includes('admin:user_management');
+      
+      if (!hasAdminPermission) {
         throw new AuthorizationError(
           'Insufficient permissions to list users',
           'INSUFFICIENT_PERMISSIONS',
           'admin:user_management',
-          context.permissions
+          flatUserPermissions
         );
       }
 
@@ -106,12 +118,17 @@ export const userResolvers = {
         throw new AuthenticationError();
       }
 
-      if (!context.permissions.includes('admin:user_management')) {
+      const workspaceAuthService = context.dataSources.workspaceAuthorizationService;
+      const userPermissionsByWorkspace = await workspaceAuthService.getUserPermissionsForContext(context.user!.id);
+      const flatUserPermissions = Object.values(userPermissionsByWorkspace).flat();
+      const hasAdminPermission = flatUserPermissions.includes('admin:user_management');
+      
+      if (!hasAdminPermission) {
         throw new AuthorizationError(
           'Insufficient permissions to create users',
           'INSUFFICIENT_PERMISSIONS',
           'admin:user_management',
-          context.permissions
+          flatUserPermissions
         );
       }
 
@@ -151,12 +168,17 @@ export const userResolvers = {
       }
 
       // Users can only update their own profile unless they have admin permissions
-      if (context.user?.id !== id && !context.permissions.includes('admin:user_management')) {
+      const workspaceAuthService = context.dataSources.workspaceAuthorizationService;
+      const userPermissionsByWorkspace = await workspaceAuthService.getUserPermissionsForContext(context.user!.id);
+      const flatUserPermissions = Object.values(userPermissionsByWorkspace).flat();
+      const hasAdminPermission = flatUserPermissions.includes('admin:user_management');
+      
+      if (context.user?.id !== id && !hasAdminPermission) {
         throw new AuthorizationError(
           'Cannot update other user profiles',
           'INSUFFICIENT_PERMISSIONS',
           'admin:user_management',
-          context.permissions
+          flatUserPermissions
         );
       }
 
@@ -165,7 +187,7 @@ export const userResolvers = {
       try {
         // If non-admin is updating, restrict what they can change
         let allowedInput = input;
-        if (context.user?.id === id && !context.permissions.includes('admin:user_management')) {
+        if (context.user?.id === id && !hasAdminPermission) {
           // Regular users can only update display name and avatar
           allowedInput = {
             displayName: input.displayName,
@@ -206,12 +228,17 @@ export const userResolvers = {
         throw new AuthenticationError();
       }
 
-      if (!context.permissions.includes('admin:user_management')) {
+      const workspaceAuthService = context.dataSources.workspaceAuthorizationService;
+      const userPermissionsByWorkspace = await workspaceAuthService.getUserPermissionsForContext(context.user!.id);
+      const flatUserPermissions = Object.values(userPermissionsByWorkspace).flat();
+      const hasAdminPermission = flatUserPermissions.includes('admin:user_management');
+      
+      if (!hasAdminPermission) {
         throw new AuthorizationError(
           'Insufficient permissions to delete users',
           'INSUFFICIENT_PERMISSIONS',
           'admin:user_management',
-          context.permissions
+          flatUserPermissions
         );
       }
 
@@ -255,13 +282,20 @@ export const userResolvers = {
       }
 
       // Users can only update their own last login or admins can update any
-      if (context.user?.id !== userId && !context.permissions.includes('admin:user_management')) {
-        throw new AuthorizationError(
-          'Cannot update other user login timestamps',
-          'INSUFFICIENT_PERMISSIONS',
-          'admin:user_management',
-          context.permissions
-        );
+      if (context.user?.id !== userId) {
+        const workspaceAuthService = context.dataSources.workspaceAuthorizationService;
+        const userPermissionsByWorkspace = await workspaceAuthService.getUserPermissionsForContext(context.user!.id);
+        const flatUserPermissions = Object.values(userPermissionsByWorkspace).flat();
+        const hasAdminPermission = flatUserPermissions.includes('admin:user_management');
+        
+        if (!hasAdminPermission) {
+          throw new AuthorizationError(
+            'Cannot update other user login timestamps',
+            'INSUFFICIENT_PERMISSIONS',
+            'admin:user_management',
+            flatUserPermissions
+          );
+        }
       }
 
       const userService = context.dataSources.userService;

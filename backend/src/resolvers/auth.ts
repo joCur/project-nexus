@@ -61,17 +61,32 @@ export const authResolvers = {
         throw new AuthenticationError();
       }
 
-      if (context.user?.id !== userId && !context.permissions.includes('admin:user_management')) {
+      // Check if user is requesting their own permissions
+      if (context.user?.id === userId) {
+        // User can access their own permissions across all workspaces
+        const workspaceAuthService = context.dataSources.workspaceAuthorizationService;
+        const permissionsByWorkspace = await workspaceAuthService.getUserPermissionsForContext(userId);
+        // Flatten permissions from all workspaces
+        return Object.values(permissionsByWorkspace).flat();
+      }
+
+      // For accessing other user permissions, check admin permission in user's context
+      const workspaceAuthService = context.dataSources.workspaceAuthorizationService;
+      const userPermissionsByWorkspace = await workspaceAuthService.getUserPermissionsForContext(context.user!.id);
+      const flatUserPermissions = Object.values(userPermissionsByWorkspace).flat();
+      
+      if (!flatUserPermissions.includes('admin:user_management')) {
         throw new AuthorizationError(
           'Cannot access other user permissions',
           'INSUFFICIENT_PERMISSIONS',
           'admin:user_management',
-          context.permissions
+          flatUserPermissions
         );
       }
 
-      const auth0Service = context.dataSources.auth0Service;
-      return await auth0Service.getUserPermissions(userId);
+      const targetPermissionsByWorkspace = await workspaceAuthService.getUserPermissionsForContext(userId);
+      // Flatten permissions from all workspaces
+      return Object.values(targetPermissionsByWorkspace).flat();
     },
   },
 
@@ -214,12 +229,17 @@ export const authResolvers = {
         throw new AuthenticationError();
       }
 
-      if (!context.permissions.includes('admin:user_management')) {
+      // Check admin permission in user's context
+      const workspaceAuthService = context.dataSources.workspaceAuthorizationService;
+      const userPermissionsByWorkspace = await workspaceAuthService.getUserPermissionsForContext(context.user!.id);
+      const flatUserPermissions = Object.values(userPermissionsByWorkspace).flat();
+      
+      if (!flatUserPermissions.includes('admin:user_management')) {
         throw new AuthorizationError(
           'Insufficient permissions to grant permissions',
           'INSUFFICIENT_PERMISSIONS',
           'admin:user_management',
-          context.permissions
+          flatUserPermissions
         );
       }
 
@@ -257,12 +277,17 @@ export const authResolvers = {
         throw new AuthenticationError();
       }
 
-      if (!context.permissions.includes('admin:user_management')) {
+      // Check admin permission in user's context
+      const workspaceAuthService = context.dataSources.workspaceAuthorizationService;
+      const userPermissionsByWorkspace = await workspaceAuthService.getUserPermissionsForContext(context.user!.id);
+      const flatUserPermissions = Object.values(userPermissionsByWorkspace).flat();
+      
+      if (!flatUserPermissions.includes('admin:user_management')) {
         throw new AuthorizationError(
           'Insufficient permissions to revoke permissions',
           'INSUFFICIENT_PERMISSIONS',
           'admin:user_management',
-          context.permissions
+          flatUserPermissions
         );
       }
 
@@ -302,12 +327,17 @@ export const authResolvers = {
         throw new AuthenticationError();
       }
 
-      if (!context.permissions.includes('admin:user_management')) {
+      // Check admin permission in user's context
+      const workspaceAuthService = context.dataSources.workspaceAuthorizationService;
+      const userPermissionsByWorkspace = await workspaceAuthService.getUserPermissionsForContext(context.user!.id);
+      const flatUserPermissions = Object.values(userPermissionsByWorkspace).flat();
+      
+      if (!flatUserPermissions.includes('admin:user_management')) {
         throw new AuthorizationError(
           'Insufficient permissions to assign roles',
           'INSUFFICIENT_PERMISSIONS',
           'admin:user_management',
-          context.permissions
+          flatUserPermissions
         );
       }
 
@@ -347,12 +377,17 @@ export const authResolvers = {
         throw new AuthenticationError();
       }
 
-      if (!context.permissions.includes('admin:user_management')) {
+      // Check admin permission in user's context
+      const workspaceAuthService = context.dataSources.workspaceAuthorizationService;
+      const userPermissionsByWorkspace = await workspaceAuthService.getUserPermissionsForContext(context.user!.id);
+      const flatUserPermissions = Object.values(userPermissionsByWorkspace).flat();
+      
+      if (!flatUserPermissions.includes('admin:user_management')) {
         throw new AuthorizationError(
           'Insufficient permissions to remove roles',
           'INSUFFICIENT_PERMISSIONS',
           'admin:user_management',
-          context.permissions
+          flatUserPermissions
         );
       }
 

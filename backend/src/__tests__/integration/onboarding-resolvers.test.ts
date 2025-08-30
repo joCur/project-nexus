@@ -62,6 +62,9 @@ describe('Onboarding GraphQL Resolvers', () => {
         userProfileService: {} as any,
         onboardingService: mockOnboardingService,
         workspaceService: {} as any,
+        workspaceAuthorizationService: {
+          getUserPermissionsForContext: jest.fn().mockResolvedValue({}),
+        } as any,
       },
       req: {} as any,
       res: {} as any,
@@ -86,6 +89,9 @@ describe('Onboarding GraphQL Resolvers', () => {
 
     it('should return onboarding progress for other user with admin permissions', async () => {
       mockContext.permissions = ['admin:user_management'];
+      // Mock the workspaceAuthorizationService to return admin permissions
+      (mockContext.dataSources.workspaceAuthorizationService.getUserPermissionsForContext as jest.Mock)
+        .mockResolvedValue({ 'workspace-1': ['admin:user_management'] });
       mockOnboardingService.getProgress.mockResolvedValue(mockOnboardingProgress);
 
       const result = await onboardingResolvers.Query.onboardingProgress(
@@ -179,6 +185,9 @@ describe('Onboarding GraphQL Resolvers', () => {
 
     it('should return completion status for other user with admin permissions', async () => {
       mockContext.permissions = ['admin:user_management'];
+      // Mock the workspaceAuthorizationService to return admin permissions
+      (mockContext.dataSources.workspaceAuthorizationService.getUserPermissionsForContext as jest.Mock)
+        .mockResolvedValue({ 'workspace-1': ['admin:user_management'] });
       mockOnboardingService.isOnboardingComplete.mockResolvedValue(false);
 
       const result = await onboardingResolvers.Query.isOnboardingComplete(
@@ -352,6 +361,9 @@ describe('Onboarding GraphQL Resolvers', () => {
 
     it('should reset onboarding for other user with admin permissions', async () => {
       mockContext.permissions = ['admin:user_management'];
+      // Mock the workspaceAuthorizationService to return admin permissions
+      (mockContext.dataSources.workspaceAuthorizationService.getUserPermissionsForContext as jest.Mock)
+        .mockResolvedValue({ 'workspace-1': ['admin:user_management'] });
       mockOnboardingService.resetOnboarding.mockResolvedValue(undefined);
 
       const result = await onboardingResolvers.Mutation.resetOnboarding(
@@ -461,6 +473,9 @@ describe('Onboarding GraphQL Resolvers', () => {
 
     it('should handle multiple admin permissions', async () => {
       mockContext.permissions = ['admin:user_management', 'admin:system'];
+      // Mock the workspaceAuthorizationService to return admin permissions
+      (mockContext.dataSources.workspaceAuthorizationService.getUserPermissionsForContext as jest.Mock)
+        .mockResolvedValue({ 'workspace-1': ['admin:user_management', 'admin:system'] });
       mockOnboardingService.getProgress.mockResolvedValue(mockOnboardingProgress);
 
       const result = await onboardingResolvers.Query.onboardingProgress(
