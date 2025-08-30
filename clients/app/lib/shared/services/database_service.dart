@@ -15,7 +15,7 @@ part 'database_service.g.dart';
 
 @riverpod
 DatabaseService databaseService(Ref ref) {
-  return DatabaseService();
+  return DatabaseService._();
 }
 
 /// Main database service for Project Nexus local storage
@@ -28,6 +28,10 @@ DatabaseService databaseService(Ref ref) {
 class DatabaseService {
   Database? _database;
   Completer<Database>? _initializationCompleter;
+  bool _fastStartMode = false;
+  
+  // Private constructor
+  DatabaseService._();
 
   /// Get the database instance, initializing if necessary
   Future<Database> get database async {
@@ -41,6 +45,19 @@ class DatabaseService {
     }
 
     return await _initDatabase();
+  }
+  
+  /// Enable fast start mode for quicker launch times
+  void enableFastStart() {
+    _fastStartMode = true;
+  }
+  
+  /// Get database with optimized initialization for critical path
+  Future<Database> get databaseFast async {
+    if (_fastStartMode) {
+      return await _initDatabaseFast();
+    }
+    return await database;
   }
 
   /// Initialize the database
@@ -166,17 +183,85 @@ class DatabaseService {
   Future<void> _onOpen(Database db) async {
     dev.log('Database opened successfully', name: 'DatabaseService');
     
-    // Enable foreign key constraints
-    await db.execute('PRAGMA foreign_keys = ON');
+    if (_fastStartMode) {
+      // Minimal configuration for fast startup
+      await db.execute('PRAGMA foreign_keys = ON');
+    } else {
+      // Full configuration
+      await db.execute('PRAGMA foreign_keys = ON');
+      await db.execute('PRAGMA journal_mode = WAL');
+      await db.execute('PRAGMA synchronous = NORMAL');
+      await db.execute('PRAGMA cache_size = -10000'); // 10MB cache
+    }
+  }
+  
+  /// Fast database initialization - defers optimization PRAGMA statements
+  Future<Database> _initDatabaseFast() async {
+    if (_initializationCompleter != null && !_initializationCompleter!.isCompleted) {
+      return await _initializationCompleter!.future;
+    }
+
+    _initializationCompleter = Completer<Database>();
     
-    // Set journal mode to WAL for better performance
-    await db.execute('PRAGMA journal_mode = WAL');
+    try {
+      dev.log('Fast initializing Project Nexus database', name: 'DatabaseService');
+      
+      final documentsDirectory = await getApplicationDocumentsDirectory();
+      final databasePath = path.join(documentsDirectory.path, DatabaseConstants.databaseName);
+      
+      final databaseDirectory = Directory(path.dirname(databasePath));
+      if (!await databaseDirectory.exists()) {
+        await databaseDirectory.create(recursive: true);
+      }
+
+      _database = await openDatabase(
+        databasePath,
+        version: DatabaseConstants.databaseVersion,
+        onCreate: _onCreate,
+        onUpgrade: _onUpgrade,
+        onDowngrade: _onDowngrade,
+        onOpen: _onOpen,
+        singleInstance: true,
+      );
+
+      dev.log('Database fast-initialized at: $databasePath', name: 'DatabaseService');
+      
+      // Apply full optimization in background
+      _optimizeDatabaseInBackground();
+      
+      _initializationCompleter!.complete(_database!);
+      return _database!;
+      
+    } catch (error, stackTrace) {
+      dev.log(
+        'Failed to fast-initialize database: $error',
+        name: 'DatabaseService',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      
+      _initializationCompleter!.completeError(error, stackTrace);
+      rethrow;
+    }
+  }
+  
+  /// Apply database optimizations in background after fast start
+  Future<void> _optimizeDatabaseInBackground() async {
+    if (_database == null) return;
     
-    // Set synchronous mode to NORMAL for better performance
-    await db.execute('PRAGMA synchronous = NORMAL');
-    
-    // Set cache size (negative value means KB)
-    await db.execute('PRAGMA cache_size = -10000'); // 10MB cache
+    try {
+      dev.log('Applying database optimizations in background', name: 'DatabaseService');
+      
+      await Future.wait([
+        _database!.execute('PRAGMA journal_mode = WAL'),
+        _database!.execute('PRAGMA synchronous = NORMAL'),
+        _database!.execute('PRAGMA cache_size = -10000'),
+      ]);
+      
+      dev.log('Database optimizations applied', name: 'DatabaseService');
+    } catch (error) {
+      dev.log('Failed to apply background optimizations: $error', name: 'DatabaseService');
+    }
   }
 
   /// Execute a query within a transaction

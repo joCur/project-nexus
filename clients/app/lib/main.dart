@@ -6,19 +6,78 @@ import 'core/router/app_router.dart';
 import 'features/auth/domain/providers/auth_providers.dart';
 import 'features/auth/presentation/screens/auth_loading_screen.dart';
 import 'shared/theme/app_theme.dart';
+import 'core/performance/performance_manager.dart';
+import 'core/providers/lazy_providers.dart';
 
-void main() async {
+/// Global initialization status tracker
+class AppInitializationState {
+  static bool _hiveInitialized = false;
+  static bool _routerInitialized = false;
+  
+  static bool get isHiveInitialized => _hiveInitialized;
+  static bool get isRouterInitialized => _routerInitialized;
+  
+  static Future<void> initializeHive() async {
+    if (!_hiveInitialized) {
+      await initHiveForFlutter().timed('hive_initialization');
+      _hiveInitialized = true;
+    }
+  }
+  
+  static void markRouterInitialized() {
+    _routerInitialized = true;
+  }
+}
+
+void main() {
+  // Start performance monitoring immediately
+  final perfManager = PerformanceManager();
+  perfManager.markAppLaunchStart();
+  
+  // Start app immediately without blocking operations
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize Hive for GraphQL caching
-  await initHiveForFlutter();
+  // Configure initialization phases
+  configureInitializationPhases();
   
   final container = ProviderContainer();
-  initializeRouter(container);
+  
+  // Defer heavy initialization to after first frame
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    _initializeInBackground(container);
+  });
+  
   runApp(UncontrolledProviderScope(
     container: container,
     child: const NexusApp(),
   ));
+}
+
+/// Initialize heavy services after UI is shown
+Future<void> _initializeInBackground(ProviderContainer container) async {
+  final perfManager = PerformanceManager();
+  final initManager = InitializationManager();
+  
+  try {
+    // Initialize critical services first
+    await AppInitializationState.initializeHive();
+    
+    // Initialize router after Hive is ready
+    perfManager.startOperation('router_initialization');
+    initializeRouter(container);
+    AppInitializationState.markRouterInitialized();
+    perfManager.endOperation('router_initialization');
+    
+    // Run phased initialization in background
+    await initManager.initializeAll().timed('phased_initialization');
+    
+    // Mark app as interactive
+    perfManager.markInteractive();
+    
+  } catch (error) {
+    debugPrint('Background initialization failed: $error');
+    perfManager.markInteractive(); // Still mark as interactive even if some services failed
+  }
 }
 
 class NexusApp extends ConsumerWidget {
@@ -26,9 +85,27 @@ class NexusApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Record first frame on first build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      PerformanceManager().markFirstFrame();
+    });
+    
+    // Show immediate loading screen while heavy services initialize
+    if (!AppInitializationState.isHiveInitialized || !AppInitializationState.isRouterInitialized) {
+      return MaterialApp(
+        title: 'Nexus Mobile',
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: ThemeMode.system,
+        home: const _OptimizedLoadingScreen(),
+        debugShowCheckedModeBanner: false,
+      );
+    }
+    
+    // Watch auth state only after initialization is complete
     final authState = ref.watch(authNotifierProvider);
     
-    // Show loading screen during initial auth check
+    // Show auth loading screen during authentication check
     if (authState.isLoading && authState.user == null) {
       return MaterialApp(
         title: 'Nexus Mobile',
@@ -36,6 +113,7 @@ class NexusApp extends ConsumerWidget {
         darkTheme: AppTheme.darkTheme,
         themeMode: ThemeMode.system,
         home: const AuthLoadingScreen(),
+        debugShowCheckedModeBanner: false,
       );
     }
     
@@ -45,6 +123,45 @@ class NexusApp extends ConsumerWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system,
       routerConfig: appRouter,
+      debugShowCheckedModeBanner: false,
+    );
+  }
+}
+
+/// Ultra-fast loading screen shown during critical path initialization
+/// Designed for minimal widget tree and instant rendering
+class _OptimizedLoadingScreen extends StatelessWidget {
+  const _OptimizedLoadingScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      body: const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Minimal app branding
+            Text(
+              'Nexus',
+              style: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.w300,
+                letterSpacing: 2,
+              ),
+            ),
+            SizedBox(height: 24),
+            // Lightweight progress indicator
+            SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
