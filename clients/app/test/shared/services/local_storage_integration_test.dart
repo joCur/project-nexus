@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter/services.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'dart:io';
 
 import '../../../lib/shared/database/database_constants.dart';
 import '../../../lib/shared/models/card.dart';
@@ -20,6 +22,23 @@ import '../../../lib/shared/services/user_preferences_service.dart';
 void main() {
   // Initialize Flutter binding for tests that use platform channels
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize SQLite FFI for testing
+  sqfliteFfiInit();
+  databaseFactory = databaseFactoryFfi;
+
+  // Mock path_provider platform channel BEFORE setUpAll
+  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+      .setMockMethodCallHandler(
+    const MethodChannel('plugins.flutter.io/path_provider'),
+    (MethodCall methodCall) async {
+      if (methodCall.method == 'getApplicationDocumentsDirectory') {
+        // Return a temporary directory path for testing
+        return Directory.systemTemp.path;
+      }
+      return null;
+    },
+  );
   
   group('Local Storage Integration Tests', () {
     late DatabaseService databaseService;
