@@ -61,7 +61,7 @@ export const canvasResolvers = {
         }
 
         // Authorization check - users can only access canvases in workspaces they have access to
-        const authService = new WorkspaceAuthorizationService();
+        const authService = context.dataSources.workspaceAuthorizationService;
         const hasAccess = await authService.hasWorkspaceAccess(
           context.user!.id,
           canvas.workspaceId,
@@ -117,7 +117,7 @@ export const canvasResolvers = {
 
       try {
         // Authorization check - verify workspace access
-        const authService = new WorkspaceAuthorizationService();
+        const authService = context.dataSources.workspaceAuthorizationService;
         await authService.requirePermission(
           context.user!.id,
           workspaceId,
@@ -182,7 +182,7 @@ export const canvasResolvers = {
 
       try {
         // Authorization check - verify workspace access
-        const authService = new WorkspaceAuthorizationService();
+        const authService = context.dataSources.workspaceAuthorizationService;
         await authService.requirePermission(
           context.user!.id,
           workspaceId,
@@ -227,7 +227,7 @@ export const canvasResolvers = {
 
       try {
         // Authorization check - verify workspace access for canvas creation
-        const authService = new WorkspaceAuthorizationService();
+        const authService = context.dataSources.workspaceAuthorizationService;
         await authService.requirePermission(
           context.user!.id,
           input.workspaceId,
@@ -290,7 +290,7 @@ export const canvasResolvers = {
         }
 
         // Authorization check - verify workspace access for canvas updates
-        const authService = new WorkspaceAuthorizationService();
+        const authService = context.dataSources.workspaceAuthorizationService;
         await authService.requirePermission(
           context.user!.id,
           existingCanvas.workspaceId,
@@ -351,7 +351,7 @@ export const canvasResolvers = {
         }
 
         // Authorization check - verify workspace access for canvas deletion
-        const authService = new WorkspaceAuthorizationService();
+        const authService = context.dataSources.workspaceAuthorizationService;
         await authService.requirePermission(
           context.user!.id,
           existingCanvas.workspaceId,
@@ -492,7 +492,7 @@ export const canvasResolvers = {
           }
 
           // Verify user has access to the workspace
-          const authService = new WorkspaceAuthorizationService();
+          const authService = context.dataSources.workspaceAuthorizationService;
           const hasAccess = await authService.hasWorkspaceAccess(
             context.user!.id,
             variables.workspaceId,
@@ -516,7 +516,7 @@ export const canvasResolvers = {
           }
 
           // Verify user has access to the workspace
-          const authService = new WorkspaceAuthorizationService();
+          const authService = context.dataSources.workspaceAuthorizationService;
           const hasAccess = await authService.hasWorkspaceAccess(
             context.user!.id,
             variables.workspaceId,
@@ -540,7 +540,7 @@ export const canvasResolvers = {
           }
 
           // Verify user has access to the workspace
-          const authService = new WorkspaceAuthorizationService();
+          const authService = context.dataSources.workspaceAuthorizationService;
           const hasAccess = await authService.hasWorkspaceAccess(
             context.user!.id,
             variables.workspaceId,

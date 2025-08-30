@@ -7,6 +7,7 @@ import {
 import { createContextLogger } from '@/utils/logger';
 import { GraphQLContext } from '@/types';
 import { WorkspaceAuthorizationService } from '@/services/workspaceAuthorization';
+import { createAuthorizationHelper } from '@/utils/authorizationHelper';
 
 /**
  * GraphQL resolvers for workspace management operations
@@ -36,21 +37,12 @@ export const workspaceResolvers = {
       }
 
       // Check if user has access to workspace (role-based)
-      const authService = new WorkspaceAuthorizationService();
-      const hasAccess = await authService.hasWorkspaceAccess(
-        context.user!.id,
+      const authHelper = createAuthorizationHelper(context);
+      await authHelper.requireWorkspacePermission(
         id,
-        'workspace:read'
+        'workspace:read',
+        'You do not have access to this workspace'
       );
-
-      if (!hasAccess) {
-        throw new AuthorizationError(
-          'You do not have access to this workspace',
-          'WORKSPACE_ACCESS_DENIED',
-          'workspace:read',
-          []
-        );
-      }
 
       return workspace;
     },
@@ -68,12 +60,13 @@ export const workspaceResolvers = {
       }
 
       // Users can only view their own workspaces unless they have admin permissions
-      if (context.user?.id !== ownerId && !context.permissions.includes('admin:workspace_management')) {
-        throw new AuthorizationError(
-          'Cannot access other user workspaces',
-          'INSUFFICIENT_PERMISSIONS',
+      if (context.user?.id !== ownerId) {
+        const authHelper = createAuthorizationHelper(context);
+        await authHelper.requireGlobalPermission(
           'admin:workspace_management',
-          context.permissions
+          'Cannot access other user workspaces',
+          'workspaces',
+          'read'
         );
       }
 
@@ -94,13 +87,14 @@ export const workspaceResolvers = {
       }
 
       const workspaceService = context.dataSources.workspaceService;
-      const authService = new WorkspaceAuthorizationService();
+      const workspaceAuthService = context.dataSources.workspaceAuthorizationService;
 
       // Get workspaces owned by user
       const ownedWorkspaces = await workspaceService.getWorkspacesByOwnerId(context.user!.id);
 
       // Get workspaces where user is a member (but not owner)
-      const _memberWorkspaces = await authService.getWorkspaceMembers(''); // We'll need to implement this method
+      // TODO: Implement method to get all workspaces where user is a member
+      // const _memberWorkspaces = await workspaceAuthService.getUserWorkspaces(context.user!.id);
       
       // For now, just return owned workspaces
       // TODO: Implement method to get all workspaces where user is a member
@@ -120,12 +114,13 @@ export const workspaceResolvers = {
       }
 
       // Users can only view their own workspaces unless they have admin permissions
-      if (context.user?.id !== ownerId && !context.permissions.includes('admin:workspace_management')) {
-        throw new AuthorizationError(
-          'Cannot access other user workspaces',
-          'INSUFFICIENT_PERMISSIONS',
+      if (context.user?.id !== ownerId) {
+        const authHelper = createAuthorizationHelper(context);
+        await authHelper.requireGlobalPermission(
           'admin:workspace_management',
-          context.permissions
+          'Cannot access other user workspaces',
+          'workspaces',
+          'read'
         );
       }
 
@@ -214,9 +209,8 @@ export const workspaceResolvers = {
       }
 
       // Check if user has permission to update workspace
-      const authService = new WorkspaceAuthorizationService();
-      await authService.requirePermission(
-        context.user!.id,
+      const authHelper = createAuthorizationHelper(context);
+      await authHelper.requireWorkspacePermission(
         id,
         'workspace:update',
         'You do not have permission to update this workspace'
@@ -266,9 +260,8 @@ export const workspaceResolvers = {
       }
 
       // Check if user has permission to delete workspace
-      const authService = new WorkspaceAuthorizationService();
-      await authService.requirePermission(
-        context.user!.id,
+      const authHelper = createAuthorizationHelper(context);
+      await authHelper.requireWorkspacePermission(
         id,
         'workspace:delete',
         'You do not have permission to delete this workspace'

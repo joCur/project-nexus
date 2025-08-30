@@ -55,7 +55,7 @@ export const cardResolvers = {
         }
 
         // Authorization check - users can only access cards in workspaces they have access to
-        const authService = new WorkspaceAuthorizationService();
+        const authService = context.dataSources.workspaceAuthorizationService;
         const hasAccess = await authService.hasWorkspaceAccess(
           context.user!.id,
           card.workspaceId,
@@ -115,7 +115,7 @@ export const cardResolvers = {
 
       try {
         // Authorization check - verify workspace access
-        const authService = new WorkspaceAuthorizationService();
+        const authService = context.dataSources.workspaceAuthorizationService;
         await authService.requirePermission(
           context.user!.id,
           workspaceId,
@@ -190,7 +190,7 @@ export const cardResolvers = {
 
       try {
         // Authorization check - verify workspace access
-        const authService = new WorkspaceAuthorizationService();
+        const authService = context.dataSources.workspaceAuthorizationService;
         await authService.requirePermission(
           context.user!.id,
           workspaceId,
@@ -243,7 +243,7 @@ export const cardResolvers = {
 
       try {
         // Authorization check - verify workspace access
-        const authService = new WorkspaceAuthorizationService();
+        const authService = context.dataSources.workspaceAuthorizationService;
         await authService.requirePermission(
           context.user!.id,
           workspaceId,
@@ -295,7 +295,7 @@ export const cardResolvers = {
 
       try {
         // Authorization check - verify workspace access for card creation
-        const authService = new WorkspaceAuthorizationService();
+        const authService = context.dataSources.workspaceAuthorizationService;
         await authService.requirePermission(
           context.user!.id,
           input.workspaceId,
@@ -355,7 +355,7 @@ export const cardResolvers = {
         }
 
         // Authorization check - verify workspace access for card updates
-        const authService = new WorkspaceAuthorizationService();
+        const authService = context.dataSources.workspaceAuthorizationService;
         await authService.requirePermission(
           context.user!.id,
           existingCard.workspaceId,
@@ -415,7 +415,7 @@ export const cardResolvers = {
         }
 
         // Authorization check - verify workspace access for card deletion
-        const authService = new WorkspaceAuthorizationService();
+        const authService = context.dataSources.workspaceAuthorizationService;
         await authService.requirePermission(
           context.user!.id,
           existingCard.workspaceId,
@@ -475,7 +475,7 @@ export const cardResolvers = {
         const workspaceIds = [...new Set(cards.map(card => card.workspaceId))];
         
         // Check authorization for all workspaces
-        const authService = new WorkspaceAuthorizationService();
+        const authService = context.dataSources.workspaceAuthorizationService;
         for (const workspaceId of workspaceIds) {
           await authService.requirePermission(
             context.user!.id,
@@ -543,7 +543,7 @@ export const cardResolvers = {
         }
 
         // Authorization check - verify workspace access for card creation
-        const authService = new WorkspaceAuthorizationService();
+        const authService = context.dataSources.workspaceAuthorizationService;
         await authService.requirePermission(
           context.user!.id,
           originalCard.workspaceId,

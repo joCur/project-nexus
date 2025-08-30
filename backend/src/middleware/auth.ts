@@ -9,6 +9,7 @@ import { AuthContext } from '@/types/auth';
 import { Auth0Service } from '@/services/auth0';
 import { UserService } from '@/services/user';
 import { CacheService } from '@/services/cache';
+import { clearPermissionCache } from '@/utils/authorizationHelper';
 
 /**
  * Authentication middleware for Express routes and GraphQL context
@@ -226,6 +227,9 @@ export function createGraphQLContext(
   workspaceAuthorizationService: import('@/services/workspaceAuthorization').WorkspaceAuthorizationService
 ) {
   return async ({ req, res }: { req: AuthenticatedRequest; res: Response }) => {
+    // Clear permission cache at the start of each request to prevent N+1 issues
+    clearPermissionCache();
+    
     // Get user from request (set by auth middleware)
     const user = req.user;
     const auth0Payload = req.auth0Payload;

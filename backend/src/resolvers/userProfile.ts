@@ -28,13 +28,20 @@ export const userProfileResolvers = {
       }
 
       // Users can only view their own profile unless they have admin permissions
-      if (context.user?.id !== userId && !context.permissions.includes('admin:user_management')) {
-        throw new AuthorizationError(
-          'Cannot access other user profiles',
-          'INSUFFICIENT_PERMISSIONS',
-          'admin:user_management',
-          context.permissions
-        );
+      if (context.user?.id !== userId) {
+        const workspaceAuthService = context.dataSources.workspaceAuthorizationService;
+        const userPermissionsByWorkspace = await workspaceAuthService.getUserPermissionsForContext(context.user!.id);
+        const flatUserPermissions = Object.values(userPermissionsByWorkspace).flat();
+        const hasAdminPermission = flatUserPermissions.includes('admin:user_management');
+        
+        if (!hasAdminPermission) {
+          throw new AuthorizationError(
+            'Cannot access other user profiles',
+            'INSUFFICIENT_PERMISSIONS',
+            'admin:user_management',
+            flatUserPermissions
+          );
+        }
       }
 
       const userProfileService = context.dataSources.userProfileService;
@@ -119,13 +126,20 @@ export const userProfileResolvers = {
       }
 
       // Users can only update their own profile unless they have admin permissions
-      if (context.user?.id !== userId && !context.permissions.includes('admin:user_management')) {
-        throw new AuthorizationError(
-          'Cannot update other user profiles',
-          'INSUFFICIENT_PERMISSIONS',
-          'admin:user_management',
-          context.permissions
-        );
+      if (context.user?.id !== userId) {
+        const workspaceAuthService = context.dataSources.workspaceAuthorizationService;
+        const userPermissionsByWorkspace = await workspaceAuthService.getUserPermissionsForContext(context.user!.id);
+        const flatUserPermissions = Object.values(userPermissionsByWorkspace).flat();
+        const hasAdminPermission = flatUserPermissions.includes('admin:user_management');
+        
+        if (!hasAdminPermission) {
+          throw new AuthorizationError(
+            'Cannot update other user profiles',
+            'INSUFFICIENT_PERMISSIONS',
+            'admin:user_management',
+            flatUserPermissions
+          );
+        }
       }
 
       const userProfileService = context.dataSources.userProfileService;
@@ -203,12 +217,17 @@ export const userProfileResolvers = {
         throw new AuthenticationError();
       }
 
-      if (!context.permissions.includes('admin:user_management')) {
+      const workspaceAuthService = context.dataSources.workspaceAuthorizationService;
+      const userPermissionsByWorkspace = await workspaceAuthService.getUserPermissionsForContext(context.user!.id);
+      const flatUserPermissions = Object.values(userPermissionsByWorkspace).flat();
+      const hasAdminPermission = flatUserPermissions.includes('admin:user_management');
+      
+      if (!hasAdminPermission) {
         throw new AuthorizationError(
           'Insufficient permissions to delete user profiles',
           'INSUFFICIENT_PERMISSIONS',
           'admin:user_management',
-          context.permissions
+          flatUserPermissions
         );
       }
 

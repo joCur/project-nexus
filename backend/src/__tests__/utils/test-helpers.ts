@@ -196,6 +196,10 @@ export function createMockGraphQLContext(overrides: any = {}) {
       auth0Service: null,
       userService: null,
       cacheService: null,
+      userProfileService: null,
+      onboardingService: null,
+      workspaceService: null,
+      workspaceAuthorizationService: null,
     },
     ...overrides,
   };
@@ -474,6 +478,25 @@ export function createMockCanvasService() {
 }
 
 /**
+ * Create mock workspace authorization service
+ */
+export function createMockWorkspaceAuthorizationService() {
+  return {
+    getUserPermissionsForContext: jest.fn(),
+    getUserPermissionsInWorkspace: jest.fn(),
+    hasPermissionInWorkspace: jest.fn(),
+    hasWorkspaceAccess: jest.fn(),
+    getWorkspaceMember: jest.fn(),
+    addWorkspaceMember: jest.fn(),
+    removeWorkspaceMember: jest.fn(),
+    updateWorkspaceMember: jest.fn(),
+    getWorkspaceMembers: jest.fn(),
+    getWorkspaceRole: jest.fn(),
+    checkPermission: jest.fn(),
+  } as any;
+}
+
+/**
  * Create mock Auth0 service
  */
 export function createMockAuth0Service() {
@@ -572,6 +595,7 @@ export async function createTestApp() {
     onboardingService: createMockOnboardingService(),
     userProfileService: createMockUserProfileService(),
     workspaceService: createMockWorkspaceService(),
+    workspaceAuthorizationService: createMockWorkspaceAuthorizationService(),
     auth0Service: createMockAuth0Service(),
     userService: createMockUserService(),
     cacheService: createMockCacheService(),
