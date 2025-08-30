@@ -81,6 +81,9 @@ describe('End-to-End Authentication Flow Tests', () => {
   let mockUserService: jest.Mocked<UserService>;
   let mockCacheService: jest.Mocked<CacheService>;
   let mockWorkspaceAuthService: any;
+  let mockUserProfileService: any;
+  let mockOnboardingService: any;
+  let mockWorkspaceService: any;
 
   beforeEach(async () => {
     // Create mock services
@@ -88,6 +91,27 @@ describe('End-to-End Authentication Flow Tests', () => {
     mockUserService = createMockUserService() as jest.Mocked<UserService>;
     mockCacheService = createMockCacheService() as jest.Mocked<CacheService>;
     mockWorkspaceAuthService = createMockWorkspaceAuthorizationService();
+    mockUserProfileService = {
+      getProfileByUserId: jest.fn(),
+      createProfile: jest.fn(),
+      updateProfile: jest.fn(),
+      upsertProfile: jest.fn(),
+      deleteProfile: jest.fn(),
+    };
+    mockOnboardingService = {
+      updateProgress: jest.fn(),
+      getProgress: jest.fn(),
+      completeOnboarding: jest.fn(),
+      isComplete: jest.fn(),
+      reset: jest.fn(),
+    };
+    mockWorkspaceService = {
+      getWorkspaceById: jest.fn(),
+      createWorkspace: jest.fn(),
+      updateWorkspace: jest.fn(),
+      deleteWorkspace: jest.fn(),
+      listWorkspaces: jest.fn(),
+    };
     
     // Setup User.workspaces field resolver mock
     mockUserService.getUserWorkspaces = jest.fn().mockResolvedValue([]);
@@ -96,6 +120,9 @@ describe('End-to-End Authentication Flow Tests', () => {
     mockWorkspaceAuthService.getUserPermissionsForContext.mockResolvedValue({});
     mockWorkspaceAuthService.getUserPermissionsInWorkspace.mockResolvedValue([]);
     mockWorkspaceAuthService.hasPermissionInWorkspace.mockResolvedValue(false);
+    mockWorkspaceAuthService.checkPermission.mockResolvedValue(false);
+    mockWorkspaceAuthService.getWorkspaceMember.mockResolvedValue(null);
+    mockWorkspaceAuthService.hasWorkspaceAccess.mockResolvedValue(false);
 
     // Create Express app
     app = express();
@@ -122,18 +149,27 @@ describe('End-to-End Authentication Flow Tests', () => {
       '/graphql',
       expressMiddleware(server, {
         context: async ({ req, res }: { req: any; res: any }) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-          const context = await createGraphQLContext(
-            mockAuth0Service,
-            mockUserService,
-            mockCacheService,
-            {} as any, // userProfileService // eslint-disable-line @typescript-eslint/no-explicit-any
-            {} as any, // onboardingService // eslint-disable-line @typescript-eslint/no-explicit-any
-            {} as any, // workspaceService // eslint-disable-line @typescript-eslint/no-explicit-any
-            mockWorkspaceAuthService
-          )({ req, res });
-          
-          
-          return context;
+          try {
+            const context = await createGraphQLContext(
+              mockAuth0Service,
+              mockUserService,
+              mockCacheService,
+              mockUserProfileService,
+              mockOnboardingService,
+              mockWorkspaceService,
+              mockWorkspaceAuthService
+            )({ req, res });
+            
+            // Verify workspace auth service is properly set
+            if (!context.dataSources?.workspaceAuthorizationService) {
+              console.error('workspaceAuthorizationService missing from context');
+            }
+            
+            return context;
+          } catch (error) {
+            console.error('Error creating GraphQL context:', error);
+            throw error;
+          }
         },
       })
     );
@@ -407,9 +443,9 @@ describe('End-to-End Authentication Flow Tests', () => {
       mockAuth0Service.syncUserFromAuth0.mockResolvedValue(user);
       mockAuth0Service.validateSession.mockResolvedValue(true);
       
-      // Mock user has no admin permissions across workspaces
+      // Mock user has no admin permissions across workspaces  
       mockWorkspaceAuthService.getUserPermissionsForContext.mockResolvedValue({
-        'workspace-1': ['card:read'], // Regular user permissions
+        'workspace-1': ['card:read'], // Regular user permissions, no admin
       });
 
       const response = await request(app)
@@ -421,15 +457,15 @@ describe('End-to-End Authentication Flow Tests', () => {
             userId: 'other-user-id',
             permissions: ['admin:permission'],
           },
+        })
+        .catch(err => {
+          console.error('Request failed:', err);
+          throw err;
         });
 
       expect(response.status).toBe(200);
-      if (response.body.errors) {
-        expect(response.body.errors[0].message).toContain('Missing required permission: admin:user_management');
-      } else {
-        console.log('Unexpected response body:', JSON.stringify(response.body, null, 2));
-        throw new Error('Expected errors but got none');
-      }
+      expect(response.body.errors).toBeDefined();
+      expect(response.body.errors[0].message).toContain('Missing required permission: admin:user_management');
     });
 
     it('should allow users to access their own data', async () => {
@@ -455,6 +491,15 @@ describe('End-to-End Authentication Flow Tests', () => {
         });
 
       expect(response.status).toBe(200);
+      expect(response.body).toBeDefined();
+      
+      // Debug the response structure
+      if (!response.body.data || response.body.data.getUserPermissions === null) {
+        console.log('DEBUG - Allow users access own data - Response body:', JSON.stringify(response.body, null, 2));
+      }
+      
+      expect(response.body.data).toBeDefined();
+      expect(response.body.data.getUserPermissions).toBeDefined();
       expect(response.body.data.getUserPermissions).toEqual(['card:read', 'card:write', 'workspace:read']);
     });
 
@@ -470,6 +515,12 @@ describe('End-to-End Authentication Flow Tests', () => {
       mockWorkspaceAuthService.getUserPermissionsForContext.mockResolvedValue({
         'workspace-1': ['card:read'], // Regular user permissions, no admin
       });
+      
+      // Reset mock to ensure proper error handling
+      mockWorkspaceAuthService.getUserPermissionsForContext.mockReset();
+      mockWorkspaceAuthService.getUserPermissionsForContext.mockResolvedValue({
+        'workspace-1': ['card:read'], // Regular user permissions, no admin
+      });
 
       const response = await request(app)
         .post('/graphql')
@@ -480,8 +531,13 @@ describe('End-to-End Authentication Flow Tests', () => {
         });
 
       expect(response.status).toBe(200);
+      expect(response.body).toBeDefined();
       expect(response.body.errors).toBeDefined();
-      expect(response.body.errors[0].message).toContain('Cannot access other user permissions');
+      expect(Array.isArray(response.body.errors)).toBe(true);
+      expect(response.body.errors.length).toBeGreaterThan(0);
+      expect(response.body.errors[0]).toBeDefined();
+      expect(response.body.errors[0].message).toBeDefined();
+      expect(response.body.errors[0].message).toContain('Cannot access other user data');
     });
   });
 

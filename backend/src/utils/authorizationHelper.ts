@@ -170,13 +170,15 @@ export class AuthorizationHelper {
       }
 
       if (typeof permissions !== 'object' || Array.isArray(permissions)) {
-        logger.error('Invalid permissions structure returned - expected object with workspace IDs as keys', {
-          userId: this.userId,
-          permissionsType: typeof permissions,
-          isArray: Array.isArray(permissions),
-          service: 'WorkspaceAuthorizationService',
-          method: 'getUserPermissionsForContext'
-        });
+        if (logger && logger.error) {
+          logger.error('Invalid permissions structure returned - expected object with workspace IDs as keys', {
+            userId: this.userId,
+            permissionsType: typeof permissions,
+            isArray: Array.isArray(permissions),
+            service: 'WorkspaceAuthorizationService',
+            method: 'getUserPermissionsForContext'
+          });
+        }
         const emptyPermissions = {};
         requestPermissionCache.set(cacheKey, emptyPermissions);
         return emptyPermissions;
@@ -230,13 +232,15 @@ export class AuthorizationHelper {
       requestPermissionCache.set(cacheKey, validatedPermissions);
       return validatedPermissions;
     } catch (error) {
-      logger.error('Failed to get user permissions', {
-        userId: this.userId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        errorStack: error instanceof Error ? error.stack : undefined,
-        service: 'WorkspaceAuthorizationService',
-        method: 'getUserPermissionsForContext'
-      });
+      if (logger && logger.error) {
+        logger.error('Failed to get user permissions', {
+          userId: this.userId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          errorStack: error instanceof Error ? error.stack : undefined,
+          service: 'WorkspaceAuthorizationService',
+          method: 'getUserPermissionsForContext'
+        });
+      }
       const emptyPermissions = {};
       requestPermissionCache.set(cacheKey, emptyPermissions);
       return emptyPermissions;
@@ -354,15 +358,17 @@ export class AuthorizationHelper {
       requestPermissionCache.set(cacheKey, booleanResult);
       return booleanResult;
     } catch (error) {
-      logger.error('Failed to check workspace permission', {
-        userId: this.userId,
-        workspaceId,
-        permission,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        errorStack: error instanceof Error ? error.stack : undefined,
-        service: 'WorkspaceAuthorizationService',
-        method: 'hasPermissionInWorkspace'
-      });
+      if (logger && logger.error) {
+        logger.error('Failed to check workspace permission', {
+          userId: this.userId,
+          workspaceId,
+          permission,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          errorStack: error instanceof Error ? error.stack : undefined,
+          service: 'WorkspaceAuthorizationService',
+          method: 'hasPermissionInWorkspace'
+        });
+      }
       // Cache false result to prevent repeated failed calls
       requestPermissionCache.set(cacheKey, false);
       return false;
@@ -407,7 +413,7 @@ export class AuthorizationHelper {
         userPermissions: flatPermissions,
         errorMessage: fullErrorMessage,
         authorizationContext: 'global_permission',
-        workspaceCount: (await this.getUserPermissionsWithCache()).length || 0
+        workspaceCount: Object.keys(await this.getUserPermissionsWithCache()).length || 0
       });
 
       throw new AuthorizationError(
@@ -640,13 +646,15 @@ export class AuthorizationHelper {
       }
 
       if (!Array.isArray(permissions)) {
-        logger.error('Invalid permissions format - expected array', {
-          userId: this.userId,
-          workspaceId,
-          permissionsType: typeof permissions,
-          service: 'WorkspaceAuthorizationService',
-          method: 'getUserPermissionsInWorkspace'
-        });
+        if (logger && logger.error) {
+          logger.error('Invalid permissions format - expected array', {
+            userId: this.userId,
+            workspaceId,
+            permissionsType: typeof permissions,
+            service: 'WorkspaceAuthorizationService',
+            method: 'getUserPermissionsInWorkspace'
+          });
+        }
         const emptyPermissions: string[] = [];
         requestPermissionCache.set(cacheKey, emptyPermissions);
         return emptyPermissions;
@@ -678,14 +686,16 @@ export class AuthorizationHelper {
       requestPermissionCache.set(cacheKey, validPermissions);
       return validPermissions;
     } catch (error) {
-      logger.error('Failed to get workspace permissions', {
-        userId: this.userId,
-        workspaceId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        errorStack: error instanceof Error ? error.stack : undefined,
-        service: 'WorkspaceAuthorizationService',
-        method: 'getUserPermissionsInWorkspace'
-      });
+      if (logger && logger.error) {
+        logger.error('Failed to get workspace permissions', {
+          userId: this.userId,
+          workspaceId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          errorStack: error instanceof Error ? error.stack : undefined,
+          service: 'WorkspaceAuthorizationService',
+          method: 'getUserPermissionsInWorkspace'
+        });
+      }
       const emptyPermissions: string[] = [];
       requestPermissionCache.set(cacheKey, emptyPermissions);
       return emptyPermissions;

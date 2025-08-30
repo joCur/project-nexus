@@ -28,24 +28,49 @@ describe('OnboardingService - Race Condition Prevention (NEX-178)', () => {
 
   // Helper to create a proper transaction mock
   const createMockTransaction = (): any => {
-    const mockTrx = {
-      where: jest.fn().mockReturnThis(),
-      first: jest.fn().mockReturnThis(),
-      forUpdate: jest.fn().mockReturnThis(),
-      update: jest.fn().mockReturnThis(),
-      returning: jest.fn().mockReturnThis(),
-      insert: jest.fn().mockReturnThis(),
-      // Add essential transaction properties
-      isCompleted: false,
-      query: jest.fn(),
-      raw: jest.fn(),
-      select: jest.fn().mockReturnThis(),
-      from: jest.fn().mockReturnThis(),
-      commit: jest.fn(),
-      rollback: jest.fn(),
-      savepoint: jest.fn(),
-      executionPromise: Promise.resolve([]),
+    const createChainableMock = () => {
+      const chainable: any = {
+        where: jest.fn(() => chainable),
+        first: jest.fn(() => {
+          // Return a promise that also has forUpdate method
+          const promise = Promise.resolve();
+          (promise as any).forUpdate = jest.fn(() => promise);
+          return promise;
+        }),
+        forUpdate: jest.fn(() => chainable),
+        update: jest.fn(() => ({
+          returning: jest.fn(() => Promise.resolve([]))
+        })),
+        returning: jest.fn(() => Promise.resolve([])),
+        insert: jest.fn(() => ({
+          returning: jest.fn(() => Promise.resolve([]))
+        })),
+        select: jest.fn(() => chainable),
+        from: jest.fn(() => chainable),
+        query: jest.fn(() => Promise.resolve([])),
+        raw: jest.fn(() => chainable),
+        then: jest.fn(),
+        catch: jest.fn(),
+        finally: jest.fn(),
+      };
+      return chainable;
     };
+    
+    const mockTrx = jest.fn(() => createChainableMock());
+    
+    // Add transaction-specific properties
+    Object.assign(mockTrx, {
+      commit: jest.fn(() => Promise.resolve()),
+      rollback: jest.fn(() => Promise.resolve()),
+      savepoint: jest.fn(() => Promise.resolve()),
+      isCompleted: false,
+      isTransaction: true,
+      client: {},
+      userParams: {},
+      // Also add the chainable methods directly to the transaction object
+      ...createChainableMock()
+    });
+    
     return mockTrx;
   };
 
@@ -86,18 +111,34 @@ describe('OnboardingService - Race Condition Prevention (NEX-178)', () => {
 
   describe('Transaction-Based Race Condition Prevention', () => {
     it('should use transactions with row locking for updateProgress', async () => {
-      const mockTrx = createMockTransaction();
+      let capturedMockTrx: any;
 
       // Mock transaction callback
       mockDatabase.transaction.mockImplementation(async (callback) => {
-        // Mock that record exists
-        mockTrx.first.mockResolvedValue(mockDbOnboarding);
-        mockTrx.update.mockReturnThis();
-        mockTrx.returning.mockResolvedValue([{ ...mockDbOnboarding, current_step: 2 }]);
+        const mockQueryBuilder = {
+          where: jest.fn().mockReturnThis(),
+          first: jest.fn().mockReturnThis(),
+          forUpdate: jest.fn().mockResolvedValue(mockDbOnboarding),
+          update: jest.fn().mockReturnThis(),
+          returning: jest.fn().mockResolvedValue([{ ...mockDbOnboarding, current_step: 2 }]),
+          insert: jest.fn().mockReturnThis()
+        };
         
-        require('@/database/connection').knex.mockReturnValue(mockTrx);
+        // Make where() and update() return the same builder for chaining
+        mockQueryBuilder.where.mockReturnValue(mockQueryBuilder);
+        mockQueryBuilder.update.mockReturnValue(mockQueryBuilder);
+        mockQueryBuilder.insert.mockReturnValue(mockQueryBuilder);
         
-        return await callback(mockTrx);
+        // The transaction function should return the query builder when called with table name
+        const mockTrx: any = jest.fn(() => mockQueryBuilder);
+        Object.assign(mockTrx, mockQueryBuilder); // Also make methods available directly on trx
+        capturedMockTrx = mockTrx; // Capture for assertions
+        
+        // Mock the knex table selector to return our mock transaction
+        const mockKnex = jest.fn(() => mockTrx);
+        require('@/database/connection').knex = mockKnex;
+        
+        return await callback(mockTrx as any);
       });
 
       const input = {
@@ -109,7 +150,7 @@ describe('OnboardingService - Race Condition Prevention (NEX-178)', () => {
       const result = await onboardingService.updateProgress(input);
 
       expect(mockDatabase.transaction).toHaveBeenCalled();
-      expect(mockTrx.forUpdate).toHaveBeenCalled(); // Row locking
+      expect(capturedMockTrx.forUpdate).toHaveBeenCalled(); // Row locking
       expect(result.currentStep).toBe(2);
     });
 
@@ -119,10 +160,12 @@ describe('OnboardingService - Race Condition Prevention (NEX-178)', () => {
       mockDatabase.transaction.mockImplementation(async (callback) => {
         // Mock that no record exists
         mockTrx.first.mockResolvedValue(null);
-        mockTrx.insert.mockReturnThis();
+        mockTrx.insert.mockReturnValue(mockTrx);
         mockTrx.returning.mockResolvedValue([{ ...mockDbOnboarding, current_step: 1 }]);
         
-        require('@/database/connection').knex.mockReturnValue(mockTrx);
+        // Mock the knex table selector to return our mock transaction
+        const mockKnex = jest.fn(() => mockTrx);
+        require('@/database/connection').knex = mockKnex;
         
         return await callback(mockTrx);
       });
@@ -151,10 +194,12 @@ describe('OnboardingService - Race Condition Prevention (NEX-178)', () => {
       mockDatabase.transaction.mockImplementation(async (callback) => {
         // Mock incomplete record exists
         mockTrx.first.mockResolvedValue(mockDbOnboarding);
-        mockTrx.update.mockReturnThis();
+        mockTrx.update.mockReturnValue(mockTrx);
         mockTrx.returning.mockResolvedValue([completedDbOnboarding]);
         
-        require('@/database/connection').knex.mockReturnValue(mockTrx);
+        // Mock the knex table selector to return our mock transaction
+        const mockKnex = jest.fn(() => mockTrx);
+        require('@/database/connection').knex = mockKnex;
         
         return await callback(mockTrx);
       });
@@ -183,7 +228,9 @@ describe('OnboardingService - Race Condition Prevention (NEX-178)', () => {
         // Mock already completed record
         mockTrx.first.mockResolvedValue(completedDbOnboarding);
         
-        require('@/database/connection').knex.mockReturnValue(mockTrx);
+        // Mock the knex table selector to return our mock transaction
+        const mockKnex = jest.fn(() => mockTrx);
+        require('@/database/connection').knex = mockKnex;
         
         return await callback(mockTrx);
       });
@@ -209,7 +256,9 @@ describe('OnboardingService - Race Condition Prevention (NEX-178)', () => {
 
         // Simulate transaction failure
         mockTrx.first!.mockRejectedValue(transactionError);
-        require('@/database/connection').knex.mockReturnValue(mockTrx);
+        // Mock the knex table selector to return our mock transaction
+        const mockKnex = jest.fn(() => mockTrx);
+        require('@/database/connection').knex = mockKnex;
         
         return await callback(mockTrx);
       });
@@ -238,13 +287,15 @@ describe('OnboardingService - Race Condition Prevention (NEX-178)', () => {
           ...mockDbOnboarding,
           current_step: currentStep,
         });
-        mockTrx.update.mockReturnThis();
+        mockTrx.update.mockReturnValue(mockTrx);
         mockTrx.returning.mockResolvedValue([{
           ...mockDbOnboarding,
           current_step: currentStep + 1,
         }]);
         
-        require('@/database/connection').knex.mockReturnValue(mockTrx);
+        // Mock the knex table selector to return our mock transaction
+        const mockKnex = jest.fn(() => mockTrx);
+        require('@/database/connection').knex = mockKnex;
         
         return await callback(mockTrx);
       });
@@ -283,14 +334,16 @@ describe('OnboardingService - Race Condition Prevention (NEX-178)', () => {
         if (completionCount === 1) {
           // First completion - record is not yet completed
           mockTrx.first.mockResolvedValue(mockDbOnboarding);
-          mockTrx.update.mockReturnThis();
+          mockTrx.update.mockReturnValue(mockTrx);
           mockTrx.returning.mockResolvedValue([completedDbOnboarding]);
         } else {
           // Second completion - record is already completed
           mockTrx.first.mockResolvedValue(completedDbOnboarding);
         }
         
-        require('@/database/connection').knex.mockReturnValue(mockTrx);
+        // Mock the knex table selector to return our mock transaction
+        const mockKnex = jest.fn(() => mockTrx);
+        require('@/database/connection').knex = mockKnex;
         
         return await callback(mockTrx);
       });
@@ -323,16 +376,18 @@ describe('OnboardingService - Race Condition Prevention (NEX-178)', () => {
         if (operationCount === 1) {
           // Update operation - record at step 2
           mockTrx.first.mockResolvedValue({ ...mockDbOnboarding, current_step: 2 });
-          mockTrx.update.mockReturnThis();
+          mockTrx.update.mockReturnValue(mockTrx);
           mockTrx.returning.mockResolvedValue([{ ...mockDbOnboarding, current_step: 3 }]);
         } else {
           // Complete operation - record is at step 3, ready to complete
           mockTrx.first.mockResolvedValue({ ...mockDbOnboarding, current_step: 3 });
-          mockTrx.update.mockReturnThis();
+          mockTrx.update.mockReturnValue(mockTrx);
           mockTrx.returning.mockResolvedValue([completedDbOnboarding]);
         }
         
-        require('@/database/connection').knex.mockReturnValue(mockTrx);
+        // Mock the knex table selector to return our mock transaction
+        const mockKnex = jest.fn(() => mockTrx);
+        require('@/database/connection').knex = mockKnex;
         
         return await callback(mockTrx);
       });
@@ -366,10 +421,12 @@ describe('OnboardingService - Race Condition Prevention (NEX-178)', () => {
 
       mockDatabase.transaction.mockImplementation(async (callback) => {
         mockTrx.first.mockResolvedValue(mockDbOnboarding);
-        mockTrx.update.mockReturnThis();
+        mockTrx.update.mockReturnValue(mockTrx);
         mockTrx.returning.mockResolvedValue([{ ...mockDbOnboarding, current_step: 2 }]);
         
-        require('@/database/connection').knex.mockReturnValue(mockTrx);
+        // Mock the knex table selector to return our mock transaction
+        const mockKnex = jest.fn(() => mockTrx);
+        require('@/database/connection').knex = mockKnex;
         
         return await callback(mockTrx);
       });
@@ -434,10 +491,12 @@ describe('OnboardingService - Race Condition Prevention (NEX-178)', () => {
 
       mockDatabase.transaction.mockImplementation(async (callback) => {
         mockTrx.first.mockResolvedValue(mockDbOnboarding);
-        mockTrx.update.mockReturnThis();
+        mockTrx.update.mockReturnValue(mockTrx);
         mockTrx.returning.mockResolvedValue([completedDbOnboarding]);
         
-        require('@/database/connection').knex.mockReturnValue(mockTrx);
+        // Mock the knex table selector to return our mock transaction
+        const mockKnex = jest.fn(() => mockTrx);
+        require('@/database/connection').knex = mockKnex;
         
         return await callback(mockTrx);
       });
@@ -514,7 +573,7 @@ describe('OnboardingService - Race Condition Prevention (NEX-178)', () => {
           ...mockDbOnboarding,
           current_step: currentStep - 1 || 1,
         });
-        mockTrx.update.mockReturnThis();
+        mockTrx.update.mockReturnValue(mockTrx);
         mockTrx.returning.mockResolvedValue([{
           ...mockDbOnboarding,
           current_step: currentStep,
@@ -522,7 +581,9 @@ describe('OnboardingService - Race Condition Prevention (NEX-178)', () => {
           completed_at: currentStep === 3 ? new Date() : null,
         }]);
         
-        require('@/database/connection').knex.mockReturnValue(mockTrx);
+        // Mock the knex table selector to return our mock transaction
+        const mockKnex = jest.fn(() => mockTrx);
+        require('@/database/connection').knex = mockKnex;
         
         return await callback(mockTrx);
       });
@@ -555,7 +616,9 @@ describe('OnboardingService - Race Condition Prevention (NEX-178)', () => {
       const mockTrx = createMockTransaction();
 
       mockDatabase.transaction.mockImplementation(async (callback) => {
-        require('@/database/connection').knex.mockReturnValue(mockTrx);
+        // Mock the knex table selector to return our mock transaction
+        const mockKnex = jest.fn(() => mockTrx);
+        require('@/database/connection').knex = mockKnex;
         
         // Track operations per user
         const userId = (mockTrx.where as jest.Mock).mock.calls[0]?.[1] || testUserId;
@@ -566,7 +629,7 @@ describe('OnboardingService - Race Condition Prevention (NEX-178)', () => {
           user_id: userId,
           current_step: userOperations[userId],
         });
-        mockTrx.update.mockReturnThis();
+        mockTrx.update.mockReturnValue(mockTrx);
         mockTrx.returning.mockResolvedValue([{
           ...mockDbOnboarding,
           user_id: userId,
@@ -606,14 +669,16 @@ describe('OnboardingService - Race Condition Prevention (NEX-178)', () => {
         if (completionAttempts === 1) {
           // First completion succeeds
           mockTrx.first.mockResolvedValue({ ...mockDbOnboarding, current_step: 3 });
-          mockTrx.update.mockReturnThis();
+          mockTrx.update.mockReturnValue(mockTrx);
           mockTrx.returning.mockResolvedValue([completedDbOnboarding]);
         } else {
           // Subsequent attempts see already completed state
           mockTrx.first.mockResolvedValue(completedDbOnboarding);
         }
         
-        require('@/database/connection').knex.mockReturnValue(mockTrx);
+        // Mock the knex table selector to return our mock transaction
+        const mockKnex = jest.fn(() => mockTrx);
+        require('@/database/connection').knex = mockKnex;
         
         return await callback(mockTrx);
       });

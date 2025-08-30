@@ -42,6 +42,9 @@ describe('GraphQL Authentication Integration Tests', () => {
     mockWorkspaceAuthService.getUserPermissionsForContext.mockImplementation(() => Promise.resolve({}));
     mockWorkspaceAuthService.getUserPermissionsInWorkspace.mockImplementation(() => Promise.resolve([]));
     mockWorkspaceAuthService.hasPermissionInWorkspace.mockImplementation(() => Promise.resolve(false));
+    mockWorkspaceAuthService.checkPermission.mockImplementation(() => Promise.resolve(false));
+    mockWorkspaceAuthService.getWorkspaceMember.mockImplementation(() => Promise.resolve(null));
+    mockWorkspaceAuthService.hasWorkspaceAccess.mockImplementation(() => Promise.resolve(false));
   });
 
   afterEach(() => {
@@ -215,6 +218,14 @@ describe('GraphQL Authentication Integration Tests', () => {
         isAuthenticated: true,
         user: USER_FIXTURES.STANDARD_USER,
         permissions: ['card:read'], // No admin permissions
+        dataSources: {
+          workspaceAuthorizationService: mockWorkspaceAuthService
+        },
+      });
+
+      // Mock user has no admin permissions
+      mockWorkspaceAuthService.getUserPermissionsForContext.mockResolvedValue({
+        'workspace-1': ['card:read'], // No admin permissions
       });
 
       // Act & Assert
