@@ -86,12 +86,10 @@ void main() {
           throw Exception('Critical phase failure');
         });
 
-        try {
-          await testManager.initializePhase(InitializationPhase.critical);
-          fail('Expected TaskExecutionError to be thrown');
-        } catch (e) {
-          expect(e, isA<TaskExecutionError>());
-        }
+        await expectLater(
+          () => testManager.initializePhase(InitializationPhase.critical),
+          throwsA(isA<TaskExecutionError>()),
+        );
       });
 
       test('should handle task failures in essential phase', () async {
@@ -103,12 +101,10 @@ void main() {
           throw Exception('Essential phase failure');
         });
 
-        try {
-          await testManager.initializePhase(InitializationPhase.essential);
-          fail('Expected TaskExecutionError to be thrown');
-        } catch (e) {
-          expect(e, isA<TaskExecutionError>());
-        }
+        await expectLater(
+          () => testManager.initializePhase(InitializationPhase.essential),
+          throwsA(isA<TaskExecutionError>()),
+        );
       });
 
       test('should handle background phase failures gracefully in initializeAll', () async {
@@ -150,12 +146,10 @@ void main() {
           throw Exception('Second task failure');
         });
 
-        try {
-          await testManager.initializePhase(InitializationPhase.critical);
-          fail('Expected TaskExecutionError to be thrown');
-        } catch (e) {
-          expect(e, isA<TaskExecutionError>());
-        }
+        await expectLater(
+          () => testManager.initializePhase(InitializationPhase.critical),
+          throwsA(isA<TaskExecutionError>()),
+        );
       });
 
       test('should complete completer even when error occurs', () async {
@@ -168,20 +162,16 @@ void main() {
         });
 
         // Start the phase initialization that will fail
-        try {
-          await testManager.initializePhase(InitializationPhase.essential);
-          fail('Expected TaskExecutionError to be thrown');
-        } catch (e) {
-          expect(e, isA<TaskExecutionError>());
-        }
+        await expectLater(
+          () => testManager.initializePhase(InitializationPhase.essential),
+          throwsA(isA<TaskExecutionError>()),
+        );
         
         // The completer should now be completed with error
-        try {
-          await testManager.waitForPhase(InitializationPhase.essential);
-          fail('Expected TaskExecutionError to be thrown');
-        } catch (e) {
-          expect(e, isA<TaskExecutionError>());
-        }
+        await expectLater(
+          () => testManager.waitForPhase(InitializationPhase.essential),
+          throwsA(isA<TaskExecutionError>()),
+        );
       });
     });
 
