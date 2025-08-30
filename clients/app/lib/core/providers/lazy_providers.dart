@@ -142,6 +142,7 @@ class InitializationManager {
               name: 'Initialization');
       // Essential phase errors should still be propagated
       // but we log them for better debugging
+      throw error;
     }));
     
     // Only wait for essential phase, background continues async with error recovery
