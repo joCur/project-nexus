@@ -513,6 +513,15 @@ describe('GraphQL Authentication Integration Tests', () => {
         isAuthenticated: true,
         user: USER_FIXTURES.STANDARD_USER,
         permissions: ['card:read'], // No admin permissions
+        dataSources: {
+          auth0Service: mockAuth0Service,
+          userService: mockUserService,
+          cacheService: mockCacheService,
+          workspaceAuthorizationService: mockWorkspaceAuthService,
+          userProfileService: null,
+          onboardingService: null,
+          workspaceService: null,
+        },
       });
 
       // Act & Assert

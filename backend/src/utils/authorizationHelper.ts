@@ -94,11 +94,11 @@ export const extendedSecurityLogger = {
     if (logLevel === 'debug') {
       safeLog('debug', 'Authorization successful', logData);
     } else {
-      logger.info('Authorization successful', logData);
+      safeLog('info', 'Authorization successful', logData);
     }
   },
   authorizationCacheHit: (userId: string, cacheType: string, metadata?: Record<string, unknown>) => {
-    logger.debug('Authorization cache hit', {
+    safeLog('debug', 'Authorization cache hit', {
       event: 'authorization_cache_hit',
       userId,
       cacheType,
@@ -107,7 +107,7 @@ export const extendedSecurityLogger = {
     });
   },
   authorizationCacheMiss: (userId: string, cacheType: string, metadata?: Record<string, unknown>) => {
-    logger.debug('Authorization cache miss', {
+    safeLog('debug', 'Authorization cache miss', {
       event: 'authorization_cache_miss',
       userId,
       cacheType,
@@ -153,7 +153,7 @@ export class AuthorizationHelper {
     
     if (requestPermissionCache.has(cacheKey)) {
       const cached = requestPermissionCache.get(cacheKey);
-      logger.debug('Permission cache hit', {
+      safeLog('debug', 'Permission cache hit', {
         userId: this.userId,
         cacheKey,
         workspaceCount: Object.keys(cached || {}).length
@@ -166,7 +166,7 @@ export class AuthorizationHelper {
       
       // Enhanced null safety checks
       if (!permissions) {
-        logger.warn('No permissions returned from workspace authorization service', {
+        safeLog('warn', 'No permissions returned from workspace authorization service', {
           userId: this.userId,
           service: 'WorkspaceAuthorizationService',
           method: 'getUserPermissionsForContext'
@@ -195,7 +195,7 @@ export class AuthorizationHelper {
       const validatedPermissions: Record<string, string[]> = {};
       for (const [workspaceId, workspacePermissions] of Object.entries(permissions)) {
         if (!workspaceId || typeof workspaceId !== 'string') {
-          logger.warn('Invalid workspace ID in permissions', {
+          safeLog('warn', 'Invalid workspace ID in permissions', {
             userId: this.userId,
             invalidWorkspaceId: workspaceId
           });
@@ -203,7 +203,7 @@ export class AuthorizationHelper {
         }
 
         if (!Array.isArray(workspacePermissions)) {
-          logger.warn('Invalid workspace permissions - expected array', {
+          safeLog('warn', 'Invalid workspace permissions - expected array', {
             userId: this.userId,
             workspaceId,
             permissionsType: typeof workspacePermissions
@@ -218,7 +218,7 @@ export class AuthorizationHelper {
         );
         
         if (validPermissions.length !== workspacePermissions.length) {
-          logger.warn('Filtered out invalid permissions in workspace', {
+          safeLog('warn', 'Filtered out invalid permissions in workspace', {
             userId: this.userId,
             workspaceId,
             originalCount: workspacePermissions.length,
@@ -229,7 +229,7 @@ export class AuthorizationHelper {
         validatedPermissions[workspaceId] = validPermissions;
       }
 
-      logger.debug('Permission cache miss - fetched from service', {
+      safeLog('debug', 'Permission cache miss - fetched from service', {
         userId: this.userId,
         cacheKey,
         workspaceCount: Object.keys(validatedPermissions).length,
@@ -262,7 +262,7 @@ export class AuthorizationHelper {
     
     // Additional safety check even though getUserPermissionsWithCache should handle this
     if (!permissionsByWorkspace || typeof permissionsByWorkspace !== 'object') {
-      logger.warn('Invalid permissions structure in getFlatPermissions', {
+      safeLog('warn', 'Invalid permissions structure in getFlatPermissions', {
         userId: this.userId,
         permissionsType: typeof permissionsByWorkspace
       });
@@ -286,7 +286,7 @@ export class AuthorizationHelper {
     // Remove duplicates while preserving order using Set
     const uniquePermissions = [...new Set(flatPermissions)];
     
-    logger.debug('Flattened permissions computed', {
+    safeLog('debug', 'Flattened permissions computed', {
       userId: this.userId,
       workspaceCount: Object.keys(permissionsByWorkspace).length,
       totalPermissions: flatPermissions.length,
@@ -311,7 +311,7 @@ export class AuthorizationHelper {
   async hasWorkspacePermission(workspaceId: string, permission: string): Promise<boolean> {
     // Input validation
     if (!workspaceId || typeof workspaceId !== 'string') {
-      logger.warn('Invalid workspaceId provided to hasWorkspacePermission', {
+      safeLog('warn', 'Invalid workspaceId provided to hasWorkspacePermission', {
         userId: this.userId,
         workspaceId,
         permission,
@@ -321,7 +321,7 @@ export class AuthorizationHelper {
     }
 
     if (!permission || typeof permission !== 'string') {
-      logger.warn('Invalid permission provided to hasWorkspacePermission', {
+      safeLog('warn', 'Invalid permission provided to hasWorkspacePermission', {
         userId: this.userId,
         workspaceId,
         permission,
@@ -334,7 +334,7 @@ export class AuthorizationHelper {
     
     if (requestPermissionCache.has(cacheKey)) {
       const cached = requestPermissionCache.get(cacheKey);
-      logger.debug('Workspace permission cache hit', {
+      safeLog('debug', 'Workspace permission cache hit', {
         userId: this.userId,
         workspaceId,
         permission,
@@ -353,7 +353,7 @@ export class AuthorizationHelper {
       // Ensure we get a boolean result
       const booleanResult = Boolean(hasPermission);
       
-      logger.debug('Workspace permission cache miss - fetched from service', {
+      safeLog('debug', 'Workspace permission cache miss - fetched from service', {
         userId: this.userId,
         workspaceId,
         permission,
@@ -495,7 +495,7 @@ export class AuthorizationHelper {
         const workspacePermissions = await this.getUserWorkspacePermissions(workspaceId);
         userPermissions = workspacePermissions || [];
       } catch (permError) {
-        logger.warn('Failed to get workspace permissions for error context', {
+        safeLog('warn', 'Failed to get workspace permissions for error context', {
           userId: this.userId,
           workspaceId,
           error: permError instanceof Error ? permError.message : 'Unknown error'
@@ -601,7 +601,7 @@ export class AuthorizationHelper {
       });
     } else {
       // Log self-access for audit purposes (at debug level)
-      logger.debug('User accessing own data', {
+      safeLog('debug', 'User accessing own data', {
         userId: this.userId,
         resource,
         action,
@@ -616,7 +616,7 @@ export class AuthorizationHelper {
   async getUserWorkspacePermissions(workspaceId: string): Promise<string[]> {
     // Input validation
     if (!workspaceId || typeof workspaceId !== 'string') {
-      logger.warn('Invalid workspaceId provided to getUserWorkspacePermissions', {
+      safeLog('warn', 'Invalid workspaceId provided to getUserWorkspacePermissions', {
         userId: this.userId,
         workspaceId,
         workspaceIdType: typeof workspaceId
@@ -628,7 +628,7 @@ export class AuthorizationHelper {
     
     if (requestPermissionCache.has(cacheKey)) {
       const cached = requestPermissionCache.get(cacheKey);
-      logger.debug('Workspace permissions cache hit', {
+      safeLog('debug', 'Workspace permissions cache hit', {
         userId: this.userId,
         workspaceId,
         permissionCount: cached?.length || 0
@@ -641,7 +641,7 @@ export class AuthorizationHelper {
       
       // Enhanced null safety and validation
       if (!permissions) {
-        logger.debug('No permissions returned for user in workspace', {
+        safeLog('debug', 'No permissions returned for user in workspace', {
           userId: this.userId,
           workspaceId,
           service: 'WorkspaceAuthorizationService',
@@ -673,7 +673,7 @@ export class AuthorizationHelper {
       );
 
       if (validPermissions.length !== permissions.length) {
-        logger.warn('Filtered out invalid permissions in workspace', {
+        safeLog('warn', 'Filtered out invalid permissions in workspace', {
           userId: this.userId,
           workspaceId,
           originalCount: permissions.length,
@@ -682,7 +682,7 @@ export class AuthorizationHelper {
         });
       }
 
-      logger.debug('Workspace permissions cache miss - fetched from service', {
+      safeLog('debug', 'Workspace permissions cache miss - fetched from service', {
         userId: this.userId,
         workspaceId,
         permissionCount: validPermissions.length,
