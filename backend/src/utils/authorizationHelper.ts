@@ -29,11 +29,30 @@ class RequestPermissionCache {
   private cacheStats = {
     hits: 0,
     misses: 0,
-    sets: 0
+    sets: 0,
+    evictions: 0
   };
+  
+  // Cache configuration
+  private static readonly MAX_CACHE_SIZE = 1000; // Prevent memory bloat
+  private static readonly CACHE_TTL_MS = 300000; // 5 minutes TTL
+  private accessTimes = new Map<string, number>(); // Track access for LRU
 
   get(key: string): any {
+    // Check TTL first
+    const now = Date.now();
     if (this.cache.has(key)) {
+      const accessTime = this.accessTimes.get(key);
+      if (accessTime && (now - accessTime) > RequestPermissionCache.CACHE_TTL_MS) {
+        // Entry expired
+        this.cache.delete(key);
+        this.accessTimes.delete(key);
+        this.cacheStats.misses++;
+        return undefined;
+      }
+      
+      // Update access time for LRU
+      this.accessTimes.set(key, now);
       this.cacheStats.hits++;
       return this.cache.get(key);
     }
@@ -42,8 +61,41 @@ class RequestPermissionCache {
   }
 
   set(key: string, value: any): void {
+    const now = Date.now();
+    
+    // Enforce cache size limit with LRU eviction
+    if (this.cache.size >= RequestPermissionCache.MAX_CACHE_SIZE) {
+      this.evictLRU();
+    }
+    
     this.cache.set(key, value);
+    this.accessTimes.set(key, now);
     this.cacheStats.sets++;
+  }
+
+  private evictLRU(): void {
+    let oldestKey: string | undefined;
+    let oldestTime = Date.now();
+    
+    // Find the least recently used entry
+    for (const [key, time] of this.accessTimes.entries()) {
+      if (time < oldestTime) {
+        oldestTime = time;
+        oldestKey = key;
+      }
+    }
+    
+    if (oldestKey) {
+      this.cache.delete(oldestKey);
+      this.accessTimes.delete(oldestKey);
+      this.cacheStats.evictions++;
+      
+      safeLog('debug', 'Cache LRU eviction performed', {
+        evictedKey: oldestKey.substring(0, 20) + '...', // Partial logging for security
+        cacheSize: this.cache.size,
+        evictionCount: this.cacheStats.evictions
+      });
+    }
   }
 
   has(key: string): boolean {
@@ -52,19 +104,123 @@ class RequestPermissionCache {
 
   clear(): void {
     this.cache.clear();
-    this.cacheStats = { hits: 0, misses: 0, sets: 0 };
+    this.accessTimes.clear();
+    this.cacheStats = { hits: 0, misses: 0, sets: 0, evictions: 0 };
   }
 
   getStats() {
-    return { ...this.cacheStats };
+    const hitRate = this.cacheStats.hits + this.cacheStats.misses > 0 
+      ? this.cacheStats.hits / (this.cacheStats.hits + this.cacheStats.misses) 
+      : 0;
+      
+    return { 
+      ...this.cacheStats,
+      size: this.cache.size,
+      hitRate: parseFloat((hitRate * 100).toFixed(2)),
+      maxSize: RequestPermissionCache.MAX_CACHE_SIZE,
+      ttlMs: RequestPermissionCache.CACHE_TTL_MS
+    };
   }
 
   size(): number {
     return this.cache.size;
   }
+
+  // Cleanup expired entries periodically
+  cleanupExpired(): number {
+    const now = Date.now();
+    let cleanedCount = 0;
+    
+    for (const [key, accessTime] of this.accessTimes.entries()) {
+      if ((now - accessTime) > RequestPermissionCache.CACHE_TTL_MS) {
+        this.cache.delete(key);
+        this.accessTimes.delete(key);
+        cleanedCount++;
+      }
+    }
+    
+    if (cleanedCount > 0) {
+      safeLog('debug', 'Cache cleanup completed', {
+        cleanedEntries: cleanedCount,
+        remainingSize: this.cache.size
+      });
+    }
+    
+    return cleanedCount;
+  }
 }
 
 const requestPermissionCache = new RequestPermissionCache();
+
+/**
+ * Performance monitoring for authorization checks
+ */
+class AuthorizationPerformanceMonitor {
+  private metrics = {
+    permissionChecks: 0,
+    totalLatencyMs: 0,
+    maxLatencyMs: 0,
+    minLatencyMs: Infinity,
+    cacheHits: 0,
+    cacheMisses: 0
+  };
+
+  startTimer(): { end: () => number } {
+    const startTime = Date.now();
+    return {
+      end: () => {
+        const latency = Date.now() - startTime;
+        this.recordLatency(latency);
+        return latency;
+      }
+    };
+  }
+
+  private recordLatency(latencyMs: number): void {
+    this.metrics.permissionChecks++;
+    this.metrics.totalLatencyMs += latencyMs;
+    this.metrics.maxLatencyMs = Math.max(this.metrics.maxLatencyMs, latencyMs);
+    this.metrics.minLatencyMs = Math.min(this.metrics.minLatencyMs, latencyMs);
+  }
+
+  recordCacheHit(): void {
+    this.metrics.cacheHits++;
+  }
+
+  recordCacheMiss(): void {
+    this.metrics.cacheMisses++;
+  }
+
+  getMetrics() {
+    const avgLatencyMs = this.metrics.permissionChecks > 0 
+      ? this.metrics.totalLatencyMs / this.metrics.permissionChecks 
+      : 0;
+      
+    const cacheHitRate = this.metrics.cacheHits + this.metrics.cacheMisses > 0
+      ? this.metrics.cacheHits / (this.metrics.cacheHits + this.metrics.cacheMisses)
+      : 0;
+
+    return {
+      ...this.metrics,
+      avgLatencyMs: parseFloat(avgLatencyMs.toFixed(2)),
+      cacheHitRatePercent: parseFloat((cacheHitRate * 100).toFixed(2)),
+      minLatencyMs: this.metrics.minLatencyMs === Infinity ? 0 : this.metrics.minLatencyMs
+    };
+  }
+
+  reset(): void {
+    this.metrics = {
+      permissionChecks: 0,
+      totalLatencyMs: 0,
+      maxLatencyMs: 0,
+      minLatencyMs: Infinity,
+      cacheHits: 0,
+      cacheMisses: 0
+    };
+  }
+}
+
+const performanceMonitor = new AuthorizationPerformanceMonitor();
 
 /**
  * Clear the permission cache - MUST be called at the start of each request
@@ -335,51 +491,69 @@ export class AuthorizationHelper {
    * Check if user has a specific permission across any workspace
    */
   async hasGlobalPermission(permission: string): Promise<boolean> {
-    const flatPermissions = await this.getFlatPermissions();
-    return flatPermissions.includes(permission);
+    const timer = performanceMonitor.startTimer();
+    
+    try {
+      const flatPermissions = await this.getFlatPermissions();
+      const hasPermission = flatPermissions.includes(permission);
+      
+      // Record cache hit/miss for monitoring
+      if (requestPermissionCache.has(`${this.userId}:permissions`)) {
+        performanceMonitor.recordCacheHit();
+      } else {
+        performanceMonitor.recordCacheMiss();
+      }
+      
+      return hasPermission;
+    } finally {
+      timer.end();
+    }
   }
 
   /**
    * Check if user has permission in a specific workspace with caching
    */
   async hasWorkspacePermission(workspaceId: string, permission: string): Promise<boolean> {
-    // Enhanced input validation with security checks
-    if (!isValidWorkspaceId(workspaceId)) {
-      safeLog('warn', 'Invalid workspaceId provided to hasWorkspacePermission', {
-        userId: this.userId,
-        // Don't log potentially malicious input
-        workspaceIdLength: (workspaceId as any)?.length || 'unknown',
-        workspaceIdType: typeof workspaceId,
-        timestamp: new Date().toISOString()
-      });
-      return false;
-    }
-
-    if (!isValidPermission(permission)) {
-      safeLog('warn', 'Invalid permission provided to hasWorkspacePermission', {
-        userId: this.userId,
-        workspaceId: workspaceId.substring(0, 8) + '...', // Partial logging
-        permissionLength: (permission as any)?.length || 'unknown',
-        permissionType: typeof permission,
-        timestamp: new Date().toISOString()
-      });
-      return false;
-    }
-
-    const cacheKey = `${this.userId}:${workspaceId}:permission:${permission}`;
+    const timer = performanceMonitor.startTimer();
     
-    if (requestPermissionCache.has(cacheKey)) {
-      const cached = requestPermissionCache.get(cacheKey);
-      safeLog('debug', 'Workspace permission cache hit', {
-        userId: this.userId,
-        workspaceId,
-        permission,
-        result: cached
-      });
-      return cached;
-    }
-
     try {
+      // Enhanced input validation with security checks
+      if (!isValidWorkspaceId(workspaceId)) {
+        safeLog('warn', 'Invalid workspaceId provided to hasWorkspacePermission', {
+          userId: this.userId,
+          // Don't log potentially malicious input
+          workspaceIdLength: (workspaceId as any)?.length || 'unknown',
+          workspaceIdType: typeof workspaceId,
+          timestamp: new Date().toISOString()
+        });
+        return false;
+      }
+
+      if (!isValidPermission(permission)) {
+        safeLog('warn', 'Invalid permission provided to hasWorkspacePermission', {
+          userId: this.userId,
+          workspaceId: workspaceId.substring(0, 8) + '...', // Partial logging
+          permissionLength: (permission as any)?.length || 'unknown',
+          permissionType: typeof permission,
+          timestamp: new Date().toISOString()
+        });
+        return false;
+      }
+
+      const cacheKey = `${this.userId}:${workspaceId}:permission:${permission}`;
+      
+      if (requestPermissionCache.has(cacheKey)) {
+        const cached = requestPermissionCache.get(cacheKey);
+        performanceMonitor.recordCacheHit();
+        safeLog('debug', 'Workspace permission cache hit', {
+          userId: this.userId,
+          workspaceId,
+          permission,
+          result: cached
+        });
+        return cached;
+      }
+
       const hasPermission = await this.workspaceAuthService.hasPermissionInWorkspace(
         this.userId,
         workspaceId,
@@ -399,6 +573,7 @@ export class AuthorizationHelper {
       });
       
       requestPermissionCache.set(cacheKey, booleanResult);
+      performanceMonitor.recordCacheMiss();
       return booleanResult;
     } catch (error) {
       if (logger && logger.error) {
@@ -413,8 +588,12 @@ export class AuthorizationHelper {
         });
       }
       // Cache false result to prevent repeated failed calls
-      requestPermissionCache.set(cacheKey, false);
+      const errorCacheKey = `${this.userId}:${workspaceId}:permission:${permission}`;
+      requestPermissionCache.set(errorCacheKey, false);
+      performanceMonitor.recordCacheMiss();
       return false;
+    } finally {
+      timer.end();
     }
   }
 
@@ -789,20 +968,30 @@ export const createAuthorizationHelper = (context: GraphQLContext): Authorizatio
 };
 
 /**
- * Get permission cache statistics for monitoring
+ * Get comprehensive permission and performance statistics for monitoring
  */
 export const getPermissionCacheStats = () => {
-  const stats = requestPermissionCache.getStats();
-  const size = requestPermissionCache.size();
-  const hitRate = stats.hits + stats.misses > 0 ? stats.hits / (stats.hits + stats.misses) : 0;
+  const cacheStats = requestPermissionCache.getStats();
+  const perfStats = performanceMonitor.getMetrics();
   
   return {
-    ...stats,
-    size,
-    hitRate: parseFloat((hitRate * 100).toFixed(2)), // Convert to percentage
-    efficiency: {
-      cacheUtilization: size > 0 ? 'active' : 'empty',
-      performance: hitRate > 0.7 ? 'excellent' : hitRate > 0.5 ? 'good' : hitRate > 0.3 ? 'fair' : 'poor'
+    cache: {
+      ...cacheStats,
+      efficiency: {
+        utilization: cacheStats.size > 0 ? 'active' : 'empty',
+        performance: cacheStats.hitRate > 70 ? 'excellent' : cacheStats.hitRate > 50 ? 'good' : cacheStats.hitRate > 30 ? 'fair' : 'poor'
+      }
+    },
+    performance: perfStats,
+    combined: {
+      totalOperations: perfStats.permissionChecks,
+      avgResponseTime: perfStats.avgLatencyMs,
+      cacheEffectiveness: cacheStats.hitRate,
+      memoryUsage: {
+        currentEntries: cacheStats.size,
+        maxEntries: cacheStats.maxSize,
+        utilizationPercent: parseFloat(((cacheStats.size / cacheStats.maxSize) * 100).toFixed(2))
+      }
     }
   };
 };
@@ -814,7 +1003,7 @@ export const logCachePerformance = (): void => {
   const stats = getPermissionCacheStats();
   
   // Only log if there's been activity
-  if (stats.hits + stats.misses > 0) {
+  if (stats.cache.hits + stats.cache.misses > 0) {
     safeLog('info', 'Permission cache performance metrics', {
       event: 'cache_performance',
       metrics: stats,
@@ -829,21 +1018,31 @@ export const logCachePerformance = (): void => {
  */
 const generateCacheRecommendations = (stats: any): string[] => {
   const recommendations: string[] = [];
+  const cacheStats = stats.cache;
+  const perfStats = stats.performance;
   
-  if (stats.hitRate < 30) {
+  if (cacheStats.hitRate < 30) {
     recommendations.push('Low cache hit rate - consider reviewing caching strategy');
   }
   
-  if (stats.size > 100) {
+  if (cacheStats.size > 100) {
     recommendations.push('Large cache size - monitor memory usage');
   }
   
-  if (stats.hits > 1000) {
+  if (cacheStats.hits > 1000) {
     recommendations.push('High cache usage - performing well');
   }
   
-  if (stats.efficiency.performance === 'poor') {
+  if (cacheStats.efficiency.performance === 'poor') {
     recommendations.push('Poor cache performance - investigate query patterns');
+  }
+  
+  if (perfStats.avgLatencyMs > 50) {
+    recommendations.push('High average latency - consider optimizing permission checks');
+  }
+  
+  if (stats.combined.memoryUsage.utilizationPercent > 80) {
+    recommendations.push('Cache utilization high - consider increasing cache size limit');
   }
   
   return recommendations;
@@ -916,4 +1115,28 @@ export const isValidWorkspaceId = (workspaceId: unknown): workspaceId is string 
   }
   
   return false;
+};
+
+/**
+ * Get comprehensive authorization performance metrics
+ * Includes both cache performance and latency metrics
+ */
+export const getAuthorizationPerformanceMetrics = () => {
+  return performanceMonitor.getMetrics();
+};
+
+/**
+ * Reset authorization performance metrics
+ * Useful for testing or periodic resets
+ */
+export const resetAuthorizationMetrics = (): void => {
+  performanceMonitor.reset();
+};
+
+/**
+ * Cleanup expired cache entries manually
+ * Returns the number of entries cleaned
+ */
+export const cleanupExpiredCacheEntries = (): number => {
+  return requestPermissionCache.cleanupExpired();
 };

@@ -523,10 +523,10 @@ describe('AuthorizationHelper', () => {
         clearPermissionCache();
         
         const stats = getPermissionCacheStats();
-        expect(stats.hits).toBe(0);
-        expect(stats.misses).toBe(0);
-        expect(stats.sets).toBe(0);
-        expect(stats.size).toBe(0);
+        expect(stats.cache.hits).toBe(0);
+        expect(stats.cache.misses).toBe(0);
+        expect(stats.cache.sets).toBe(0);
+        expect(stats.cache.size).toBe(0);
       });
     });
 
@@ -541,21 +541,21 @@ describe('AuthorizationHelper', () => {
 
       // Verify stats are initially zero
       let stats = getPermissionCacheStats();
-      expect(stats.hits).toBe(0);
-      expect(stats.misses).toBe(0);
-      expect(stats.sets).toBe(0);
+      expect(stats.cache.hits).toBe(0);
+      expect(stats.cache.misses).toBe(0);
+      expect(stats.cache.sets).toBe(0);
 
       // First call (cache miss + set)
       await authHelper.getFlatPermissions();
       
       stats = getPermissionCacheStats();
-      expect(stats.sets).toBeGreaterThan(0);
+      expect(stats.cache.sets).toBeGreaterThan(0);
       
       // Second call should result in cache hit
       await authHelper.getFlatPermissions();
       
       stats = getPermissionCacheStats();
-      expect(stats.hits).toBeGreaterThan(0);
+      expect(stats.cache.hits).toBeGreaterThan(0);
     });
   });
 
