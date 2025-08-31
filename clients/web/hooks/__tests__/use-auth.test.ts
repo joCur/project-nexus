@@ -46,7 +46,6 @@ describe('useAuth', () => {
     updated_at: '2023-01-01T00:00:00Z',
     org_id: undefined,
     roles: ['user', 'premium'],
-    permissions: ['read:cards', 'write:cards', 'read:workspaces'],
     internalUserId: 'internal-user-id-123',
   };
 
@@ -135,7 +134,6 @@ describe('useAuth', () => {
       expect(result.current.user).toEqual({
         ...userWithoutClaims,
         roles: [],
-        permissions: [],
         internalUserId: undefined,
       });
     });
@@ -250,13 +248,16 @@ describe('useAuth', () => {
   });
 
   describe('Permission Checking', () => {
-    it('should check permissions correctly', () => {
+    it('should return false for all permission checks (warnings suppressed in tests)', () => {
       const { result } = renderHook(() => useAuth());
 
-      expect(result.current.checkPermission('read:cards')).toBe(true);
-      expect(result.current.checkPermission('write:cards')).toBe(true);
+      expect(result.current.checkPermission('read:cards')).toBe(false);
+      expect(result.current.checkPermission('write:cards')).toBe(false);
       expect(result.current.checkPermission('delete:cards')).toBe(false);
       expect(result.current.checkPermission('admin:system')).toBe(false);
+      
+      // Note: Console warnings are suppressed in test environment for cleaner test output
+      // The warning functionality is tested separately in the permissions utility tests
     });
 
     it('should return false for permissions when user is not authenticated', () => {

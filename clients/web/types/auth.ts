@@ -8,6 +8,16 @@
 import { UserProfile } from '@auth0/nextjs-auth0/client';
 
 /**
+ * Auth0 custom claim URL constants
+ * Centralized constants for maintainability
+ */
+export const AUTH0_CLAIM_URLS = {
+  ROLES: 'https://api.nexus-app.de/roles',
+  PERMISSIONS: 'https://api.nexus-app.de/permissions', // Deprecated: permissions no longer used
+  USER_ID: 'https://api.nexus-app.de/user_id',
+} as const;
+
+/**
  * Auth0 JWT payload structure
  * Matches the backend Auth0JWTPayload interface
  */
@@ -25,9 +35,9 @@ export interface Auth0JWTPayload {
   scope: string; // OAuth scopes
 
   // Custom claims (set via Auth0 Rules/Actions)
-  'https://api.nexus-app.de/roles'?: string[];
-  'https://api.nexus-app.de/permissions'?: string[];
-  'https://api.nexus-app.de/user_id'?: string; // Internal user ID
+  [AUTH0_CLAIM_URLS.ROLES]?: string[];
+  [AUTH0_CLAIM_URLS.PERMISSIONS]?: string[]; // Deprecated: no longer extracted
+  [AUTH0_CLAIM_URLS.USER_ID]?: string; // Internal user ID
 }
 
 /**
@@ -400,28 +410,32 @@ export function isAuth0Error(error: any): error is Auth0Error {
 }
 
 export function hasPermission(user: ExtendedUserProfile | null, permission: Permission): boolean {
-  // Note: Permission checking now requires backend integration
-  // This function will be updated to work with backend permissions
-  console.warn('hasPermission: Permission checking now requires backend integration');
-  return false;
+  // Import the shared utility to avoid duplication
+  const { checkUserPermission } = require('@/lib/utils/permissions');
+  return checkUserPermission(user, permission);
 }
 
 export function hasRole(user: ExtendedUserProfile | null, role: Role): boolean {
-  return user?.roles?.includes(role) ?? false;
+  const { checkUserRole } = require('@/lib/utils/permissions');
+  return checkUserRole(user, role);
 }
 
 export function hasAnyPermission(user: ExtendedUserProfile | null, permissions: Permission[]): boolean {
-  return permissions.some(permission => hasPermission(user, permission));
+  const { checkAnyUserPermission } = require('@/lib/utils/permissions');
+  return checkAnyUserPermission(user, permissions);
 }
 
 export function hasAllPermissions(user: ExtendedUserProfile | null, permissions: Permission[]): boolean {
-  return permissions.every(permission => hasPermission(user, permission));
+  const { checkAllUserPermissions } = require('@/lib/utils/permissions');
+  return checkAllUserPermissions(user, permissions);
 }
 
 export function hasAnyRole(user: ExtendedUserProfile | null, roles: Role[]): boolean {
-  return roles.some(role => hasRole(user, role));
+  const { checkAnyUserRole } = require('@/lib/utils/permissions');
+  return checkAnyUserRole(user, roles);
 }
 
 export function hasAllRoles(user: ExtendedUserProfile | null, roles: Role[]): boolean {
-  return roles.every(role => hasRole(user, role));
+  const { checkAllUserRoles } = require('@/lib/utils/permissions');
+  return checkAllUserRoles(user, roles);
 }

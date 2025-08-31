@@ -3,7 +3,8 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useMemo, useEffect } from 'react';
 import { announceToScreenReader } from '@/lib/utils';
 import { navigationUtils } from '@/lib/navigation';
-import { ExtendedUserProfile, LoginOptions, LogoutOptions, UseAuthReturn, AuthState } from '@/types/auth';
+import { checkUserPermission, checkUserRole } from '@/lib/utils/permissions';
+import { ExtendedUserProfile, LoginOptions, LogoutOptions, UseAuthReturn, AuthState, AUTH0_CLAIM_URLS } from '@/types/auth';
 
 /**
  * Extended user interface with custom claims from Auth0
@@ -50,10 +51,10 @@ export function useAuth(): UseAuthReturn {
       org_id: user.org_id ?? undefined,
       
       // Extract custom claims (ensure they're arrays)
-      roles: Array.isArray(user['https://api.nexus-app.de/roles']) 
-        ? user['https://api.nexus-app.de/roles'] 
+      roles: Array.isArray(user[AUTH0_CLAIM_URLS.ROLES]) 
+        ? user[AUTH0_CLAIM_URLS.ROLES] 
         : [],
-      internalUserId: user['https://api.nexus-app.de/user_id'] as string | undefined,
+      internalUserId: user[AUTH0_CLAIM_URLS.USER_ID] as string | undefined,
     };
   }, [user]);
 
@@ -127,22 +128,15 @@ export function useAuth(): UseAuthReturn {
    * TODO: Implement backend permission fetching logic
    */
   const checkPermission = useCallback((permission: string): boolean => {
-    console.warn('checkPermission: Permission checking now requires backend integration. Permission:', permission);
-    // TODO: Implement logic to fetch permissions from backend
-    // This could involve:
-    // 1. Storing permissions in React state/context after fetching from backend
-    // 2. Using a GraphQL query to get user permissions
-    // 3. Caching permissions for performance
-    return false;
-  }, []);
+    return checkUserPermission(extendedUser, permission);
+  }, [extendedUser]);
 
   /**
    * Check if user has a specific role
    */
   const hasRole = useCallback((role: string): boolean => {
-    if (!extendedUser?.roles) return false;
-    return extendedUser.roles.includes(role);
-  }, [extendedUser?.roles]);
+    return checkUserRole(extendedUser, role);
+  }, [extendedUser]);
 
   /**
    * Refresh user data from Auth0 with accessibility announcements
