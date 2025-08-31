@@ -612,6 +612,58 @@ export const connectionResolvers = {
 
       try {
         const connectionService = new ConnectionService();
+        const workspaceAuth = context.dataSources.workspaceAuthorizationService;
+
+        // SECURITY FIX: Validate workspace authorization for each connection before batch processing
+        for (const connectionInput of connections) {
+          // Get both cards to validate workspace access
+          const [sourceCard, targetCard] = await Promise.all([
+            connectionService.getCardById(connectionInput.sourceCardId),
+            connectionService.getCardById(connectionInput.targetCardId)
+          ]);
+
+          if (!sourceCard || !targetCard) {
+            throw new NotFoundError(
+              'Card', 
+              !sourceCard ? connectionInput.sourceCardId : connectionInput.targetCardId
+            );
+          }
+
+          // Validate workspace access for both cards
+          const [hasSourceAccess, hasTargetAccess] = await Promise.all([
+            workspaceAuth.hasPermissionInWorkspace(
+              context.user!.id,
+              sourceCard.workspace_id,
+              'connection:create'
+            ),
+            workspaceAuth.hasPermissionInWorkspace(
+              context.user!.id,
+              targetCard.workspace_id,
+              'connection:create'
+            )
+          ]);
+          
+          if (!hasSourceAccess) {
+            const userPermissions = await workspaceAuth.getUserPermissionsInWorkspace(context.user!.id, sourceCard.workspace_id);
+            throw new AuthorizationError(
+              'Cannot create connection in source card workspace',
+              'INSUFFICIENT_PERMISSIONS',
+              'connection:create',
+              userPermissions
+            );
+          }
+          
+          if (!hasTargetAccess) {
+            const userPermissions = await workspaceAuth.getUserPermissionsInWorkspace(context.user!.id, targetCard.workspace_id);
+            throw new AuthorizationError(
+              'Cannot create connection in target card workspace',
+              'INSUFFICIENT_PERMISSIONS',
+              'connection:create',
+              userPermissions
+            );
+          }
+        }
+
         const result = await connectionService.batchCreateConnections(connections, context.user!.id);
 
         // Publish real-time events for successful connections
@@ -681,6 +733,60 @@ export const connectionResolvers = {
 
       try {
         const connectionService = new ConnectionService();
+        const workspaceAuth = context.dataSources.workspaceAuthorizationService;
+
+        // SECURITY FIX: Validate workspace authorization for each connection before batch processing
+        for (const update of updates) {
+          // Check if connection exists and get associated cards
+          const existingConnection = await connectionService.getConnection(update.id);
+          if (!existingConnection) {
+            throw new NotFoundError('Connection', update.id);
+          }
+
+          const [sourceCard, targetCard] = await Promise.all([
+            connectionService.getCardById(existingConnection.sourceCardId),
+            connectionService.getCardById(existingConnection.targetCardId)
+          ]);
+
+          if (!sourceCard || !targetCard) {
+            throw new NotFoundError('Card', 'associated with connection');
+          }
+
+          // Validate workspace access for both cards
+          const [hasSourceAccess, hasTargetAccess] = await Promise.all([
+            workspaceAuth.hasPermissionInWorkspace(
+              context.user!.id,
+              sourceCard.workspace_id,
+              'connection:update'
+            ),
+            workspaceAuth.hasPermissionInWorkspace(
+              context.user!.id,
+              targetCard.workspace_id,
+              'connection:update'
+            )
+          ]);
+          
+          if (!hasSourceAccess) {
+            const userPermissions = await workspaceAuth.getUserPermissionsInWorkspace(context.user!.id, sourceCard.workspace_id);
+            throw new AuthorizationError(
+              'Cannot update connection in source card workspace',
+              'INSUFFICIENT_PERMISSIONS',
+              'connection:update',
+              userPermissions
+            );
+          }
+          
+          if (!hasTargetAccess) {
+            const userPermissions = await workspaceAuth.getUserPermissionsInWorkspace(context.user!.id, targetCard.workspace_id);
+            throw new AuthorizationError(
+              'Cannot update connection in target card workspace',
+              'INSUFFICIENT_PERMISSIONS',
+              'connection:update',
+              userPermissions
+            );
+          }
+        }
+
         const result = await connectionService.batchUpdateConnections(updates, context.user!.id);
 
         // Publish real-time events for successful updates
