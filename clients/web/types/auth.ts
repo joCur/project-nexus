@@ -8,6 +8,17 @@
 import { UserProfile } from '@auth0/nextjs-auth0/client';
 
 /**
+ * Auth0 custom claim URL constants
+ * Centralized constants for maintainability
+ * @deprecated Use AUTH0_CONFIG.CLAIM_URLS from @/lib/config/auth instead
+ */
+export const AUTH0_CLAIM_URLS = {
+  ROLES: 'https://api.nexus-app.de/roles',
+  PERMISSIONS: 'https://api.nexus-app.de/permissions', // Deprecated: permissions no longer used
+  USER_ID: 'https://api.nexus-app.de/user_id',
+} as const;
+
+/**
  * Auth0 JWT payload structure
  * Matches the backend Auth0JWTPayload interface
  */
@@ -25,14 +36,15 @@ export interface Auth0JWTPayload {
   scope: string; // OAuth scopes
 
   // Custom claims (set via Auth0 Rules/Actions)
-  'https://api.nexus-app.de/roles'?: string[];
-  'https://api.nexus-app.de/permissions'?: string[];
-  'https://api.nexus-app.de/user_id'?: string; // Internal user ID
+  [AUTH0_CLAIM_URLS.ROLES]?: string[];
+  [AUTH0_CLAIM_URLS.PERMISSIONS]?: string[]; // Deprecated: no longer extracted
+  [AUTH0_CLAIM_URLS.USER_ID]?: string; // Internal user ID
 }
 
 /**
  * Extended user profile with custom claims and type safety
  * Used throughout the application for authenticated user data
+ * Note: permissions are now fetched from backend, not Auth0 JWT
  */
 export interface ExtendedUserProfile {
   // Required Auth0 fields
@@ -47,7 +59,6 @@ export interface ExtendedUserProfile {
   
   // Custom claims extracted from JWT
   roles?: string[];
-  permissions?: string[];
   internalUserId?: string;
   
   // Additional computed fields
@@ -183,23 +194,38 @@ export interface UseAuthReturn extends AuthState, AuthActions {
 
 /**
  * Permission definitions
- * These should match the backend permission system
+ * Updated to match the backend permission system format
  */
 export const Permissions = {
-  // Card permissions
-  READ_CARDS: 'read:cards',
-  WRITE_CARDS: 'write:cards',
-  DELETE_CARDS: 'delete:cards',
-  
   // Workspace permissions
-  READ_WORKSPACES: 'read:workspaces',
-  WRITE_WORKSPACES: 'write:workspaces',
-  DELETE_WORKSPACES: 'delete:workspaces',
-  ADMIN_WORKSPACES: 'admin:workspaces',
+  WORKSPACE_READ: 'workspace:read',
+  WORKSPACE_CREATE: 'workspace:create',
+  WORKSPACE_UPDATE: 'workspace:update',
+  WORKSPACE_DELETE: 'workspace:delete',
+  WORKSPACE_MANAGE_MEMBERS: 'workspace:manage_members',
+  
+  // Card permissions
+  CARD_READ: 'card:read',
+  CARD_CREATE: 'card:create',
+  CARD_UPDATE: 'card:update',
+  CARD_DELETE: 'card:delete',
+  
+  // Canvas permissions
+  CANVAS_READ: 'canvas:read',
+  CANVAS_CREATE: 'canvas:create',
+  CANVAS_UPDATE: 'canvas:update',
+  CANVAS_DELETE: 'canvas:delete',
+  
+  // Connection permissions
+  CONNECTION_READ: 'connection:read',
+  CONNECTION_CREATE: 'connection:create',
+  CONNECTION_UPDATE: 'connection:update',
+  CONNECTION_DELETE: 'connection:delete',
   
   // User permissions
-  READ_PROFILE: 'read:profile',
-  WRITE_PROFILE: 'write:profile',
+  USER_READ: 'user:read',
+  USER_UPDATE: 'user:update',
+  USER_DELETE: 'user:delete',
   
   // Admin permissions
   ADMIN_USERS: 'admin:users',
@@ -385,25 +411,34 @@ export function isAuth0Error(error: any): error is Auth0Error {
 }
 
 export function hasPermission(user: ExtendedUserProfile | null, permission: Permission): boolean {
-  return user?.permissions?.includes(permission) ?? false;
+  // Import the shared utility to avoid duplication
+  // Note: Using dynamic import here to avoid circular dependency issues
+  // TODO: Refactor to use proper ES6 imports when circular dependency is resolved
+  const { checkUserPermission } = require('@/lib/utils/permissions');
+  return checkUserPermission(user, permission);
 }
 
 export function hasRole(user: ExtendedUserProfile | null, role: Role): boolean {
-  return user?.roles?.includes(role) ?? false;
+  const { checkUserRole } = require('@/lib/utils/permissions');
+  return checkUserRole(user, role);
 }
 
 export function hasAnyPermission(user: ExtendedUserProfile | null, permissions: Permission[]): boolean {
-  return permissions.some(permission => hasPermission(user, permission));
+  const { checkAnyUserPermission } = require('@/lib/utils/permissions');
+  return checkAnyUserPermission(user, permissions);
 }
 
 export function hasAllPermissions(user: ExtendedUserProfile | null, permissions: Permission[]): boolean {
-  return permissions.every(permission => hasPermission(user, permission));
+  const { checkAllUserPermissions } = require('@/lib/utils/permissions');
+  return checkAllUserPermissions(user, permissions);
 }
 
 export function hasAnyRole(user: ExtendedUserProfile | null, roles: Role[]): boolean {
-  return roles.some(role => hasRole(user, role));
+  const { checkAnyUserRole } = require('@/lib/utils/permissions');
+  return checkAnyUserRole(user, roles);
 }
 
 export function hasAllRoles(user: ExtendedUserProfile | null, roles: Role[]): boolean {
-  return roles.every(role => hasRole(user, role));
+  const { checkAllUserRoles } = require('@/lib/utils/permissions');
+  return checkAllUserRoles(user, roles);
 }

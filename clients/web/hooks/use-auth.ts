@@ -3,7 +3,8 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useMemo, useEffect } from 'react';
 import { announceToScreenReader } from '@/lib/utils';
 import { navigationUtils } from '@/lib/navigation';
-import { ExtendedUserProfile, LoginOptions, LogoutOptions, UseAuthReturn, AuthState } from '@/types/auth';
+import { checkUserPermission, checkUserRole } from '@/lib/utils/permissions';
+import { ExtendedUserProfile, LoginOptions, LogoutOptions, UseAuthReturn, AuthState, AUTH0_CLAIM_URLS } from '@/types/auth';
 
 /**
  * Extended user interface with custom claims from Auth0
@@ -35,6 +36,7 @@ export function useAuth(): UseAuthReturn {
   }, [user, error, isLoading]);
 
   // Extend user profile with custom claims and type safety
+  // Note: permissions are no longer extracted from Auth0 JWT - they come from backend
   const extendedUser: ExtendedUserProfile | null = useMemo(() => {
     if (!user) return null;
 
@@ -49,13 +51,10 @@ export function useAuth(): UseAuthReturn {
       org_id: user.org_id ?? undefined,
       
       // Extract custom claims (ensure they're arrays)
-      roles: Array.isArray(user['https://api.nexus-app.de/roles']) 
-        ? user['https://api.nexus-app.de/roles'] 
+      roles: Array.isArray(user[AUTH0_CLAIM_URLS.ROLES]) 
+        ? (user[AUTH0_CLAIM_URLS.ROLES] as string[]) 
         : [],
-      permissions: Array.isArray(user['https://api.nexus-app.de/permissions'])
-        ? user['https://api.nexus-app.de/permissions']
-        : [],
-      internalUserId: user['https://api.nexus-app.de/user_id'] as string | undefined,
+      internalUserId: user[AUTH0_CLAIM_URLS.USER_ID] as string | undefined,
     };
   }, [user]);
 
@@ -125,19 +124,19 @@ export function useAuth(): UseAuthReturn {
 
   /**
    * Check if user has a specific permission
+   * Note: This now requires backend integration to fetch permissions
+   * TODO: Implement backend permission fetching logic
    */
   const checkPermission = useCallback((permission: string): boolean => {
-    if (!extendedUser?.permissions) return false;
-    return extendedUser.permissions.includes(permission);
-  }, [extendedUser?.permissions]);
+    return checkUserPermission(extendedUser, permission);
+  }, [extendedUser]);
 
   /**
    * Check if user has a specific role
    */
   const hasRole = useCallback((role: string): boolean => {
-    if (!extendedUser?.roles) return false;
-    return extendedUser.roles.includes(role);
-  }, [extendedUser?.roles]);
+    return checkUserRole(extendedUser, role);
+  }, [extendedUser]);
 
   /**
    * Refresh user data from Auth0 with accessibility announcements
@@ -227,22 +226,38 @@ export function useRequireAuth(redirectTo: string = '/workspace'): ExtendedUserP
 
 /**
  * Permission checking utilities
+ * Updated to match backend permission system format
  */
 export const Permissions = {
-  // Card permissions
-  READ_CARDS: 'read:cards',
-  WRITE_CARDS: 'write:cards',
-  DELETE_CARDS: 'delete:cards',
+  // Workspace permissions
+  WORKSPACE_READ: 'workspace:read',
+  WORKSPACE_CREATE: 'workspace:create',
+  WORKSPACE_UPDATE: 'workspace:update',
+  WORKSPACE_DELETE: 'workspace:delete',
+  WORKSPACE_MANAGE_MEMBERS: 'workspace:manage_members',
   
-  // Workspace permissions  
-  READ_WORKSPACES: 'read:workspaces',
-  WRITE_WORKSPACES: 'write:workspaces',
-  DELETE_WORKSPACES: 'delete:workspaces',
-  ADMIN_WORKSPACES: 'admin:workspaces',
+  // Card permissions
+  CARD_READ: 'card:read',
+  CARD_CREATE: 'card:create',
+  CARD_UPDATE: 'card:update',
+  CARD_DELETE: 'card:delete',
+  
+  // Canvas permissions
+  CANVAS_READ: 'canvas:read',
+  CANVAS_CREATE: 'canvas:create',
+  CANVAS_UPDATE: 'canvas:update',
+  CANVAS_DELETE: 'canvas:delete',
+  
+  // Connection permissions
+  CONNECTION_READ: 'connection:read',
+  CONNECTION_CREATE: 'connection:create',
+  CONNECTION_UPDATE: 'connection:update',
+  CONNECTION_DELETE: 'connection:delete',
   
   // User permissions
-  READ_PROFILE: 'read:profile',
-  WRITE_PROFILE: 'write:profile',
+  USER_READ: 'user:read',
+  USER_UPDATE: 'user:update',
+  USER_DELETE: 'user:delete',
   
   // Admin permissions
   ADMIN_USERS: 'admin:users',
