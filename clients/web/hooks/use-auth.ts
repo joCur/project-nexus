@@ -52,7 +52,7 @@ export function useAuth(): UseAuthReturn {
       
       // Extract custom claims (ensure they're arrays)
       roles: Array.isArray(user[AUTH0_CLAIM_URLS.ROLES]) 
-        ? user[AUTH0_CLAIM_URLS.ROLES] 
+        ? (user[AUTH0_CLAIM_URLS.ROLES] as string[]) 
         : [],
       internalUserId: user[AUTH0_CLAIM_URLS.USER_ID] as string | undefined,
     };

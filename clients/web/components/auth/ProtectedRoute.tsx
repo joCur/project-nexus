@@ -24,7 +24,7 @@ export interface ProtectedRouteProps {
   // Custom authorization function
   authorize?: (user: ExtendedUserProfile) => boolean;
   
-  // Redirect configuration
+  // Redirect configuration  
   redirectTo?: string;
   onUnauthorized?: () => void;
 }
@@ -310,7 +310,9 @@ function ProtectedRouteInternal({
         if (onUnauthorized) {
           onUnauthorized();
         } else if (redirectTo !== window.location.pathname) {
-          router.push(redirectTo);
+          // Use window.location.href to avoid Next.js App Router typing issues
+          // This is safer than type assertions and works consistently across route types
+          window.location.href = redirectTo;
         }
       }
     }

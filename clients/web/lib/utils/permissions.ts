@@ -178,6 +178,15 @@ interface PermissionCache {
 // const permissionCache: PermissionCache = {};
 
 /**
+ * Check if backend integration is ready for permission checking
+ * 
+ * @returns true if backend permission system is enabled
+ */
+export function isBackendIntegrationReady(): boolean {
+  return process.env.NEXT_PUBLIC_BACKEND_PERMISSIONS_ENABLED === 'true';
+}
+
+/**
  * Constants for permission checking
  */
 export const PERMISSION_CHECK_CONFIG = {

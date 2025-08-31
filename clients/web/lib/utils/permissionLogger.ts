@@ -53,7 +53,7 @@ export interface PermissionLogEntry {
 export class PermissionLogger {
   private static instance: PermissionLogger;
   private logBuffer: PermissionLogEntry[] = [];
-  private readonly maxBufferSize = 1000;
+  private readonly maxBufferSize = 100;
   private readonly isEnabled: boolean;
 
   constructor() {
