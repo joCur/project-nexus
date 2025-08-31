@@ -501,15 +501,15 @@ export function createMockWorkspaceAuthorizationService() {
   return {
     getUserPermissionsForContext: jest.fn(),
     getUserPermissionsInWorkspace: jest.fn(),
+    getUserWorkspaceRole: jest.fn(),
     hasPermissionInWorkspace: jest.fn(),
     hasWorkspaceAccess: jest.fn(),
     getWorkspaceMember: jest.fn(),
-    addWorkspaceMember: jest.fn(),
-    removeWorkspaceMember: jest.fn(),
-    updateWorkspaceMember: jest.fn(),
     getWorkspaceMembers: jest.fn(),
-    getWorkspaceRole: jest.fn(),
-    checkPermission: jest.fn(),
+    addWorkspaceMember: jest.fn(),
+    updateMemberRole: jest.fn(),
+    removeMember: jest.fn(),
+    requirePermission: jest.fn(),
   } as any;
 }
 
