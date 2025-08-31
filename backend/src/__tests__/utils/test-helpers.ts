@@ -525,23 +525,6 @@ export const TEST_DATA = {
     '',
   ],
   
-  PERMISSIONS: [
-    'card:create',
-    'card:read',
-    'card:update',
-    'card:delete',
-    'workspace:create',
-    'workspace:read',
-    'workspace:update',
-    'workspace:delete',
-    'workspace:invite',
-    'workspace:manage_members',
-    'ai:generate_embeddings',
-    'ai:search',
-    'ai:connections',
-    'admin:user_management',
-    'admin:system_settings',
-  ],
   
   ROLES: [
     'super_admin',
@@ -553,7 +536,6 @@ export const TEST_DATA = {
   
   AUTH0_CUSTOM_CLAIMS: {
     ROLES: 'https://api.nexus-app.de/roles',
-    PERMISSIONS: 'https://api.nexus-app.de/permissions',
     USER_ID: 'https://api.nexus-app.de/user_id',
   },
 };
