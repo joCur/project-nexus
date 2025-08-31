@@ -417,7 +417,6 @@ describe('End-to-End Authentication Flow Tests', () => {
       mockUserService.findById.mockResolvedValue(USER_FIXTURES.STANDARD_USER);
       mockUserService.update.mockResolvedValue({
         ...USER_FIXTURES.STANDARD_USER,
-        permissions: [...USER_FIXTURES.STANDARD_USER.permissions, 'new:permission'],
       });
 
       const response = await request(app)

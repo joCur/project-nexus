@@ -269,7 +269,6 @@ describe('Security Testing Scenarios', () => {
       mockAuth0Service.syncUserFromAuth0.mockResolvedValue({
         ...USER_FIXTURES.STANDARD_USER,
         roles: SECURITY_FIXTURES.SQL_INJECTION_ATTEMPTS,
-        permissions: SECURITY_FIXTURES.XSS_ATTEMPTS,
       });
 
       mockAuth0Service.validateSession.mockResolvedValue(true);

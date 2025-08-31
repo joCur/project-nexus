@@ -25,7 +25,6 @@ export const authTypeDefs = gql`
     createdAt: DateTime!
     updatedAt: DateTime!
     roles: [String!]!
-    permissions: [String!]!
     metadataSyncedAt: DateTime!
     
     # Computed fields

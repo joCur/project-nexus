@@ -48,7 +48,6 @@ export interface User {
   
   // Auth0 metadata cache for performance
   roles: string[];
-  permissions: string[];
   metadataSyncedAt: Date;
 }
 
