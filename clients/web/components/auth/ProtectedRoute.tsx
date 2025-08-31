@@ -490,7 +490,7 @@ export function PremiumRoute({ children, ...props }: Omit<ProtectedRouteProps, '
 export function WorkspaceRoute({ children, ...props }: Omit<ProtectedRouteProps, 'requiredPermissions'>) {
   return (
     <ProtectedRoute
-      requiredPermissions={[Permissions.READ_WORKSPACES]}
+      requiredPermissions={[Permissions.WORKSPACE_READ]}
       redirectTo="/workspace"
       {...props}
     >

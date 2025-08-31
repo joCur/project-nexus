@@ -33,6 +33,7 @@ export interface Auth0JWTPayload {
 /**
  * Extended user profile with custom claims and type safety
  * Used throughout the application for authenticated user data
+ * Note: permissions are now fetched from backend, not Auth0 JWT
  */
 export interface ExtendedUserProfile {
   // Required Auth0 fields
@@ -47,7 +48,6 @@ export interface ExtendedUserProfile {
   
   // Custom claims extracted from JWT
   roles?: string[];
-  permissions?: string[];
   internalUserId?: string;
   
   // Additional computed fields
@@ -183,23 +183,38 @@ export interface UseAuthReturn extends AuthState, AuthActions {
 
 /**
  * Permission definitions
- * These should match the backend permission system
+ * Updated to match the backend permission system format
  */
 export const Permissions = {
-  // Card permissions
-  READ_CARDS: 'read:cards',
-  WRITE_CARDS: 'write:cards',
-  DELETE_CARDS: 'delete:cards',
-  
   // Workspace permissions
-  READ_WORKSPACES: 'read:workspaces',
-  WRITE_WORKSPACES: 'write:workspaces',
-  DELETE_WORKSPACES: 'delete:workspaces',
-  ADMIN_WORKSPACES: 'admin:workspaces',
+  WORKSPACE_READ: 'workspace:read',
+  WORKSPACE_CREATE: 'workspace:create',
+  WORKSPACE_UPDATE: 'workspace:update',
+  WORKSPACE_DELETE: 'workspace:delete',
+  WORKSPACE_MANAGE_MEMBERS: 'workspace:manage_members',
+  
+  // Card permissions
+  CARD_READ: 'card:read',
+  CARD_CREATE: 'card:create',
+  CARD_UPDATE: 'card:update',
+  CARD_DELETE: 'card:delete',
+  
+  // Canvas permissions
+  CANVAS_READ: 'canvas:read',
+  CANVAS_CREATE: 'canvas:create',
+  CANVAS_UPDATE: 'canvas:update',
+  CANVAS_DELETE: 'canvas:delete',
+  
+  // Connection permissions
+  CONNECTION_READ: 'connection:read',
+  CONNECTION_CREATE: 'connection:create',
+  CONNECTION_UPDATE: 'connection:update',
+  CONNECTION_DELETE: 'connection:delete',
   
   // User permissions
-  READ_PROFILE: 'read:profile',
-  WRITE_PROFILE: 'write:profile',
+  USER_READ: 'user:read',
+  USER_UPDATE: 'user:update',
+  USER_DELETE: 'user:delete',
   
   // Admin permissions
   ADMIN_USERS: 'admin:users',
@@ -385,7 +400,10 @@ export function isAuth0Error(error: any): error is Auth0Error {
 }
 
 export function hasPermission(user: ExtendedUserProfile | null, permission: Permission): boolean {
-  return user?.permissions?.includes(permission) ?? false;
+  // Note: Permission checking now requires backend integration
+  // This function will be updated to work with backend permissions
+  console.warn('hasPermission: Permission checking now requires backend integration');
+  return false;
 }
 
 export function hasRole(user: ExtendedUserProfile | null, role: Role): boolean {

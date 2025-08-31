@@ -567,9 +567,10 @@ describe('useRequireAuth', () => {
 
 describe('Permission and Role Constants', () => {
   it('should export correct permission constants', () => {
-    expect(Permissions.READ_CARDS).toBe('read:cards');
-    expect(Permissions.WRITE_CARDS).toBe('write:cards');
-    expect(Permissions.DELETE_CARDS).toBe('delete:cards');
+    expect(Permissions.CARD_READ).toBe('card:read');
+    expect(Permissions.CARD_CREATE).toBe('card:create');
+    expect(Permissions.CARD_DELETE).toBe('card:delete');
+    expect(Permissions.WORKSPACE_READ).toBe('workspace:read');
     expect(Permissions.ADMIN_SYSTEM).toBe('admin:system');
   });
 
