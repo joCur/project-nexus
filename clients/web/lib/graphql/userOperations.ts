@@ -20,6 +20,13 @@
  * 5. **Error Handling**: On cache miss or network error, gracefully degrade by
  *    assuming no permissions (secure by default).
  * 
+ * 6. **Cache Warming Strategies**: Implement proactive cache warming to improve
+ *    user experience and reduce backend load:
+ *    - Warm cache during user login/session establishment
+ *    - Prefetch permissions for commonly accessed workspaces
+ *    - Background refresh for permissions nearing TTL expiration
+ *    - Predictive warming based on user navigation patterns
+ * 
  * Example Apollo Client cache configuration:
  * ```typescript
  * const cacheConfig = {
@@ -27,14 +34,34 @@
  *     Query: {
  *       fields: {
  *         getUserPermissions: {
- *           keyArgs: ['userId'],
+ *           keyArgs: ['userId', 'workspaceId'],
  *           merge: false, // Replace cached data completely
  *         }
  *       }
  *     }
  *   }
  * };
+ * 
+ * // Cache warming implementation
+ * const warmPermissionCache = async (userId: string, workspaceIds: string[]) => {
+ *   const warmingPromises = workspaceIds.map(workspaceId => 
+ *     apolloClient.query({
+ *       query: GET_USER_PERMISSIONS,
+ *       variables: { userId, workspaceId },
+ *       fetchPolicy: 'cache-first', // Use cache if available
+ *       errorPolicy: 'ignore', // Don't fail the entire warming process
+ *     })
+ *   );
+ *   
+ *   await Promise.allSettled(warmingPromises);
+ * };
  * ```
+ * 
+ * **Integration Testing Strategy**:
+ * - Test cache warming performance under various network conditions
+ * - Validate cache invalidation triggers work correctly
+ * - Ensure graceful degradation when backend is unavailable
+ * - Verify workspace-scoped caching prevents permission leakage
  * 
  * @see NEX-183 - Remove Auth0 permission extraction from frontend
  */

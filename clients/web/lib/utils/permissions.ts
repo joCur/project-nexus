@@ -9,6 +9,7 @@
  */
 
 import { ExtendedUserProfile } from '@/types/auth';
+import { logBackendIntegrationWarning, logPermissionCheck, permissionLogger } from './permissionLogger';
 
 /**
  * Standard warning message for permission checking
@@ -25,16 +26,26 @@ const PERMISSION_WARNING_MESSAGE = 'Permission checking now requires backend int
  * @deprecated This function will be updated to fetch permissions from backend
  */
 export function checkUserPermission(user: ExtendedUserProfile | null, permission: string): boolean {
-  if (process.env.NODE_ENV !== 'test') {
-    console.warn(`${PERMISSION_WARNING_MESSAGE}. Permission:`, permission);
-  }
+  const startTime = performance.now();
+  const result = false; // Always false until backend integration
+  
+  // Use dedicated permission logger
+  logBackendIntegrationWarning(permission, user?.sub);
+  logPermissionCheck(permission, result, user?.sub);
+  
+  // Log performance metrics
+  const duration = performance.now() - startTime;
+  permissionLogger.logPerformanceMetric('checkUserPermission', duration, user?.sub, undefined, {
+    permission,
+    result,
+  });
   
   // TODO: Implement backend permission fetching logic
   // This could involve:
   // 1. Storing permissions in React state/context after fetching from backend
   // 2. Using a GraphQL query to get user permissions
   // 3. Caching permissions for performance
-  return false;
+  return result;
 }
 
 /**

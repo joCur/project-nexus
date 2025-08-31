@@ -10,6 +10,7 @@ import { UserProfile } from '@auth0/nextjs-auth0/client';
 /**
  * Auth0 custom claim URL constants
  * Centralized constants for maintainability
+ * @deprecated Use AUTH0_CONFIG.CLAIM_URLS from @/lib/config/auth instead
  */
 export const AUTH0_CLAIM_URLS = {
   ROLES: 'https://api.nexus-app.de/roles',
@@ -411,6 +412,8 @@ export function isAuth0Error(error: any): error is Auth0Error {
 
 export function hasPermission(user: ExtendedUserProfile | null, permission: Permission): boolean {
   // Import the shared utility to avoid duplication
+  // Note: Using dynamic import here to avoid circular dependency issues
+  // TODO: Refactor to use proper ES6 imports when circular dependency is resolved
   const { checkUserPermission } = require('@/lib/utils/permissions');
   return checkUserPermission(user, permission);
 }

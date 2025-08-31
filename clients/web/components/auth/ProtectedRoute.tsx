@@ -310,7 +310,7 @@ function ProtectedRouteInternal({
         if (onUnauthorized) {
           onUnauthorized();
         } else if (redirectTo !== window.location.pathname) {
-          router.push(redirectTo as any);
+          router.push(redirectTo);
         }
       }
     }
