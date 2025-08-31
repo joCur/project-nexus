@@ -738,9 +738,9 @@ export const connectionResolvers = {
         // SECURITY FIX: Validate workspace authorization for each connection before batch processing
         for (const update of updates) {
           // Check if connection exists and get associated cards
-          const existingConnection = await connectionService.getConnection(update.id);
+          const existingConnection = await connectionService.getConnection(update.connectionId);
           if (!existingConnection) {
-            throw new NotFoundError('Connection', update.id);
+            throw new NotFoundError('Connection', update.connectionId);
           }
 
           const [sourceCard, targetCard] = await Promise.all([
