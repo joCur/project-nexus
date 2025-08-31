@@ -401,7 +401,6 @@ export class UserService {
       createdAt: new Date(dbUser.created_at),
       updatedAt: new Date(dbUser.updated_at),
       roles: typeof dbUser.roles === 'string' ? JSON.parse(dbUser.roles) : (dbUser.roles || []),
-      permissions: typeof dbUser.permissions === 'string' ? JSON.parse(dbUser.permissions) : (dbUser.permissions || []),
       metadataSyncedAt: new Date(dbUser.metadata_synced_at),
     };
   }

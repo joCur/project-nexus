@@ -38,7 +38,6 @@ export function generateMockJWT(payload: Partial<Auth0TokenPayload> = {}): strin
     exp: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
     scope: 'openid profile email',
     'https://api.nexus-app.de/roles': ['user'],
-    'https://api.nexus-app.de/permissions': ['card:read', 'workspace:read'],
     'https://api.nexus-app.de/user_id': randomUUID(),
     ...payload,
   };
@@ -117,7 +116,6 @@ export function createMockUser(overrides: Partial<User> = {}): User {
     createdAt: now,
     updatedAt: now,
     roles: ['user'],
-    permissions: ['card:read', 'workspace:read'],
     metadataSyncedAt: now,
     ...overrides,
   };
@@ -132,7 +130,6 @@ export function createMockSessionData(userId: string, auth0UserId: string) {
     userId,
     auth0UserId,
     email: 'test@example.com',
-    permissions: ['card:read', 'workspace:read'],
     roles: ['user'],
     createdAt: now,
     lastActivity: now,
@@ -154,7 +151,6 @@ export function createMockRequest(overrides: any = {}) {
     path: '/test',
     method: 'GET',
     isAuthenticated: false,
-    permissions: [],
     ...overrides,
   };
 }
@@ -187,7 +183,6 @@ export function createMockGraphQLContext(overrides: any = {}) {
   return {
     user: null,
     auth0Payload: null,
-    permissions: [],
     isAuthenticated: false,
     req: createMockRequest(),
     res: createMockResponse(),
@@ -608,7 +603,6 @@ export async function createTestApp() {
     const auth = req.headers.authorization;
     const userSub = req.headers['x-user-sub'];
     const userEmail = req.headers['x-user-email'];
-    const userPermissions = req.headers['x-user-permissions'];
     
     if (auth && userSub) {
       req.isAuthenticated = true;
@@ -617,11 +611,9 @@ export async function createTestApp() {
         email: userEmail,
         sub: userSub,
       };
-      req.permissions = userPermissions ? userPermissions.split(',') : ['user:read', 'user:update'];
     } else {
       req.isAuthenticated = false;
       req.user = null;
-      req.permissions = [];
     }
     
     next();
@@ -640,7 +632,6 @@ export async function createTestApp() {
     context: async ({ req }: { req: any }) => ({
       isAuthenticated: req.isAuthenticated,
       user: req.user,
-      permissions: req.permissions,
       dataSources: testMockServices,
     }),
   }));

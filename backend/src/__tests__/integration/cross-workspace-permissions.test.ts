@@ -6,7 +6,7 @@
  * proper authorization.
  */
 
-import { GraphQLContext } from '@/types';
+import { GraphQLContext as _GraphQLContext } from '@/types';
 import { workspaceResolvers } from '@/resolvers/workspace';
 import { AuthorizationError } from '@/utils/errors';
 import { WorkspaceRole } from '@/types/auth';

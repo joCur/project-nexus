@@ -113,8 +113,15 @@ export class Auth0Service {
       if (legacyPermissions && legacyPermissions.length > 0) {
         this.logger.warn('Legacy Auth0 permissions detected in JWT token - these are now ignored', {
           auth0UserId: auth0User.sub,
+          email: auth0User.email,
+          legacyPermissionCount: legacyPermissions.length,
           legacyPermissions,
-          migrationNote: 'Permissions now managed by workspace authorization system (NEX-179)',
+          migrationInfo: {
+            ticketId: 'NEX-184',
+            note: 'Permissions now managed by workspace authorization system (NEX-179)',
+            replacementSystem: 'WorkspaceAuthorizationService',
+            timestamp: new Date().toISOString(),
+          },
         });
       }
 

@@ -80,14 +80,34 @@ export const authResolvers = {
         securityLogger.authSuccess(user.id, auth0User.sub, {
           sessionId,
           email: user.email,
-          permissions: user.permissions,
+          roles: user.roles,
         });
+
+        // Get user permissions across all workspaces
+        const permissions = await (async () => {
+          try {
+            const workspacePermissions = await context.dataSources.workspaceAuthorizationService.getUserPermissionsForContext(user.id);
+            
+            // Flatten permissions from all workspaces into a single array
+            const allPermissions = Object.values(workspacePermissions || {}).flat();
+            
+            // Remove duplicates and return
+            return [...new Set(allPermissions)];
+          } catch (error) {
+            securityLogger.authFailure('permission_resolution', {
+              userId: user.id,
+              error: error instanceof Error ? error.message : 'Unknown error',
+            });
+            // Return empty array on error to maintain functionality
+            return [];
+          }
+        })();
 
         return {
           user,
           sessionId,
           expiresAt,
-          permissions: [], // Empty initially, will be resolved dynamically using WorkspaceAuthorizationService in NEX-182
+          permissions,
         };
 
       } catch (error) {

@@ -4,8 +4,8 @@ import { UserService } from '@/services/user';
 import { CacheService } from '@/services/cache';
 import {
   AuthenticationError,
-  AuthorizationError,
-  NotFoundError,
+  AuthorizationError as _AuthorizationError,
+  NotFoundError as _NotFoundError,
 } from '@/utils/errors';
 import {
   createMockAuth0Service,
