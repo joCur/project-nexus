@@ -24,6 +24,15 @@ import { UserService } from './user';
  * Auth0 Integration Service
  * Handles JWT validation, user synchronization, and Auth0 Management API operations
  * Based on technical architecture specifications
+ * 
+ * Migration Guide (NEX-184):
+ * - Auth0 now handles ONLY authentication (identity verification) and high-level roles
+ * - Permissions are NO LONGER synchronized from Auth0 JWT tokens
+ * - Use WorkspaceAuthorizationService for all permission checks instead
+ * - Legacy getUserPermissions() and checkPermission() methods removed
+ * 
+ * @see WorkspaceAuthorizationService for permission management
+ * @see NEX-179 for overall migration strategy
  */
 export class Auth0Service {
   private readonly jwksClient: jwksClient.JwksClient;
@@ -98,6 +107,16 @@ export class Auth0Service {
         roles: payload['https://api.nexus-app.de/roles'] as string[] | undefined,
         userId: payload['https://api.nexus-app.de/user_id'] as string | undefined,
       };
+
+      // Migration Logging: Check for legacy Auth0 permission fields (NEX-184)
+      const legacyPermissions = payload['https://api.nexus-app.de/permissions'] as string[] | undefined;
+      if (legacyPermissions && legacyPermissions.length > 0) {
+        this.logger.warn('Legacy Auth0 permissions detected in JWT token - these are now ignored', {
+          auth0UserId: auth0User.sub,
+          legacyPermissions,
+          migrationNote: 'Permissions now managed by workspace authorization system (NEX-179)',
+        });
+      }
 
       const duration = Date.now() - startTime;
       performanceLogger.externalService('Auth0', 'token_validation', duration, true, {

@@ -1,6 +1,19 @@
 /**
  * Auth0 and authentication-related type definitions
  * Based on technical architecture specifications
+ * 
+ * Breaking Changes (NEX-184):
+ * - Removed Auth0 permission synchronization fields
+ * - Removed GraphQL mutations: grantPermissions, revokePermissions
+ * - Removed GraphQL query: getUserPermissions
+ * - Auth0User interface no longer includes 'permissions' field
+ * 
+ * Migration Guide:
+ * - Replace getUserPermissions queries with WorkspaceAuthorizationService.getUserPermissions()
+ * - Replace grantPermissions mutations with workspace-based permission assignments
+ * - Use workspace authorization system for all permission operations
+ * 
+ * @see WorkspaceAuthorizationService for new permission management
  */
 
 export interface Auth0User {

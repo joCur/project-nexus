@@ -17,6 +17,13 @@ import { z } from 'zod';
 /**
  * User Service - Repository layer for user management
  * Implements user CRUD operations with Auth0 integration
+ * 
+ * Migration Note (NEX-184):
+ * - User creation/update NO LONGER includes Auth0 permission fields
+ * - Permissions are managed exclusively by WorkspaceAuthorizationService
+ * - User sync now focuses only on identity data (email, displayName, avatarUrl, roles)
+ * 
+ * @see WorkspaceAuthorizationService for permission operations
  */
 
 const logger = createContextLogger({ service: 'UserService' });
