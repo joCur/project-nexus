@@ -6,7 +6,7 @@
 
 import request from 'supertest';
 import { Express } from 'express';
-import { buildTestApp } from '../utils/test-app';
+import { createTestApp } from '../utils/test-helpers';
 import { 
   createMockAuth0Service,
   createMockUserService,
@@ -30,13 +30,8 @@ describe('Auth Middleware Integration Tests', () => {
     mockCacheService = createMockCacheService();
     mockWorkspaceAuthService = createMockWorkspaceAuthorizationService();
 
-    // Build test app with mocked services
-    app = await buildTestApp({
-      auth0Service: mockAuth0Service,
-      userService: mockUserService,
-      cacheService: mockCacheService,
-      workspaceAuthorizationService: mockWorkspaceAuthService,
-    });
+    // Create test app
+    app = await createTestApp();
   });
 
   afterEach(() => {

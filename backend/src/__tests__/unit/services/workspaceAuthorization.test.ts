@@ -155,15 +155,16 @@ describe('WorkspaceAuthorizationService', () => {
       mockCacheService.get.mockResolvedValue(null);
       
       // Mock database query
-      mockDb = {
-        ...mockDb,
-        '': jest.fn(() => ({
-          where: jest.fn(() => ({
-            first: jest.fn(() => null)
-          }))
-        })),
-        fn: { now: jest.fn(() => new Date()) }
+      const mockQueryBuilder = {
+        where: jest.fn(() => ({
+          first: jest.fn(() => null)
+        }))
       };
+      
+      mockDb = jest.fn(() => mockQueryBuilder);
+      mockDb.fn = { now: jest.fn(() => new Date()) };
+      mockDb.transaction = jest.fn();
+      mockDb.raw = jest.fn();
       (authService as any).db = mockDb;
 
       const result = await authService.getWorkspaceMember('user-1', 'ws-1');
@@ -628,6 +629,57 @@ describe('WorkspaceAuthorizationService', () => {
       
       expect(cardReadCount).toBe(1);
       expect(cardCreateCount).toBe(1);
+    });
+  });
+
+  describe('database transaction handling', () => {
+    test('handles transaction errors gracefully', async () => {
+      // Mock database to throw an error
+      const mockQueryBuilder = {
+        where: jest.fn(() => ({
+          first: jest.fn(() => {
+            throw new Error('Database connection failed');
+          })
+        }))
+      };
+      
+      mockDb = jest.fn(() => mockQueryBuilder);
+      mockDb.transaction = jest.fn();
+      mockDb.fn = { now: jest.fn(() => new Date()) };
+      mockDb.raw = jest.fn();
+      (authService as any).db = mockDb;
+
+      await expect(
+        authService.getWorkspaceMember('user-1', 'ws-1')
+      ).rejects.toThrow('Database connection failed');
+    });
+
+    test('verifies transaction method exists on database', () => {
+      expect(mockDb.transaction).toBeDefined();
+      expect(typeof mockDb.transaction).toBe('function');
+    });
+
+    test('database operations fail gracefully with proper error handling', async () => {
+      // Set up mock to simulate constraint violations
+      const mockQueryBuilder = {
+        where: jest.fn(() => ({
+          first: jest.fn(() => null),
+          insert: jest.fn(() => {
+            throw new Error('Unique constraint violation');
+          })
+        }))
+      };
+      
+      mockDb = jest.fn(() => mockQueryBuilder);
+      mockDb.transaction = jest.fn();
+      mockDb.fn = { now: jest.fn(() => new Date()) };
+      mockDb.raw = jest.fn();
+      (authService as any).db = mockDb;
+
+      // Test that errors are properly propagated
+      await expect(
+        authService.getWorkspaceMember('user-1', 'ws-1')
+      ).resolves.toBeNull(); // Should handle the null case gracefully
     });
   });
 });

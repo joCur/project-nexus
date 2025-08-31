@@ -14,6 +14,7 @@ import {
   createMockWorkspaceAuthorizationService,
   createMockWorkspaceService,
   createMockCanvasService,
+  createMockCardService,
   createMockUser
 } from '../utils/test-helpers';
 import { JWT_FIXTURES, USER_FIXTURES } from '../utils/test-fixtures';
@@ -27,6 +28,8 @@ describe('Permission Resolver Integration Tests', () => {
   let mockWorkspaceAuthService: any;
   let mockWorkspaceService: any;
   let mockCanvasService: any;
+  let mockCardService: any;
+  
   // Test data
   const testUser = USER_FIXTURES.STANDARD_USER;
   const adminUser = USER_FIXTURES.ADMIN_USER;
@@ -78,6 +81,7 @@ describe('Permission Resolver Integration Tests', () => {
     mockWorkspaceAuthService = createMockWorkspaceAuthorizationService();
     mockWorkspaceService = createMockWorkspaceService();
     mockCanvasService = createMockCanvasService();
+    mockCardService = createMockCardService();
 
     // Create test app
     app = await createTestApp();

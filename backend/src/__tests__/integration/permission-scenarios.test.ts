@@ -131,7 +131,8 @@ describe('End-to-End Permission Scenarios', () => {
 
       expect(createCanvasResponse.status).toBe(200);
       expect(createCanvasResponse.body.errors).toBeDefined();
-      expect(createCanvasResponse.body.errors[0].message).toContain('permission');
+      expect(createCanvasResponse.body.errors[0].message).toBe('Insufficient permissions for canvas creation');
+      expect(createCanvasResponse.body.errors[0].extensions?.code).toBe('INSUFFICIENT_PERMISSIONS');
 
       // Test 3: Cannot create cards
       const createCardResponse = await request(app)
@@ -155,7 +156,8 @@ describe('End-to-End Permission Scenarios', () => {
 
       expect(createCardResponse.status).toBe(200);
       expect(createCardResponse.body.errors).toBeDefined();
-      expect(createCardResponse.body.errors[0].message).toContain('permission');
+      expect(createCardResponse.body.errors[0].message).toBe('Insufficient permissions for card creation');
+      expect(createCardResponse.body.errors[0].extensions?.code).toBe('INSUFFICIENT_PERMISSIONS');
 
       // Verify permission calls
       expect(mockWorkspaceAuthService.hasPermissionInWorkspace).toHaveBeenCalledWith(
@@ -301,7 +303,8 @@ describe('End-to-End Permission Scenarios', () => {
 
       expect(inviteUserResponse.status).toBe(200);
       expect(inviteUserResponse.body.errors).toBeDefined();
-      expect(inviteUserResponse.body.errors[0].message).toContain('permission');
+      expect(inviteUserResponse.body.errors[0].message).toBe('Insufficient permissions for member management');
+      expect(inviteUserResponse.body.errors[0].extensions?.code).toBe('INSUFFICIENT_PERMISSIONS');
 
       // Verify cache was invalidated on role change
       expect(mockCacheService.del).toHaveBeenCalledWith(`user_context_permissions:${editorUser.id}`);
@@ -458,7 +461,8 @@ describe('End-to-End Permission Scenarios', () => {
 
       expect(transferOwnershipResponse.status).toBe(200);
       expect(transferOwnershipResponse.body.errors).toBeDefined();
-      expect(transferOwnershipResponse.body.errors[0].message).toContain('permission');
+      expect(transferOwnershipResponse.body.errors[0].message).toBe('Insufficient permissions for ownership transfer');
+      expect(transferOwnershipResponse.body.errors[0].extensions?.code).toBe('INSUFFICIENT_PERMISSIONS');
     });
   });
 
@@ -521,7 +525,8 @@ describe('End-to-End Permission Scenarios', () => {
 
       expect(createCanvasResponse.status).toBe(200);
       expect(createCanvasResponse.body.errors).toBeDefined();
-      expect(createCanvasResponse.body.errors[0].message).toContain('permission');
+      expect(createCanvasResponse.body.errors[0].message).toBe('Access denied to workspace');
+      expect(createCanvasResponse.body.errors[0].extensions?.code).toBe('ACCESS_DENIED');
 
       // Test 3: Cannot access existing content
       const readCanvasResponse = await request(app)
@@ -737,7 +742,8 @@ describe('End-to-End Permission Scenarios', () => {
 
       expect(oldOwnerTransferResponse.status).toBe(200);
       expect(oldOwnerTransferResponse.body.errors).toBeDefined();
-      expect(oldOwnerTransferResponse.body.errors[0].message).toContain('permission');
+      expect(oldOwnerTransferResponse.body.errors[0].message).toBe('Only workspace owners can transfer ownership');
+      expect(oldOwnerTransferResponse.body.errors[0].extensions?.code).toBe('OWNERSHIP_REQUIRED');
 
       // Test 4: Old owner retains admin permissions
       const oldOwnerAdminActionResponse = await request(app)

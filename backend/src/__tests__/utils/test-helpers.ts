@@ -472,6 +472,29 @@ export function createMockCanvasService() {
 }
 
 /**
+ * Create mock card service
+ */
+export function createMockCardService() {
+  return {
+    getCardById: jest.fn(),
+    getCanvasCards: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+    findById: jest.fn(),
+    findByCanvasId: jest.fn(),
+    bulkUpdate: jest.fn(),
+    bulkDelete: jest.fn(),
+    searchCards: jest.fn(),
+    getCardHistory: jest.fn(),
+    duplicateCard: jest.fn(),
+    moveCard: jest.fn(),
+    linkCards: jest.fn(),
+    unlinkCards: jest.fn(),
+  } as any;
+}
+
+/**
  * Create mock workspace authorization service
  */
 export function createMockWorkspaceAuthorizationService() {
