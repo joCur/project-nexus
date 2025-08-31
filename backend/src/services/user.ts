@@ -29,14 +29,12 @@ const userCreateSchema = z.object({
   displayName: z.string().min(1).max(100).optional(),
   avatarUrl: z.string().url().optional(),
   roles: z.array(z.string()).optional().default([]),
-  permissions: z.array(z.string()).optional().default([]),
 });
 
 const userUpdateSchema = z.object({
   displayName: z.string().min(1).max(100).optional(),
   avatarUrl: z.string().url().optional(),
   roles: z.array(z.string()).optional(),
-  permissions: z.array(z.string()).optional(),
   lastLogin: z.date().optional(),
 });
 
@@ -65,7 +63,6 @@ export class UserService {
         display_name: validatedInput.displayName,
         avatar_url: validatedInput.avatarUrl,
         roles: JSON.stringify(validatedInput.roles || []),
-        permissions: JSON.stringify(validatedInput.permissions || []),
         metadata_synced_at: new Date(),
       };
 
@@ -195,10 +192,6 @@ export class UserService {
       }
       if (validatedInput.roles !== undefined) {
         updateData.roles = JSON.stringify(validatedInput.roles);
-        updateData.metadata_synced_at = new Date();
-      }
-      if (validatedInput.permissions !== undefined) {
-        updateData.permissions = JSON.stringify(validatedInput.permissions);
         updateData.metadata_synced_at = new Date();
       }
       if (validatedInput.lastLogin !== undefined) {

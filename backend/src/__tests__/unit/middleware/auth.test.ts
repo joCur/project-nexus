@@ -2,7 +2,6 @@ import { Response, NextFunction } from 'express';
 import {
   createAuthMiddleware,
   requireAuth,
-  requirePermission,
   requireRole,
   createGraphQLContext,
   authDirectives,
@@ -249,65 +248,6 @@ describe('Authentication Middleware', () => {
     });
   });
 
-  describe('requirePermission middleware', () => {
-    it('should pass request with required permission', () => {
-      // Arrange
-      const permission = 'card:read';
-      const middleware = requirePermission(permission);
-
-      mockReq.isAuthenticated = true;
-      mockReq.user = USER_FIXTURES.STANDARD_USER;
-      mockReq.permissions = ['card:read', 'workspace:read'];
-
-      // Act
-      middleware(mockReq, mockRes, mockNext);
-
-      // Assert
-      expect(mockNext).toHaveBeenCalledWith();
-    });
-
-    it('should reject unauthenticated request', () => {
-      // Arrange
-      const permission = 'card:read';
-      const middleware = requirePermission(permission);
-
-      mockReq.isAuthenticated = false;
-
-      // Act & Assert
-      expect(() => middleware(mockReq, mockRes, mockNext))
-        .toThrow(AuthenticationError);
-    });
-
-    it('should reject request without required permission', () => {
-      // Arrange
-      const permission = 'admin:user_management';
-      const middleware = requirePermission(permission);
-
-      mockReq.isAuthenticated = true;
-      mockReq.user = USER_FIXTURES.STANDARD_USER;
-      mockReq.permissions = ['card:read', 'workspace:read'];
-
-      // Act & Assert
-      expect(() => middleware(mockReq, mockRes, mockNext))
-        .toThrow(AuthorizationError);
-    });
-
-    it('should pass admin user with any permission', () => {
-      // Arrange
-      const permission = 'some:permission';
-      const middleware = requirePermission(permission);
-
-      mockReq.isAuthenticated = true;
-      mockReq.user = USER_FIXTURES.ADMIN_USER;
-      mockReq.permissions = USER_FIXTURES.ADMIN_USER.permissions;
-
-      // Act
-      middleware(mockReq, mockRes, mockNext);
-
-      // Assert
-      expect(mockNext).toHaveBeenCalledWith();
-    });
-  });
 
   describe('requireRole middleware', () => {
     it('should pass request with required role', () => {
@@ -453,74 +393,6 @@ describe('Authentication Middleware', () => {
       });
     });
 
-    describe('@requirePermission directive', () => {
-      it('should pass request with required permission', () => {
-        // Arrange
-        const context = createMockGraphQLContext({
-          isAuthenticated: true,
-          user: USER_FIXTURES.STANDARD_USER,
-          permissions: ['card:read', 'workspace:read'],
-        });
-        const info = {
-          directive: {
-            arguments: {
-              permission: { value: 'card:read' }
-            }
-          },
-          operation: { operation: 'query' },
-          fieldName: 'cards',
-        };
-        const next = jest.fn();
-
-        // Act
-        authDirectives.requirePermission(next, null, null, context, info);
-
-        // Assert
-        expect(next).toHaveBeenCalled();
-      });
-
-      it('should reject unauthenticated request', () => {
-        // Arrange
-        const context = createMockGraphQLContext({
-          isAuthenticated: false,
-        });
-        const info = {
-          directive: {
-            arguments: {
-              permission: { value: 'card:read' }
-            }
-          }
-        };
-        const next = jest.fn();
-
-        // Act & Assert
-        expect(() => authDirectives.requirePermission(next, null, null, context, info))
-          .toThrow(AuthenticationError);
-      });
-
-      it('should reject request without required permission', () => {
-        // Arrange
-        const context = createMockGraphQLContext({
-          isAuthenticated: true,
-          user: USER_FIXTURES.STANDARD_USER,
-          permissions: ['card:read'],
-        });
-        const info = {
-          directive: {
-            arguments: {
-              permission: { value: 'admin:user_management' }
-            }
-          },
-          operation: { operation: 'mutation' },
-          fieldName: 'deleteUser',
-        };
-        const next = jest.fn();
-
-        // Act & Assert
-        expect(() => authDirectives.requirePermission(next, null, null, context, info))
-          .toThrow(AuthorizationError);
-      });
-    });
 
     describe('@requireRole directive', () => {
       it('should pass request with required role', () => {
@@ -656,35 +528,6 @@ describe('Authentication Middleware', () => {
       expect(mockNext).toHaveBeenCalledWith();
     });
 
-    it('should handle permission arrays with duplicate values', () => {
-      // Arrange
-      const permission = 'card:read';
-      const middleware = requirePermission(permission);
-
-      mockReq.isAuthenticated = true;
-      mockReq.user = USER_FIXTURES.STANDARD_USER;
-      mockReq.permissions = ['card:read', 'card:read', 'workspace:read'];
-
-      // Act
-      middleware(mockReq, mockRes, mockNext);
-
-      // Assert
-      expect(mockNext).toHaveBeenCalledWith();
-    });
-
-    it('should handle case-sensitive permission checks', () => {
-      // Arrange
-      const permission = 'Card:Read'; // Different case
-      const middleware = requirePermission(permission);
-
-      mockReq.isAuthenticated = true;
-      mockReq.user = USER_FIXTURES.STANDARD_USER;
-      mockReq.permissions = ['card:read']; // Lowercase
-
-      // Act & Assert
-      expect(() => middleware(mockReq, mockRes, mockNext))
-        .toThrow(AuthorizationError);
-    });
   });
 
   describe('Performance tests', () => {
@@ -719,15 +562,14 @@ describe('Authentication Middleware', () => {
       expect(mockNext).toHaveBeenCalledTimes(iterations);
     });
 
-    it('should handle permission checks efficiently', () => {
+    it('should handle role checks efficiently', () => {
       // Arrange
-      const permission = 'card:read';
-      const middleware = requirePermission(permission);
+      const role = 'user';
+      const middleware = requireRole(role);
       const iterations = 1000;
 
       mockReq.isAuthenticated = true;
       mockReq.user = USER_FIXTURES.STANDARD_USER;
-      mockReq.permissions = ['card:read', 'workspace:read'];
 
       const startTime = Date.now();
 

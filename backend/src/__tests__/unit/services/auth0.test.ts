@@ -265,7 +265,7 @@ describe('Auth0Service', () => {
           lastLogin: expect.any(Date),
         })
       );
-      expect(mockCacheService.set).toHaveBeenCalledTimes(2); // Permissions and Auth0 user cache
+      expect(mockCacheService.set).toHaveBeenCalledTimes(1); // Auth0 user cache only
     });
 
     it('should create new user when not found', async () => {
@@ -315,11 +315,7 @@ describe('Auth0Service', () => {
       await auth0Service.syncUserFromAuth0(auth0User);
 
       // Assert
-      expect(mockCacheService.set).toHaveBeenCalledWith(
-        expect.stringContaining('permissions:'),
-        adminUser.permissions,
-        60 * 60 * 1000
-      );
+      expect(mockCacheService.set).toHaveBeenCalled(); // Auth0 user should be cached
     });
 
     it('should handle cache service errors gracefully', async () => {
@@ -473,9 +469,6 @@ describe('Auth0Service', () => {
       expect(mockCacheService.del).toHaveBeenCalledWith(
         expect.stringContaining('session:')
       );
-      expect(mockCacheService.del).toHaveBeenCalledWith(
-        expect.stringContaining('permissions:')
-      );
     });
 
     it('should handle cache service errors gracefully', async () => {
@@ -489,89 +482,7 @@ describe('Auth0Service', () => {
     });
   });
 
-  describe('getUserPermissions', () => {
-    it('should return cached permissions', async () => {
-      // Arrange
-      const userId = 'test-user-id';
-      const permissions = ['card:read', 'workspace:read'];
 
-      mockCacheService.get.mockResolvedValue(JSON.stringify(permissions));
-
-      // Act
-      const result = await auth0Service.getUserPermissions(userId);
-
-      // Assert
-      expect(result).toEqual(permissions);
-      expect(mockUserService.findById).not.toHaveBeenCalled();
-    });
-
-    it('should fetch permissions from database when not cached', async () => {
-      // Arrange
-      const userId = 'test-user-id';
-      const user = USER_FIXTURES.STANDARD_USER;
-
-      mockCacheService.get.mockResolvedValue(null);
-      mockUserService.findById.mockResolvedValue(user);
-
-      // Act
-      const result = await auth0Service.getUserPermissions(userId);
-
-      // Assert
-      expect(result).toEqual(user.permissions);
-      expect(mockUserService.findById).toHaveBeenCalledWith(userId);
-      expect(mockCacheService.set).toHaveBeenCalledWith(
-        expect.stringContaining('permissions:'),
-        user.permissions,
-        60 * 60 * 1000
-      );
-    });
-
-    it('should return empty array for non-existent user', async () => {
-      // Arrange
-      const userId = 'non-existent-user';
-
-      mockCacheService.get.mockResolvedValue(null);
-      mockUserService.findById.mockResolvedValue(null);
-
-      // Act
-      const result = await auth0Service.getUserPermissions(userId);
-
-      // Assert
-      expect(result).toEqual([]);
-    });
-  });
-
-  describe('checkPermission', () => {
-    it('should return true for user with permission', async () => {
-      // Arrange
-      const userId = 'test-user-id';
-      const permission = 'card:read';
-      const permissions = ['card:read', 'workspace:read'];
-
-      mockCacheService.get.mockResolvedValue(JSON.stringify(permissions));
-
-      // Act
-      const result = await auth0Service.checkPermission(userId, permission);
-
-      // Assert
-      expect(result).toBe(true);
-    });
-
-    it('should return false for user without permission', async () => {
-      // Arrange
-      const userId = 'test-user-id';
-      const permission = 'admin:user_management';
-      const permissions = ['card:read', 'workspace:read'];
-
-      mockCacheService.get.mockResolvedValue(JSON.stringify(permissions));
-
-      // Act
-      const result = await auth0Service.checkPermission(userId, permission);
-
-      // Assert
-      expect(result).toBe(false);
-    });
-  });
 
   describe('healthCheck', () => {
     it('should return OK status for healthy Auth0 connection', async () => {
@@ -707,7 +618,6 @@ describe('Auth0Service', () => {
       // Assert
       expect(result).toBeDefined();
       expect(result?.roles).toContain('role with spaces');
-      expect(result?.permissions).toContain('permission:with:colons');
     });
   });
 

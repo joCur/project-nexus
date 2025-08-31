@@ -90,7 +90,6 @@ export const AUTH0_USER_FIXTURES = {
     name: 'John Doe',
     picture: 'https://example.com/avatars/john.jpg',
     roles: ['user'],
-    permissions: ['card:read', 'workspace:read'],
     userId: 'user-123-uuid',
   }),
 
@@ -101,11 +100,6 @@ export const AUTH0_USER_FIXTURES = {
     name: 'Admin User',
     picture: 'https://example.com/avatars/admin.jpg',
     roles: ['super_admin'],
-    permissions: [
-      'card:create', 'card:read', 'card:update', 'card:delete',
-      'workspace:create', 'workspace:read', 'workspace:update', 'workspace:delete',
-      'admin:user_management', 'admin:system_settings'
-    ],
     userId: 'admin-456-uuid',
   }),
 
@@ -116,10 +110,6 @@ export const AUTH0_USER_FIXTURES = {
     name: 'Workspace Owner',
     picture: 'https://example.com/avatars/owner.jpg',
     roles: ['workspace_owner'],
-    permissions: [
-      'card:create', 'card:read', 'card:update', 'card:delete',
-      'workspace:read', 'workspace:update', 'workspace:invite', 'workspace:manage_members'
-    ],
     userId: 'owner-789-uuid',
   }),
 
@@ -130,7 +120,6 @@ export const AUTH0_USER_FIXTURES = {
     name: 'Unverified User',
     picture: 'https://example.com/avatars/unverified.jpg',
     roles: ['user'],
-    permissions: ['card:read', 'workspace:read'],
     userId: 'unverified-555-uuid',
   }),
 };
@@ -279,20 +268,6 @@ export const GRAPHQL_FIXTURES = {
     }
   `,
 
-  GET_USER_PERMISSIONS_QUERY: `
-    query GetUserPermissions($userId: String!) {
-      getUserPermissions(userId: $userId)
-    }
-  `,
-
-  GRANT_PERMISSIONS_MUTATION: `
-    mutation GrantPermissions($userId: String!, $permissions: [String!]!) {
-      grantPermissions(userId: $userId, permissions: $permissions) {
-        id
-        permissions
-      }
-    }
-  `,
 };
 
 // HTTP Request Fixtures

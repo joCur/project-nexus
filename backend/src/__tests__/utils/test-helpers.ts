@@ -95,7 +95,6 @@ export function createMockAuth0User(overrides: Partial<Auth0User> = {}): Auth0Us
     exp: Math.floor(Date.now() / 1000) + 3600,
     scope: 'openid profile email',
     roles: ['user'],
-    permissions: ['card:read', 'workspace:read'],
     userId: randomUUID(),
     ...overrides,
   };
