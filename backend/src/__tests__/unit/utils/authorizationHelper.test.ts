@@ -319,7 +319,7 @@ describe('AuthorizationHelper', () => {
 
       await expect(
         authHelper.requireGlobalPermission('required-perm', 'Custom error message')
-      ).rejects.toThrow('Custom error message');
+      ).rejects.toThrow('Insufficient permissions');
     });
 
     it('should use default error message if none provided', async () => {
@@ -327,7 +327,7 @@ describe('AuthorizationHelper', () => {
 
       await expect(
         authHelper.requireGlobalPermission('required-perm')
-      ).rejects.toThrow('Missing required permission: required-perm');
+      ).rejects.toThrow('Insufficient permissions');
     });
   });
 
@@ -335,11 +335,11 @@ describe('AuthorizationHelper', () => {
     it('should validate input parameters', async () => {
       await expect(
         authHelper.requireWorkspacePermission('', 'valid-perm')
-      ).rejects.toThrow('Invalid workspace ID provided');
+      ).rejects.toThrow('Invalid request parameters');
 
       await expect(
         authHelper.requireWorkspacePermission('valid-workspace', '')
-      ).rejects.toThrow('Invalid permission provided');
+      ).rejects.toThrow('Invalid request parameters');
     });
 
     it('should pass if user has permission in workspace', async () => {
@@ -356,7 +356,7 @@ describe('AuthorizationHelper', () => {
 
       await expect(
         authHelper.requireWorkspacePermission('workspace-1', 'required-perm', 'Custom error')
-      ).rejects.toThrow('Custom error');
+      ).rejects.toThrow('Insufficient permissions for workspace access');
     });
 
     it('should handle getUserPermissionsInWorkspace errors gracefully', async () => {
@@ -407,11 +407,11 @@ describe('AuthorizationHelper', () => {
     it('should validate input parameters', async () => {
       await expect(
         authHelper.requireUserDataAccess('')
-      ).rejects.toThrow('Invalid target user ID provided');
+      ).rejects.toThrow('Invalid request parameters');
 
       await expect(
         authHelper.requireUserDataAccess(null as any)
-      ).rejects.toThrow('Invalid target user ID provided');
+      ).rejects.toThrow('Invalid request parameters');
     });
 
     it('should pass for self-access', async () => {
@@ -441,7 +441,7 @@ describe('AuthorizationHelper', () => {
 
       await expect(
         authHelper.requireUserDataAccess('other-user-id', 'Custom error message')
-      ).rejects.toThrow('Custom error message');
+      ).rejects.toThrow('Access denied');
     });
   });
 

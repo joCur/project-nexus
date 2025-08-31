@@ -2,6 +2,14 @@ import { AuthenticationError, AuthorizationError } from '@/utils/errors';
 import { securityLogger, createContextLogger } from '@/utils/logger';
 import { GraphQLContext } from '@/types';
 import { WorkspaceAuthorizationService } from '@/services/workspaceAuthorization';
+import { 
+  ERROR_CODES, 
+  GENERIC_ERROR_MESSAGES, 
+  DEBUG_ERROR_MESSAGES, 
+  getErrorMessage,
+  createErrorInfo,
+  isDevelopmentMode 
+} from '@/constants/errorCodes';
 
 const logger = createContextLogger({ service: 'AuthorizationHelper' });
 
@@ -421,9 +429,13 @@ export class AuthorizationHelper {
   ): Promise<void> {
     // Enhanced input validation with security checks
     if (!isValidPermission(permission)) {
+      const debugMessage = isDevelopmentMode() 
+        ? DEBUG_ERROR_MESSAGES.AUTHORIZATION.INVALID_PERMISSION(permission)
+        : undefined;
+
       const error = new AuthorizationError(
-        'Invalid request parameters', // Generic error - don't expose details
-        'INVALID_PERMISSION',
+        getErrorMessage(GENERIC_ERROR_MESSAGES.INVALID_REQUEST, debugMessage),
+        ERROR_CODES.AUTHORIZATION.INVALID_PERMISSION,
         'redacted', // Don't leak potentially malicious input
         []
       );
@@ -452,9 +464,13 @@ export class AuthorizationHelper {
         workspaceCount: Object.keys(await this.getUserPermissionsWithCache()).length || 0
       });
 
+      const debugMessage = isDevelopmentMode() 
+        ? DEBUG_ERROR_MESSAGES.AUTHORIZATION.MISSING_PERMISSION(permission)
+        : undefined;
+
       throw new AuthorizationError(
-        'Insufficient permissions', // Generic error message - don't expose specific permission
-        'INSUFFICIENT_PERMISSIONS',
+        getErrorMessage(GENERIC_ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS, debugMessage),
+        ERROR_CODES.AUTHORIZATION.GLOBAL_PERMISSION_DENIED,
         permission,
         [] // Don't expose user's actual permissions in error
       );
@@ -480,9 +496,13 @@ export class AuthorizationHelper {
   ): Promise<void> {
     // Enhanced input validation with security checks
     if (!isValidWorkspaceId(workspaceId)) {
+      const debugMessage = isDevelopmentMode() 
+        ? DEBUG_ERROR_MESSAGES.AUTHORIZATION.INVALID_WORKSPACE_ID(workspaceId)
+        : undefined;
+
       const error = new AuthorizationError(
-        'Invalid request parameters', // Generic error
-        'INVALID_WORKSPACE_ID',
+        getErrorMessage(GENERIC_ERROR_MESSAGES.INVALID_REQUEST, debugMessage),
+        ERROR_CODES.AUTHORIZATION.INVALID_WORKSPACE_ID,
         'redacted',
         []
       );
@@ -498,9 +518,13 @@ export class AuthorizationHelper {
     }
 
     if (!isValidPermission(permission)) {
+      const debugMessage = isDevelopmentMode() 
+        ? DEBUG_ERROR_MESSAGES.AUTHORIZATION.INVALID_PERMISSION(permission)
+        : undefined;
+
       const error = new AuthorizationError(
-        'Invalid request parameters', // Generic error
-        'INVALID_PERMISSION',
+        getErrorMessage(GENERIC_ERROR_MESSAGES.INVALID_REQUEST, debugMessage),
+        ERROR_CODES.AUTHORIZATION.INVALID_PERMISSION,
         'redacted',
         []
       );
@@ -541,9 +565,13 @@ export class AuthorizationHelper {
         authorizationContext: 'workspace_specific'
       });
 
+      const debugMessage = isDevelopmentMode() 
+        ? DEBUG_ERROR_MESSAGES.AUTHORIZATION.MISSING_PERMISSION(permission, workspaceId)
+        : undefined;
+
       throw new AuthorizationError(
-        'Insufficient permissions for workspace access', // Generic error message
-        'INSUFFICIENT_PERMISSIONS', 
+        getErrorMessage(GENERIC_ERROR_MESSAGES.WORKSPACE_ACCESS_DENIED, debugMessage),
+        ERROR_CODES.AUTHORIZATION.WORKSPACE_ACCESS_DENIED,
         permission,
         [] // Don't expose user's actual permissions in error
       );
@@ -582,9 +610,13 @@ export class AuthorizationHelper {
   ): Promise<void> {
     // Enhanced input validation with security checks
     if (!targetUserId || typeof targetUserId !== 'string' || targetUserId.trim().length === 0) {
+      const debugMessage = isDevelopmentMode() 
+        ? DEBUG_ERROR_MESSAGES.VALIDATION.FIELD_REQUIRED('targetUserId')
+        : undefined;
+
       const error = new AuthorizationError(
-        'Invalid request parameters', // Generic error
-        'INVALID_USER_ID',
+        getErrorMessage(GENERIC_ERROR_MESSAGES.INVALID_REQUEST, debugMessage),
+        ERROR_CODES.AUTHORIZATION.INVALID_USER_ID,
         'admin:user_management',
         []
       );
@@ -614,10 +646,14 @@ export class AuthorizationHelper {
         isSelfAccess: this.userId === targetUserId
       });
 
+      const debugMessage = isDevelopmentMode() 
+        ? `User '${this.userId}' lacks permission 'admin:user_management' to access data for user '${targetUserId}'`
+        : undefined;
+
       throw new AuthorizationError(
-        'Access denied', // Generic error message
-        'INSUFFICIENT_PERMISSIONS',
-        'admin:user_management', 
+        getErrorMessage(GENERIC_ERROR_MESSAGES.ACCESS_DENIED, debugMessage),
+        ERROR_CODES.AUTHORIZATION.USER_DATA_ACCESS_DENIED,
+        'admin:user_management',
         [] // Don't expose user's actual permissions in error
       );
     }

@@ -465,7 +465,7 @@ describe('End-to-End Authentication Flow Tests', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.errors).toBeDefined();
-      expect(response.body.errors[0].message).toContain('Insufficient permissions to grant permissions');
+      expect(response.body.errors[0].message).toContain('Insufficient permissions');
     });
 
     it('should allow users to access their own data', async () => {
@@ -537,7 +537,7 @@ describe('End-to-End Authentication Flow Tests', () => {
       expect(response.body.errors.length).toBeGreaterThan(0);
       expect(response.body.errors[0]).toBeDefined();
       expect(response.body.errors[0].message).toBeDefined();
-      expect(response.body.errors[0].message).toContain('Cannot access other user permissions');
+      expect(response.body.errors[0].message).toContain('Insufficient permissions');
     });
   });
 
