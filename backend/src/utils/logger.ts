@@ -136,6 +136,20 @@ export const securityLogger = {
   },
 
   /**
+   * Log successful authorization
+   */
+  authorizationSuccess: (userId: string, resource: string, action: string, metadata?: Record<string, unknown>) => {
+    logger.info('Authorization successful', {
+      event: 'authorization_success',
+      userId,
+      resource,
+      action,
+      timestamp: new Date().toISOString(),
+      ...metadata,
+    });
+  },
+
+  /**
    * Log suspicious activities
    */
   suspiciousActivity: (activity: string, metadata?: Record<string, unknown>) => {

@@ -82,5 +82,6 @@ export interface GraphQLContext {
     userProfileService: import('../services/userProfile').UserProfileService;
     onboardingService: import('../services/onboarding').OnboardingService;
     workspaceService: import('../services/workspace').WorkspaceService;
+    workspaceAuthorizationService: import('../services/workspaceAuthorization').WorkspaceAuthorizationService;
   };
 }

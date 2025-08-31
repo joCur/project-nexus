@@ -28,13 +28,20 @@ export const onboardingResolvers = {
       }
 
       // Users can only view their own onboarding unless they have admin permissions
-      if (context.user?.id !== userId && !context.permissions.includes('admin:user_management')) {
-        throw new AuthorizationError(
-          'Cannot access other user onboarding progress',
-          'INSUFFICIENT_PERMISSIONS',
-          'admin:user_management',
-          context.permissions
-        );
+      if (context.user?.id !== userId) {
+        const workspaceAuthService = context.dataSources.workspaceAuthorizationService;
+        const userPermissionsByWorkspace = await workspaceAuthService.getUserPermissionsForContext(context.user!.id);
+        const flatUserPermissions = Object.values(userPermissionsByWorkspace).flat();
+        const hasAdminPermission = flatUserPermissions.includes('admin:user_management');
+        
+        if (!hasAdminPermission) {
+          throw new AuthorizationError(
+            'Cannot access other user onboarding progress',
+            'INSUFFICIENT_PERMISSIONS',
+            'admin:user_management',
+            flatUserPermissions
+          );
+        }
       }
 
       const onboardingService = context.dataSources.onboardingService;
@@ -94,18 +101,25 @@ export const onboardingResolvers = {
       }
 
       // Users can only check their own onboarding unless they have admin permissions
-      if (context.user?.id !== userId && !context.permissions.includes('admin:user_management')) {
-        logger.warn('Unauthorized access attempt to onboarding completion check', {
-          requestingUserId: context.user?.id,
-          targetUserId: userId,
-          permissions: context.permissions
-        });
-        throw new AuthorizationError(
-          undefined, // Use default "Insufficient permissions" message
-          'INSUFFICIENT_PERMISSIONS',
-          'admin:user_management',
-          context.permissions
-        );
+      if (context.user?.id !== userId) {
+        const workspaceAuthService = context.dataSources.workspaceAuthorizationService;
+        const userPermissionsByWorkspace = await workspaceAuthService.getUserPermissionsForContext(context.user!.id);
+        const flatUserPermissions = Object.values(userPermissionsByWorkspace).flat();
+        const hasAdminPermission = flatUserPermissions.includes('admin:user_management');
+        
+        if (!hasAdminPermission) {
+          logger.warn('Unauthorized access attempt to onboarding completion check', {
+            requestingUserId: context.user?.id,
+            targetUserId: userId,
+            permissions: flatUserPermissions
+          });
+          throw new AuthorizationError(
+            undefined, // Use default "Insufficient permissions" message
+            'INSUFFICIENT_PERMISSIONS',
+            'admin:user_management',
+            flatUserPermissions
+          );
+        }
       }
 
       logger.info('Checking onboarding completion status', {
@@ -298,13 +312,20 @@ export const onboardingResolvers = {
       }
 
       // Users can only reset their own onboarding unless they have admin permissions
-      if (context.user?.id !== userId && !context.permissions.includes('admin:user_management')) {
-        throw new AuthorizationError(
-          undefined, // Use default "Insufficient permissions" message
-          'INSUFFICIENT_PERMISSIONS',
-          'admin:user_management',
-          context.permissions
-        );
+      if (context.user?.id !== userId) {
+        const workspaceAuthService = context.dataSources.workspaceAuthorizationService;
+        const userPermissionsByWorkspace = await workspaceAuthService.getUserPermissionsForContext(context.user!.id);
+        const flatUserPermissions = Object.values(userPermissionsByWorkspace).flat();
+        const hasAdminPermission = flatUserPermissions.includes('admin:user_management');
+        
+        if (!hasAdminPermission) {
+          throw new AuthorizationError(
+            undefined, // Use default "Insufficient permissions" message
+            'INSUFFICIENT_PERMISSIONS',
+            'admin:user_management',
+            flatUserPermissions
+          );
+        }
       }
 
       const onboardingService = context.dataSources.onboardingService;

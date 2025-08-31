@@ -6,6 +6,7 @@ import {
 } from '@/utils/errors';
 import { createContextLogger } from '@/utils/logger';
 import { GraphQLContext } from '@/types';
+import { createAuthorizationHelper } from '@/utils/authorizationHelper';
 
 /**
  * GraphQL resolvers for user management operations
@@ -28,14 +29,13 @@ export const userResolvers = {
       }
 
       // Users can only view their own profile unless they have admin permissions
-      if (context.user?.id !== id && !context.permissions.includes('admin:user_management')) {
-        throw new AuthorizationError(
-          'Cannot access other user profiles',
-          'INSUFFICIENT_PERMISSIONS',
-          'admin:user_management',
-          context.permissions
-        );
-      }
+      const authHelper = createAuthorizationHelper(context);
+      await authHelper.requireUserDataAccess(
+        id,
+        'Cannot access other user profiles',
+        'user_profile',
+        'read'
+      );
 
       const userService = context.dataSources.userService;
       const user = await userService.findById(id);
@@ -59,14 +59,13 @@ export const userResolvers = {
         throw new AuthenticationError();
       }
 
-      if (!context.permissions.includes('admin:user_management')) {
-        throw new AuthorizationError(
-          'Insufficient permissions to list users',
-          'INSUFFICIENT_PERMISSIONS',
-          'admin:user_management',
-          context.permissions
-        );
-      }
+      const authHelper = createAuthorizationHelper(context);
+      await authHelper.requireGlobalPermission(
+        'admin:user_management',
+        'Insufficient permissions to list users',
+        'users',
+        'list'
+      );
 
       const userService = context.dataSources.userService;
       return await userService.list(pagination);
@@ -106,14 +105,13 @@ export const userResolvers = {
         throw new AuthenticationError();
       }
 
-      if (!context.permissions.includes('admin:user_management')) {
-        throw new AuthorizationError(
-          'Insufficient permissions to create users',
-          'INSUFFICIENT_PERMISSIONS',
-          'admin:user_management',
-          context.permissions
-        );
-      }
+      const authHelper = createAuthorizationHelper(context);
+      await authHelper.requireGlobalPermission(
+        'admin:user_management',
+        'Insufficient permissions to create users',
+        'users',
+        'create'
+      );
 
       const userService = context.dataSources.userService;
 
@@ -151,21 +149,21 @@ export const userResolvers = {
       }
 
       // Users can only update their own profile unless they have admin permissions
-      if (context.user?.id !== id && !context.permissions.includes('admin:user_management')) {
-        throw new AuthorizationError(
-          'Cannot update other user profiles',
-          'INSUFFICIENT_PERMISSIONS',
-          'admin:user_management',
-          context.permissions
-        );
-      }
+      const authHelper = createAuthorizationHelper(context);
+      await authHelper.requireUserDataAccess(
+        id,
+        'Cannot update other user profiles',
+        'user_profile',
+        'update'
+      );
 
       const userService = context.dataSources.userService;
 
       try {
         // If non-admin is updating, restrict what they can change
         let allowedInput = input;
-        if (context.user?.id === id && !context.permissions.includes('admin:user_management')) {
+        const hasAdminPermission = await authHelper.hasGlobalPermission('admin:user_management');
+        if (context.user?.id === id && !hasAdminPermission) {
           // Regular users can only update display name and avatar
           allowedInput = {
             displayName: input.displayName,
@@ -206,14 +204,13 @@ export const userResolvers = {
         throw new AuthenticationError();
       }
 
-      if (!context.permissions.includes('admin:user_management')) {
-        throw new AuthorizationError(
-          'Insufficient permissions to delete users',
-          'INSUFFICIENT_PERMISSIONS',
-          'admin:user_management',
-          context.permissions
-        );
-      }
+      const authHelper = createAuthorizationHelper(context);
+      await authHelper.requireGlobalPermission(
+        'admin:user_management',
+        'Insufficient permissions to delete users',
+        'users',
+        'delete'
+      );
 
       // Prevent self-deletion
       if (context.user?.id === id) {
@@ -255,14 +252,13 @@ export const userResolvers = {
       }
 
       // Users can only update their own last login or admins can update any
-      if (context.user?.id !== userId && !context.permissions.includes('admin:user_management')) {
-        throw new AuthorizationError(
-          'Cannot update other user login timestamps',
-          'INSUFFICIENT_PERMISSIONS',
-          'admin:user_management',
-          context.permissions
-        );
-      }
+      const authHelper = createAuthorizationHelper(context);
+      await authHelper.requireUserDataAccess(
+        userId,
+        'Cannot update other user login timestamps',
+        'user_login_timestamp',
+        'update'
+      );
 
       const userService = context.dataSources.userService;
 

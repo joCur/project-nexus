@@ -1148,7 +1148,7 @@ export class ConnectionService {
   /**
    * Helper method to get card by ID for workspace validation
    */
-  private async getCardById(cardId: string): Promise<{ workspace_id: string } | null> {
+  async getCardById(cardId: string): Promise<{ workspace_id: string } | null> {
     return database.query<{ workspace_id: string } | null>(
       knex('cards')
         .where('id', cardId)

@@ -31,7 +31,7 @@ export const workspaceMemberResolvers = {
       }
 
       try {
-        const authService = new WorkspaceAuthorizationService();
+        const authService = context.dataSources.workspaceAuthorizationService;
         
         // Check if user has access to view workspace members
         await authService.requirePermission(
@@ -73,7 +73,7 @@ export const workspaceMemberResolvers = {
       }
 
       try {
-        const authService = new WorkspaceAuthorizationService();
+        const authService = context.dataSources.workspaceAuthorizationService;
         
         // Check access to workspace
         const hasAccess = await authService.hasWorkspaceAccess(
@@ -250,7 +250,7 @@ export const workspaceMemberResolvers = {
 
       try {
         const inviteService = new WorkspaceInvitationService();
-        const authService = new WorkspaceAuthorizationService();
+        const authService = context.dataSources.workspaceAuthorizationService;
 
         await inviteService.acceptInvite(input.token, context.user!.id);
 
@@ -368,7 +368,7 @@ export const workspaceMemberResolvers = {
       }
 
       try {
-        const authService = new WorkspaceAuthorizationService();
+        const authService = context.dataSources.workspaceAuthorizationService;
 
         // Check if requester has permission to manage members
         await authService.requirePermission(
@@ -423,7 +423,7 @@ export const workspaceMemberResolvers = {
       }
 
       try {
-        const authService = new WorkspaceAuthorizationService();
+        const authService = context.dataSources.workspaceAuthorizationService;
 
         // Check if requester has permission to manage members
         await authService.requirePermission(
@@ -466,7 +466,7 @@ export const workspaceMemberResolvers = {
       }
 
       try {
-        const authService = new WorkspaceAuthorizationService();
+        const authService = context.dataSources.workspaceAuthorizationService;
         
         // Users can always leave a workspace (except owners)
         await authService.removeMember(workspaceId, context.user!.id, context.user!.id);
@@ -535,7 +535,7 @@ export const workspaceMemberResolvers = {
       if (!context.isAuthenticated) return [];
 
       try {
-        const authService = new WorkspaceAuthorizationService();
+        const authService = context.dataSources.workspaceAuthorizationService;
         
         // Check if user has access to view workspace
         const hasAccess = await authService.hasWorkspaceAccess(
@@ -563,7 +563,7 @@ export const workspaceMemberResolvers = {
       if (!context.isAuthenticated) return 0;
 
       try {
-        const authService = new WorkspaceAuthorizationService();
+        const authService = context.dataSources.workspaceAuthorizationService;
         
         // Check if user has access to view workspace
         const hasAccess = await authService.hasWorkspaceAccess(
@@ -592,7 +592,7 @@ export const workspaceMemberResolvers = {
       if (!context.isAuthenticated) return null;
 
       try {
-        const authService = new WorkspaceAuthorizationService();
+        const authService = context.dataSources.workspaceAuthorizationService;
         const member = await authService.getWorkspaceMember(context.user!.id, workspace.id);
         return member?.role || null;
       } catch (error) {
