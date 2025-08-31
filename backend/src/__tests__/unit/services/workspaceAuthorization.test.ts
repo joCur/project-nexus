@@ -132,7 +132,8 @@ describe('WorkspaceAuthorizationService', () => {
   });
 
   describe('cache operations', () => {
-    test('getWorkspaceMember returns cached result when available', async () => {
+    describe('cache hits', () => {
+      test('getWorkspaceMember returns cached result when available', async () => {
       const cachedMember = {
         id: 'member-1',
         workspaceId: 'ws-1',
@@ -150,8 +151,10 @@ describe('WorkspaceAuthorizationService', () => {
       expect(mockCacheService.get).toHaveBeenCalledWith('workspace_member:ws-1:user-1');
       expect(result).toEqual(cachedMember);
     });
+    });
 
-    test('getWorkspaceMember queries database when cache miss', async () => {
+    describe('cache misses', () => {
+      test('getWorkspaceMember queries database when cache miss', async () => {
       mockCacheService.get.mockResolvedValue(null);
       
       // Mock database query
@@ -171,6 +174,7 @@ describe('WorkspaceAuthorizationService', () => {
       
       expect(mockCacheService.get).toHaveBeenCalled();
       expect(result).toBeNull();
+    });
     });
   });
 
@@ -368,7 +372,8 @@ describe('WorkspaceAuthorizationService', () => {
   });
 
   describe('error handling', () => {
-    test('getUserPermissionsInWorkspace handles database errors gracefully', async () => {
+    describe('database errors', () => {
+      test('getUserPermissionsInWorkspace handles database errors gracefully', async () => {
       mockCacheService.get.mockResolvedValue(null);
       jest.spyOn(authService, 'getWorkspaceMember').mockRejectedValue(new Error('Database connection failed'));
 
@@ -406,8 +411,10 @@ describe('WorkspaceAuthorizationService', () => {
       
       expect(result).toEqual({});
     });
+    });
 
-    test('handles cache service errors gracefully', async () => {
+    describe('cache errors', () => {
+      test('handles cache service errors gracefully', async () => {
       mockCacheService.get.mockRejectedValue(new Error('Redis connection failed'));
       mockCacheService.set.mockRejectedValue(new Error('Redis connection failed'));
       
@@ -428,6 +435,7 @@ describe('WorkspaceAuthorizationService', () => {
       // Should still work without cache
       expect(result).toContain('workspace:read');
       expect(result).toContain('card:read');
+    });
     });
   });
 

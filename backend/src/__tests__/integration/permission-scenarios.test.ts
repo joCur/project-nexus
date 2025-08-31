@@ -36,6 +36,11 @@ describe('End-to-End Permission Scenarios', () => {
   let mockCacheService: any;
   let mockWorkspaceAuthService: any;
 
+  // Test data with const assertions
+  const VIEWER_PERMISSIONS = ['workspace:read', 'canvas:read', 'card:read'] as const;
+  const EDITOR_PERMISSIONS = ['workspace:read', 'canvas:read', 'canvas:create', 'canvas:update', 'card:read', 'card:create', 'card:update'] as const;
+  const ADMIN_PERMISSIONS = ['workspace:read', 'workspace:update', 'canvas:read', 'canvas:create', 'canvas:update', 'canvas:delete', 'card:read', 'card:create', 'card:update', 'card:delete', 'member:invite', 'member:remove', 'member:update_role'] as const;
+
   // Test workspace and users
   const testWorkspace = createMockWorkspace({ id: 'ws-test', name: 'Test Workspace' });
   const viewerUser = createMockUser({ id: 'user-viewer', email: 'viewer@test.com', auth0UserId: 'auth0|viewer' });
@@ -65,22 +70,18 @@ describe('End-to-End Permission Scenarios', () => {
         sub: viewerUser.auth0UserId,
         email: viewerUser.email,
         roles: ['user'],
-      });
+      } as const);
 
       mockUserService.findByAuth0Id.mockResolvedValue(viewerUser);
 
       // Mock viewer permissions
       mockWorkspaceAuthService.getUserWorkspaceRole.mockResolvedValue('viewer');
-      mockWorkspaceAuthService.getUserPermissionsInWorkspace.mockResolvedValue([
-        'workspace:read',
-        'canvas:read',
-        'card:read'
-      ]);
+      mockWorkspaceAuthService.getUserPermissionsInWorkspace.mockResolvedValue([...VIEWER_PERMISSIONS]);
 
       mockWorkspaceAuthService.hasPermissionInWorkspace.mockImplementation(
         (userId: string, workspaceId: string, permission: string) => {
           if (userId === viewerUser.id && workspaceId === testWorkspace.id) {
-            return Promise.resolve(['workspace:read', 'canvas:read', 'card:read'].includes(permission));
+            return Promise.resolve(VIEWER_PERMISSIONS.includes(permission as any));
           }
           return Promise.resolve(false);
         }
@@ -179,31 +180,18 @@ describe('End-to-End Permission Scenarios', () => {
         sub: editorUser.auth0UserId,
         email: editorUser.email,
         roles: ['user'],
-      });
+      } as const);
 
       mockUserService.findByAuth0Id.mockResolvedValue(editorUser);
 
       // Mock editor permissions after promotion
       mockWorkspaceAuthService.getUserWorkspaceRole.mockResolvedValue('member'); // member = editor
-      mockWorkspaceAuthService.getUserPermissionsInWorkspace.mockResolvedValue([
-        'workspace:read',
-        'canvas:read',
-        'canvas:create',
-        'canvas:update',
-        'card:read',
-        'card:create',
-        'card:update'
-      ]);
+      mockWorkspaceAuthService.getUserPermissionsInWorkspace.mockResolvedValue([...EDITOR_PERMISSIONS]);
 
       mockWorkspaceAuthService.hasPermissionInWorkspace.mockImplementation(
         (userId: string, workspaceId: string, permission: string) => {
           if (userId === editorUser.id && workspaceId === testWorkspace.id) {
-            const editorPermissions = [
-              'workspace:read',
-              'canvas:read', 'canvas:create', 'canvas:update',
-              'card:read', 'card:create', 'card:update'
-            ];
-            return Promise.resolve(editorPermissions.includes(permission));
+            return Promise.resolve(EDITOR_PERMISSIONS.includes(permission as any));
           }
           return Promise.resolve(false);
         }
@@ -325,24 +313,12 @@ describe('End-to-End Permission Scenarios', () => {
 
       // Mock admin permissions
       mockWorkspaceAuthService.getUserWorkspaceRole.mockResolvedValue('admin');
-      mockWorkspaceAuthService.getUserPermissionsInWorkspace.mockResolvedValue([
-        'workspace:read',
-        'workspace:update',
-        'canvas:read', 'canvas:create', 'canvas:update', 'canvas:delete',
-        'card:read', 'card:create', 'card:update', 'card:delete',
-        'member:invite', 'member:remove', 'member:update_role'
-      ]);
+      mockWorkspaceAuthService.getUserPermissionsInWorkspace.mockResolvedValue([...ADMIN_PERMISSIONS]);
 
       mockWorkspaceAuthService.hasPermissionInWorkspace.mockImplementation(
         (userId: string, workspaceId: string, permission: string) => {
           if (userId === adminUser.id && workspaceId === testWorkspace.id) {
-            const adminPermissions = [
-              'workspace:read', 'workspace:update',
-              'canvas:read', 'canvas:create', 'canvas:update', 'canvas:delete',
-              'card:read', 'card:create', 'card:update', 'card:delete',
-              'member:invite', 'member:remove', 'member:update_role'
-            ];
-            return Promise.resolve(adminPermissions.includes(permission));
+            return Promise.resolve(ADMIN_PERMISSIONS.includes(permission as any));
           }
           return Promise.resolve(false);
         }
