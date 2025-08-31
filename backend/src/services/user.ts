@@ -17,6 +17,13 @@ import { z } from 'zod';
 /**
  * User Service - Repository layer for user management
  * Implements user CRUD operations with Auth0 integration
+ * 
+ * Migration Note (NEX-184):
+ * - User creation/update NO LONGER includes Auth0 permission fields
+ * - Permissions are managed exclusively by WorkspaceAuthorizationService
+ * - User sync now focuses only on identity data (email, displayName, avatarUrl, roles)
+ * 
+ * @see WorkspaceAuthorizationService for permission operations
  */
 
 const logger = createContextLogger({ service: 'UserService' });
@@ -29,14 +36,12 @@ const userCreateSchema = z.object({
   displayName: z.string().min(1).max(100).optional(),
   avatarUrl: z.string().url().optional(),
   roles: z.array(z.string()).optional().default([]),
-  permissions: z.array(z.string()).optional().default([]),
 });
 
 const userUpdateSchema = z.object({
   displayName: z.string().min(1).max(100).optional(),
   avatarUrl: z.string().url().optional(),
   roles: z.array(z.string()).optional(),
-  permissions: z.array(z.string()).optional(),
   lastLogin: z.date().optional(),
 });
 
@@ -65,7 +70,6 @@ export class UserService {
         display_name: validatedInput.displayName,
         avatar_url: validatedInput.avatarUrl,
         roles: JSON.stringify(validatedInput.roles || []),
-        permissions: JSON.stringify(validatedInput.permissions || []),
         metadata_synced_at: new Date(),
       };
 
@@ -195,10 +199,6 @@ export class UserService {
       }
       if (validatedInput.roles !== undefined) {
         updateData.roles = JSON.stringify(validatedInput.roles);
-        updateData.metadata_synced_at = new Date();
-      }
-      if (validatedInput.permissions !== undefined) {
-        updateData.permissions = JSON.stringify(validatedInput.permissions);
         updateData.metadata_synced_at = new Date();
       }
       if (validatedInput.lastLogin !== undefined) {
@@ -401,7 +401,6 @@ export class UserService {
       createdAt: new Date(dbUser.created_at),
       updatedAt: new Date(dbUser.updated_at),
       roles: typeof dbUser.roles === 'string' ? JSON.parse(dbUser.roles) : (dbUser.roles || []),
-      permissions: typeof dbUser.permissions === 'string' ? JSON.parse(dbUser.permissions) : (dbUser.permissions || []),
       metadataSyncedAt: new Date(dbUser.metadata_synced_at),
     };
   }

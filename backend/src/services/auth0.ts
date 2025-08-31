@@ -24,6 +24,15 @@ import { UserService } from './user';
  * Auth0 Integration Service
  * Handles JWT validation, user synchronization, and Auth0 Management API operations
  * Based on technical architecture specifications
+ * 
+ * Migration Guide (NEX-184):
+ * - Auth0 now handles ONLY authentication (identity verification) and high-level roles
+ * - Permissions are NO LONGER synchronized from Auth0 JWT tokens
+ * - Use WorkspaceAuthorizationService for all permission checks instead
+ * - Legacy getUserPermissions() and checkPermission() methods removed
+ * 
+ * @see WorkspaceAuthorizationService for permission management
+ * @see NEX-179 for overall migration strategy
  */
 export class Auth0Service {
   private readonly jwksClient: jwksClient.JwksClient;
@@ -96,9 +105,25 @@ export class Auth0Service {
         // Map custom claims to clean field names, with fallbacks to standard fields
         email: payload['https://api.nexus-app.de/email'] as string || payload.email as string,
         roles: payload['https://api.nexus-app.de/roles'] as string[] | undefined,
-        permissions: payload['https://api.nexus-app.de/permissions'] as string[] | undefined,
         userId: payload['https://api.nexus-app.de/user_id'] as string | undefined,
       };
+
+      // Migration Logging: Check for legacy Auth0 permission fields (NEX-184)
+      const legacyPermissions = payload['https://api.nexus-app.de/permissions'] as string[] | undefined;
+      if (legacyPermissions && legacyPermissions.length > 0) {
+        this.logger.warn('Legacy Auth0 permissions detected in JWT token - these are now ignored', {
+          auth0UserId: auth0User.sub,
+          email: auth0User.email,
+          legacyPermissionCount: legacyPermissions.length,
+          legacyPermissions,
+          migrationInfo: {
+            ticketId: 'NEX-184',
+            note: 'Permissions now managed by workspace authorization system (NEX-179)',
+            replacementSystem: 'WorkspaceAuthorizationService',
+            timestamp: new Date().toISOString(),
+          },
+        });
+      }
 
       const duration = Date.now() - startTime;
       performanceLogger.externalService('Auth0', 'token_validation', duration, true, {
@@ -162,7 +187,6 @@ export class Auth0Service {
         picture: auth0User.picture,
         hasEmail: !!auth0User.email,
         roles: auth0User.roles,
-        permissions: auth0User.permissions,
       });
 
       // Check if user exists in local database
@@ -179,7 +203,6 @@ export class Auth0Service {
         displayName: auth0User.name || auth0User.username || 'User',
         avatarUrl: auth0User.picture,
         roles: auth0User.roles || [],
-        permissions: auth0User.permissions || [],
         lastLogin: new Date(),
       };
 
@@ -215,15 +238,8 @@ export class Auth0Service {
         });
       }
 
-      // Cache user permissions for performance (handle cache errors gracefully)
+      // Cache Auth0 user data for performance (handle cache errors gracefully)
       try {
-        if (user.permissions.length > 0) {
-          await this.cacheService.set(
-            CacheKeys.USER_PERMISSIONS(user.id),
-            user.permissions,
-            60 * 60 * 1000 // 1 hour cache
-          );
-        }
 
         // Cache Auth0 user data
         await this.cacheService.set(
@@ -279,7 +295,6 @@ export class Auth0Service {
       userId: user.id,
       auth0UserId: auth0User.sub,
       email: user.email,
-      permissions: user.permissions,
       roles: user.roles,
       createdAt: new Date(),
       lastActivity: new Date(),
@@ -366,7 +381,6 @@ export class Auth0Service {
   async destroySession(userId: string): Promise<void> {
     try {
       await this.cacheService.del(CacheKeys.USER_SESSION(userId));
-      await this.cacheService.del(CacheKeys.USER_PERMISSIONS(userId));
       securityLogger.sessionEvent('destroyed', userId);
     } catch (error) {
       // Log error but don't throw - session destruction should always succeed
@@ -379,39 +393,6 @@ export class Auth0Service {
     }
   }
 
-  /**
-   * Gets user permissions with caching
-   */
-  async getUserPermissions(userId: string): Promise<string[]> {
-    // Try cache first
-    const cached = await this.cacheService.get(CacheKeys.USER_PERMISSIONS(userId));
-    if (cached) {
-      return JSON.parse(cached) as string[];
-    }
-
-    // Get from database
-    const user = await this.userService.findById(userId);
-    if (!user) {
-      return [];
-    }
-
-    // Cache permissions
-    await this.cacheService.set(
-      CacheKeys.USER_PERMISSIONS(userId),
-      user.permissions,
-      60 * 60 * 1000 // 1 hour cache
-    );
-
-    return user.permissions;
-  }
-
-  /**
-   * Checks if user has specific permission
-   */
-  async checkPermission(userId: string, permission: string): Promise<boolean> {
-    const permissions = await this.getUserPermissions(userId);
-    return permissions.includes(permission);
-  }
 
   /**
    * Gets signing key from Auth0 JWKS endpoint with caching

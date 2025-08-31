@@ -48,47 +48,6 @@ export const authResolvers = {
 
       return isValid;
     },
-
-    /**
-     * Get user permissions
-     */
-    getUserPermissions: async (
-      _: any, 
-      { userId }: { userId: string }, 
-      context: GraphQLContext
-    ) => {
-      // Only allow users to get their own permissions or admins to get any
-      if (!context.isAuthenticated) {
-        throw new AuthenticationError();
-      }
-
-      // Check if user is requesting their own permissions
-      if (context.user?.id === userId) {
-        // User can access their own permissions across all workspaces
-        const authHelper = createAuthorizationHelper(context);
-        const permissions = await authHelper.getFlatPermissions();
-        return permissions;
-      }
-
-      // For accessing other user permissions, check admin permission in user's context
-      const authHelper = createAuthorizationHelper(context);
-      await authHelper.requireGlobalPermission(
-        'admin:user_management',
-        'Cannot access other user permissions',
-        'user_permissions',
-        'access'
-      );
-
-      const workspaceAuthService = context.dataSources.workspaceAuthorizationService;
-      const targetPermissionsByWorkspace = await workspaceAuthService.getUserPermissionsForContext(userId);
-      
-      if (!targetPermissionsByWorkspace || typeof targetPermissionsByWorkspace !== 'object') {
-        return [];
-      }
-      
-      // Flatten permissions from all workspaces
-      return Object.values(targetPermissionsByWorkspace).flat().filter(Boolean);
-    },
   },
 
   Mutation: {
@@ -121,14 +80,34 @@ export const authResolvers = {
         securityLogger.authSuccess(user.id, auth0User.sub, {
           sessionId,
           email: user.email,
-          permissions: user.permissions,
+          roles: user.roles,
         });
+
+        // Get user permissions across all workspaces
+        const permissions = await (async () => {
+          try {
+            const workspacePermissions = await context.dataSources.workspaceAuthorizationService.getUserPermissionsForContext(user.id);
+            
+            // Flatten permissions from all workspaces into a single array
+            const allPermissions = Object.values(workspacePermissions || {}).flat();
+            
+            // Remove duplicates and return
+            return [...new Set(allPermissions)];
+          } catch (error) {
+            securityLogger.authFailure('permission_resolution', {
+              userId: user.id,
+              error: error instanceof Error ? error.message : 'Unknown error',
+            });
+            // Return empty array on error to maintain functionality
+            return [];
+          }
+        })();
 
         return {
           user,
           sessionId,
           expiresAt,
-          permissions: [], // Empty initially, will be resolved dynamically using WorkspaceAuthorizationService in NEX-182
+          permissions,
         };
 
       } catch (error) {
@@ -218,93 +197,6 @@ export const authResolvers = {
       }
     },
 
-    /**
-     * Grant permissions to user (admin only)
-     */
-    grantPermissions: async (
-      _: any,
-      { userId, permissions }: { userId: string; permissions: string[] },
-      context: GraphQLContext
-    ) => {
-      if (!context.isAuthenticated) {
-        throw new AuthenticationError();
-      }
-
-      // Check admin permission in user's context
-      const authHelper = createAuthorizationHelper(context);
-      await authHelper.requireGlobalPermission(
-        'admin:user_management',
-        'Insufficient permissions to grant permissions',
-        'user_permissions',
-        'grant'
-      );
-
-      const userService = context.dataSources.userService;
-
-      const user = await userService.findById(userId);
-      if (!user) {
-        throw new NotFoundError('User', userId);
-      }
-
-      // Merge with existing permissions
-      const updatedPermissions = Array.from(new Set([...user.permissions, ...permissions]));
-
-      const updatedUser = await userService.update(userId, {
-        permissions: updatedPermissions,
-      });
-
-      extendedSecurityLogger.authorizationSuccess(context.user!.id, 'user_permissions', 'grant', {
-        targetUserId: userId,
-        grantedPermissions: permissions,
-      });
-
-      return updatedUser;
-    },
-
-    /**
-     * Revoke permissions from user (admin only)
-     */
-    revokePermissions: async (
-      _: any,
-      { userId, permissions }: { userId: string; permissions: string[] },
-      context: GraphQLContext
-    ) => {
-      if (!context.isAuthenticated) {
-        throw new AuthenticationError();
-      }
-
-      // Check admin permission in user's context
-      const authHelper = createAuthorizationHelper(context);
-      await authHelper.requireGlobalPermission(
-        'admin:user_management',
-        'Insufficient permissions to revoke permissions',
-        'user_permissions',
-        'revoke'
-      );
-
-      const userService = context.dataSources.userService;
-
-      const user = await userService.findById(userId);
-      if (!user) {
-        throw new NotFoundError('User', userId);
-      }
-
-      // Remove specified permissions
-      const updatedPermissions = user.permissions.filter(
-        permission => !permissions.includes(permission)
-      );
-
-      const updatedUser = await userService.update(userId, {
-        permissions: updatedPermissions,
-      });
-
-      extendedSecurityLogger.authorizationSuccess(context.user!.id, 'user_permissions', 'revoke', {
-        targetUserId: userId,
-        revokedPermissions: permissions,
-      });
-
-      return updatedUser;
-    },
 
     /**
      * Assign role to user (admin only)

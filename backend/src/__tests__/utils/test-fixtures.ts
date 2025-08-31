@@ -20,7 +20,6 @@ export const JWT_FIXTURES = {
     email_verified: true,
     name: 'John Doe',
     'https://api.nexus-app.de/roles': ['user'],
-    'https://api.nexus-app.de/permissions': ['card:read', 'workspace:read'],
   }),
 
   ADMIN_TOKEN: generateMockJWT({
@@ -29,11 +28,6 @@ export const JWT_FIXTURES = {
     email_verified: true,
     name: 'Admin User',
     'https://api.nexus-app.de/roles': ['super_admin'],
-    'https://api.nexus-app.de/permissions': [
-      'card:create', 'card:read', 'card:update', 'card:delete',
-      'workspace:create', 'workspace:read', 'workspace:update', 'workspace:delete',
-      'admin:user_management', 'admin:system_settings'
-    ],
   }),
 
   WORKSPACE_OWNER_TOKEN: generateMockJWT({
@@ -42,10 +36,6 @@ export const JWT_FIXTURES = {
     email_verified: true,
     name: 'Workspace Owner',
     'https://api.nexus-app.de/roles': ['workspace_owner'],
-    'https://api.nexus-app.de/permissions': [
-      'card:create', 'card:read', 'card:update', 'card:delete',
-      'workspace:read', 'workspace:update', 'workspace:invite', 'workspace:manage_members'
-    ],
   }),
 
   LIMITED_USER_TOKEN: generateMockJWT({
@@ -54,7 +44,6 @@ export const JWT_FIXTURES = {
     email_verified: true,
     name: 'Limited User',
     'https://api.nexus-app.de/roles': ['workspace_viewer'],
-    'https://api.nexus-app.de/permissions': ['card:read', 'workspace:read'],
   }),
 
   EXPIRED_TOKEN: generateExpiredJWT({
@@ -90,7 +79,6 @@ export const AUTH0_USER_FIXTURES = {
     name: 'John Doe',
     picture: 'https://example.com/avatars/john.jpg',
     roles: ['user'],
-    permissions: ['card:read', 'workspace:read'],
     userId: 'user-123-uuid',
   }),
 
@@ -101,11 +89,6 @@ export const AUTH0_USER_FIXTURES = {
     name: 'Admin User',
     picture: 'https://example.com/avatars/admin.jpg',
     roles: ['super_admin'],
-    permissions: [
-      'card:create', 'card:read', 'card:update', 'card:delete',
-      'workspace:create', 'workspace:read', 'workspace:update', 'workspace:delete',
-      'admin:user_management', 'admin:system_settings'
-    ],
     userId: 'admin-456-uuid',
   }),
 
@@ -116,10 +99,6 @@ export const AUTH0_USER_FIXTURES = {
     name: 'Workspace Owner',
     picture: 'https://example.com/avatars/owner.jpg',
     roles: ['workspace_owner'],
-    permissions: [
-      'card:create', 'card:read', 'card:update', 'card:delete',
-      'workspace:read', 'workspace:update', 'workspace:invite', 'workspace:manage_members'
-    ],
     userId: 'owner-789-uuid',
   }),
 
@@ -130,7 +109,6 @@ export const AUTH0_USER_FIXTURES = {
     name: 'Unverified User',
     picture: 'https://example.com/avatars/unverified.jpg',
     roles: ['user'],
-    permissions: ['card:read', 'workspace:read'],
     userId: 'unverified-555-uuid',
   }),
 };
@@ -145,7 +123,6 @@ export const USER_FIXTURES = {
     displayName: 'John Doe',
     avatarUrl: 'https://example.com/avatars/john.jpg',
     roles: ['user'],
-    permissions: ['card:read', 'workspace:read'],
   }),
 
   ADMIN_USER: createMockUser({
@@ -156,11 +133,6 @@ export const USER_FIXTURES = {
     displayName: 'Admin User',
     avatarUrl: 'https://example.com/avatars/admin.jpg',
     roles: ['super_admin'],
-    permissions: [
-      'card:create', 'card:read', 'card:update', 'card:delete',
-      'workspace:create', 'workspace:read', 'workspace:update', 'workspace:delete',
-      'admin:user_management', 'admin:system_settings'
-    ],
   }),
 
   WORKSPACE_OWNER: createMockUser({
@@ -171,10 +143,6 @@ export const USER_FIXTURES = {
     displayName: 'Workspace Owner',
     avatarUrl: 'https://example.com/avatars/owner.jpg',
     roles: ['workspace_owner'],
-    permissions: [
-      'card:create', 'card:read', 'card:update', 'card:delete',
-      'workspace:read', 'workspace:update', 'workspace:invite', 'workspace:manage_members'
-    ],
   }),
 
   NEW_USER: {
@@ -184,7 +152,6 @@ export const USER_FIXTURES = {
     displayName: 'New User',
     avatarUrl: 'https://example.com/avatars/new.jpg',
     roles: ['user'],
-    permissions: ['card:read', 'workspace:read'],
   },
 };
 
@@ -194,7 +161,6 @@ export const SESSION_FIXTURES = {
     userId: 'user-123-uuid',
     auth0UserId: 'auth0|test_user_123',
     email: 'john.doe@example.com',
-    permissions: ['card:read', 'workspace:read'],
     roles: ['user'],
     createdAt: new Date(),
     lastActivity: new Date(),
@@ -205,7 +171,6 @@ export const SESSION_FIXTURES = {
     userId: 'user-456-uuid',
     auth0UserId: 'auth0|expired_user_456',
     email: 'expired@example.com',
-    permissions: ['card:read'],
     roles: ['user'],
     createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000), // 5 hours ago
     lastActivity: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
@@ -216,7 +181,6 @@ export const SESSION_FIXTURES = {
     userId: 'user-789-uuid',
     auth0UserId: 'auth0|inactive_user_789',
     email: 'inactive@example.com',
-    permissions: ['card:read'],
     roles: ['user'],
     createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
     lastActivity: new Date(Date.now() - 35 * 60 * 1000), // 35 minutes ago (inactive)
@@ -234,7 +198,6 @@ export const GRAPHQL_FIXTURES = {
           email
           displayName
           roles
-          permissions
         }
         sessionId
         expiresAt
@@ -250,7 +213,6 @@ export const GRAPHQL_FIXTURES = {
         email
         displayName
         roles
-        permissions
         lastLogin
         createdAt
       }
@@ -279,20 +241,6 @@ export const GRAPHQL_FIXTURES = {
     }
   `,
 
-  GET_USER_PERMISSIONS_QUERY: `
-    query GetUserPermissions($userId: String!) {
-      getUserPermissions(userId: $userId)
-    }
-  `,
-
-  GRANT_PERMISSIONS_MUTATION: `
-    mutation GrantPermissions($userId: String!, $permissions: [String!]!) {
-      grantPermissions(userId: $userId, permissions: $permissions) {
-        id
-        permissions
-      }
-    }
-  `,
 };
 
 // HTTP Request Fixtures

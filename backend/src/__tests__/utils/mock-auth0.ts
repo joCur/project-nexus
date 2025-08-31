@@ -112,7 +112,6 @@ export class MockAuth0TokenValidator {
         username: payload.username,
         email: payload.email || payload['https://api.nexus-app.de/email'] as string,
         roles: payload['https://api.nexus-app.de/roles'] as string[] || undefined,
-        permissions: payload['https://api.nexus-app.de/permissions'] as string[] || undefined,
         userId: payload['https://api.nexus-app.de/user_id'] as string || undefined,
         iat: payload.iat,
         exp: payload.exp,
@@ -338,8 +337,6 @@ export function createMockAuth0Service(scenario: keyof typeof AUTH0_TEST_SCENARI
     createSession: jest.fn(),
     validateSession: jest.fn(),
     destroySession: jest.fn(),
-    getUserPermissions: jest.fn(),
-    checkPermission: jest.fn(),
     healthCheck: jest.fn().mockResolvedValue({ status: 'OK', responseTime: 100 }),
   };
 }

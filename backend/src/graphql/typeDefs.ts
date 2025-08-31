@@ -25,7 +25,6 @@ export const authTypeDefs = gql`
     createdAt: DateTime!
     updatedAt: DateTime!
     roles: [String!]!
-    permissions: [String!]!
     metadataSyncedAt: DateTime!
     
     # Computed fields
@@ -338,7 +337,6 @@ export const authTypeDefs = gql`
     # Authentication queries
     me: User
     validateSession: Boolean!
-    getUserPermissions(userId: ID!): [String!]!
     
     # User queries
     user(id: ID!): User
@@ -424,9 +422,6 @@ export const authTypeDefs = gql`
     removeWorkspaceMember(workspaceId: ID!, userId: ID!): Boolean!
     leaveWorkspace(workspaceId: ID!): Boolean!
     
-    # Permission mutations
-    grantPermissions(userId: ID!, permissions: [String!]!): User!
-    revokePermissions(userId: ID!, permissions: [String!]!): User!
     assignRole(userId: ID!, role: UserRole!): User!
     removeRole(userId: ID!, role: UserRole!): User!
   }
@@ -444,7 +439,6 @@ export const authTypeDefs = gql`
 
   # Directives for authentication and authorization
   directive @auth on FIELD_DEFINITION
-  directive @requirePermission(permission: String!) on FIELD_DEFINITION
   directive @requireRole(role: UserRole!) on FIELD_DEFINITION
   directive @rateLimit(max: Int!, window: Int!) on FIELD_DEFINITION
 

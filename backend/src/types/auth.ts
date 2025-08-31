@@ -1,6 +1,19 @@
 /**
  * Auth0 and authentication-related type definitions
  * Based on technical architecture specifications
+ * 
+ * Breaking Changes (NEX-184):
+ * - Removed Auth0 permission synchronization fields
+ * - Removed GraphQL mutations: grantPermissions, revokePermissions
+ * - Removed GraphQL query: getUserPermissions
+ * - Auth0User interface no longer includes 'permissions' field
+ * 
+ * Migration Guide:
+ * - Replace getUserPermissions queries with WorkspaceAuthorizationService.getUserPermissions()
+ * - Replace grantPermissions mutations with workspace-based permission assignments
+ * - Use workspace authorization system for all permission operations
+ * 
+ * @see WorkspaceAuthorizationService for new permission management
  */
 
 export interface Auth0User {
@@ -18,7 +31,6 @@ export interface Auth0User {
   // Clean field names mapped from custom claims and standard fields
   email?: string; // Email from custom claims or standard field
   roles?: string[]; // User roles from custom claims
-  permissions?: string[]; // User permissions from custom claims
   userId?: string; // Internal user ID from custom claims
 }
 
@@ -36,7 +48,6 @@ export interface User {
   
   // Auth0 metadata cache for performance
   roles: string[];
-  permissions: string[];
   metadataSyncedAt: Date;
 }
 
@@ -47,21 +58,18 @@ export interface UserCreateInput {
   displayName?: string;
   avatarUrl?: string;
   roles?: string[];
-  permissions?: string[];
 }
 
 export interface UserUpdateInput {
   displayName?: string;
   avatarUrl?: string;
   roles?: string[];
-  permissions?: string[];
   lastLogin?: Date;
 }
 
 export interface AuthContext {
   user?: User;
   auth0Payload?: Auth0User;
-  permissions: string[];
   isAuthenticated: boolean;
   dataSources: {
     auth0Service: import('@/services/auth0').Auth0Service;
@@ -78,7 +86,6 @@ export interface SessionData {
   userId: string;
   auth0UserId: string;
   email: string;
-  permissions: string[];
   roles: string[];
   createdAt: Date;
   lastActivity: Date;

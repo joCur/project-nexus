@@ -4,8 +4,8 @@ import { UserService } from '@/services/user';
 import { CacheService } from '@/services/cache';
 import {
   AuthenticationError,
-  AuthorizationError,
-  NotFoundError,
+  AuthorizationError as _AuthorizationError,
+  NotFoundError as _NotFoundError,
 } from '@/utils/errors';
 import {
   createMockAuth0Service,
@@ -133,107 +133,6 @@ describe('GraphQL Authentication Integration Tests', () => {
     });
   });
 
-  describe('Query: getUserPermissions', () => {
-    it('should return user permissions for own user', async () => {
-      // Arrange
-      const userId = USER_FIXTURES.STANDARD_USER.id;
-      const context = createMockGraphQLContext({
-        isAuthenticated: true,
-        user: USER_FIXTURES.STANDARD_USER,
-        dataSources: { 
-          auth0Service: mockAuth0Service,
-          workspaceAuthorizationService: mockWorkspaceAuthService
-        },
-      });
-
-      // Mock workspace authorization service to return user permissions with duplicates to test deduplication
-      mockWorkspaceAuthService.getUserPermissionsForContext.mockResolvedValueOnce({
-        'workspace-1': ['perm1', 'perm2'],
-        'workspace-2': ['perm2', 'perm3'] // perm2 is duplicate
-      });
-
-      // Act
-      const result = await authResolvers.Query.getUserPermissions(
-        null,
-        { userId },
-        context
-      );
-
-      // Assert
-      expect(result).toEqual(['perm1', 'perm2', 'perm3']); // Should be flattened and deduplicated
-      expect(mockWorkspaceAuthService.getUserPermissionsForContext).toHaveBeenCalledWith(userId);
-    });
-
-    it('should return permissions for admin accessing other user', async () => {
-      // Arrange
-      const userId = USER_FIXTURES.STANDARD_USER.id;
-      const context = createMockGraphQLContext({
-        isAuthenticated: true,
-        user: USER_FIXTURES.ADMIN_USER,
-        permissions: ['admin:user_management'],
-        dataSources: { 
-          auth0Service: mockAuth0Service,
-          workspaceAuthorizationService: mockWorkspaceAuthService
-        },
-      });
-
-      // Mock admin user having admin permissions across workspaces
-      mockWorkspaceAuthService.getUserPermissionsForContext
-        .mockResolvedValueOnce({
-          'workspace-1': ['admin:user_management'], // Admin user permissions for authorization check
-        })
-        .mockResolvedValueOnce({
-          'workspace-1': ['perm1', 'perm2'], // Target user permissions
-        });
-
-      // Act
-      const result = await authResolvers.Query.getUserPermissions(
-        null,
-        { userId },
-        context
-      );
-
-      // Assert
-      expect(result).toEqual(['perm1', 'perm2']); // Target user's permissions flattened
-      expect(mockWorkspaceAuthService.getUserPermissionsForContext).toHaveBeenCalledTimes(2);
-    });
-
-    it('should throw AuthenticationError when not authenticated', async () => {
-      // Arrange
-      const userId = USER_FIXTURES.STANDARD_USER.id;
-      const context = createMockGraphQLContext({
-        isAuthenticated: false,
-      });
-
-      // Act & Assert
-      await expect(
-        authResolvers.Query.getUserPermissions(null, { userId }, context)
-      ).rejects.toThrow(AuthenticationError);
-    });
-
-    it('should throw AuthorizationError for unauthorized access', async () => {
-      // Arrange
-      const otherUserId = 'other-user-id';
-      const context = createMockGraphQLContext({
-        isAuthenticated: true,
-        user: USER_FIXTURES.STANDARD_USER,
-        permissions: ['card:read'], // No admin permissions
-        dataSources: {
-          workspaceAuthorizationService: mockWorkspaceAuthService
-        },
-      });
-
-      // Mock user has no admin permissions
-      mockWorkspaceAuthService.getUserPermissionsForContext.mockResolvedValue({
-        'workspace-1': ['card:read'], // No admin permissions
-      });
-
-      // Act & Assert
-      await expect(
-        authResolvers.Query.getUserPermissions(null, { userId: otherUserId }, context)
-      ).rejects.toThrow(AuthorizationError);
-    });
-  });
 
   describe('Mutation: syncUserFromAuth0', () => {
     it('should sync user successfully', async () => {
@@ -445,162 +344,7 @@ describe('GraphQL Authentication Integration Tests', () => {
     });
   });
 
-  describe('Mutation: grantPermissions', () => {
-    it('should grant permissions successfully', async () => {
-      // Arrange
-      const targetUserId = USER_FIXTURES.STANDARD_USER.id;
-      const newPermissions = ['card:delete'];
-      const context = createMockGraphQLContext({
-        isAuthenticated: true,
-        user: USER_FIXTURES.ADMIN_USER,
-        permissions: ['admin:user_management'],
-        dataSources: { 
-          userService: mockUserService,
-          workspaceAuthorizationService: mockWorkspaceAuthService
-        },
-      });
 
-      const updatedUser = {
-        ...USER_FIXTURES.STANDARD_USER,
-        permissions: [...USER_FIXTURES.STANDARD_USER.permissions, ...newPermissions],
-      };
-
-      // Mock admin user has admin permissions across workspaces
-      mockWorkspaceAuthService.getUserPermissionsForContext.mockResolvedValueOnce({
-        'workspace-1': ['admin:user_management'], // Admin user permissions for authorization check
-      });
-
-      mockUserService.findById.mockResolvedValue(USER_FIXTURES.STANDARD_USER);
-      mockUserService.update.mockResolvedValue(updatedUser);
-
-      // Act
-      const result = await authResolvers.Mutation.grantPermissions(
-        null,
-        { userId: targetUserId, permissions: newPermissions },
-        context
-      );
-
-      // Assert
-      expect(result).toBe(updatedUser);
-      expect(mockUserService.findById).toHaveBeenCalledWith(targetUserId);
-      expect(mockUserService.update).toHaveBeenCalledWith(
-        targetUserId,
-        expect.objectContaining({
-          permissions: expect.arrayContaining(newPermissions),
-        })
-      );
-    });
-
-    it('should throw AuthenticationError when not authenticated', async () => {
-      // Arrange
-      const context = createMockGraphQLContext({
-        isAuthenticated: false,
-      });
-
-      // Act & Assert
-      await expect(
-        authResolvers.Mutation.grantPermissions(
-          null,
-          { userId: 'user-id', permissions: ['card:read'] },
-          context
-        )
-      ).rejects.toThrow(AuthenticationError);
-    });
-
-    it('should throw AuthorizationError for insufficient permissions', async () => {
-      // Arrange
-      const context = createMockGraphQLContext({
-        isAuthenticated: true,
-        user: USER_FIXTURES.STANDARD_USER,
-        permissions: ['card:read'], // No admin permissions
-        dataSources: {
-          auth0Service: mockAuth0Service,
-          userService: mockUserService,
-          cacheService: mockCacheService,
-          workspaceAuthorizationService: mockWorkspaceAuthService,
-          userProfileService: null,
-          onboardingService: null,
-          workspaceService: null,
-        },
-      });
-
-      // Act & Assert
-      await expect(
-        authResolvers.Mutation.grantPermissions(
-          null,
-          { userId: 'user-id', permissions: ['card:delete'] },
-          context
-        )
-      ).rejects.toThrow(AuthorizationError);
-    });
-
-    it('should throw NotFoundError for non-existent user', async () => {
-      // Arrange
-      const context = createMockGraphQLContext({
-        isAuthenticated: true,
-        user: USER_FIXTURES.ADMIN_USER,
-        permissions: ['admin:user_management'],
-        dataSources: { 
-          userService: mockUserService,
-          workspaceAuthorizationService: mockWorkspaceAuthService
-        },
-      });
-
-      mockUserService.findById.mockResolvedValue(null);
-
-      // Act & Assert
-      await expect(
-        authResolvers.Mutation.grantPermissions(
-          null,
-          { userId: 'non-existent', permissions: ['card:read'] },
-          context
-        )
-      ).rejects.toThrow(NotFoundError);
-    });
-  });
-
-  describe('Mutation: revokePermissions', () => {
-    it('should revoke permissions successfully', async () => {
-      // Arrange
-      const targetUserId = USER_FIXTURES.ADMIN_USER.id;
-      const permissionsToRevoke = ['admin:system_settings'];
-      const context = createMockGraphQLContext({
-        isAuthenticated: true,
-        user: USER_FIXTURES.ADMIN_USER,
-        permissions: ['admin:user_management'],
-        dataSources: { 
-          userService: mockUserService,
-          workspaceAuthorizationService: mockWorkspaceAuthService
-        },
-      });
-
-      const updatedUser = {
-        ...USER_FIXTURES.ADMIN_USER,
-        permissions: USER_FIXTURES.ADMIN_USER.permissions.filter(
-          p => !permissionsToRevoke.includes(p)
-        ),
-      };
-
-      mockUserService.findById.mockResolvedValue(USER_FIXTURES.ADMIN_USER);
-      mockUserService.update.mockResolvedValue(updatedUser);
-
-      // Act
-      const result = await authResolvers.Mutation.revokePermissions(
-        null,
-        { userId: targetUserId, permissions: permissionsToRevoke },
-        context
-      );
-
-      // Assert
-      expect(result).toBe(updatedUser);
-      expect(mockUserService.update).toHaveBeenCalledWith(
-        targetUserId,
-        expect.objectContaining({
-          permissions: expect.not.arrayContaining(permissionsToRevoke),
-        })
-      );
-    });
-  });
 
   describe('Mutation: assignRole', () => {
     it('should assign role successfully', async () => {
@@ -624,6 +368,11 @@ describe('GraphQL Authentication Integration Tests', () => {
 
       mockUserService.findById.mockResolvedValue(USER_FIXTURES.STANDARD_USER);
       mockUserService.update.mockResolvedValue(updatedUser);
+      
+      // Mock workspace authorization to allow admin permissions
+      mockWorkspaceAuthService.getUserPermissionsForContext.mockResolvedValue({
+        'workspace-1': ['admin:user_management']
+      });
 
       // Act
       const result = await authResolvers.Mutation.assignRole(
@@ -658,6 +407,11 @@ describe('GraphQL Authentication Integration Tests', () => {
 
       mockUserService.findById.mockResolvedValue(USER_FIXTURES.STANDARD_USER);
       mockUserService.update.mockResolvedValue(USER_FIXTURES.STANDARD_USER);
+      
+      // Mock workspace authorization to allow admin permissions
+      mockWorkspaceAuthService.getUserPermissionsForContext.mockResolvedValue({
+        'workspace-1': ['admin:user_management']
+      });
 
       // Act
       const result = await authResolvers.Mutation.assignRole(
@@ -699,6 +453,11 @@ describe('GraphQL Authentication Integration Tests', () => {
 
       mockUserService.findById.mockResolvedValue(USER_FIXTURES.ADMIN_USER);
       mockUserService.update.mockResolvedValue(updatedUser);
+      
+      // Mock workspace authorization to allow admin permissions
+      mockWorkspaceAuthService.getUserPermissionsForContext.mockResolvedValue({
+        'workspace-1': ['admin:user_management']
+      });
 
       // Act
       const result = await authResolvers.Mutation.removeRole(
@@ -848,9 +607,9 @@ describe('GraphQL Authentication Integration Tests', () => {
 
       // Act & Assert
       await expect(
-        authResolvers.Mutation.grantPermissions(
+        authResolvers.Mutation.assignRole(
           null,
-          { userId: '', permissions: [] }, // Empty values
+          { userId: '', role: '' }, // Empty values
           context
         )
       ).rejects.toThrow();
@@ -873,9 +632,9 @@ describe('GraphQL Authentication Integration Tests', () => {
 
       // Act & Assert
       await expect(
-        authResolvers.Mutation.grantPermissions(
+        authResolvers.Mutation.assignRole(
           null,
-          { userId: USER_FIXTURES.STANDARD_USER.id, permissions: ['new:permission'] },
+          { userId: USER_FIXTURES.STANDARD_USER.id, role: 'new_role' },
           context
         )
       ).rejects.toThrow();
@@ -905,9 +664,8 @@ describe('GraphQL Authentication Integration Tests', () => {
       expect(duration).toBeLessThan(1000); // Should complete within 1 second
     });
 
-    it('should handle large permission arrays efficiently', async () => {
+    it('should handle role assignment efficiently', async () => {
       // Arrange
-      const largePermissionArray = Array(1000).fill(null).map((_, i) => `permission:${i}`);
       const context = createMockGraphQLContext({
         isAuthenticated: true,
         user: USER_FIXTURES.ADMIN_USER,
@@ -920,21 +678,26 @@ describe('GraphQL Authentication Integration Tests', () => {
 
       const updatedUser = {
         ...USER_FIXTURES.STANDARD_USER,
-        permissions: largePermissionArray,
+        roles: [...USER_FIXTURES.STANDARD_USER.roles, 'new_role'],
       };
 
       mockUserService.findById.mockResolvedValue(USER_FIXTURES.STANDARD_USER);
       mockUserService.update.mockResolvedValue(updatedUser);
+      
+      // Mock workspace authorization to allow admin permissions
+      mockWorkspaceAuthService.getUserPermissionsForContext.mockResolvedValue({
+        'workspace-1': ['admin:user_management']
+      });
 
       // Act
-      const result = await authResolvers.Mutation.grantPermissions(
+      const result = await authResolvers.Mutation.assignRole(
         null,
-        { userId: USER_FIXTURES.STANDARD_USER.id, permissions: largePermissionArray },
+        { userId: USER_FIXTURES.STANDARD_USER.id, role: 'new_role' },
         context
       );
 
       // Assert
-      expect(result.permissions).toHaveLength(1000);
+      expect(result.roles).toContain('new_role');
     });
   });
 });

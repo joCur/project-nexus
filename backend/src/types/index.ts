@@ -71,7 +71,6 @@ export interface HealthCheckResponse {
 export interface GraphQLContext {
   user?: import('./auth').User;
   auth0Payload?: import('./auth').Auth0User;
-  permissions: string[];
   isAuthenticated: boolean;
   req: import('express').Request;
   res: import('express').Response;

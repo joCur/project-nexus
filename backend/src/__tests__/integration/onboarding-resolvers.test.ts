@@ -51,10 +51,8 @@ describe('Onboarding GraphQL Resolvers', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
         roles: ['user'],
-        permissions: ['user:read', 'user:update'],
         metadataSyncedAt: new Date(),
       },
-      permissions: ['user:read', 'user:update'],
       dataSources: {
         userService: {} as any,
         auth0Service: {} as any,
@@ -88,7 +86,6 @@ describe('Onboarding GraphQL Resolvers', () => {
     });
 
     it('should return onboarding progress for other user with admin permissions', async () => {
-      mockContext.permissions = ['admin:user_management'];
       // Mock the workspaceAuthorizationService to return admin permissions
       (mockContext.dataSources.workspaceAuthorizationService.getUserPermissionsForContext as jest.Mock)
         .mockResolvedValue({ 'workspace-1': ['admin:user_management'] });
@@ -184,7 +181,6 @@ describe('Onboarding GraphQL Resolvers', () => {
     });
 
     it('should return completion status for other user with admin permissions', async () => {
-      mockContext.permissions = ['admin:user_management'];
       // Mock the workspaceAuthorizationService to return admin permissions
       (mockContext.dataSources.workspaceAuthorizationService.getUserPermissionsForContext as jest.Mock)
         .mockResolvedValue({ 'workspace-1': ['admin:user_management'] });
@@ -360,7 +356,6 @@ describe('Onboarding GraphQL Resolvers', () => {
     });
 
     it('should reset onboarding for other user with admin permissions', async () => {
-      mockContext.permissions = ['admin:user_management'];
       // Mock the workspaceAuthorizationService to return admin permissions
       (mockContext.dataSources.workspaceAuthorizationService.getUserPermissionsForContext as jest.Mock)
         .mockResolvedValue({ 'workspace-1': ['admin:user_management'] });
@@ -459,8 +454,9 @@ describe('Onboarding GraphQL Resolvers', () => {
     });
 
     it('should validate admin permissions correctly', async () => {
-      // Test with insufficient admin permissions
-      mockContext.permissions = ['admin:read_only'];
+      // Test with insufficient admin permissions - workspace authorization service should handle this
+      (mockContext.dataSources.workspaceAuthorizationService.getUserPermissionsForContext as jest.Mock)
+        .mockResolvedValue({}); // No admin permissions
 
       await expect(
         onboardingResolvers.Query.onboardingProgress(
@@ -472,7 +468,6 @@ describe('Onboarding GraphQL Resolvers', () => {
     });
 
     it('should handle multiple admin permissions', async () => {
-      mockContext.permissions = ['admin:user_management', 'admin:system'];
       // Mock the workspaceAuthorizationService to return admin permissions
       (mockContext.dataSources.workspaceAuthorizationService.getUserPermissionsForContext as jest.Mock)
         .mockResolvedValue({ 'workspace-1': ['admin:user_management', 'admin:system'] });

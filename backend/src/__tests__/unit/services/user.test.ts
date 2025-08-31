@@ -62,7 +62,6 @@ describe('UserService', () => {
         displayName: 'Test User',
         avatarUrl: 'https://example.com/avatar.jpg',
         roles: ['user'],
-        permissions: ['card:read', 'workspace:read'],
       };
 
       const expectedDbUser = {
@@ -73,7 +72,6 @@ describe('UserService', () => {
         display_name: 'Test User',
         avatar_url: 'https://example.com/avatar.jpg',
         roles: ['user'],
-        permissions: ['card:read', 'workspace:read'],
         created_at: new Date(),
         updated_at: new Date(),
         metadata_synced_at: new Date(),
@@ -94,7 +92,6 @@ describe('UserService', () => {
       expect(result.emailVerified).toBe(createInput.emailVerified);
       expect(result.displayName).toBe(createInput.displayName);
       expect(result.roles).toEqual(createInput.roles);
-      expect(result.permissions).toEqual(createInput.permissions);
 
       expect(mockDatabaseQuery).toHaveBeenCalledWith(
         expect.anything(),
@@ -117,7 +114,6 @@ describe('UserService', () => {
         display_name: null,
         avatar_url: null,
         roles: [],
-        permissions: [],
         created_at: new Date(),
         updated_at: new Date(),
         metadata_synced_at: new Date(),
@@ -136,7 +132,6 @@ describe('UserService', () => {
       expect(result.auth0UserId).toBe(minimalInput.auth0UserId);
       expect(result.emailVerified).toBe(false);
       expect(result.roles).toEqual([]);
-      expect(result.permissions).toEqual([]);
     });
 
     it('should validate email format', async () => {
@@ -208,7 +203,6 @@ describe('UserService', () => {
         display_name: 'Test User',
         avatar_url: 'https://example.com/avatar.jpg',
         roles: ['user'],
-        permissions: ['card:read'],
         created_at: new Date(),
         updated_at: new Date(),
         metadata_synced_at: new Date(),
@@ -266,7 +260,6 @@ describe('UserService', () => {
         email_verified: true,
         display_name: 'Test User',
         roles: ['user'],
-        permissions: ['card:read'],
         created_at: new Date(),
         updated_at: new Date(),
         metadata_synced_at: new Date(),
@@ -310,7 +303,6 @@ describe('UserService', () => {
         email_verified: true,
         display_name: 'Test User',
         roles: ['user'],
-        permissions: ['card:read'],
         created_at: new Date(),
         updated_at: new Date(),
         metadata_synced_at: new Date(),
@@ -338,7 +330,6 @@ describe('UserService', () => {
         email: 'test@example.com', // Stored in lowercase
         auth0_user_id: 'auth0|test_user_123',
         roles: [],
-        permissions: [],
         created_at: new Date(),
         updated_at: new Date(),
         metadata_synced_at: new Date(),
@@ -379,7 +370,6 @@ describe('UserService', () => {
       const updateData = {
         displayName: 'Updated Name',
         roles: ['admin'],
-        permissions: ['admin:user_management'],
       };
 
       const updatedDbUser = {
@@ -390,7 +380,6 @@ describe('UserService', () => {
         display_name: updateData.displayName,
         avatar_url: existingUser.avatarUrl,
         roles: updateData.roles,
-        permissions: updateData.permissions,
         created_at: existingUser.createdAt,
         updated_at: new Date(),
         metadata_synced_at: new Date(),
@@ -410,7 +399,6 @@ describe('UserService', () => {
       expect(result).toBeDefined();
       expect(result.displayName).toBe(updateData.displayName);
       expect(result.roles).toEqual(updateData.roles);
-      expect(result.permissions).toEqual(updateData.permissions);
       expect(mockDatabaseQuery).toHaveBeenCalledTimes(2);
     });
 
@@ -469,19 +457,17 @@ describe('UserService', () => {
       expect(mockDatabaseQuery).not.toHaveBeenCalled();
     });
 
-    it('should update metadata_synced_at when roles or permissions change', async () => {
+    it('should update metadata_synced_at when roles change', async () => {
       // Arrange
       const userId = 'user-123-uuid';
       const existingUser = USER_FIXTURES.STANDARD_USER;
       const updateData = {
         roles: ['admin'],
-        permissions: ['admin:user_management'],
       };
 
       const updatedDbUser = {
         ...existingUser,
         roles: updateData.roles,
-        permissions: updateData.permissions,
         updated_at: new Date(),
         metadata_synced_at: new Date(),
       };
@@ -743,7 +729,6 @@ describe('UserService', () => {
         created_at: '2023-01-01T00:00:00.000Z',
         updated_at: '2023-01-01T00:00:00.000Z',
         roles: ['user'],
-        permissions: ['card:read'],
         metadata_synced_at: '2023-01-01T00:00:00.000Z',
       };
 
@@ -766,7 +751,6 @@ describe('UserService', () => {
       expect(result?.updatedAt).toBeInstanceOf(Date);
       expect(result?.metadataSyncedAt).toBeInstanceOf(Date);
       expect(result?.roles).toEqual(dbUser.roles);
-      expect(result?.permissions).toEqual(dbUser.permissions);
     });
 
     it('should handle null values correctly', async () => {
@@ -783,7 +767,6 @@ describe('UserService', () => {
         created_at: '2023-01-01T00:00:00.000Z',
         updated_at: '2023-01-01T00:00:00.000Z',
         roles: null,
-        permissions: null,
         metadata_synced_at: '2023-01-01T00:00:00.000Z',
       };
 
@@ -798,7 +781,6 @@ describe('UserService', () => {
       expect(result?.lastLogin).toBeUndefined();
       expect(result?.auth0UpdatedAt).toBeUndefined();
       expect(result?.roles).toEqual([]);
-      expect(result?.permissions).toEqual([]);
     });
   });
 

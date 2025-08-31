@@ -155,36 +155,6 @@ export function requireAuth(req: AuthenticatedRequest, res: Response, next: Next
   next();
 }
 
-/**
- * Middleware to require specific permission
- */
-export function requirePermission(permission: string) {
-  return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    if (!req.isAuthenticated) {
-      throw new AuthenticationError();
-    }
-
-    // Check if user has super_admin role - allows bypassing permission checks
-    const isAdmin = req.user?.roles.includes('super_admin');
-    
-    if (!isAdmin && !req.permissions.includes(permission)) {
-      securityLogger.authorizationFailure(req.user!.id, 'permission', permission, {
-        userPermissions: req.permissions,
-        path: req.path,
-        method: req.method,
-      });
-
-      throw new AuthorizationError(
-        `Permission required: ${permission}`,
-        'INSUFFICIENT_PERMISSIONS',
-        permission,
-        req.permissions
-      );
-    }
-
-    next();
-  };
-}
 
 /**
  * Middleware to require specific role
@@ -270,41 +240,6 @@ export const authDirectives = {
     return next();
   },
 
-  /**
-   * @requirePermission directive - requires specific permission
-   */
-  requirePermission: (next: any, source: any, args: any, context: AuthContext, info: any) => {
-    if (!context.isAuthenticated) {
-      throw new AuthenticationError();
-    }
-
-    const permission = info.directive.arguments.permission.value;
-    
-    // Check if user has super_admin role - allows bypassing permission checks
-    const isAdmin = context.user?.roles.includes('super_admin');
-    
-    if (!isAdmin && !context.permissions.includes(permission)) {
-      securityLogger.authorizationFailure(
-        context.user?.id || 'unknown',
-        'graphql_permission',
-        permission,
-        {
-          userPermissions: context.permissions,
-          operation: info.operation.operation,
-          fieldName: info.fieldName,
-        }
-      );
-
-      throw new AuthorizationError(
-        `Permission required: ${permission}`,
-        'INSUFFICIENT_PERMISSIONS',
-        permission,
-        context.permissions
-      );
-    }
-
-    return next();
-  },
 
   /**
    * @requireRole directive - requires specific role
