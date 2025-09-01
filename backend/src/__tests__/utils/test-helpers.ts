@@ -449,6 +449,8 @@ export function createMockWorkspaceService() {
     removeMember: jest.fn(),
     updateMemberRole: jest.fn(),
     getMembers: jest.fn(),
+    // Add missing methods used in tests
+    findById: jest.fn(),
   } as any;
 }
 
@@ -468,6 +470,12 @@ export function createMockCanvasService() {
     duplicateCanvas: jest.fn(),
     getCanvasStats: jest.fn(),
     getCanvasStatistics: jest.fn(),
+    // Add missing methods used in tests
+    create: jest.fn(),
+    findById: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+    findByWorkspace: jest.fn(),
   } as any;
 }
 
@@ -600,23 +608,36 @@ export async function createTestApp() {
     userService: createMockUserService(),
     cacheService: createMockCacheService(),
     canvasService: createMockCanvasService(),
+    cardService: createMockCardService(),
   };
   
   // Using imported schema and resolvers
   
   // Mock authentication middleware
-  app.use('/graphql', (req: any, res: any, next: any) => {
+  app.use('/graphql', async (req: any, res: any, next: any) => {
     const auth = req.headers.authorization;
     const userSub = req.headers['x-user-sub'];
     const userEmail = req.headers['x-user-email'];
     
     if (auth && userSub) {
       req.isAuthenticated = true;
-      req.user = {
-        id: userSub.replace('auth0|', ''),
-        email: userEmail,
-        sub: userSub,
-      };
+      
+      // Look up the full user from the mock service
+      try {
+        const fullUser = await testMockServices.userService.findByAuth0Id(userSub);
+        req.user = fullUser || {
+          id: userSub.replace('auth0|', ''),
+          email: userEmail,
+          sub: userSub,
+        };
+      } catch (error) {
+        // Fallback to basic user if lookup fails
+        req.user = {
+          id: userSub.replace('auth0|', ''),
+          email: userEmail,
+          sub: userSub,
+        };
+      }
     } else {
       req.isAuthenticated = false;
       req.user = null;

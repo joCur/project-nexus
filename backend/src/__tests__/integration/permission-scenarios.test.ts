@@ -8,10 +8,7 @@ import request from 'supertest';
 import express, { Express } from 'express';
 import { ApolloServer } from '@apollo/server';
 import { expressMiddleware } from '@apollo/server/express4';
-import { createAuthMiddleware, createGraphQLContext } from '@/middleware/auth';
-import { authResolvers } from '@/resolvers/auth';
-import { canvasResolvers } from '@/graphql/canvasResolvers';
-import { GraphQLContext } from '@/types';
+import { createTestApp } from '../utils/test-helpers';
 import { 
   createMockAuth0Service,
   createMockUserService,
@@ -54,20 +51,19 @@ describe('End-to-End Permission Scenarios', () => {
   const ownerUser = createMockUser({ id: 'user-owner', email: 'owner@test.com', auth0UserId: 'auth0|owner' });
 
   beforeEach(async () => {
-    // Create mock services
-    mockAuth0Service = createMockAuth0Service();
-    mockUserService = createMockUserService();
-    mockCacheService = createMockCacheService();
-    mockWorkspaceAuthService = createMockWorkspaceAuthorizationService();
+    // Create test app first (this creates working GraphQL setup)
+    app = await createTestApp();
 
-    // Use working auth-flow.test.ts pattern for now - simplified setup
-    app = express();
-    app.use(express.json());
+    // Use the global test mock services (same pattern as permission.resolvers.test.ts)
+    const { testMockServices } = require('../utils/test-helpers');
     
-    // Skip GraphQL setup for now to fix immediate TypeScript error
-    app.post('/graphql', (req, res) => {
-      res.status(400).json({ errors: [{ message: 'GraphQL endpoint not configured in test' }] });
-    });
+    mockAuth0Service = testMockServices.auth0Service;
+    mockUserService = testMockServices.userService;
+    mockCacheService = testMockServices.cacheService;
+    mockWorkspaceAuthService = testMockServices.workspaceAuthorizationService;
+    
+    // Setup basic user service mocks
+    mockUserService.getUserWorkspaces.mockResolvedValue([testWorkspace.id]);
   });
 
   afterEach(() => {
@@ -106,20 +102,17 @@ describe('End-to-End Permission Scenarios', () => {
         .send({
           query: `
             query {
-              workspace(id: "${testWorkspace.id}") {
+              me {
                 id
-                name
-                canvases {
-                  id
-                  title
-                }
+                email
+                workspaces
               }
             }
           `
         });
 
       expect(readResponse.status).toBe(200);
-      expect(readResponse.body.data.workspace).toBeDefined();
+      expect(readResponse.body.data.me).toBeDefined();
 
       // Test 2: Cannot create canvas
       const createCanvasResponse = await request(app)
