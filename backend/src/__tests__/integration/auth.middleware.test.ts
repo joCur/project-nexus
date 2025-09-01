@@ -5,8 +5,12 @@
  */
 
 import request from 'supertest';
-import { Express } from 'express';
-import { createTestApp } from '../utils/test-helpers';
+import express, { Express } from 'express';
+import { ApolloServer } from '@apollo/server';
+import { expressMiddleware } from '@apollo/server/express4';
+import { createAuthMiddleware, createGraphQLContext } from '@/middleware/auth';
+import { authResolvers } from '@/resolvers/auth';
+import { GraphQLContext } from '@/types';
 import { 
   createMockAuth0Service,
   createMockUserService,
@@ -18,10 +22,14 @@ import { JWT_FIXTURES, USER_FIXTURES, REQUEST_FIXTURES } from '../utils/test-fix
 
 describe('Auth Middleware Integration Tests', () => {
   let app: Express;
+  let server: ApolloServer<GraphQLContext>;
   let mockAuth0Service: any;
   let mockUserService: any;
   let mockCacheService: any;
   let mockWorkspaceAuthService: any;
+  let mockUserProfileService: any;
+  let mockOnboardingService: any;
+  let mockWorkspaceService: any;
 
   beforeEach(async () => {
     // Create mock services
@@ -29,13 +37,135 @@ describe('Auth Middleware Integration Tests', () => {
     mockUserService = createMockUserService();
     mockCacheService = createMockCacheService();
     mockWorkspaceAuthService = createMockWorkspaceAuthorizationService();
+    
+    // Create additional required mock services
+    mockUserProfileService = {
+      getProfile: jest.fn(),
+      createProfile: jest.fn(),
+      updateProfile: jest.fn(),
+    };
+    mockOnboardingService = {
+      updateProgress: jest.fn(),
+      getProgress: jest.fn(),
+      completeOnboarding: jest.fn(),
+      isComplete: jest.fn(),
+      reset: jest.fn(),
+    };
+    mockWorkspaceService = {
+      getWorkspaceById: jest.fn(),
+      createWorkspace: jest.fn(),
+      updateWorkspace: jest.fn(),
+      deleteWorkspace: jest.fn(),
+      listWorkspaces: jest.fn(),
+    };
+    
+    // Setup User.workspaces field resolver mock
+    mockUserService.getUserWorkspaces = jest.fn().mockResolvedValue([]);
+    
+    // Setup workspace authorization service defaults
+    mockWorkspaceAuthService.getUserPermissionsForContext.mockResolvedValue({});
+    mockWorkspaceAuthService.getUserPermissionsInWorkspace.mockResolvedValue([]);
+    mockWorkspaceAuthService.hasPermissionInWorkspace.mockResolvedValue(false);
+    mockWorkspaceAuthService.checkPermission.mockResolvedValue(false);
+    mockWorkspaceAuthService.getWorkspaceMember.mockResolvedValue(null);
+    mockWorkspaceAuthService.hasWorkspaceAccess.mockResolvedValue(false);
 
-    // Create test app
-    app = await createTestApp();
+    // Create Express app
+    app = express();
+    app.use(express.json());
+
+    // Setup authentication middleware
+    const authMiddleware = createAuthMiddleware(
+      mockAuth0Service,
+      mockUserService,
+      mockCacheService
+    );
+    app.use(authMiddleware);
+
+    // Create Apollo Server  
+    server = new ApolloServer({
+      typeDefs: `
+        scalar DateTime
+        scalar JSON
+        
+        type User {
+          id: ID!
+          email: String!
+          displayName: String
+          roles: [String!]!
+          permissions: [String!]!
+          lastLogin: DateTime
+          createdAt: DateTime!
+          workspaces: [String!]
+        }
+        
+        type AuthPayload {
+          user: User!
+          sessionId: String!
+          expiresAt: DateTime!
+          permissions: [String!]!
+        }
+        
+        type Query {
+          me: User
+          validateSession: Boolean!
+        }
+        
+        type Mutation {
+          syncUserFromAuth0(auth0Token: String!): AuthPayload!
+          refreshSession: Session!
+          logout: Boolean!
+          assignRole(userId: ID!, role: String!): User!
+          removeRole(userId: ID!, role: String!): User!
+        }
+        
+        type Session {
+          userId: String!
+          auth0UserId: String!
+          email: String!
+          permissions: [String!]!
+          roles: [String!]!
+          createdAt: DateTime!
+          lastActivity: DateTime!
+          expiresAt: DateTime!
+        }
+      `,
+      resolvers: authResolvers,
+    });
+
+    await server.start();
+
+    // Setup GraphQL endpoint
+    app.use(
+      '/graphql',
+      expressMiddleware(server, {
+        context: async ({ req, res }: { req: any; res: any }) => {
+          try {
+            const context = await createGraphQLContext(
+              mockAuth0Service,
+              mockUserService,
+              mockCacheService,
+              mockUserProfileService,
+              mockOnboardingService,
+              mockWorkspaceService,
+              mockWorkspaceAuthService
+            )({ req, res });
+            
+            return context;
+          } catch (error) {
+            console.error('Error creating GraphQL context:', error);
+            throw error;
+          }
+        },
+      })
+    );
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     jest.clearAllMocks();
+    if (server) {
+      await server.stop();
+    }
   });
 
   describe('Authentication without Auth0 permissions', () => {
