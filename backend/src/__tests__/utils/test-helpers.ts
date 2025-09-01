@@ -510,6 +510,7 @@ export function createMockWorkspaceAuthorizationService() {
     updateMemberRole: jest.fn(),
     removeMember: jest.fn(),
     requirePermission: jest.fn(),
+    checkPermission: jest.fn(),
   } as any;
 }
 
