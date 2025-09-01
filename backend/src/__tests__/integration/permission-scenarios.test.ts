@@ -5,8 +5,13 @@
  */
 
 import request from 'supertest';
-import { Express } from 'express';
-import { createTestApp } from '../utils/test-helpers';
+import express, { Express } from 'express';
+import { ApolloServer } from '@apollo/server';
+import { expressMiddleware } from '@apollo/server/express4';
+import { createAuthMiddleware, createGraphQLContext } from '@/middleware/auth';
+import { authResolvers } from '@/resolvers/auth';
+import { canvasResolvers } from '@/graphql/canvasResolvers';
+import { GraphQLContext } from '@/types';
 import { 
   createMockAuth0Service,
   createMockUserService,
