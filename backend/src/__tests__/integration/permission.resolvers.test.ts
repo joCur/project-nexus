@@ -15,7 +15,8 @@ import {
   createMockWorkspaceService,
   createMockCanvasService,
   createMockCardService,
-  createMockUser
+  createMockUser,
+  testMockServices
 } from '../utils/test-helpers';
 import { JWT_FIXTURES, USER_FIXTURES } from '../utils/test-fixtures';
 import { WorkspaceRole } from '@/types/auth';
@@ -78,7 +79,7 @@ describe('Permission Resolver Integration Tests', () => {
     app = await createTestApp();
 
     // Configure global test mock services and assign to local variables
-    const { testMockServices } = require('../utils/test-helpers');
+    // Using imported testMockServices instead of dynamic require()
     
     // Assign the internal mocks to our local variables so test expectations work
     mockAuth0Service = testMockServices.auth0Service;
@@ -825,6 +826,508 @@ describe('Permission Resolver Integration Tests', () => {
       // Removed permission service expectation - me query doesn't trigger permissions
       // Removed service expectation - me query doesn't use workspace service
       // Test passes - batch query permission boundaries are working
+    });
+  });
+
+  describe('Performance Baseline Tests', () => {
+    test('permission checks complete within acceptable timeframe (< 100ms)', async () => {
+      const startTime = Date.now();
+      
+      const response = await request(app)
+        .post('/graphql')
+        .set('Authorization', `Bearer ${JWT_FIXTURES.VALID_TOKEN}`)
+        .set('x-user-sub', testUser.auth0UserId)
+        .set('x-user-email', testUser.email)
+        .send({
+          query: `
+            query {
+              me {
+                id
+                email
+                permissions
+                workspaces
+              }
+            }
+          `
+        });
+      
+      const endTime = Date.now();
+      const responseTime = endTime - startTime;
+      
+      expect(response.status).toBe(200);
+      expect(response.body.data.me).toBeDefined();
+      expect(responseTime).toBeLessThan(100); // Performance baseline: < 100ms
+    });
+
+    test('concurrent permission checks maintain performance', async () => {
+      const concurrentRequests = 10;
+      const promises: Promise<any>[] = [];
+      
+      const startTime = Date.now();
+      
+      for (let i = 0; i < concurrentRequests; i++) {
+        const promise = request(app)
+          .post('/graphql')
+          .set('Authorization', `Bearer ${JWT_FIXTURES.VALID_TOKEN}`)
+          .set('x-user-sub', testUser.auth0UserId)
+          .set('x-user-email', testUser.email)
+          .send({
+            query: `
+              query {
+                me {
+                  id
+                  email
+                  permissions
+                }
+              }
+            `
+          });
+        promises.push(promise);
+      }
+      
+      const responses = await Promise.all(promises);
+      const endTime = Date.now();
+      const totalResponseTime = endTime - startTime;
+      const avgResponseTime = totalResponseTime / concurrentRequests;
+      
+      // All requests should succeed
+      responses.forEach(response => {
+        expect(response.status).toBe(200);
+        expect(response.body.data.me).toBeDefined();
+      });
+      
+      // Average response time should remain reasonable under load
+      expect(avgResponseTime).toBeLessThan(200); // Performance baseline: < 200ms average
+    });
+
+    test('memory usage remains stable during permission operations', async () => {
+      const initialMemory = process.memoryUsage().heapUsed;
+      
+      // Perform multiple permission checks
+      for (let i = 0; i < 50; i++) {
+        await request(app)
+          .post('/graphql')
+          .set('Authorization', `Bearer ${JWT_FIXTURES.VALID_TOKEN}`)
+          .set('x-user-sub', testUser.auth0UserId)
+          .set('x-user-email', testUser.email)
+          .send({
+            query: `
+              query {
+                me {
+                  id
+                  email
+                  permissions
+                }
+              }
+            `
+          });
+      }
+      
+      // Force garbage collection if available
+      if (global.gc) {
+        global.gc();
+      }
+      
+      const finalMemory = process.memoryUsage().heapUsed;
+      const memoryGrowth = finalMemory - initialMemory;
+      
+      // Memory growth should be reasonable (< 10MB for 50 operations)
+      expect(memoryGrowth).toBeLessThan(10 * 1024 * 1024);
+    });
+  });
+
+  describe('Cache Stampede Scenario Tests', () => {
+    test('handles concurrent cache misses without multiple database queries', async () => {
+      // Clear cache to force cache miss
+      mockCacheService.get.mockResolvedValue(null);
+      mockCacheService.set.mockResolvedValue(undefined);
+      
+      let dbQueryCount = 0;
+      mockUserService.findByAuth0Id.mockImplementation(async (auth0Id: string) => {
+        dbQueryCount++;
+        // Simulate database delay
+        await new Promise(resolve => setTimeout(resolve, 50));
+        return testUser;
+      });
+      
+      // Make 10 concurrent requests for the same user data
+      const requests = Array(10).fill(null).map(() =>
+        request(app)
+          .post('/graphql')
+          .set('Authorization', `Bearer ${JWT_FIXTURES.VALID_TOKEN}`)
+          .set('x-user-sub', testUser.auth0UserId)
+          .set('x-user-email', testUser.email)
+          .send({
+            query: `
+              query {
+                me {
+                  id
+                  email
+                  permissions
+                }
+              }
+            `
+          })
+      );
+      
+      const responses = await Promise.all(requests);
+      
+      // All requests should succeed
+      responses.forEach(response => {
+        expect(response.status).toBe(200);
+        expect(response.body.data.me).toBeDefined();
+      });
+      
+      // With proper cache stampede protection, database should be queried minimal times
+      // Without protection, this could be up to 10 queries
+      expect(dbQueryCount).toBeLessThanOrEqual(2);
+    });
+
+    test('prevents cache stampede for workspace permission lookups', async () => {
+      // Mock workspace permission cache miss
+      mockCacheService.get.mockImplementation((key: string) => {
+        if (key.includes('workspace-permissions')) return Promise.resolve(null);
+        return Promise.resolve(null);
+      });
+      
+      let permissionQueryCount = 0;
+      mockWorkspaceAuthService.getUserWorkspaceRole.mockImplementation(async (userId: string, workspaceId: string) => {
+        permissionQueryCount++;
+        await new Promise(resolve => setTimeout(resolve, 30));
+        return WorkspaceRole.MEMBER;
+      });
+      
+      mockWorkspaceService.findUserWorkspaces.mockResolvedValue([testWorkspace]);
+      
+      // Simulate 5 concurrent permission checks for the same workspace
+      const requests = Array(5).fill(null).map(() =>
+        request(app)
+          .post('/graphql')
+          .set('Authorization', `Bearer ${JWT_FIXTURES.VALID_TOKEN}`)
+          .set('x-user-sub', testUser.auth0UserId)
+          .set('x-user-email', testUser.email)
+          .send({
+            query: `
+              query {
+                me {
+                  id
+                  workspaces
+                  permissions
+                }
+              }
+            `
+          })
+      );
+      
+      const responses = await Promise.all(requests);
+      
+      responses.forEach(response => {
+        expect(response.status).toBe(200);
+        expect(response.body.data.me).toBeDefined();
+      });
+      
+      // Should have efficient permission lookup caching
+      expect(permissionQueryCount).toBeLessThanOrEqual(2);
+    });
+
+    test('cache stampede protection with rapid successive requests', async () => {
+      // Reset mocks
+      mockCacheService.get.mockResolvedValue(null);
+      let serviceCallCount = 0;
+      
+      mockUserService.findByAuth0Id.mockImplementation(async (auth0Id: string) => {
+        serviceCallCount++;
+        // Longer delay to increase chances of stampede
+        await new Promise(resolve => setTimeout(resolve, 100));
+        return testUser;
+      });
+      
+      // Make requests with minimal delay between them
+      const responses = [];
+      for (let i = 0; i < 5; i++) {
+        const promise = request(app)
+          .post('/graphql')
+          .set('Authorization', `Bearer ${JWT_FIXTURES.VALID_TOKEN}`)
+          .set('x-user-sub', testUser.auth0UserId)
+          .set('x-user-email', testUser.email)
+          .send({
+            query: `
+              query {
+                me {
+                  id
+                  email
+                }
+              }
+            `
+          });
+        responses.push(promise);
+        
+        // Very small delay between requests to simulate rapid succession
+        if (i < 4) await new Promise(resolve => setTimeout(resolve, 5));
+      }
+      
+      const results = await Promise.all(responses);
+      
+      results.forEach(response => {
+        expect(response.status).toBe(200);
+        expect(response.body.data.me).toBeDefined();
+      });
+      
+      // With stampede protection, should minimize database calls
+      expect(serviceCallCount).toBeLessThanOrEqual(2);
+    });
+  });
+
+  describe('Cross-Workspace Permission Leakage Tests', () => {
+    const workspace1 = {
+      id: 'ws-secure-1',
+      name: 'Secure Workspace 1',
+      ownerId: testUser.id,
+      privacy: 'private',
+      settings: {},
+      isDefault: false,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    const workspace2 = {
+      id: 'ws-secure-2', 
+      name: 'Secure Workspace 2',
+      ownerId: adminUser.id,
+      privacy: 'private',
+      settings: {},
+      isDefault: false,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    const adminOnlyUser = {
+      id: 'user-admin-only',
+      email: 'admin@example.com',
+      auth0UserId: 'auth0|admin-only-user',
+      name: 'Admin Only User',
+      profileImage: null,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    test('ensures user cannot access workspace they are not member of', async () => {
+      // Setup: testUser is member of workspace1 but NOT workspace2
+      mockWorkspaceAuthService.getUserWorkspaceRole.mockImplementation((userId: string, workspaceId: string) => {
+        if (userId === testUser.id && workspaceId === workspace1.id) {
+          return Promise.resolve(WorkspaceRole.MEMBER);
+        }
+        // testUser has NO role in workspace2
+        return Promise.resolve(null);
+      });
+
+      mockWorkspaceService.findUserWorkspaces.mockImplementation((userId: string) => {
+        if (userId === testUser.id) return Promise.resolve([workspace1]); // Only workspace1
+        return Promise.resolve([]);
+      });
+
+      mockUserService.findByAuth0Id.mockResolvedValue(testUser);
+
+      const response = await request(app)
+        .post('/graphql')
+        .set('Authorization', `Bearer ${JWT_FIXTURES.VALID_TOKEN}`)
+        .set('x-user-sub', testUser.auth0UserId)
+        .set('x-user-email', testUser.email)
+        .send({
+          query: `
+            query {
+              me {
+                id
+                workspaces
+                permissions
+              }
+            }
+          `
+        });
+
+      expect(response.status).toBe(200);
+      const userData = response.body.data.me;
+      expect(userData).toBeDefined();
+      
+      // Should only see workspace1, not workspace2
+      if (userData.workspaces) {
+        expect(userData.workspaces).not.toContain(workspace2.id);
+      }
+
+      // Verify workspace authorization was checked correctly
+      expect(mockWorkspaceAuthService.getUserWorkspaceRole).toHaveBeenCalledWith(testUser.id, workspace1.id);
+    });
+
+    test('prevents permission elevation through workspace switching', async () => {
+      // Setup: User has different roles in different workspaces
+      mockWorkspaceAuthService.getUserWorkspaceRole.mockImplementation((userId: string, workspaceId: string) => {
+        if (userId === testUser.id && workspaceId === workspace1.id) {
+          return Promise.resolve(WorkspaceRole.VIEWER); // Limited role in workspace1
+        }
+        if (userId === adminOnlyUser.id && workspaceId === workspace2.id) {
+          return Promise.resolve(WorkspaceRole.ADMIN); // Admin role in workspace2
+        }
+        return Promise.resolve(null);
+      });
+
+      // Test that testUser cannot get admin permissions from workspace2
+      mockUserService.findByAuth0Id.mockResolvedValue(testUser);
+      mockWorkspaceService.findUserWorkspaces.mockResolvedValue([workspace1]);
+
+      const response = await request(app)
+        .post('/graphql')
+        .set('Authorization', `Bearer ${JWT_FIXTURES.VALID_TOKEN}`)
+        .set('x-user-sub', testUser.auth0UserId)
+        .set('x-user-email', testUser.email)
+        .send({
+          query: `
+            query {
+              me {
+                id
+                permissions
+                workspaces
+              }
+            }
+          `
+        });
+
+      expect(response.status).toBe(200);
+      const userData = response.body.data.me;
+      expect(userData).toBeDefined();
+
+      // Should not have elevated permissions from other workspace
+      expect(mockWorkspaceAuthService.getUserWorkspaceRole).not.toHaveBeenCalledWith(testUser.id, workspace2.id);
+    });
+
+    test('isolates workspace-specific cache keys', async () => {
+      // Setup cache isolation test
+      let cacheKeys: string[] = [];
+      mockCacheService.set.mockImplementation((key: string, value: any) => {
+        cacheKeys.push(key);
+        return Promise.resolve();
+      });
+
+      mockCacheService.get.mockResolvedValue(null); // Force cache miss
+
+      mockWorkspaceAuthService.getUserWorkspaceRole.mockImplementation((userId: string, workspaceId: string) => {
+        if (userId === testUser.id && workspaceId === workspace1.id) {
+          return Promise.resolve(WorkspaceRole.MEMBER);
+        }
+        return Promise.resolve(null);
+      });
+
+      mockUserService.findByAuth0Id.mockResolvedValue(testUser);
+      mockWorkspaceService.findUserWorkspaces.mockResolvedValue([workspace1]);
+
+      await request(app)
+        .post('/graphql')
+        .set('Authorization', `Bearer ${JWT_FIXTURES.VALID_TOKEN}`)
+        .set('x-user-sub', testUser.auth0UserId)
+        .set('x-user-email', testUser.email)
+        .send({
+          query: `
+            query {
+              me {
+                id
+                workspaces
+                permissions
+              }
+            }
+          `
+        });
+
+      // Check that cache keys are workspace-specific
+      const workspaceSpecificKeys = cacheKeys.filter(key => 
+        key.includes('workspace') && key.includes(workspace1.id)
+      );
+      
+      // Should not have any cache keys referencing workspace2
+      const leakedKeys = cacheKeys.filter(key => 
+        key.includes(workspace2.id)
+      );
+      
+      expect(leakedKeys).toHaveLength(0);
+    });
+
+    test('validates workspace context switching does not persist permissions', async () => {
+      // Simulate rapid context switching between workspaces
+      const requests = [
+        // Request 1: testUser accessing workspace1 (should succeed)
+        request(app)
+          .post('/graphql')
+          .set('Authorization', `Bearer ${JWT_FIXTURES.VALID_TOKEN}`)
+          .set('x-user-sub', testUser.auth0UserId)
+          .set('x-user-email', testUser.email)
+          .send({
+            query: `
+              query {
+                me {
+                  id
+                  workspaces
+                }
+              }
+            `
+          }),
+        
+        // Request 2: adminOnlyUser accessing workspace2 (should succeed)
+        request(app)
+          .post('/graphql')
+          .set('Authorization', `Bearer ${JWT_FIXTURES.ADMIN_TOKEN}`)
+          .set('x-user-sub', adminOnlyUser.auth0UserId)
+          .set('x-user-email', adminOnlyUser.email)
+          .send({
+            query: `
+              query {
+                me {
+                  id
+                  workspaces
+                }
+              }
+            `
+          }),
+
+        // Request 3: testUser accessing again (should still be limited)
+        request(app)
+          .post('/graphql')
+          .set('Authorization', `Bearer ${JWT_FIXTURES.VALID_TOKEN}`)
+          .set('x-user-sub', testUser.auth0UserId)
+          .set('x-user-email', testUser.email)
+          .send({
+            query: `
+              query {
+                me {
+                  id
+                  workspaces
+                }
+              }
+            `
+          })
+      ];
+
+      // Setup user-specific workspace access
+      mockUserService.findByAuth0Id.mockImplementation((auth0Id: string) => {
+        if (auth0Id === testUser.auth0UserId) return Promise.resolve(testUser);
+        if (auth0Id === adminOnlyUser.auth0UserId) return Promise.resolve(adminOnlyUser);
+        return Promise.resolve(null);
+      });
+
+      mockWorkspaceService.findUserWorkspaces.mockImplementation((userId: string) => {
+        if (userId === testUser.id) return Promise.resolve([workspace1]);
+        if (userId === adminOnlyUser.id) return Promise.resolve([workspace2]);
+        return Promise.resolve([]);
+      });
+
+      const responses = await Promise.all(requests);
+
+      // All requests should succeed
+      responses.forEach(response => {
+        expect(response.status).toBe(200);
+        expect(response.body.data.me).toBeDefined();
+      });
+
+      // Verify that each user only accessed their own workspaces
+      expect(mockWorkspaceService.findUserWorkspaces).toHaveBeenCalledWith(testUser.id);
+      expect(mockWorkspaceService.findUserWorkspaces).toHaveBeenCalledWith(adminOnlyUser.id);
     });
   });
 });

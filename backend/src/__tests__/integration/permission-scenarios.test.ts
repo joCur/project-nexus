@@ -8,13 +8,14 @@ import request from 'supertest';
 import express, { Express } from 'express';
 import { ApolloServer } from '@apollo/server';
 import { expressMiddleware } from '@apollo/server/express4';
-import { createTestApp } from '../utils/test-helpers';
 import { 
+  createTestApp,
   createMockAuth0Service,
   createMockUserService,
   createMockCacheService,
   createMockWorkspaceAuthorizationService,
-  createMockUser
+  createMockUser,
+  testMockServices
 } from '../utils/test-helpers';
 import { JWT_FIXTURES, USER_FIXTURES } from '../utils/test-fixtures';
 
@@ -55,7 +56,7 @@ describe('End-to-End Permission Scenarios', () => {
     app = await createTestApp();
 
     // Use the global test mock services (same pattern as permission.resolvers.test.ts)
-    const { testMockServices } = require('../utils/test-helpers');
+    // Using imported testMockServices instead of dynamic require()
     
     mockAuth0Service = testMockServices.auth0Service;
     mockUserService = testMockServices.userService;

@@ -12,6 +12,67 @@ import { resolvers } from '@/resolvers';
  * Provides mock data generation and test utilities
  */
 
+// Mock service type definitions for better type safety
+interface MockAuth0Service {
+  validateAuth0Token: jest.MockedFunction<any>;
+  syncUserFromAuth0: jest.MockedFunction<any>;
+  createSession: jest.MockedFunction<any>;
+  validateSession: jest.MockedFunction<any>;
+  invalidateSession: jest.MockedFunction<any>;
+  refreshSession: jest.MockedFunction<any>;
+  getActiveSessionsForUser: jest.MockedFunction<any>;
+  getUserPermissions: jest.MockedFunction<any>;
+  destroySession: jest.MockedFunction<any>;
+  healthCheck: jest.MockedFunction<any>;
+}
+
+interface MockUserService {
+  tableName: string;
+  create: jest.MockedFunction<any>;
+  findById: jest.MockedFunction<any>;
+  findByAuth0Id: jest.MockedFunction<any>;
+  findByEmail: jest.MockedFunction<any>;
+  update: jest.MockedFunction<any>;
+  delete: jest.MockedFunction<any>;
+  list: jest.MockedFunction<any>;
+  search: jest.MockedFunction<any>;
+  updateLastLogin: jest.MockedFunction<any>;
+  getUserWorkspaces: jest.MockedFunction<any>;
+  mapDbUserToUser: jest.MockedFunction<any>;
+}
+
+interface MockWorkspaceAuthService {
+  getUserPermissionsForContext: jest.MockedFunction<any>;
+  getUserPermissionsInWorkspace: jest.MockedFunction<any>;
+  getUserWorkspaceRole: jest.MockedFunction<any>;
+  hasPermissionInWorkspace: jest.MockedFunction<any>;
+  hasWorkspaceAccess: jest.MockedFunction<any>;
+  getWorkspaceMember: jest.MockedFunction<any>;
+  getWorkspaceMembers: jest.MockedFunction<any>;
+  addWorkspaceMember: jest.MockedFunction<any>;
+  updateMemberRole: jest.MockedFunction<any>;
+  removeMember: jest.MockedFunction<any>;
+  requirePermission: jest.MockedFunction<any>;
+  checkPermission: jest.MockedFunction<any>;
+}
+
+interface MockCanvasService {
+  getCanvasById: jest.MockedFunction<any>;
+  getWorkspaceCanvases: jest.MockedFunction<any>;
+  create: jest.MockedFunction<any>;
+  findById: jest.MockedFunction<any>;
+  update: jest.MockedFunction<any>;
+  delete: jest.MockedFunction<any>;
+  findByWorkspace: jest.MockedFunction<any>;
+}
+
+interface MockCardService {
+  create: jest.MockedFunction<any>;
+  findById: jest.MockedFunction<any>;
+  update: jest.MockedFunction<any>;
+  delete: jest.MockedFunction<any>;
+}
+
 // Test secret for JWT mocking - NOT A REAL SECRET
 // This is only used for testing purposes where we mock JWT verification
 export const TEST_JWT_SECRET = 'test-jwt-secret-for-unit-tests-only-not-real';
@@ -378,7 +439,7 @@ export function createMockCacheService() {
 /**
  * Create mock user service
  */
-export function createMockUserService() {
+export function createMockUserService(): MockUserService {
   return {
     tableName: 'users',
     create: jest.fn(),
@@ -392,7 +453,7 @@ export function createMockUserService() {
     updateLastLogin: jest.fn(),
     getUserWorkspaces: jest.fn(),
     mapDbUserToUser: jest.fn(),
-  } as any;
+  };
 }
 
 /**
@@ -505,7 +566,7 @@ export function createMockCardService() {
 /**
  * Create mock workspace authorization service
  */
-export function createMockWorkspaceAuthorizationService() {
+export function createMockWorkspaceAuthorizationService(): MockWorkspaceAuthService {
   return {
     getUserPermissionsForContext: jest.fn(),
     getUserPermissionsInWorkspace: jest.fn(),
@@ -519,13 +580,13 @@ export function createMockWorkspaceAuthorizationService() {
     removeMember: jest.fn(),
     requirePermission: jest.fn(),
     checkPermission: jest.fn(),
-  } as any;
+  };
 }
 
 /**
  * Create mock Auth0 service
  */
-export function createMockAuth0Service() {
+export function createMockAuth0Service(): MockAuth0Service {
   return {
     validateAuth0Token: jest.fn(),
     syncUserFromAuth0: jest.fn(),
@@ -537,7 +598,7 @@ export function createMockAuth0Service() {
     getUserPermissions: jest.fn(),
     destroySession: jest.fn(),
     healthCheck: jest.fn(),
-  } as any;
+  };
 }
 
 /**
