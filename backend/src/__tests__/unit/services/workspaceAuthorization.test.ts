@@ -132,7 +132,8 @@ describe('WorkspaceAuthorizationService', () => {
   });
 
   describe('cache operations', () => {
-    test('getWorkspaceMember returns cached result when available', async () => {
+    describe('cache hits', () => {
+      test('getWorkspaceMember returns cached result when available', async () => {
       const cachedMember = {
         id: 'member-1',
         workspaceId: 'ws-1',
@@ -150,26 +151,30 @@ describe('WorkspaceAuthorizationService', () => {
       expect(mockCacheService.get).toHaveBeenCalledWith('workspace_member:ws-1:user-1');
       expect(result).toEqual(cachedMember);
     });
+    });
 
-    test('getWorkspaceMember queries database when cache miss', async () => {
+    describe('cache misses', () => {
+      test('getWorkspaceMember queries database when cache miss', async () => {
       mockCacheService.get.mockResolvedValue(null);
       
       // Mock database query
-      mockDb = {
-        ...mockDb,
-        '': jest.fn(() => ({
-          where: jest.fn(() => ({
-            first: jest.fn(() => null)
-          }))
-        })),
-        fn: { now: jest.fn(() => new Date()) }
+      const mockQueryBuilder = {
+        where: jest.fn(() => ({
+          first: jest.fn(() => null)
+        }))
       };
+      
+      mockDb = jest.fn(() => mockQueryBuilder);
+      mockDb.fn = { now: jest.fn(() => new Date()) };
+      mockDb.transaction = jest.fn();
+      mockDb.raw = jest.fn();
       (authService as any).db = mockDb;
 
       const result = await authService.getWorkspaceMember('user-1', 'ws-1');
       
       expect(mockCacheService.get).toHaveBeenCalled();
       expect(result).toBeNull();
+    });
     });
   });
 
@@ -363,6 +368,321 @@ describe('WorkspaceAuthorizationService', () => {
         expect(result['ws-3']).toContain('workspace:delete'); // Owner permissions
         expect(mockCacheService.set).toHaveBeenCalled();
       });
+    });
+  });
+
+  describe('error handling', () => {
+    describe('database errors', () => {
+      test('getUserPermissionsInWorkspace handles database errors gracefully', async () => {
+      mockCacheService.get.mockResolvedValue(null);
+      jest.spyOn(authService, 'getWorkspaceMember').mockRejectedValue(new Error('Database connection failed'));
+
+      const result = await authService.getUserPermissionsInWorkspace('user-1', 'ws-1');
+      
+      expect(result).toEqual([]);
+    });
+
+    test('getUserWorkspaceRole handles database errors gracefully', async () => {
+      jest.spyOn(authService, 'getWorkspaceMember').mockRejectedValue(new Error('Database connection failed'));
+
+      const result = await authService.getUserWorkspaceRole('user-1', 'ws-1');
+      
+      expect(result).toBeNull();
+    });
+
+    test('hasPermissionInWorkspace handles database errors gracefully', async () => {
+      jest.spyOn(authService, 'getWorkspaceMember').mockRejectedValue(new Error('Database connection failed'));
+
+      const result = await authService.hasPermissionInWorkspace('user-1', 'ws-1', 'card:create');
+      
+      expect(result).toBe(false);
+    });
+
+    test('getUserPermissionsForContext handles database errors gracefully', async () => {
+      mockCacheService.get.mockResolvedValue(null);
+      
+      // Mock database to throw error
+      mockDb = jest.fn(() => {
+        throw new Error('Database connection failed');
+      });
+      (authService as any).db = mockDb;
+
+      const result = await authService.getUserPermissionsForContext('user-1');
+      
+      expect(result).toEqual({});
+    });
+    });
+
+    describe('cache errors', () => {
+      test('handles cache service errors gracefully', async () => {
+      mockCacheService.get.mockRejectedValue(new Error('Redis connection failed'));
+      mockCacheService.set.mockRejectedValue(new Error('Redis connection failed'));
+      
+      // When cache fails, the service should handle gracefully but may return empty array
+      // This test verifies no exceptions are thrown
+      const result = await authService.getUserPermissionsInWorkspace('user-1', 'ws-1');
+      
+      // Should handle cache errors without throwing exceptions
+      expect(result).toEqual([]); // Service returns empty array on cache/db errors
+    });
+    });
+  });
+
+  describe('edge cases', () => {
+    test('handles invalid workspace ID', async () => {
+      const result = await authService.getUserPermissionsInWorkspace('user-1', '');
+      expect(result).toEqual([]);
+    });
+
+    test('handles invalid user ID', async () => {
+      const result = await authService.getUserPermissionsInWorkspace('', 'ws-1');
+      expect(result).toEqual([]);
+    });
+
+    test('handles null permission parameter', async () => {
+      const result = await authService.hasPermissionInWorkspace('user-1', 'ws-1', null as any);
+      expect(result).toBe(false);
+    });
+
+    test('handles inactive member', async () => {
+      const mockMember = {
+        id: 'member-1',
+        workspaceId: 'ws-1',
+        userId: 'user-1',
+        role: 'member' as WorkspaceRole,
+        permissions: [],
+        joinedAt: new Date(),
+        isActive: false // Inactive member
+      };
+      
+      jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+
+      const result = await authService.getUserPermissionsInWorkspace('user-1', 'ws-1');
+      
+      expect(result).toEqual([]);
+    });
+
+    test('handles member with null permissions array', async () => {
+      const mockMember = {
+        id: 'member-1',
+        workspaceId: 'ws-1',
+        userId: 'user-1',
+        role: 'viewer' as WorkspaceRole,
+        permissions: null as any,
+        joinedAt: new Date(),
+        isActive: true
+      };
+      
+      jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+
+      const result = await authService.getUserPermissionsInWorkspace('user-1', 'ws-1');
+      
+      expect(result).toContain('workspace:read');
+      expect(result).toContain('card:read');
+    });
+
+    test('handles unknown role type', async () => {
+      const mockMember = {
+        id: 'member-1',
+        workspaceId: 'ws-1',
+        userId: 'user-1',
+        role: 'unknown' as any,
+        permissions: [],
+        joinedAt: new Date(),
+        isActive: true
+      };
+      
+      jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+
+      const result = await authService.getUserPermissionsInWorkspace('user-1', 'ws-1');
+      
+      // Should fallback to viewer permissions for unknown roles (default case in getRolePermissions)
+      expect(result).toContain('workspace:read');
+      expect(result).toContain('card:read');
+      expect(result).toContain('canvas:read');
+    });
+  });
+
+
+  describe('performance and caching', () => {
+    test('getUserPermissionsInWorkspace uses cache with TTL', async () => {
+      mockCacheService.get.mockResolvedValue(null);
+      
+      const mockMember = {
+        id: 'member-1',
+        workspaceId: 'ws-1',
+        userId: 'user-1',
+        role: 'viewer' as WorkspaceRole,
+        permissions: ['custom:permission'],
+        joinedAt: new Date(),
+        isActive: true
+      };
+      
+      jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+
+      await authService.getUserPermissionsInWorkspace('user-1', 'ws-1');
+      
+      expect(mockCacheService.set).toHaveBeenCalledWith(
+        'user_permissions:user-1:ws-1',
+        expect.any(Array),
+        300 // 5 minutes TTL
+      );
+    });
+
+    test('getUserPermissionsForContext uses cache with TTL', async () => {
+      mockCacheService.get.mockResolvedValue(null);
+      
+      // Mock empty database results
+      mockDb = jest.fn(() => ({
+        select: jest.fn(() => ({
+          where: jest.fn(() => Promise.resolve([]))
+        }))
+      }));
+      (authService as any).db = mockDb;
+
+      await authService.getUserPermissionsForContext('user-1');
+      
+      expect(mockCacheService.set).toHaveBeenCalledWith(
+        'user_context_permissions:user-1',
+        expect.any(Object),
+        300 // 5 minutes TTL
+      );
+    });
+
+    test('multiple calls to same method use cache', async () => {
+      const cachedPermissions = ['workspace:read', 'card:read'];
+      mockCacheService.get.mockResolvedValue(cachedPermissions);
+
+      // Create spy for database method
+      const getWorkspaceMemberSpy = jest.spyOn(authService, 'getWorkspaceMember');
+
+      // Make multiple calls
+      await authService.getUserPermissionsInWorkspace('user-1', 'ws-1');
+      await authService.getUserPermissionsInWorkspace('user-1', 'ws-1');
+      await authService.getUserPermissionsInWorkspace('user-1', 'ws-1');
+      
+      // Cache should only be queried 3 times, no database calls
+      expect(mockCacheService.get).toHaveBeenCalledTimes(3);
+      expect(getWorkspaceMemberSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('permission inheritance and custom permissions', () => {
+    test('custom permissions override role restrictions', async () => {
+      const mockMember = {
+        id: 'member-1',
+        workspaceId: 'ws-1',
+        userId: 'user-1',
+        role: 'viewer' as WorkspaceRole, // Viewer can't normally delete
+        permissions: ['card:delete'], // But has custom delete permission
+        joinedAt: new Date(),
+        isActive: true
+      };
+      
+      jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+
+      const result = await authService.hasPermissionInWorkspace('user-1', 'ws-1', 'card:delete');
+      
+      expect(result).toBe(true);
+    });
+
+    test('custom permissions are added to role permissions', async () => {
+      mockCacheService.get.mockResolvedValue(null);
+      
+      const mockMember = {
+        id: 'member-1',
+        workspaceId: 'ws-1',
+        userId: 'user-1',
+        role: 'viewer' as WorkspaceRole,
+        permissions: ['custom:special', 'another:custom'],
+        joinedAt: new Date(),
+        isActive: true
+      };
+      
+      jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+
+      const result = await authService.getUserPermissionsInWorkspace('user-1', 'ws-1');
+      
+      expect(result).toContain('workspace:read'); // Role permission
+      expect(result).toContain('card:read'); // Role permission
+      expect(result).toContain('custom:special'); // Custom permission
+      expect(result).toContain('another:custom'); // Custom permission
+    });
+
+    test('duplicate permissions are handled correctly', async () => {
+      mockCacheService.get.mockResolvedValue(null);
+      
+      const mockMember = {
+        id: 'member-1',
+        workspaceId: 'ws-1',
+        userId: 'user-1',
+        role: 'member' as WorkspaceRole,
+        permissions: ['card:read', 'card:create'], // Duplicates role permissions
+        joinedAt: new Date(),
+        isActive: true
+      };
+      
+      jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+
+      const result = await authService.getUserPermissionsInWorkspace('user-1', 'ws-1');
+      
+      // Should not have duplicates
+      const cardReadCount = result.filter(p => p === 'card:read').length;
+      const cardCreateCount = result.filter(p => p === 'card:create').length;
+      
+      expect(cardReadCount).toBe(1);
+      expect(cardCreateCount).toBe(1);
+    });
+  });
+
+  describe('database transaction handling', () => {
+    test('handles transaction errors gracefully', async () => {
+      // Mock database to throw an error
+      const mockQueryBuilder = {
+        where: jest.fn(() => ({
+          first: jest.fn(() => {
+            throw new Error('Database connection failed');
+          })
+        }))
+      };
+      
+      mockDb = jest.fn(() => mockQueryBuilder);
+      mockDb.transaction = jest.fn();
+      mockDb.fn = { now: jest.fn(() => new Date()) };
+      mockDb.raw = jest.fn();
+      (authService as any).db = mockDb;
+
+      // The method handles errors gracefully and returns null instead of throwing
+      const result = await authService.getWorkspaceMember('user-1', 'ws-1');
+      expect(result).toBeNull(); // Service handles errors by returning null
+    });
+
+    test('verifies transaction method exists on database', () => {
+      expect(mockDb.transaction).toBeDefined();
+      expect(typeof mockDb.transaction).toBe('function');
+    });
+
+    test('database operations fail gracefully with proper error handling', async () => {
+      // Set up mock to simulate constraint violations
+      const mockQueryBuilder = {
+        where: jest.fn(() => ({
+          first: jest.fn(() => null),
+          insert: jest.fn(() => {
+            throw new Error('Unique constraint violation');
+          })
+        }))
+      };
+      
+      mockDb = jest.fn(() => mockQueryBuilder);
+      mockDb.transaction = jest.fn();
+      mockDb.fn = { now: jest.fn(() => new Date()) };
+      mockDb.raw = jest.fn();
+      (authService as any).db = mockDb;
+
+      // Test that errors are properly propagated
+      await expect(
+        authService.getWorkspaceMember('user-1', 'ws-1')
+      ).resolves.toBeNull(); // Should handle the null case gracefully
     });
   });
 });

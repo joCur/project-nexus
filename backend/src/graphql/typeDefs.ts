@@ -29,6 +29,7 @@ export const authTypeDefs = gql`
     
     # Computed fields
     workspaces: [String!]!
+    permissions: [String!]!
     profile: UserProfile
     onboarding: UserOnboarding
   }
