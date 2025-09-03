@@ -21,6 +21,15 @@ import {
 import { JWT_FIXTURES, USER_FIXTURES } from '../utils/test-fixtures';
 import { WorkspaceRole } from '@/types/auth';
 
+// WorkspaceRole string constants for test usage
+const WORKSPACE_ROLES = {
+  OWNER: 'owner' as WorkspaceRole,
+  ADMIN: 'admin' as WorkspaceRole,
+  EDITOR: 'editor' as WorkspaceRole,
+  MEMBER: 'member' as WorkspaceRole,
+  VIEWER: 'viewer' as WorkspaceRole,
+};
+
 describe('Permission Resolver Integration Tests', () => {
   let app: Express;
   let mockAuth0Service: any;
@@ -31,18 +40,62 @@ describe('Permission Resolver Integration Tests', () => {
   let mockCanvasService: any;
   let mockCardService: any;
   
-  // Test data
+  // Enhanced test data with realistic relationships
   const testUser = USER_FIXTURES.STANDARD_USER;
   const adminUser = USER_FIXTURES.ADMIN_USER;
   const workspaceOwner = USER_FIXTURES.WORKSPACE_OWNER;
 
+  // Additional test users for comprehensive scenarios
+  const viewerUser = {
+    id: 'user-viewer-123',
+    email: 'viewer@example.com',
+    auth0UserId: 'auth0|viewer-user-123',
+    name: 'Viewer User',
+    profileImage: null,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  };
+
+  const editorUser = {
+    id: 'user-editor-456',
+    email: 'editor@example.com',
+    auth0UserId: 'auth0|editor-user-456',
+    name: 'Editor User',
+    profileImage: null,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  };
+
+  // Multiple workspaces with different access levels
   const testWorkspace = {
     id: 'ws-test-1',
     name: 'Test Workspace',
     ownerId: workspaceOwner.id,
     privacy: 'private',
-    settings: {},
+    settings: { allowGuestAccess: false, defaultRole: 'viewer' },
     isDefault: false,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  };
+
+  const publicWorkspace = {
+    id: 'ws-public-2',
+    name: 'Public Workspace',
+    ownerId: adminUser.id,
+    privacy: 'public',
+    settings: { allowGuestAccess: true, defaultRole: 'viewer' },
+    isDefault: false,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  };
+
+  const teamWorkspace = {
+    id: 'ws-team-3',
+    name: 'Team Workspace',
+    ownerId: testUser.id,
+    privacy: 'team',
+    settings: { allowGuestAccess: false, defaultRole: 'editor' },
+    isDefault: true,
     createdAt: new Date(),
     updatedAt: new Date()
   };
@@ -900,6 +953,55 @@ describe('Permission Resolver Integration Tests', () => {
       expect(avgResponseTime).toBeLessThan(200); // Performance baseline: < 200ms average
     });
 
+    test('prevents N+1 query problems in workspace permission checks', async () => {
+      let dbQueryCount = 0;
+      
+      // Track database queries
+      mockWorkspaceService.getWorkspaceById.mockImplementation(async (id: string) => {
+        dbQueryCount++;
+        return testWorkspace;
+      });
+      
+      mockWorkspaceAuthService.hasWorkspaceAccess.mockImplementation(async (userId: string, workspaceId: string) => {
+        dbQueryCount++;
+        return userId === testUser.id && workspaceId === testWorkspace.id;
+      });
+      
+      mockUserService.findByAuth0Id.mockResolvedValue(testUser);
+      
+      // Make multiple workspace requests that could trigger N+1 queries
+      const workspaceIds = [testWorkspace.id, testWorkspace.id, testWorkspace.id]; // Simulate same workspace multiple times
+      const requests = workspaceIds.map(workspaceId =>
+        request(app)
+          .post('/graphql')
+          .set('Authorization', `Bearer ${JWT_FIXTURES.VALID_TOKEN}`)
+          .set('x-user-sub', testUser.auth0UserId)
+          .set('x-user-email', testUser.email)
+          .send({
+            query: `
+              query {
+                workspace(id: "${workspaceId}") {
+                  id
+                  name
+                  privacy
+                }
+              }
+            `
+          })
+      );
+      
+      const responses = await Promise.all(requests);
+      
+      responses.forEach(response => {
+        expect(response.status).toBe(200);
+        expect(response.body.data.workspace).toBeDefined();
+      });
+      
+      // Should not have N+1 queries - efficient query patterns should cache results
+      // For 3 identical requests, we shouldn't need more than 2-3 total queries (with proper caching)
+      expect(dbQueryCount).toBeLessThanOrEqual(4); // Allow some flexibility but prevent excessive queries
+    });
+
     test('memory usage remains stable during permission operations', async () => {
       const initialMemory = process.memoryUsage().heapUsed;
       
@@ -924,8 +1026,10 @@ describe('Permission Resolver Integration Tests', () => {
       }
       
       // Force garbage collection if available
-      if (global.gc) {
+      if (typeof global.gc === 'function') {
         global.gc();
+      } else {
+        console.warn('Garbage collection not available in test environment');
       }
       
       const finalMemory = process.memoryUsage().heapUsed;
@@ -991,15 +1095,16 @@ describe('Permission Resolver Integration Tests', () => {
       });
       
       let permissionQueryCount = 0;
-      mockWorkspaceAuthService.getUserWorkspaceRole.mockImplementation(async (userId: string, workspaceId: string) => {
+      mockWorkspaceAuthService.hasWorkspaceAccess.mockImplementation(async (userId: string, workspaceId: string) => {
         permissionQueryCount++;
         await new Promise(resolve => setTimeout(resolve, 30));
-        return WorkspaceRole.MEMBER;
+        return userId === testUser.id && workspaceId === testWorkspace.id;
       });
       
-      mockWorkspaceService.findUserWorkspaces.mockResolvedValue([testWorkspace]);
+      mockWorkspaceService.getWorkspaceById.mockResolvedValue(testWorkspace);
+      mockUserService.findByAuth0Id.mockResolvedValue(testUser);
       
-      // Simulate 5 concurrent permission checks for the same workspace
+      // Simulate 5 concurrent workspace access requests (which trigger permission checks)
       const requests = Array(5).fill(null).map(() =>
         request(app)
           .post('/graphql')
@@ -1009,10 +1114,10 @@ describe('Permission Resolver Integration Tests', () => {
           .send({
             query: `
               query {
-                me {
+                workspace(id: "${testWorkspace.id}") {
                   id
-                  workspaces
-                  permissions
+                  name
+                  privacy
                 }
               }
             `
@@ -1023,10 +1128,12 @@ describe('Permission Resolver Integration Tests', () => {
       
       responses.forEach(response => {
         expect(response.status).toBe(200);
-        expect(response.body.data.me).toBeDefined();
+        expect(response.body.data.workspace).toBeDefined();
+        expect(response.body.data.workspace.id).toBe(testWorkspace.id);
       });
       
-      // Should have efficient permission lookup caching
+      // Should have efficient permission lookup caching - with cache stampede protection
+      // database should be queried minimal times even with 5 concurrent requests
       expect(permissionQueryCount).toBeLessThanOrEqual(2);
     });
 
@@ -1112,23 +1219,26 @@ describe('Permission Resolver Integration Tests', () => {
     };
 
     test('ensures user cannot access workspace they are not member of', async () => {
-      // Setup: testUser is member of workspace1 but NOT workspace2
-      mockWorkspaceAuthService.getUserWorkspaceRole.mockImplementation((userId: string, workspaceId: string) => {
-        if (userId === testUser.id && workspaceId === workspace1.id) {
-          return Promise.resolve(WorkspaceRole.MEMBER);
+      // Setup: testUser has workspace:read permission for workspace1 but NOT workspace2
+      mockWorkspaceAuthService.hasPermissionInWorkspace.mockImplementation(
+        (userId: string, workspaceId: string, permission: string) => {
+        if (userId === testUser.id && workspaceId === workspace1.id && permission === 'workspace:read') {
+          return Promise.resolve(true);
         }
-        // testUser has NO role in workspace2
-        return Promise.resolve(null);
+        // testUser has NO workspace:read permission in workspace2
+        return Promise.resolve(false);
       });
 
-      mockWorkspaceService.findUserWorkspaces.mockImplementation((userId: string) => {
-        if (userId === testUser.id) return Promise.resolve([workspace1]); // Only workspace1
-        return Promise.resolve([]);
+      mockWorkspaceService.getWorkspaceById.mockImplementation((id: string) => {
+        if (id === workspace1.id) return Promise.resolve(workspace1);
+        if (id === workspace2.id) return Promise.resolve(workspace2);
+        return Promise.resolve(null);
       });
 
       mockUserService.findByAuth0Id.mockResolvedValue(testUser);
 
-      const response = await request(app)
+      // Test accessing workspace1 (should succeed)
+      const successResponse = await request(app)
         .post('/graphql')
         .set('Authorization', `Bearer ${JWT_FIXTURES.VALID_TOKEN}`)
         .set('x-user-sub', testUser.auth0UserId)
@@ -1136,45 +1246,78 @@ describe('Permission Resolver Integration Tests', () => {
         .send({
           query: `
             query {
-              me {
+              workspace(id: "${workspace1.id}") {
                 id
-                workspaces
-                permissions
+                name
+                privacy
               }
             }
           `
         });
 
-      expect(response.status).toBe(200);
-      const userData = response.body.data.me;
-      expect(userData).toBeDefined();
-      
-      // Should only see workspace1, not workspace2
-      if (userData.workspaces) {
-        expect(userData.workspaces).not.toContain(workspace2.id);
-      }
+      expect(successResponse.status).toBe(200);
+      expect(successResponse.body.data.workspace).toBeDefined();
+      expect(successResponse.body.data.workspace.id).toBe(workspace1.id);
+
+      // Test accessing workspace2 (should fail with permission error)
+      const failResponse = await request(app)
+        .post('/graphql')
+        .set('Authorization', `Bearer ${JWT_FIXTURES.VALID_TOKEN}`)
+        .set('x-user-sub', testUser.auth0UserId)
+        .set('x-user-email', testUser.email)
+        .send({
+          query: `
+            query {
+              workspace(id: "${workspace2.id}") {
+                id
+                name
+                privacy
+              }
+            }
+          `
+        });
+
+      expect(failResponse.status).toBe(200);
+      expect(failResponse.body.errors).toBeDefined();
+      expect(failResponse.body.errors[0].message).toContain('You do not have access to this workspace');
 
       // Verify workspace authorization was checked correctly
-      expect(mockWorkspaceAuthService.getUserWorkspaceRole).toHaveBeenCalledWith(testUser.id, workspace1.id);
+      expect(mockWorkspaceAuthService.hasPermissionInWorkspace).toHaveBeenCalledWith(testUser.id, workspace1.id, 'workspace:read');
+      expect(mockWorkspaceAuthService.hasPermissionInWorkspace).toHaveBeenCalledWith(testUser.id, workspace2.id, 'workspace:read');
     });
 
     test('prevents permission elevation through workspace switching', async () => {
-      // Setup: User has different roles in different workspaces
-      mockWorkspaceAuthService.getUserWorkspaceRole.mockImplementation((userId: string, workspaceId: string) => {
+      // Setup: testUser has VIEWER role in workspace1, adminOnlyUser has ADMIN role in workspace2
+      mockWorkspaceAuthService.hasWorkspaceAccess.mockImplementation((userId: string, workspaceId: string) => {
         if (userId === testUser.id && workspaceId === workspace1.id) {
-          return Promise.resolve(WorkspaceRole.VIEWER); // Limited role in workspace1
+          return Promise.resolve(true); // testUser can access workspace1 as viewer
         }
         if (userId === adminOnlyUser.id && workspaceId === workspace2.id) {
-          return Promise.resolve(WorkspaceRole.ADMIN); // Admin role in workspace2
+          return Promise.resolve(true); // adminOnlyUser can access workspace2 as admin
+        }
+        return Promise.resolve(false); // No cross-workspace access
+      });
+
+      mockWorkspaceAuthService.getUserWorkspaceRole.mockImplementation((userId: string, workspaceId: string) => {
+        if (userId === testUser.id && workspaceId === workspace1.id) {
+          return Promise.resolve(WORKSPACE_ROLES.VIEWER); // Limited role in workspace1
+        }
+        if (userId === adminOnlyUser.id && workspaceId === workspace2.id) {
+          return Promise.resolve(WORKSPACE_ROLES.ADMIN); // Admin role in workspace2
         }
         return Promise.resolve(null);
       });
 
-      // Test that testUser cannot get admin permissions from workspace2
-      mockUserService.findByAuth0Id.mockResolvedValue(testUser);
-      mockWorkspaceService.findUserWorkspaces.mockResolvedValue([workspace1]);
+      mockWorkspaceService.getWorkspaceById.mockImplementation((id: string) => {
+        if (id === workspace1.id) return Promise.resolve(workspace1);
+        if (id === workspace2.id) return Promise.resolve(workspace2);
+        return Promise.resolve(null);
+      });
 
-      const response = await request(app)
+      mockUserService.findByAuth0Id.mockResolvedValue(testUser);
+
+      // Test: testUser can access workspace1 with viewer permissions but cannot access workspace2
+      const workspace1Response = await request(app)
         .post('/graphql')
         .set('Authorization', `Bearer ${JWT_FIXTURES.VALID_TOKEN}`)
         .set('x-user-sub', testUser.auth0UserId)
@@ -1182,21 +1325,46 @@ describe('Permission Resolver Integration Tests', () => {
         .send({
           query: `
             query {
-              me {
+              workspace(id: "${workspace1.id}") {
                 id
-                permissions
-                workspaces
+                name
+                privacy
               }
             }
           `
         });
 
-      expect(response.status).toBe(200);
-      const userData = response.body.data.me;
-      expect(userData).toBeDefined();
+      // Should succeed for workspace1
+      expect(workspace1Response.status).toBe(200);
+      expect(workspace1Response.body.data.workspace).toBeDefined();
+      expect(workspace1Response.body.data.workspace.id).toBe(workspace1.id);
 
-      // Should not have elevated permissions from other workspace
-      expect(mockWorkspaceAuthService.getUserWorkspaceRole).not.toHaveBeenCalledWith(testUser.id, workspace2.id);
+      // Test: testUser cannot access workspace2 (where they don't have permissions)
+      const workspace2Response = await request(app)
+        .post('/graphql')
+        .set('Authorization', `Bearer ${JWT_FIXTURES.VALID_TOKEN}`)
+        .set('x-user-sub', testUser.auth0UserId)
+        .set('x-user-email', testUser.email)
+        .send({
+          query: `
+            query {
+              workspace(id: "${workspace2.id}") {
+                id
+                name
+                privacy
+              }
+            }
+          `
+        });
+
+      // Should fail for workspace2
+      expect(workspace2Response.status).toBe(200);
+      expect(workspace2Response.body.errors).toBeDefined();
+      expect(workspace2Response.body.errors[0].message).toContain('You do not have access to this workspace');
+
+      // Verify that permission checks were called appropriately
+      expect(mockWorkspaceAuthService.hasWorkspaceAccess).toHaveBeenCalledWith(testUser.id, workspace1.id);
+      expect(mockWorkspaceAuthService.hasWorkspaceAccess).toHaveBeenCalledWith(testUser.id, workspace2.id);
     });
 
     test('isolates workspace-specific cache keys', async () => {
@@ -1211,7 +1379,7 @@ describe('Permission Resolver Integration Tests', () => {
 
       mockWorkspaceAuthService.getUserWorkspaceRole.mockImplementation((userId: string, workspaceId: string) => {
         if (userId === testUser.id && workspaceId === workspace1.id) {
-          return Promise.resolve(WorkspaceRole.MEMBER);
+          return Promise.resolve(WORKSPACE_ROLES.MEMBER);
         }
         return Promise.resolve(null);
       });
@@ -1247,6 +1415,103 @@ describe('Permission Resolver Integration Tests', () => {
       );
       
       expect(leakedKeys).toHaveLength(0);
+    });
+
+    test('validates realistic multi-workspace permission scenarios', async () => {
+      // Enhanced test using the realistic test fixtures with multiple workspaces and user roles
+      const workspaceUserMap = new Map([
+        [publicWorkspace.id, { user: viewerUser, role: WORKSPACE_ROLES.VIEWER }],
+        [teamWorkspace.id, { user: editorUser, role: WORKSPACE_ROLES.EDITOR }],
+        [testWorkspace.id, { user: workspaceOwner, role: WORKSPACE_ROLES.OWNER }],
+      ]);
+
+      mockWorkspaceAuthService.hasWorkspaceAccess.mockImplementation((userId: string, workspaceId: string) => {
+        const entry = workspaceUserMap.get(workspaceId);
+        return Promise.resolve(entry ? entry.user.id === userId : false);
+      });
+
+      mockWorkspaceService.getWorkspaceById.mockImplementation((id: string) => {
+        if (id === publicWorkspace.id) return Promise.resolve(publicWorkspace);
+        if (id === teamWorkspace.id) return Promise.resolve(teamWorkspace);
+        if (id === testWorkspace.id) return Promise.resolve(testWorkspace);
+        return Promise.resolve(null);
+      });
+
+      // Test 1: Viewer user can access public workspace
+      mockUserService.findByAuth0Id.mockResolvedValue(viewerUser);
+      const viewerResponse = await request(app)
+        .post('/graphql')
+        .set('Authorization', `Bearer ${JWT_FIXTURES.VALID_TOKEN}`)
+        .set('x-user-sub', viewerUser.auth0UserId)
+        .set('x-user-email', viewerUser.email)
+        .send({
+          query: `
+            query {
+              workspace(id: "${publicWorkspace.id}") {
+                id
+                name
+                privacy
+                settings
+              }
+            }
+          `
+        });
+
+      expect(viewerResponse.status).toBe(200);
+      expect(viewerResponse.body.data.workspace).toBeDefined();
+      expect(viewerResponse.body.data.workspace.privacy).toBe('public');
+
+      // Test 2: Editor user can access team workspace
+      mockUserService.findByAuth0Id.mockResolvedValue(editorUser);
+      const editorResponse = await request(app)
+        .post('/graphql')
+        .set('Authorization', `Bearer ${JWT_FIXTURES.VALID_TOKEN}`)
+        .set('x-user-sub', editorUser.auth0UserId)
+        .set('x-user-email', editorUser.email)
+        .send({
+          query: `
+            query {
+              workspace(id: "${teamWorkspace.id}") {
+                id
+                name
+                privacy
+                isDefault
+              }
+            }
+          `
+        });
+
+      expect(editorResponse.status).toBe(200);
+      expect(editorResponse.body.data.workspace).toBeDefined();
+      expect(editorResponse.body.data.workspace.isDefault).toBe(true);
+
+      // Test 3: Verify cross-workspace isolation - viewer cannot access private workspace
+      mockUserService.findByAuth0Id.mockResolvedValue(viewerUser);
+      const unauthorizedResponse = await request(app)
+        .post('/graphql')
+        .set('Authorization', `Bearer ${JWT_FIXTURES.VALID_TOKEN}`)
+        .set('x-user-sub', viewerUser.auth0UserId)
+        .set('x-user-email', viewerUser.email)
+        .send({
+          query: `
+            query {
+              workspace(id: "${testWorkspace.id}") {
+                id
+                name
+                privacy
+              }
+            }
+          `
+        });
+
+      expect(unauthorizedResponse.status).toBe(200);
+      expect(unauthorizedResponse.body.errors).toBeDefined();
+      expect(unauthorizedResponse.body.errors[0].message).toContain('You do not have access to this workspace');
+
+      // Verify that permission checks were called for all scenarios
+      expect(mockWorkspaceAuthService.hasWorkspaceAccess).toHaveBeenCalledWith(viewerUser.id, publicWorkspace.id);
+      expect(mockWorkspaceAuthService.hasWorkspaceAccess).toHaveBeenCalledWith(editorUser.id, teamWorkspace.id);
+      expect(mockWorkspaceAuthService.hasWorkspaceAccess).toHaveBeenCalledWith(viewerUser.id, testWorkspace.id);
     });
 
     test('validates workspace context switching does not persist permissions', async () => {
