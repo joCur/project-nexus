@@ -31,6 +31,7 @@ describe('WorkspaceAuthorizationService', () => {
     mockCacheService = {
       get: jest.fn(),
       set: jest.fn(),
+      delete: jest.fn(),
       del: jest.fn(),
     };
 
@@ -192,7 +193,7 @@ describe('WorkspaceAuthorizationService', () => {
     });
 
     test('valid roles are accepted', () => {
-      const validRoles: WorkspaceRole[] = ['admin', 'member', 'viewer'];
+      const validRoles = ['admin', 'member', 'viewer'] as const satisfies readonly WorkspaceRole[];
       validRoles.forEach(role => {
         expect(() => {
           (authService as any).getRolePermissions(role);
@@ -204,7 +205,7 @@ describe('WorkspaceAuthorizationService', () => {
   describe('new permission resolution methods', () => {
     describe('getUserPermissionsInWorkspace', () => {
       test('returns cached permissions when available', async () => {
-        const cachedPermissions = ['workspace:read', 'card:read', 'card:create'];
+        const cachedPermissions = ['workspace:read', 'card:read', 'card:create'] as const;
         mockCacheService.get.mockResolvedValue(cachedPermissions);
 
         const result = await authService.getUserPermissionsInWorkspace('user-1', 'ws-1');
@@ -379,7 +380,7 @@ describe('WorkspaceAuthorizationService', () => {
 
   describe('error handling', () => {
     describe('database errors', () => {
-      test('getUserPermissionsInWorkspace handles database errors gracefully', async () => {
+      test('handles database errors gracefully', async () => {
       mockCacheService.get.mockResolvedValue(null);
       jest.spyOn(authService, 'getWorkspaceMember').mockRejectedValue(new Error('Database connection failed'));
 
@@ -388,7 +389,7 @@ describe('WorkspaceAuthorizationService', () => {
       expect(result).toEqual([]);
     });
 
-    test('getUserWorkspaceRole handles database errors gracefully', async () => {
+    test('handles database errors gracefully', async () => {
       jest.spyOn(authService, 'getWorkspaceMember').mockRejectedValue(new Error('Database connection failed'));
 
       const result = await authService.getUserWorkspaceRole('user-1', 'ws-1');
@@ -396,7 +397,7 @@ describe('WorkspaceAuthorizationService', () => {
       expect(result).toBeNull();
     });
 
-    test('hasPermissionInWorkspace handles database errors gracefully', async () => {
+    test('handles database errors gracefully', async () => {
       jest.spyOn(authService, 'getWorkspaceMember').mockRejectedValue(new Error('Database connection failed'));
 
       const result = await authService.hasPermissionInWorkspace('user-1', 'ws-1', 'card:create');
@@ -404,7 +405,7 @@ describe('WorkspaceAuthorizationService', () => {
       expect(result).toBe(false);
     });
 
-    test('getUserPermissionsForContext handles database errors gracefully', async () => {
+    test('handles database errors gracefully', async () => {
       mockCacheService.get.mockResolvedValue(null);
       
       // Mock database to throw error
@@ -511,7 +512,7 @@ describe('WorkspaceAuthorizationService', () => {
 
 
   describe('performance and caching', () => {
-    test('getUserPermissionsInWorkspace uses cache with TTL', async () => {
+    test('uses cache with TTL', async () => {
       mockCacheService.get.mockResolvedValue(null);
       
       const mockMember = {
@@ -535,7 +536,7 @@ describe('WorkspaceAuthorizationService', () => {
       );
     });
 
-    test('getUserPermissionsForContext uses cache with TTL', async () => {
+    test('uses cache with TTL', async () => {
       mockCacheService.get.mockResolvedValue(null);
       
       // Mock empty database results
@@ -556,7 +557,7 @@ describe('WorkspaceAuthorizationService', () => {
     });
 
     test('multiple calls to same method use cache', async () => {
-      const cachedPermissions = ['workspace:read', 'card:read'];
+      const cachedPermissions = ['workspace:read', 'card:read'] as const;
       mockCacheService.get.mockResolvedValue(cachedPermissions);
 
       // Create spy for database method
@@ -731,7 +732,7 @@ describe('WorkspaceAuthorizationService', () => {
 
       // Perform concurrent permission updates for the same user
       const updatePromises = Array(5).fill(null).map((_, index) => 
-        authService.updateMemberRole('user-1', 'ws-1', index % 2 === 0 ? 'editor' : 'member')
+        authService.updateMemberRole('user-1', 'ws-1', index % 2 === 0 ? 'member' : 'viewer', 'test-user')
       );
 
       const results = await Promise.all(updatePromises);
@@ -820,15 +821,15 @@ describe('WorkspaceAuthorizationService', () => {
       (authService as any).db = mockDb;
       mockCacheService.get.mockResolvedValue(null);
 
-      // Simulate concurrent role transitions: viewer -> editor -> admin
+      // Simulate concurrent role transitions: viewer -> member -> admin
       const roleTransitions = [
-        { from: 'viewer', to: 'editor' },
-        { from: 'editor', to: 'admin' },
+        { from: 'viewer', to: 'member' },
+        { from: 'member', to: 'admin' },
         { from: 'admin', to: 'viewer' } // Demotion
-      ];
+      ] as const;
 
       const transitionPromises = roleTransitions.map(({ to }) =>
-        authService.updateMemberRole('user-1', 'ws-1', to)
+        authService.updateMemberRole('user-1', 'ws-1', to, 'test-user')
       );
 
       // All role transitions should complete without errors
@@ -944,7 +945,7 @@ describe('WorkspaceAuthorizationService', () => {
 
     test('validates permission inheritance with conflicting role transitions', async () => {
       let currentRole = 'member';
-      let currentCustomPermissions = ['card:special_view', 'workspace:metrics'];
+      let currentCustomPermissions = ['card:special_view', 'workspace:metrics'] as const;
 
       const mockQueryBuilder = {
         select: jest.fn().mockReturnThis(),
@@ -976,7 +977,7 @@ describe('WorkspaceAuthorizationService', () => {
       expect(initialPermissions).toContain('card:special_view'); // Custom permission
 
       // Step 2: Simulate role promotion to admin (should retain custom permissions)
-      await authService.updateMemberRole('user-3', 'ws-1', 'admin');
+      await authService.updateMemberRole('user-3', 'ws-1', 'admin', 'test-user');
       currentRole = 'admin'; // Simulate database update
 
       // Clear cache to force fresh lookup
@@ -1084,7 +1085,7 @@ describe('WorkspaceAuthorizationService', () => {
       (authService as any).db = mockDb;
 
       // Should fall back to database query when cache is corrupted
-      const permissions = await authService.getUserPermissions('user-1', 'ws-1');
+      const permissions = await authService.getUserPermissionsInWorkspace('user-1', 'ws-1');
       
       expect(permissions).toContain('workspace:read');
       expect(permissions).toContain('workspace:edit');
@@ -1120,7 +1121,7 @@ describe('WorkspaceAuthorizationService', () => {
       (authService as any).db = mockDb;
 
       // Should still function without cache
-      const permissions = await authService.getUserPermissions('user-1', 'ws-1');
+      const permissions = await authService.getUserPermissionsInWorkspace('user-1', 'ws-1');
       
       expect(permissions).toContain('workspace:read');
       expect(permissions).toContain('workspace:edit');
@@ -1162,9 +1163,9 @@ describe('WorkspaceAuthorizationService', () => {
 
       // Simulate concurrent permission checks that hit TTL expiration
       const concurrentChecks = [
-        authService.getUserPermissions('user-1', 'ws-1'),
-        authService.getUserPermissions('user-1', 'ws-1'),
-        authService.getUserPermissions('user-1', 'ws-1')
+        authService.getUserPermissionsInWorkspace('user-1', 'ws-1'),
+        authService.getUserPermissionsInWorkspace('user-1', 'ws-1'),
+        authService.getUserPermissionsInWorkspace('user-1', 'ws-1')
       ];
 
       const results = await Promise.all(concurrentChecks);
@@ -1178,7 +1179,7 @@ describe('WorkspaceAuthorizationService', () => {
 
     test('handles cache key collision scenarios', async () => {
       // Setup scenario with similar cache keys that could collide
-      const userIds = ['user-123', 'user-12', 'user-1234'];
+      const userIds = ['user-123', 'user-12', 'user-1234'] as const;
       const workspaceId = 'ws-1';
       
       // Mock different permission sets for each user
@@ -1186,7 +1187,7 @@ describe('WorkspaceAuthorizationService', () => {
         'user-123': ['workspace:read'],
         'user-12': ['workspace:read', 'workspace:edit'],
         'user-1234': ['workspace:read', 'workspace:edit', 'workspace:delete']
-      };
+      } as const;
 
       mockCacheService.get.mockImplementation((key: string) => {
         const userId = key.split(':')[1];
@@ -1195,7 +1196,7 @@ describe('WorkspaceAuthorizationService', () => {
 
       // Each user should get their correct permissions, not colliding keys
       for (const userId of userIds) {
-        const permissions = await authService.getUserPermissions(userId, workspaceId);
+        const permissions = await authService.getUserPermissionsInWorkspace(userId, workspaceId);
         expect(permissions).toEqual(mockPermissionSets[userId]);
         
         // Verify correct cache key was used
@@ -1232,9 +1233,9 @@ describe('WorkspaceAuthorizationService', () => {
 
       // Simulate concurrent permission updates that trigger cache invalidation
       const concurrentUpdates = [
-        authService.updateMemberRole('user-1', 'ws-1', 'editor'),
-        authService.updateMemberRole('user-1', 'ws-1', 'viewer'),
-        authService.updateMemberRole('user-1', 'ws-1', 'admin')
+        authService.updateMemberRole('user-1', 'ws-1', 'member', 'test-user'),
+        authService.updateMemberRole('user-1', 'ws-1', 'viewer', 'test-user'),
+        authService.updateMemberRole('user-1', 'ws-1', 'admin', 'test-user')
       ];
 
       // All updates should complete without deadlock or corruption
