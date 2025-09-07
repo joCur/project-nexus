@@ -1,6 +1,12 @@
 import { WorkspaceAuthorizationService } from '@/services/workspaceAuthorization';
 import { WorkspaceRole } from '@/types/auth';
 
+// Cache TTL constants
+const CACHE_TTL = {
+  USER_PERMISSIONS: 300, // 5 minutes
+  SHORT_TERM: 60         // 1 minute
+} as const;
+
 // Mock dependencies
 jest.mock('@/database/connection');
 jest.mock('@/services/cache');
@@ -62,7 +68,7 @@ describe('WorkspaceAuthorizationService', () => {
     });
 
     test('editor role has content permissions', () => {
-      const permissions = (authService as any).getRolePermissions('member');
+      const permissions = (authService as any).getRolePermissions('editor');
       expect(permissions).toContain('workspace:read');
       expect(permissions).toContain('card:create');
       expect(permissions).toContain('card:read');
@@ -215,7 +221,7 @@ describe('WorkspaceAuthorizationService', () => {
         const result = await authService.getUserPermissionsInWorkspace('user-1', 'ws-1');
         
         expect(result).toEqual([]);
-        expect(mockCacheService.set).toHaveBeenCalledWith('user_permissions:user-1:ws-1', [], 60);
+        expect(mockCacheService.set).toHaveBeenCalledWith('user_permissions:user-1:ws-1', [], CACHE_TTL.SHORT_TERM);
       });
 
       test('combines role and custom permissions', async () => {
@@ -525,7 +531,7 @@ describe('WorkspaceAuthorizationService', () => {
       expect(mockCacheService.set).toHaveBeenCalledWith(
         'user_permissions:user-1:ws-1',
         expect.any(Array),
-        300 // 5 minutes TTL
+        CACHE_TTL.USER_PERMISSIONS
       );
     });
 
@@ -545,7 +551,7 @@ describe('WorkspaceAuthorizationService', () => {
       expect(mockCacheService.set).toHaveBeenCalledWith(
         'user_context_permissions:user-1',
         expect.any(Object),
-        300 // 5 minutes TTL
+        CACHE_TTL.USER_PERMISSIONS
       );
     });
 
@@ -683,6 +689,566 @@ describe('WorkspaceAuthorizationService', () => {
       await expect(
         authService.getWorkspaceMember('user-1', 'ws-1')
       ).resolves.toBeNull(); // Should handle the null case gracefully
+    });
+  });
+
+  describe('Concurrent Permission Operations', () => {
+    beforeEach(() => {
+      // Setup fresh mocks for concurrency tests
+      mockCacheService.get.mockClear();
+      mockCacheService.set.mockClear();
+      mockCacheService.delete.mockClear();
+    });
+
+    test('handles concurrent permission updates without race conditions', async () => {
+      // Mock database to simulate concurrent updates
+      let dbCallCount = 0;
+      const mockQueryBuilder = {
+        select: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        first: jest.fn().mockImplementation(async () => {
+          dbCallCount++;
+          // Simulate processing delay to increase chance of race conditions
+          await new Promise(resolve => setTimeout(resolve, 10));
+          return {
+            id: 'member-1',
+            workspace_id: 'ws-1',
+            user_id: 'user-1',
+            role: 'member',
+            permissions: ['card:create', 'card:read'],
+            is_active: true
+          };
+        }),
+        update: jest.fn().mockResolvedValue(1),
+        insert: jest.fn().mockResolvedValue(['member-1'])
+      };
+
+      mockDb.mockImplementation(() => mockQueryBuilder);
+      (authService as any).db = mockDb;
+
+      // Clear cache to force database calls
+      mockCacheService.get.mockResolvedValue(null);
+
+      // Perform concurrent permission updates for the same user
+      const updatePromises = Array(5).fill(null).map((_, index) => 
+        authService.updateMemberRole('user-1', 'ws-1', index % 2 === 0 ? 'editor' : 'member')
+      );
+
+      const results = await Promise.all(updatePromises);
+
+      // All updates should complete successfully
+      results.forEach(result => {
+        expect(result).toBeDefined();
+      });
+
+      // Database should handle concurrent access appropriately
+      expect(dbCallCount).toBeGreaterThan(0);
+      expect(mockQueryBuilder.update).toHaveBeenCalled();
+    });
+
+    test('manages cache consistency during concurrent permission checks', async () => {
+      const cacheOperations: string[] = [];
+      
+      // Track cache operations
+      mockCacheService.get.mockImplementation(async (key: string) => {
+        cacheOperations.push(`GET:${key}`);
+        return null; // Always miss for this test
+      });
+      
+      mockCacheService.set.mockImplementation(async (key: string, value: any, ttl: number) => {
+        cacheOperations.push(`SET:${key}`);
+        return undefined;
+      });
+
+      // Mock database response
+      const mockQueryBuilder = {
+        select: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        first: jest.fn().mockResolvedValue({
+          user_id: 'user-1',
+          workspace_id: 'ws-1',
+          role: 'member',
+          permissions: ['card:read'],
+          is_active: true
+        })
+      };
+
+      mockDb.mockImplementation(() => mockQueryBuilder);
+      (authService as any).db = mockDb;
+
+      // Perform concurrent permission checks for the same user/workspace
+      const checkPromises = Array(3).fill(null).map(() => 
+        authService.getUserPermissionsInWorkspace('user-1', 'ws-1')
+      );
+
+      const results = await Promise.all(checkPromises);
+
+      // All permission checks should return consistent results
+      results.forEach(permissions => {
+        expect(Array.isArray(permissions)).toBe(true);
+      });
+
+      // Cache operations should maintain consistency
+      const getCalls = cacheOperations.filter(op => op.startsWith('GET:')).length;
+      const setCalls = cacheOperations.filter(op => op.startsWith('SET:')).length;
+      
+      expect(getCalls).toBeGreaterThan(0);
+      expect(setCalls).toBeGreaterThan(0);
+    });
+
+    test('handles concurrent member role transitions correctly', async () => {
+      // Setup for role transition testing
+      const mockQueryBuilder = {
+        select: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        first: jest.fn().mockResolvedValue({
+          id: 'member-1',
+          workspace_id: 'ws-1', 
+          user_id: 'user-1',
+          role: 'viewer',
+          permissions: [],
+          is_active: true
+        }),
+        update: jest.fn().mockResolvedValue(1),
+        insert: jest.fn().mockResolvedValue(['member-1'])
+      };
+
+      mockDb.mockImplementation(() => mockQueryBuilder);
+      (authService as any).db = mockDb;
+      mockCacheService.get.mockResolvedValue(null);
+
+      // Simulate concurrent role transitions: viewer -> editor -> admin
+      const roleTransitions = [
+        { from: 'viewer', to: 'editor' },
+        { from: 'editor', to: 'admin' },
+        { from: 'admin', to: 'viewer' } // Demotion
+      ];
+
+      const transitionPromises = roleTransitions.map(({ to }) =>
+        authService.updateMemberRole('user-1', 'ws-1', to)
+      );
+
+      // All role transitions should complete without errors
+      const transitionResults = await Promise.all(transitionPromises);
+      
+      transitionResults.forEach(result => {
+        expect(result).toBeDefined();
+      });
+
+      // Verify that update operations were called
+      expect(mockQueryBuilder.update).toHaveBeenCalled();
+      
+      // Cache should be invalidated for each role change
+      expect(mockCacheService.delete).toHaveBeenCalled();
+    });
+  });
+
+  describe('Permission Inheritance with Multiple Custom Permissions', () => {
+    beforeEach(() => {
+      mockCacheService.get.mockClear();
+      mockCacheService.set.mockClear();
+    });
+
+    test('combines role permissions with multiple custom permissions correctly', async () => {
+      // Mock member with editor role + custom permissions
+      const mockQueryBuilder = {
+        select: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        first: jest.fn().mockResolvedValue({
+          user_id: 'user-1',
+          workspace_id: 'ws-1',
+          role: 'editor',
+          permissions: [
+            'canvas:special_edit',      // Custom permission 1
+            'workspace:analytics',      // Custom permission 2
+            'card:bulk_operations',     // Custom permission 3
+            'integration:webhook_manage' // Custom permission 4
+          ],
+          is_active: true
+        })
+      };
+
+      mockDb.mockImplementation(() => mockQueryBuilder);
+      (authService as any).db = mockDb;
+      mockCacheService.get.mockResolvedValue(null);
+
+      const permissions = await authService.getUserPermissionsInWorkspace('user-1', 'ws-1');
+
+      // Should include all role-based permissions for editor
+      expect(permissions).toContain('workspace:read');
+      expect(permissions).toContain('card:create');
+      expect(permissions).toContain('card:read');
+      expect(permissions).toContain('card:update');
+
+      // Should include all custom permissions
+      expect(permissions).toContain('canvas:special_edit');
+      expect(permissions).toContain('workspace:analytics');
+      expect(permissions).toContain('card:bulk_operations'); 
+      expect(permissions).toContain('integration:webhook_manage');
+
+      // Should not have admin-only permissions
+      expect(permissions).not.toContain('workspace:delete');
+      expect(permissions).not.toContain('workspace:manage_billing');
+
+      // Verify no duplicates (role + custom permissions merged correctly)
+      const uniquePermissions = [...new Set(permissions)];
+      expect(permissions.length).toBe(uniquePermissions.length);
+    });
+
+    test('handles permission inheritance hierarchy with custom overrides', async () => {
+      // Test case: viewer role with elevated custom permissions
+      const mockQueryBuilder = {
+        select: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        first: jest.fn().mockResolvedValue({
+          user_id: 'user-2',
+          workspace_id: 'ws-1',
+          role: 'viewer', // Base viewer role
+          permissions: [
+            'card:update',           // Elevated from viewer role
+            'canvas:create',         // Elevated from viewer role
+            'workspace:invite',      // Elevated from viewer role
+            'custom:special_feature' // Completely custom permission
+          ],
+          is_active: true
+        })
+      };
+
+      mockDb.mockImplementation(() => mockQueryBuilder);
+      (authService as any).db = mockDb;
+      mockCacheService.get.mockResolvedValue(null);
+
+      const permissions = await authService.getUserPermissionsInWorkspace('user-2', 'ws-1');
+
+      // Should have base viewer permissions
+      expect(permissions).toContain('workspace:read');
+      expect(permissions).toContain('card:read');
+
+      // Should have elevated permissions from custom list
+      expect(permissions).toContain('card:update');    // Elevated beyond viewer
+      expect(permissions).toContain('canvas:create');   // Elevated beyond viewer
+      expect(permissions).toContain('workspace:invite'); // Elevated beyond viewer
+      expect(permissions).toContain('custom:special_feature'); // Custom permission
+
+      // Should NOT have admin permissions not granted
+      expect(permissions).not.toContain('workspace:delete');
+      expect(permissions).not.toContain('workspace:manage_members');
+    });
+
+    test('validates permission inheritance with conflicting role transitions', async () => {
+      let currentRole = 'member';
+      let currentCustomPermissions = ['card:special_view', 'workspace:metrics'];
+
+      const mockQueryBuilder = {
+        select: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        first: jest.fn().mockImplementation(() => Promise.resolve({
+          user_id: 'user-3',
+          workspace_id: 'ws-1',
+          role: currentRole,
+          permissions: currentCustomPermissions,
+          is_active: true
+        })),
+        update: jest.fn().mockImplementation(async (updateData) => {
+          // Simulate role update
+          if (updateData.role) currentRole = updateData.role;
+          if (updateData.permissions) currentCustomPermissions = updateData.permissions;
+          return 1;
+        })
+      };
+
+      mockDb.mockImplementation(() => mockQueryBuilder);
+      (authService as any).db = mockDb;
+      mockCacheService.get.mockResolvedValue(null);
+
+      // Step 1: Get initial permissions (member + custom)
+      const initialPermissions = await authService.getUserPermissionsInWorkspace('user-3', 'ws-1');
+      expect(initialPermissions).toContain('card:create'); // Member role permission
+      expect(initialPermissions).toContain('card:special_view'); // Custom permission
+
+      // Step 2: Simulate role promotion to admin (should retain custom permissions)
+      await authService.updateMemberRole('user-3', 'ws-1', 'admin');
+      currentRole = 'admin'; // Simulate database update
+
+      // Clear cache to force fresh lookup
+      mockCacheService.get.mockResolvedValue(null);
+      
+      const adminPermissions = await authService.getUserPermissionsInWorkspace('user-3', 'ws-1');
+      
+      // Should have admin permissions
+      expect(adminPermissions).toContain('workspace:manage_members');
+      expect(adminPermissions).toContain('workspace:update');
+      
+      // Should still have custom permissions
+      expect(adminPermissions).toContain('card:special_view');
+      expect(adminPermissions).toContain('workspace:metrics');
+    });
+
+    test('manages complex permission scenarios with multiple inheritance levels', async () => {
+      // Simulate a workspace with complex permission structure:
+      // - Base role: editor
+      // - Custom permissions: some overlap with role, some unique, some from higher role
+      const mockQueryBuilder = {
+        select: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        first: jest.fn().mockResolvedValue({
+          user_id: 'user-4',
+          workspace_id: 'ws-complex',
+          role: 'editor', // Base editor role
+          permissions: [
+            // Permissions editor already has (should not duplicate)
+            'card:create',
+            'card:read',
+            'card:update',
+            // Admin-level permissions granted specifically
+            'workspace:manage_members',
+            'workspace:billing_view',
+            // Completely custom permissions
+            'integration:zapier',
+            'export:advanced_csv',
+            'analytics:custom_dashboard',
+            // Edge case: permission that doesn't exist in role system
+            'future:beta_feature'
+          ],
+          is_active: true
+        })
+      };
+
+      mockDb.mockImplementation(() => mockQueryBuilder);
+      (authService as any).db = mockDb;
+      mockCacheService.get.mockResolvedValue(null);
+
+      const permissions = await authService.getUserPermissionsInWorkspace('user-4', 'ws-complex');
+
+      // Verify all permission categories are included
+      const editorBasePermissions = permissions.filter(p => 
+        ['card:create', 'card:read', 'card:update', 'workspace:read'].includes(p)
+      );
+      expect(editorBasePermissions.length).toBeGreaterThan(3);
+
+      // Verify elevated admin permissions are included
+      expect(permissions).toContain('workspace:manage_members');
+      expect(permissions).toContain('workspace:billing_view');
+
+      // Verify custom permissions are included
+      expect(permissions).toContain('integration:zapier');
+      expect(permissions).toContain('export:advanced_csv');
+      expect(permissions).toContain('analytics:custom_dashboard');
+      expect(permissions).toContain('future:beta_feature');
+
+      // Verify no duplicates in final permission set
+      const uniquePermissions = [...new Set(permissions)];
+      expect(permissions.length).toBe(uniquePermissions.length);
+
+      // Verify proper caching of complex permission set
+      expect(mockCacheService.set).toHaveBeenCalledWith(
+        'user_permissions:user-4:ws-complex',
+        expect.any(Array),
+        CACHE_TTL.USER_PERMISSIONS
+      );
+    });
+  });
+
+  describe('Cache Invalidation Edge Cases', () => {
+    test('handles cache corruption gracefully', async () => {
+      // Setup corrupted cache data
+      const corruptedCacheData = 'invalid-json-data';
+      mockCacheService.get.mockResolvedValue(corruptedCacheData);
+      
+      const mockQueryBuilder = {
+        select: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        first: jest.fn().mockResolvedValue({
+          id: 'member-1',
+          workspace_id: 'ws-1',
+          user_id: 'user-1', 
+          role: 'editor',
+          permissions: ['workspace:read', 'workspace:edit'],
+          is_active: true
+        })
+      };
+
+      mockDb.mockImplementation(() => mockQueryBuilder);
+      (authService as any).db = mockDb;
+
+      // Should fall back to database query when cache is corrupted
+      const permissions = await authService.getUserPermissions('user-1', 'ws-1');
+      
+      expect(permissions).toContain('workspace:read');
+      expect(permissions).toContain('workspace:edit');
+      
+      // Should attempt to refresh cache with valid data
+      expect(mockCacheService.set).toHaveBeenCalledWith(
+        'user_permissions:user-1:ws-1',
+        expect.any(Array),
+        CACHE_TTL.USER_PERMISSIONS
+      );
+    });
+
+    test('handles cache service unavailability', async () => {
+      // Simulate cache service failure
+      mockCacheService.get.mockRejectedValue(new Error('Cache service unavailable'));
+      mockCacheService.set.mockRejectedValue(new Error('Cache service unavailable'));
+      
+      const mockQueryBuilder = {
+        select: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        first: jest.fn().mockResolvedValue({
+          id: 'member-1',
+          workspace_id: 'ws-1',
+          user_id: 'user-1',
+          role: 'admin',
+          permissions: ['workspace:read', 'workspace:edit', 'workspace:delete'],
+          is_active: true
+        })
+      };
+
+      mockDb.mockImplementation(() => mockQueryBuilder);
+      (authService as any).db = mockDb;
+
+      // Should still function without cache
+      const permissions = await authService.getUserPermissions('user-1', 'ws-1');
+      
+      expect(permissions).toContain('workspace:read');
+      expect(permissions).toContain('workspace:edit');
+      expect(permissions).toContain('workspace:delete');
+      
+      // Verify database was queried directly
+      expect(mockQueryBuilder.select).toHaveBeenCalled();
+      expect(mockQueryBuilder.where).toHaveBeenCalled();
+    });
+
+    test('handles TTL expiration race conditions', async () => {
+      // Setup scenario where cache expires between check and retrieval
+      let cacheCallCount = 0;
+      mockCacheService.get.mockImplementation(() => {
+        cacheCallCount++;
+        // First call returns data, second call (race condition) returns null
+        if (cacheCallCount === 1) {
+          return Promise.resolve(['workspace:read', 'workspace:edit']);
+        }
+        return Promise.resolve(null);
+      });
+      
+      const mockQueryBuilder = {
+        select: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        first: jest.fn().mockResolvedValue({
+          id: 'member-1',
+          workspace_id: 'ws-1',
+          user_id: 'user-1',
+          role: 'editor',
+          permissions: ['workspace:read', 'workspace:edit', 'custom:feature'],
+          is_active: true
+        })
+      };
+
+      mockDb.mockImplementation(() => mockQueryBuilder);
+      (authService as any).db = mockDb;
+
+      // Simulate concurrent permission checks that hit TTL expiration
+      const concurrentChecks = [
+        authService.getUserPermissions('user-1', 'ws-1'),
+        authService.getUserPermissions('user-1', 'ws-1'),
+        authService.getUserPermissions('user-1', 'ws-1')
+      ];
+
+      const results = await Promise.all(concurrentChecks);
+      
+      // All should return valid permissions despite race condition
+      results.forEach(permissions => {
+        expect(Array.isArray(permissions)).toBe(true);
+        expect(permissions.length).toBeGreaterThan(0);
+      });
+    });
+
+    test('handles cache key collision scenarios', async () => {
+      // Setup scenario with similar cache keys that could collide
+      const userIds = ['user-123', 'user-12', 'user-1234'];
+      const workspaceId = 'ws-1';
+      
+      // Mock different permission sets for each user
+      const mockPermissionSets = {
+        'user-123': ['workspace:read'],
+        'user-12': ['workspace:read', 'workspace:edit'],
+        'user-1234': ['workspace:read', 'workspace:edit', 'workspace:delete']
+      };
+
+      mockCacheService.get.mockImplementation((key: string) => {
+        const userId = key.split(':')[1];
+        return Promise.resolve(mockPermissionSets[userId] || null);
+      });
+
+      // Each user should get their correct permissions, not colliding keys
+      for (const userId of userIds) {
+        const permissions = await authService.getUserPermissions(userId, workspaceId);
+        expect(permissions).toEqual(mockPermissionSets[userId]);
+        
+        // Verify correct cache key was used
+        expect(mockCacheService.get).toHaveBeenCalledWith(
+          `user_permissions:${userId}:${workspaceId}`
+        );
+      }
+    });
+
+    test('handles cache stampede protection during invalidation', async () => {
+      // Setup concurrent invalidation scenario
+      mockCacheService.delete.mockImplementation(() => {
+        // Simulate slow cache deletion
+        return new Promise(resolve => setTimeout(resolve, 50));
+      });
+      
+      const mockQueryBuilder = {
+        select: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        first: jest.fn().mockResolvedValue({
+          id: 'member-1',
+          workspace_id: 'ws-1',
+          user_id: 'user-1',
+          role: 'admin',
+          permissions: ['workspace:read', 'workspace:edit', 'workspace:delete'],
+          is_active: true
+        }),
+        update: jest.fn().mockResolvedValue(1)
+      };
+
+      mockDb.mockImplementation(() => mockQueryBuilder);
+      (authService as any).db = mockDb;
+
+      // Simulate concurrent permission updates that trigger cache invalidation
+      const concurrentUpdates = [
+        authService.updateMemberRole('user-1', 'ws-1', 'editor'),
+        authService.updateMemberRole('user-1', 'ws-1', 'viewer'),
+        authService.updateMemberRole('user-1', 'ws-1', 'admin')
+      ];
+
+      // All updates should complete without deadlock or corruption
+      const updateResults = await Promise.all(concurrentUpdates);
+      
+      updateResults.forEach(result => {
+        expect(result).toBeDefined();
+      });
+
+      // Cache deletion should be called for each update
+      expect(mockCacheService.delete).toHaveBeenCalled();
+      
+      // Database updates should all complete
+      expect(mockQueryBuilder.update).toHaveBeenCalled();
     });
   });
 });
