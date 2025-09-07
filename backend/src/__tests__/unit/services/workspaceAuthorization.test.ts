@@ -68,8 +68,8 @@ describe('WorkspaceAuthorizationService', () => {
       expect(permissions).not.toContain('workspace:delete');
     });
 
-    test('editor role has content permissions', () => {
-      const permissions = (authService as any).getRolePermissions('editor');
+    test('member role has content permissions', () => {
+      const permissions = (authService as any).getRolePermissions('member');
       expect(permissions).toContain('workspace:read');
       expect(permissions).toContain('card:create');
       expect(permissions).toContain('card:read');
@@ -140,7 +140,7 @@ describe('WorkspaceAuthorizationService', () => {
 
   describe('cache operations', () => {
     describe('cache hits', () => {
-      test('getWorkspaceMember returns cached result when available', async () => {
+      test('returns cached workspace member when available', async () => {
       const cachedMember = {
         id: 'member-1',
         workspaceId: 'ws-1',
@@ -161,7 +161,7 @@ describe('WorkspaceAuthorizationService', () => {
     });
 
     describe('cache misses', () => {
-      test('getWorkspaceMember queries database when cache miss', async () => {
+      test('queries database when cache miss occurs', async () => {
       mockCacheService.get.mockResolvedValue(null);
       
       // Mock database query
@@ -1062,7 +1062,8 @@ describe('WorkspaceAuthorizationService', () => {
   });
 
   describe('Cache Invalidation Edge Cases', () => {
-    test('handles cache corruption gracefully', async () => {
+    describe('cache corruption scenarios', () => {
+      test('handles corrupted cache data gracefully', async () => {
       // Setup corrupted cache data
       const corruptedCacheData = 'invalid-json-data';
       mockCacheService.get.mockResolvedValue(corruptedCacheData);
@@ -1098,7 +1099,7 @@ describe('WorkspaceAuthorizationService', () => {
       );
     });
 
-    test('handles cache service unavailability', async () => {
+      test('handles cache service unavailability', async () => {
       // Simulate cache service failure
       mockCacheService.get.mockRejectedValue(new Error('Cache service unavailable'));
       mockCacheService.set.mockRejectedValue(new Error('Cache service unavailable'));
@@ -1130,9 +1131,11 @@ describe('WorkspaceAuthorizationService', () => {
       // Verify database was queried directly
       expect(mockQueryBuilder.select).toHaveBeenCalled();
       expect(mockQueryBuilder.where).toHaveBeenCalled();
+      });
     });
 
-    test('handles TTL expiration race conditions', async () => {
+    describe('race condition scenarios', () => {
+      test('handles TTL expiration race conditions', async () => {
       // Setup scenario where cache expires between check and retrieval
       let cacheCallCount = 0;
       mockCacheService.get.mockImplementation(() => {
@@ -1175,9 +1178,9 @@ describe('WorkspaceAuthorizationService', () => {
         expect(Array.isArray(permissions)).toBe(true);
         expect(permissions.length).toBeGreaterThan(0);
       });
-    });
+      });
 
-    test('handles cache key collision scenarios', async () => {
+      test('handles cache key collision scenarios', async () => {
       // Setup scenario with similar cache keys that could collide
       const userIds = ['user-123', 'user-12', 'user-1234'] as const;
       const workspaceId = 'ws-1';
@@ -1204,9 +1207,9 @@ describe('WorkspaceAuthorizationService', () => {
           `user_permissions:${userId}:${workspaceId}`
         );
       }
-    });
+      });
 
-    test('handles cache stampede protection during invalidation', async () => {
+      test('handles cache stampede protection during invalidation', async () => {
       // Setup concurrent invalidation scenario
       mockCacheService.delete.mockImplementation(() => {
         // Simulate slow cache deletion
@@ -1250,6 +1253,7 @@ describe('WorkspaceAuthorizationService', () => {
       
       // Database updates should all complete
       expect(mockQueryBuilder.update).toHaveBeenCalled();
+      });
     });
   });
 });
