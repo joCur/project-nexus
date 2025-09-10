@@ -418,7 +418,7 @@ describe('WorkspaceAuthorizationService', () => {
 
   describe('error handling', () => {
     describe('database errors', () => {
-      test('handles database errors gracefully', async () => {
+      test('handles database errors gracefully in getUserPermissionsInWorkspace', async () => {
       mockCacheService.get.mockResolvedValue(null);
       jest.spyOn((authService as any), 'getWorkspaceMember').mockRejectedValue(new Error('Database connection failed'));
 
@@ -427,7 +427,7 @@ describe('WorkspaceAuthorizationService', () => {
       expect(result).toEqual([]);
     });
 
-    test('handles database errors gracefully', async () => {
+    test('handles database errors gracefully in getUserWorkspaceRole', async () => {
       jest.spyOn((authService as any), 'getWorkspaceMember').mockRejectedValue(new Error('Database connection failed'));
 
       const result = await authService.getUserWorkspaceRole('user-1', 'ws-1');
@@ -435,7 +435,7 @@ describe('WorkspaceAuthorizationService', () => {
       expect(result).toBeNull();
     });
 
-    test('handles database errors gracefully', async () => {
+    test('handles database errors gracefully in hasPermissionInWorkspace', async () => {
       jest.spyOn((authService as any), 'getWorkspaceMember').mockRejectedValue(new Error('Database connection failed'));
 
       const result = await authService.hasPermissionInWorkspace('user-1', 'ws-1', 'card:create');
@@ -443,7 +443,7 @@ describe('WorkspaceAuthorizationService', () => {
       expect(result).toBe(false);
     });
 
-    test('handles database errors gracefully', async () => {
+    test('handles database errors gracefully in getUserPermissionsForContext', async () => {
       mockCacheService.get.mockResolvedValue(null);
       
       // Mock database to throw error

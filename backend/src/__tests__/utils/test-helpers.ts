@@ -57,20 +57,20 @@ interface MockWorkspaceAuthService {
 }
 
 interface MockCanvasService {
-  getCanvasById: jest.MockedFunction<any>;
-  getWorkspaceCanvases: jest.MockedFunction<any>;
-  create: jest.MockedFunction<any>;
-  findById: jest.MockedFunction<any>;
-  update: jest.MockedFunction<any>;
-  delete: jest.MockedFunction<any>;
-  findByWorkspace: jest.MockedFunction<any>;
+  getCanvasById: jest.MockedFunction<(canvasId: string) => Promise<any | null>>;
+  getWorkspaceCanvases: jest.MockedFunction<(workspaceId: string) => Promise<any[]>>;
+  create: jest.MockedFunction<(input: any, userId: string) => Promise<any>>;
+  findById: jest.MockedFunction<(canvasId: string) => Promise<any | null>>;
+  update: jest.MockedFunction<(canvasId: string, input: any, userId: string) => Promise<any>>;
+  delete: jest.MockedFunction<(canvasId: string, userId: string) => Promise<boolean>>;
+  findByWorkspace: jest.MockedFunction<(workspaceId: string) => Promise<any[]>>;
 }
 
 interface MockCardService {
-  create: jest.MockedFunction<any>;
-  findById: jest.MockedFunction<any>;
-  update: jest.MockedFunction<any>;
-  delete: jest.MockedFunction<any>;
+  create: jest.MockedFunction<(input: any, userId: string) => Promise<any>>;
+  findById: jest.MockedFunction<(cardId: string) => Promise<any | null>>;
+  update: jest.MockedFunction<(cardId: string, input: any, userId: string) => Promise<any>>;
+  delete: jest.MockedFunction<(cardId: string, userId: string) => Promise<boolean>>;
 }
 
 // Test secret for JWT mocking - NOT A REAL SECRET
