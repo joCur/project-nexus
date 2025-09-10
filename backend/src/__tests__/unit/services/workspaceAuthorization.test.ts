@@ -1,4 +1,4 @@
-import { WorkspaceAuthorizationService } from '@/services/workspaceAuthorization';
+import { WorkspaceAuthorizationService, WorkspaceMember } from '@/services/workspaceAuthorization';
 import { WorkspaceRole } from '@/types/auth';
 
 // Cache TTL constants
@@ -7,9 +7,60 @@ const CACHE_TTL = {
   SHORT_TERM: 60         // 1 minute
 } as const;
 
+// Performance test constants
+const PERFORMANCE_LIMITS = {
+  RESPONSE_TIME_MS: 100,     // Max response time for individual operations
+  CONCURRENT_AVG_MS: 200,    // Max average response time for concurrent operations
+  MEMORY_GROWTH_MB: 10,      // Max memory growth during repeated operations
+  CONCURRENT_REQUEST_COUNT: 10, // Number of concurrent requests for performance tests
+  REPEATED_OPERATION_COUNT: 100, // Number of operations for memory leak tests
+  CACHE_QUERY_COUNT: 3,      // Expected cache queries for performance tests
+  CONCURRENT_UPDATE_COUNT: 5, // Number of concurrent updates for race condition tests
+  CONCURRENT_CHECK_COUNT: 3,  // Number of concurrent permission checks
+  PROCESSING_DELAY_MS: 10,   // Simulated processing delay for race conditions
+  CACHE_DELETION_DELAY_MS: 50, // Simulated cache deletion delay
+  MIN_BASE_PERMISSIONS: 3,   // Minimum expected base permissions
+  TEMP_ARRAY_SIZE: 1000      // Size of temporary array for GC simulation
+} as const;
+
 // Mock dependencies
 jest.mock('@/database/connection');
 jest.mock('@/services/cache');
+
+// Mock factory functions for better type safety and reusability
+const createMockDatabase = () => ({
+  fn: { now: jest.fn(() => new Date()) },
+  transaction: jest.fn(),
+  raw: jest.fn(),
+});
+
+const createMockCacheService = () => ({
+  get: jest.fn(),
+  set: jest.fn(),
+  delete: jest.fn(),
+  del: jest.fn(),
+});
+
+const createMockQueryBuilder = (mockResult?: any) => ({
+  select: jest.fn().mockReturnThis(),
+  leftJoin: jest.fn().mockReturnThis(),
+  where: jest.fn().mockReturnThis(),
+  andWhere: jest.fn().mockReturnThis(),
+  first: jest.fn().mockResolvedValue(mockResult || null),
+  update: jest.fn().mockResolvedValue(1),
+  insert: jest.fn().mockResolvedValue(['member-1'])
+});
+
+const createMockWorkspaceMember = (overrides: Partial<WorkspaceMember> = {}): WorkspaceMember => ({
+  id: 'member-1',
+  workspaceId: 'ws-1',
+  userId: 'user-1',
+  role: 'member' as WorkspaceRole,
+  permissions: ['workspace:read', 'card:create', 'card:read', 'card:update'],
+  joinedAt: new Date(),
+  isActive: true,
+  ...overrides
+});
 
 describe('WorkspaceAuthorizationService', () => {
   let authService: WorkspaceAuthorizationService;
@@ -20,20 +71,9 @@ describe('WorkspaceAuthorizationService', () => {
     // Reset mocks
     jest.clearAllMocks();
     
-    // Mock database
-    mockDb = {
-      fn: { now: jest.fn(() => new Date()) },
-      transaction: jest.fn(),
-      raw: jest.fn(),
-    };
-
-    // Mock cache service
-    mockCacheService = {
-      get: jest.fn(),
-      set: jest.fn(),
-      delete: jest.fn(),
-      del: jest.fn(),
-    };
+    // Create mocks using factory functions
+    mockDb = createMockDatabase();
+    mockCacheService = createMockCacheService();
 
     // Create service instance
     authService = new WorkspaceAuthorizationService();
@@ -93,30 +133,19 @@ describe('WorkspaceAuthorizationService', () => {
 
   describe('permission checking', () => {
     test('hasPermission returns true for valid role permission', () => {
-      const member = {
-        id: 'member-1',
-        workspaceId: 'ws-1',
-        userId: 'user-1',
-        role: 'editor' as WorkspaceRole,
-        permissions: ['workspace:read', 'card:create', 'card:read', 'card:update'],
-        joinedAt: new Date(),
-        isActive: true
-      };
+      const member = createMockWorkspaceMember({
+        permissions: ['workspace:read', 'card:create', 'card:read', 'card:update']
+      });
 
       const hasPermission = (authService as any).hasPermission(member, 'card:create');
       expect(hasPermission).toBe(true);
     });
 
     test('hasPermission returns false for invalid permission', () => {
-      const member = {
-        id: 'member-1',
-        workspaceId: 'ws-1',
-        userId: 'user-1',
+      const member = createMockWorkspaceMember({
         role: 'viewer' as WorkspaceRole,
-        permissions: ['workspace:read', 'card:read'],
-        joinedAt: new Date(),
-        isActive: true
-      };
+        permissions: ['workspace:read', 'card:read']
+      });
 
       const hasPermission = (authService as any).hasPermission(member, 'card:create');
       expect(hasPermission).toBe(false);
@@ -139,13 +168,14 @@ describe('WorkspaceAuthorizationService', () => {
   });
 
   describe('cache operations', () => {
-    describe('cache hits', () => {
-      test('returns cached workspace member when available', async () => {
+    describe('workspace member caching', () => {
+      describe('cache hits', () => {
+        test('returns cached workspace member when available', async () => {
       const cachedMember = {
         id: 'member-1',
         workspaceId: 'ws-1',
         userId: 'user-1',
-        role: 'editor',
+        role: 'member',
         permissions: ['workspace:read', 'card:create'],
         joinedAt: new Date(),
         isActive: true
@@ -157,10 +187,10 @@ describe('WorkspaceAuthorizationService', () => {
       
       expect(mockCacheService.get).toHaveBeenCalledWith('workspace_member:ws-1:user-1');
       expect(result).toEqual(cachedMember);
-    });
-    });
+        });
+      });
 
-    describe('cache misses', () => {
+      describe('cache misses', () => {
       test('queries database when cache miss occurs', async () => {
       mockCacheService.get.mockResolvedValue(null);
       
@@ -185,7 +215,8 @@ describe('WorkspaceAuthorizationService', () => {
       
       expect(mockCacheService.get).toHaveBeenCalled();
       expect(result).toBeNull();
-    });
+        });
+      });
     });
   });
 
@@ -221,7 +252,7 @@ describe('WorkspaceAuthorizationService', () => {
       test('returns empty array for non-member', async () => {
         mockCacheService.get.mockResolvedValue(null);
         // Mock getWorkspaceMember to return null (not a member)
-        jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(null);
+        jest.spyOn((authService as any), 'getWorkspaceMember').mockResolvedValue(null);
 
         const result = await authService.getUserPermissionsInWorkspace('user-1', 'ws-1');
         
@@ -242,7 +273,7 @@ describe('WorkspaceAuthorizationService', () => {
           isActive: true
         };
         
-        jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+        jest.spyOn((authService as any), 'getWorkspaceMember').mockResolvedValue(mockMember);
 
         const result = await authService.getUserPermissionsInWorkspace('user-1', 'ws-1');
         
@@ -265,7 +296,7 @@ describe('WorkspaceAuthorizationService', () => {
           isActive: true
         };
         
-        jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+        jest.spyOn((authService as any), 'getWorkspaceMember').mockResolvedValue(mockMember);
 
         const result = await authService.getUserWorkspaceRole('user-1', 'ws-1');
         
@@ -273,7 +304,7 @@ describe('WorkspaceAuthorizationService', () => {
       });
 
       test('returns null when user is not a member', async () => {
-        jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(null);
+        jest.spyOn((authService as any), 'getWorkspaceMember').mockResolvedValue(null);
 
         const result = await authService.getUserWorkspaceRole('user-1', 'ws-1');
         
@@ -293,7 +324,7 @@ describe('WorkspaceAuthorizationService', () => {
           isActive: true
         };
         
-        jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+        jest.spyOn((authService as any), 'getWorkspaceMember').mockResolvedValue(mockMember);
 
         const result = await authService.hasPermissionInWorkspace('user-1', 'ws-1', 'card:create');
         
@@ -311,7 +342,7 @@ describe('WorkspaceAuthorizationService', () => {
           isActive: true
         };
         
-        jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+        jest.spyOn((authService as any), 'getWorkspaceMember').mockResolvedValue(mockMember);
 
         const result = await authService.hasPermissionInWorkspace('user-1', 'ws-1', 'card:create');
         
@@ -319,7 +350,7 @@ describe('WorkspaceAuthorizationService', () => {
       });
 
       test('returns false when user is not a member', async () => {
-        jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(null);
+        jest.spyOn((authService as any), 'getWorkspaceMember').mockResolvedValue(null);
 
         const result = await authService.hasPermissionInWorkspace('user-1', 'ws-1', 'card:create');
         
@@ -372,8 +403,8 @@ describe('WorkspaceAuthorizationService', () => {
 
         const result = await authService.getUserPermissionsForContext('user-1');
         
-        expect(result['ws-1']).toContain('workspace:read'); // Editor permissions
-        expect(result['ws-1']).toContain('card:create'); // Editor permissions
+        expect(result['ws-1']).toContain('workspace:read'); // Member permissions
+        expect(result['ws-1']).toContain('card:create'); // Member permissions
         expect(result['ws-1']).toContain('custom:permission'); // Custom permission
         expect(result['ws-2']).toContain('workspace:read'); // Viewer permissions
         expect(result['ws-3']).toContain('workspace:delete'); // Owner permissions
@@ -386,7 +417,7 @@ describe('WorkspaceAuthorizationService', () => {
     describe('database errors', () => {
       test('handles database errors gracefully', async () => {
       mockCacheService.get.mockResolvedValue(null);
-      jest.spyOn(authService, 'getWorkspaceMember').mockRejectedValue(new Error('Database connection failed'));
+      jest.spyOn((authService as any), 'getWorkspaceMember').mockRejectedValue(new Error('Database connection failed'));
 
       const result = await authService.getUserPermissionsInWorkspace('user-1', 'ws-1');
       
@@ -394,7 +425,7 @@ describe('WorkspaceAuthorizationService', () => {
     });
 
     test('handles database errors gracefully', async () => {
-      jest.spyOn(authService, 'getWorkspaceMember').mockRejectedValue(new Error('Database connection failed'));
+      jest.spyOn((authService as any), 'getWorkspaceMember').mockRejectedValue(new Error('Database connection failed'));
 
       const result = await authService.getUserWorkspaceRole('user-1', 'ws-1');
       
@@ -402,7 +433,7 @@ describe('WorkspaceAuthorizationService', () => {
     });
 
     test('handles database errors gracefully', async () => {
-      jest.spyOn(authService, 'getWorkspaceMember').mockRejectedValue(new Error('Database connection failed'));
+      jest.spyOn((authService as any), 'getWorkspaceMember').mockRejectedValue(new Error('Database connection failed'));
 
       const result = await authService.hasPermissionInWorkspace('user-1', 'ws-1', 'card:create');
       
@@ -466,7 +497,7 @@ describe('WorkspaceAuthorizationService', () => {
         isActive: false // Inactive member
       };
       
-      jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+      jest.spyOn((authService as any), 'getWorkspaceMember').mockResolvedValue(mockMember);
 
       const result = await authService.getUserPermissionsInWorkspace('user-1', 'ws-1');
       
@@ -484,7 +515,7 @@ describe('WorkspaceAuthorizationService', () => {
         isActive: true
       };
       
-      jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+      jest.spyOn((authService as any), 'getWorkspaceMember').mockResolvedValue(mockMember);
 
       const result = await authService.getUserPermissionsInWorkspace('user-1', 'ws-1');
       
@@ -503,7 +534,7 @@ describe('WorkspaceAuthorizationService', () => {
         isActive: true
       };
       
-      jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+      jest.spyOn((authService as any), 'getWorkspaceMember').mockResolvedValue(mockMember);
 
       const result = await authService.getUserPermissionsInWorkspace('user-1', 'ws-1');
       
@@ -516,7 +547,8 @@ describe('WorkspaceAuthorizationService', () => {
 
 
   describe('performance and caching', () => {
-    test('uses cache with TTL', async () => {
+    describe('TTL behavior', () => {
+      test('uses cache with TTL for user permissions', async () => {
       mockCacheService.get.mockResolvedValue(null);
       
       const mockMember = {
@@ -529,7 +561,7 @@ describe('WorkspaceAuthorizationService', () => {
         isActive: true
       };
       
-      jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+      jest.spyOn((authService as any), 'getWorkspaceMember').mockResolvedValue(mockMember);
 
       await authService.getUserPermissionsInWorkspace('user-1', 'ws-1');
       
@@ -538,9 +570,9 @@ describe('WorkspaceAuthorizationService', () => {
         expect.any(Array),
         CACHE_TTL.USER_PERMISSIONS
       );
-    });
+      });
 
-    test('uses cache with TTL', async () => {
+      test('uses cache with TTL for context permissions', async () => {
       mockCacheService.get.mockResolvedValue(null);
       
       // Mock empty database results
@@ -558,14 +590,16 @@ describe('WorkspaceAuthorizationService', () => {
         expect.any(Object),
         CACHE_TTL.USER_PERMISSIONS
       );
+      });
     });
 
-    test('multiple calls to same method use cache', async () => {
+    describe('cache efficiency', () => {
+      test('multiple calls to same method use cache', async () => {
       const cachedPermissions = ['workspace:read', 'card:read'] as const;
       mockCacheService.get.mockResolvedValue(cachedPermissions);
 
       // Create spy for database method
-      const getWorkspaceMemberSpy = jest.spyOn(authService, 'getWorkspaceMember');
+      const getWorkspaceMemberSpy = jest.spyOn((authService as any), 'getWorkspaceMember');
 
       // Make multiple calls
       await authService.getUserPermissionsInWorkspace('user-1', 'ws-1');
@@ -573,8 +607,9 @@ describe('WorkspaceAuthorizationService', () => {
       await authService.getUserPermissionsInWorkspace('user-1', 'ws-1');
       
       // Cache should only be queried 3 times, no database calls
-      expect(mockCacheService.get).toHaveBeenCalledTimes(3);
+      expect(mockCacheService.get).toHaveBeenCalledTimes(PERFORMANCE_LIMITS.CACHE_QUERY_COUNT);
       expect(getWorkspaceMemberSpy).not.toHaveBeenCalled();
+      });
     });
   });
 
@@ -592,7 +627,7 @@ describe('WorkspaceAuthorizationService', () => {
           isActive: true
         };
         
-        jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+        jest.spyOn((authService as any), 'getWorkspaceMember').mockResolvedValue(mockMember);
         mockCacheService.get.mockResolvedValue(null);
 
         const startTime = Date.now();
@@ -600,7 +635,7 @@ describe('WorkspaceAuthorizationService', () => {
         const endTime = Date.now();
         const responseTime = endTime - startTime;
 
-        expect(responseTime).toBeLessThan(100); // Should complete in < 100ms
+        expect(responseTime).toBeLessThan(PERFORMANCE_LIMITS.RESPONSE_TIME_MS); // Should complete in < 100ms
       });
 
       test('hasPermissionInWorkspace completes within 100ms', async () => {
@@ -614,19 +649,19 @@ describe('WorkspaceAuthorizationService', () => {
           isActive: true
         };
         
-        jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+        jest.spyOn((authService as any), 'getWorkspaceMember').mockResolvedValue(mockMember);
 
         const startTime = Date.now();
         await authService.hasPermissionInWorkspace('user-1', 'ws-1', 'workspace:read');
         const endTime = Date.now();
         const responseTime = endTime - startTime;
 
-        expect(responseTime).toBeLessThan(100); // Should complete in < 100ms
+        expect(responseTime).toBeLessThan(PERFORMANCE_LIMITS.RESPONSE_TIME_MS); // Should complete in < 100ms
       });
     });
 
     describe('concurrent request performance', () => {
-      test('handles 10 concurrent requests within 200ms average', async () => {
+      test(`handles ${PERFORMANCE_LIMITS.CONCURRENT_REQUEST_COUNT} concurrent requests within ${PERFORMANCE_LIMITS.CONCURRENT_AVG_MS}ms average`, async () => {
         // Mock consistent database response
         const mockMember = {
           id: 'member-1',
@@ -638,21 +673,21 @@ describe('WorkspaceAuthorizationService', () => {
           isActive: true
         };
         
-        jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+        jest.spyOn((authService as any), 'getWorkspaceMember').mockResolvedValue(mockMember);
         mockCacheService.get.mockResolvedValue(null);
 
         // Create 10 concurrent requests
         const startTime = Date.now();
-        const concurrentRequests = Array(10).fill(null).map(() =>
+        const concurrentRequests = Array(PERFORMANCE_LIMITS.CONCURRENT_REQUEST_COUNT).fill(null).map(() =>
           authService.getUserPermissionsInWorkspace('user-1', 'ws-1')
         );
 
         await Promise.all(concurrentRequests);
         const endTime = Date.now();
         const totalTime = endTime - startTime;
-        const averageTime = totalTime / 10;
+        const averageTime = totalTime / PERFORMANCE_LIMITS.CONCURRENT_REQUEST_COUNT;
 
-        expect(averageTime).toBeLessThan(200); // Average should be < 200ms per request
+        expect(averageTime).toBeLessThan(PERFORMANCE_LIMITS.CONCURRENT_AVG_MS); // Average should be < 200ms per request
       });
     });
 
@@ -668,14 +703,14 @@ describe('WorkspaceAuthorizationService', () => {
           isActive: true
         };
         
-        jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+        jest.spyOn((authService as any), 'getWorkspaceMember').mockResolvedValue(mockMember);
         mockCacheService.get.mockResolvedValue(null);
 
         // Baseline memory usage
         const initialMemory = process.memoryUsage().heapUsed;
 
         // Perform 100 operations
-        for (let i = 0; i < 100; i++) {
+        for (let i = 0; i < PERFORMANCE_LIMITS.REPEATED_OPERATION_COUNT; i++) {
           await authService.getUserPermissionsInWorkspace(`user-${i}`, 'ws-1');
         }
 
@@ -684,14 +719,14 @@ describe('WorkspaceAuthorizationService', () => {
           global.gc();
         } else {
           // Simulate garbage collection pressure
-          const tempArray = new Array(1000).fill('temp-data');
+          const tempArray = new Array(PERFORMANCE_LIMITS.TEMP_ARRAY_SIZE).fill('temp-data');
           tempArray.length = 0;
         }
 
         const finalMemory = process.memoryUsage().heapUsed;
         const memoryGrowth = (finalMemory - initialMemory) / 1024 / 1024; // Convert to MB
 
-        expect(memoryGrowth).toBeLessThan(10); // Should not grow by more than 10MB
+        expect(memoryGrowth).toBeLessThan(PERFORMANCE_LIMITS.MEMORY_GROWTH_MB); // Should not grow by more than 10MB
       });
     });
   });
@@ -708,7 +743,7 @@ describe('WorkspaceAuthorizationService', () => {
         isActive: true
       };
       
-      jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+      jest.spyOn((authService as any), 'getWorkspaceMember').mockResolvedValue(mockMember);
 
       const result = await authService.hasPermissionInWorkspace('user-1', 'ws-1', 'card:delete');
       
@@ -728,7 +763,7 @@ describe('WorkspaceAuthorizationService', () => {
         isActive: true
       };
       
-      jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+      jest.spyOn((authService as any), 'getWorkspaceMember').mockResolvedValue(mockMember);
 
       const result = await authService.getUserPermissionsInWorkspace('user-1', 'ws-1');
       
@@ -751,7 +786,7 @@ describe('WorkspaceAuthorizationService', () => {
         isActive: true
       };
       
-      jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+      jest.spyOn((authService as any), 'getWorkspaceMember').mockResolvedValue(mockMember);
 
       const result = await authService.getUserPermissionsInWorkspace('user-1', 'ws-1');
       
@@ -839,7 +874,7 @@ describe('WorkspaceAuthorizationService', () => {
 
         const workspace2Member = null; // User not a member of workspace 2
 
-        jest.spyOn(authService, 'getWorkspaceMember')
+        jest.spyOn((authService as any), 'getWorkspaceMember')
           .mockImplementation(async (userId, workspaceId) => {
             if (workspaceId === 'workspace-1') return workspace1Member;
             if (workspaceId === 'workspace-2') return workspace2Member;
@@ -884,7 +919,7 @@ describe('WorkspaceAuthorizationService', () => {
           isActive: true
         };
 
-        jest.spyOn(authService, 'getWorkspaceMember')
+        jest.spyOn((authService as any), 'getWorkspaceMember')
           .mockImplementation(async (userId, workspaceId) => {
             if (workspaceId === 'workspace-alpha') return mockMember1;
             if (workspaceId === 'workspace-beta') return mockMember2;
@@ -939,7 +974,7 @@ describe('WorkspaceAuthorizationService', () => {
           isActive: true
         };
 
-        jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+        jest.spyOn((authService as any), 'getWorkspaceMember').mockResolvedValue(mockMember);
 
         const permissions = await authService.getUserPermissionsInWorkspace('user-1', 'secure-workspace');
 
@@ -996,7 +1031,7 @@ describe('WorkspaceAuthorizationService', () => {
             isActive: true
           };
 
-          jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+          jest.spyOn((authService as any), 'getWorkspaceMember').mockResolvedValue(mockMember);
 
           const permissions = await authService.getUserPermissionsInWorkspace(`user-${role}`, 'test-workspace');
 
@@ -1037,9 +1072,9 @@ describe('WorkspaceAuthorizationService', () => {
           }
         };
 
-        jest.spyOn(authService, 'getWorkspaceMember')
-          .mockImplementation(async (userId, workspaceId) => {
-            return membershipMap[workspaceId] || null;
+        jest.spyOn((authService as any), 'getWorkspaceMember')
+          .mockImplementation(async (userId: string, workspaceId: string) => {
+            return membershipMap[workspaceId as keyof typeof membershipMap] || null;
           });
 
         // Simulate rapid context switching
@@ -1092,9 +1127,9 @@ describe('WorkspaceAuthorizationService', () => {
           }
         };
 
-        jest.spyOn(authService, 'getWorkspaceMember')
-          .mockImplementation(async (userId, workspaceId) => {
-            return workspaceRoles[workspaceId] || null;
+        jest.spyOn((authService as any), 'getWorkspaceMember')
+          .mockImplementation(async (userId: string, workspaceId: string) => {
+            return workspaceRoles[workspaceId as keyof typeof workspaceRoles] || null;
           });
 
         // Rapidly switch between workspace contexts
@@ -1138,7 +1173,7 @@ describe('WorkspaceAuthorizationService', () => {
         first: jest.fn().mockImplementation(async () => {
           dbCallCount++;
           // Simulate processing delay to increase chance of race conditions
-          await new Promise(resolve => setTimeout(resolve, 10));
+          await new Promise(resolve => setTimeout(resolve, PERFORMANCE_LIMITS.PROCESSING_DELAY_MS));
           return {
             id: 'member-1',
             workspace_id: 'ws-1',
@@ -1163,7 +1198,7 @@ describe('WorkspaceAuthorizationService', () => {
       mockCacheService.get.mockResolvedValue(null);
 
       // Perform concurrent permission updates for the same user
-      const updatePromises = Array(5).fill(null).map((_, index) => 
+      const updatePromises = Array(PERFORMANCE_LIMITS.CONCURRENT_UPDATE_COUNT).fill(null).map((_, index) => 
         authService.updateMemberRole('ws-1', 'user-1', index % 2 === 0 ? 'member' : 'viewer', 'test-user')
       );
 
@@ -1212,7 +1247,7 @@ describe('WorkspaceAuthorizationService', () => {
       (authService as any).db = mockDb;
 
       // Perform concurrent permission checks for the same user/workspace
-      const checkPromises = Array(3).fill(null).map(() => 
+      const checkPromises = Array(PERFORMANCE_LIMITS.CONCURRENT_CHECK_COUNT).fill(null).map(() => 
         authService.getUserPermissionsInWorkspace('user-1', 'ws-1')
       );
 
@@ -1448,7 +1483,7 @@ describe('WorkspaceAuthorizationService', () => {
 
     test('manages complex permission scenarios with multiple inheritance levels', async () => {
       // Simulate a workspace with complex permission structure:
-      // - Base role: editor
+      // - Base role: member
       // - Custom permissions: some overlap with role, some unique, some from higher role
       const mockQueryBuilder = {
         select: jest.fn().mockReturnThis(),
@@ -1458,9 +1493,9 @@ describe('WorkspaceAuthorizationService', () => {
         first: jest.fn().mockResolvedValue({
           user_id: 'user-4',
           workspace_id: 'ws-complex',
-          role: 'editor', // Base editor role
+          role: 'member', // Base member role
           permissions: [
-            // Permissions editor already has (should not duplicate)
+            // Permissions member already has (should not duplicate)
             'card:create',
             'card:read',
             'card:update',
@@ -1489,10 +1524,10 @@ describe('WorkspaceAuthorizationService', () => {
       const permissions = await authService.getUserPermissionsInWorkspace('user-4', 'ws-complex');
 
       // Verify all permission categories are included
-      const editorBasePermissions = permissions.filter(p => 
+      const memberBasePermissions = permissions.filter(p => 
         ['card:create', 'card:read', 'card:update', 'workspace:read'].includes(p)
       );
-      expect(editorBasePermissions.length).toBeGreaterThan(3);
+      expect(memberBasePermissions.length).toBeGreaterThan(PERFORMANCE_LIMITS.MIN_BASE_PERMISSIONS);
 
       // Verify elevated admin permissions are included
       expect(permissions).toContain('workspace:manage_members');
@@ -1620,7 +1655,7 @@ describe('WorkspaceAuthorizationService', () => {
           id: 'member-1',
           workspace_id: 'ws-1',
           user_id: 'user-1',
-          role: 'editor',
+          role: 'member',
           permissions: ['workspace:read', 'workspace:edit', 'custom:feature'],
           is_active: true
         })
@@ -1682,7 +1717,7 @@ describe('WorkspaceAuthorizationService', () => {
       // Setup concurrent invalidation scenario
       mockCacheService.delete.mockImplementation(() => {
         // Simulate slow cache deletion
-        return new Promise(resolve => setTimeout(resolve, 50));
+        return new Promise(resolve => setTimeout(resolve, PERFORMANCE_LIMITS.CACHE_DELETION_DELAY_MS));
       });
       
       const mockQueryBuilder = {
