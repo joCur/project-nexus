@@ -14,46 +14,46 @@ import { resolvers } from '@/resolvers';
 
 // Mock service type definitions for better type safety
 interface MockAuth0Service {
-  validateAuth0Token: jest.MockedFunction<any>;
-  syncUserFromAuth0: jest.MockedFunction<any>;
-  createSession: jest.MockedFunction<any>;
-  validateSession: jest.MockedFunction<any>;
-  invalidateSession: jest.MockedFunction<any>;
-  refreshSession: jest.MockedFunction<any>;
-  getActiveSessionsForUser: jest.MockedFunction<any>;
-  getUserPermissions: jest.MockedFunction<any>;
-  destroySession: jest.MockedFunction<any>;
-  healthCheck: jest.MockedFunction<any>;
+  validateAuth0Token: jest.MockedFunction<(token: string) => Promise<any | null>>;
+  syncUserFromAuth0: jest.MockedFunction<(auth0User: any) => Promise<any>>;
+  createSession: jest.MockedFunction<(user: any, auth0User: any) => Promise<string>>;
+  validateSession: jest.MockedFunction<(userId: string) => Promise<boolean>>;
+  invalidateSession: jest.MockedFunction<(userId: string) => Promise<void>>;
+  refreshSession: jest.MockedFunction<(userId: string) => Promise<any>>;
+  getActiveSessionsForUser: jest.MockedFunction<(userId: string) => Promise<any[]>>;
+  getUserPermissions: jest.MockedFunction<(userId: string) => Promise<string[]>>;
+  destroySession: jest.MockedFunction<(userId: string) => Promise<void>>;
+  healthCheck: jest.MockedFunction<() => Promise<{ status: 'OK' | 'ERROR'; error?: string; responseTime: number }>>;
 }
 
 interface MockUserService {
   tableName: string;
-  create: jest.MockedFunction<any>;
-  findById: jest.MockedFunction<any>;
-  findByAuth0Id: jest.MockedFunction<any>;
-  findByEmail: jest.MockedFunction<any>;
-  update: jest.MockedFunction<any>;
-  delete: jest.MockedFunction<any>;
-  list: jest.MockedFunction<any>;
-  search: jest.MockedFunction<any>;
-  updateLastLogin: jest.MockedFunction<any>;
-  getUserWorkspaces: jest.MockedFunction<any>;
-  mapDbUserToUser: jest.MockedFunction<any>;
+  create: jest.MockedFunction<(userData: any) => Promise<any>>;
+  findById: jest.MockedFunction<(id: string) => Promise<any | null>>;
+  findByAuth0Id: jest.MockedFunction<(auth0Id: string) => Promise<any | null>>;
+  findByEmail: jest.MockedFunction<(email: string) => Promise<any | null>>;
+  update: jest.MockedFunction<(id: string, updates: any) => Promise<any>>;
+  delete: jest.MockedFunction<(id: string) => Promise<void>>;
+  list: jest.MockedFunction<(input?: any) => Promise<{ items: any[]; totalCount: number; page: number; limit: number; totalPages: number; hasNextPage: boolean; hasPreviousPage: boolean }>>;
+  search: jest.MockedFunction<(query: string, options?: any) => Promise<any[]>>;
+  updateLastLogin: jest.MockedFunction<(userId: string) => Promise<void>>;
+  getUserWorkspaces: jest.MockedFunction<(userId: string) => Promise<string[]>>;
+  mapDbUserToUser: jest.MockedFunction<(dbUser: any) => any>;
 }
 
 interface MockWorkspaceAuthService {
-  getUserPermissionsForContext: jest.MockedFunction<any>;
-  getUserPermissionsInWorkspace: jest.MockedFunction<any>;
-  getUserWorkspaceRole: jest.MockedFunction<any>;
-  hasPermissionInWorkspace: jest.MockedFunction<any>;
-  hasWorkspaceAccess: jest.MockedFunction<any>;
-  getWorkspaceMember: jest.MockedFunction<any>;
-  getWorkspaceMembers: jest.MockedFunction<any>;
-  addWorkspaceMember: jest.MockedFunction<any>;
-  updateMemberRole: jest.MockedFunction<any>;
-  removeMember: jest.MockedFunction<any>;
-  requirePermission: jest.MockedFunction<any>;
-  checkPermission: jest.MockedFunction<any>;
+  getUserPermissionsForContext: jest.MockedFunction<(userId: string) => Promise<Record<string, string[]>>>;
+  getUserPermissionsInWorkspace: jest.MockedFunction<(userId: string, workspaceId: string) => Promise<string[]>>;
+  getUserWorkspaceRole: jest.MockedFunction<(userId: string, workspaceId: string) => Promise<string | null>>;
+  hasPermissionInWorkspace: jest.MockedFunction<(userId: string, workspaceId: string, permission: string) => Promise<boolean>>;
+  hasWorkspaceAccess: jest.MockedFunction<(userId: string, workspaceId: string) => Promise<boolean>>;
+  getWorkspaceMember: jest.MockedFunction<(userId: string, workspaceId: string) => Promise<any | null>>;
+  getWorkspaceMembers: jest.MockedFunction<(workspaceId: string) => Promise<any[]>>;
+  addWorkspaceMember: jest.MockedFunction<(workspaceId: string, userId: string, role: string) => Promise<any>>;
+  updateMemberRole: jest.MockedFunction<(workspaceId: string, userId: string, role: string) => Promise<any>>;
+  removeMember: jest.MockedFunction<(workspaceId: string, userId: string) => Promise<boolean>>;
+  requirePermission: jest.MockedFunction<(userId: string, workspaceId: string, permission: string) => Promise<void>>;
+  checkPermission: jest.MockedFunction<(userId: string, workspaceId: string, permission: string) => Promise<boolean>>;
 }
 
 interface MockCanvasService {
@@ -442,17 +442,17 @@ export function createMockCacheService() {
 export function createMockUserService(): MockUserService {
   return {
     tableName: 'users',
-    create: jest.fn(),
-    findById: jest.fn(),
-    findByAuth0Id: jest.fn(),
-    findByEmail: jest.fn(),
-    update: jest.fn(),
-    delete: jest.fn(),
-    list: jest.fn(),
-    search: jest.fn(),
-    updateLastLogin: jest.fn(),
-    getUserWorkspaces: jest.fn(),
-    mapDbUserToUser: jest.fn(),
+    create: jest.fn().mockResolvedValue(createMockUser()),
+    findById: jest.fn().mockResolvedValue(null),
+    findByAuth0Id: jest.fn().mockResolvedValue(null),
+    findByEmail: jest.fn().mockResolvedValue(null),
+    update: jest.fn().mockResolvedValue(createMockUser()),
+    delete: jest.fn().mockResolvedValue(undefined),
+    list: jest.fn().mockResolvedValue({ items: [], totalCount: 0, page: 1, limit: 10, totalPages: 0, hasNextPage: false, hasPreviousPage: false }),
+    search: jest.fn().mockResolvedValue([]),
+    updateLastLogin: jest.fn().mockResolvedValue(undefined),
+    getUserWorkspaces: jest.fn().mockResolvedValue([]),
+    mapDbUserToUser: jest.fn().mockImplementation((user) => user),
   };
 }
 
@@ -512,6 +512,7 @@ export function createMockWorkspaceService() {
     getMembers: jest.fn(),
     // Add missing methods used in tests
     findById: jest.fn(),
+    findUserWorkspaces: jest.fn(),
   } as any;
 }
 
@@ -588,17 +589,25 @@ export function createMockWorkspaceAuthorizationService(): MockWorkspaceAuthServ
  */
 export function createMockAuth0Service(): MockAuth0Service {
   return {
-    validateAuth0Token: jest.fn(),
-    syncUserFromAuth0: jest.fn(),
-    createSession: jest.fn(),
-    validateSession: jest.fn(),
-    invalidateSession: jest.fn(),
-    refreshSession: jest.fn(),
-    getActiveSessionsForUser: jest.fn(),
-    getUserPermissions: jest.fn(),
-    destroySession: jest.fn(),
-    healthCheck: jest.fn(),
-  };
+    validateAuth0Token: jest.fn().mockResolvedValue(null),
+    syncUserFromAuth0: jest.fn().mockResolvedValue(createMockUser()),
+    createSession: jest.fn().mockResolvedValue('mock-session-id'),
+    validateSession: jest.fn().mockResolvedValue(true),
+    invalidateSession: jest.fn().mockResolvedValue(undefined),
+    refreshSession: jest.fn().mockResolvedValue(createMockSessionData('user-id', 'auth0|user-id')),
+    getActiveSessionsForUser: jest.fn().mockResolvedValue([]),
+    getUserPermissions: jest.fn().mockResolvedValue([]),
+    destroySession: jest.fn().mockResolvedValue(undefined),
+    healthCheck: jest.fn().mockResolvedValue({ status: 'OK' as const, responseTime: 50 }),
+    // Add missing properties as any type to avoid strict typing issues
+    jwksClient: {} as any,
+    logger: {} as any, 
+    signingKeyCache: new Map() as any,
+    cacheService: {} as any,
+    userService: {} as any,
+    auth0Domain: 'test.auth0.com' as any,
+    auth0Audience: 'test-audience' as any,
+  } as any;
 }
 
 /**
