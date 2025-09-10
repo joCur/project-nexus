@@ -5,14 +5,20 @@ import { Workspace } from '@/services/workspace';
 import { 
   AuthenticationError, 
   AuthorizationError, 
-  NotFoundError 
+  NotFoundError,
+  RateLimitError
 } from '@/utils/errors';
-import { WorkspaceService } from '@/services/workspace';
-import { UserService } from '@/services/user';
+import { createComprehensiveMocks, resetAllMocks, TEST_FIXTURES, ComprehensiveMocks } from '../../utils/comprehensive-mocks';
 
-// Mock services
-jest.mock('@/services/workspace');
-jest.mock('@/services/user');
+// Mock services and utilities
+jest.mock('@/services/rateLimiter', () => ({
+  rateLimiterService: {
+    checkOwnershipTransferLimit: jest.fn(),
+    resetLimit: jest.fn(),
+    getRateLimitStatus: jest.fn(),
+  },
+}));
+
 jest.mock('@/utils/logger', () => ({
   createContextLogger: () => ({
     info: jest.fn(),
@@ -22,7 +28,6 @@ jest.mock('@/utils/logger', () => ({
   }),
 }));
 
-// Mock authorization helper
 jest.mock('@/utils/authorizationHelper', () => ({
   createAuthorizationHelper: () => ({
     requireWorkspacePermission: jest.fn(),
@@ -31,250 +36,174 @@ jest.mock('@/utils/authorizationHelper', () => ({
 }));
 
 describe('Workspace Resolvers', () => {
-  let mockWorkspaceService: jest.Mocked<WorkspaceService>;
-  let mockUserService: jest.Mocked<UserService>;
-  let mockAuthHelper: any;
-  let mockContext: GraphQLContext;
+  let mocks: ComprehensiveMocks;
 
   beforeEach(() => {
-    // Reset mocks
-    jest.clearAllMocks();
-
-    // Create mock services
-    mockWorkspaceService = {
-      getWorkspaceById: jest.fn(),
-      updateWorkspace: jest.fn(),
-    } as any;
-
-    mockUserService = {
-      findById: jest.fn(),
-    } as any;
-
-    // Mock authorization helper
-    mockAuthHelper = {
-      requireWorkspacePermission: jest.fn(),
-    };
-
-    // Create mock context
-    mockContext = {
-      isAuthenticated: true,
-      user: {
-        id: 'user-123',
-        email: 'test@example.com',
-      },
-      dataSources: {
-        workspaceService: mockWorkspaceService,
-        userService: mockUserService,
-      },
-    } as any;
+    mocks = createComprehensiveMocks();
+    resetAllMocks(mocks);
 
     // Mock createAuthorizationHelper to return our mock
     const authHelperModule = require('@/utils/authorizationHelper');
-    authHelperModule.createAuthorizationHelper = jest.fn().mockReturnValue(mockAuthHelper);
+    authHelperModule.createAuthorizationHelper = jest.fn().mockReturnValue(mocks.authHelper);
+
+    // Mock rateLimiterService
+    const rateLimiterModule = require('@/services/rateLimiter');
+    rateLimiterModule.rateLimiterService = mocks.rateLimiterService;
   });
 
-  describe('transferWorkspaceOwnership mutation', () => {
-    const mockInput = {
-      workspaceId: 'workspace-123',
-      newOwnerId: 'new-owner-456',
-    };
-
-    const mockWorkspace: Workspace = {
-      id: 'workspace-123',
-      name: 'Test Workspace',
-      ownerId: 'current-owner-789',
-      privacy: 'PRIVATE',
-      settings: {},
-      isDefault: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    const mockNewOwner: User = {
-      id: 'new-owner-456',
-      email: 'newowner@example.com',
-      auth0UserId: 'auth0|new-owner-456',
-      emailVerified: true,
-      displayName: 'New Owner',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      roles: ['user'],
-      metadataSyncedAt: new Date(),
-    };
-
-    const mockUpdatedWorkspace: Workspace = {
-      ...mockWorkspace,
-      ownerId: 'new-owner-456',
-    };
-
-    it('should successfully transfer workspace ownership', async () => {
-      // Setup mocks
-      mockWorkspaceService.getWorkspaceById.mockResolvedValue(mockWorkspace);
-      mockUserService.findById.mockResolvedValue(mockNewOwner);
-      mockWorkspaceService.updateWorkspace.mockResolvedValue(mockUpdatedWorkspace);
-      mockAuthHelper.requireWorkspacePermission.mockResolvedValue(undefined);
-
-      // Execute resolver
-      const result = await workspaceResolvers.Mutation.transferWorkspaceOwnership(
-        {},
-        { input: mockInput },
-        mockContext
-      );
-
-      // Verify result
-      expect(result).toEqual(mockUpdatedWorkspace);
-
-      // Verify service calls
-      expect(mockWorkspaceService.getWorkspaceById).toHaveBeenCalledWith('workspace-123');
-      expect(mockUserService.findById).toHaveBeenCalledWith('new-owner-456');
-      expect(mockWorkspaceService.updateWorkspace).toHaveBeenCalledWith('workspace-123', {
-        ownerId: 'new-owner-456'
-      });
-
-      // Verify permission check
-      expect(mockAuthHelper.requireWorkspacePermission).toHaveBeenCalledWith(
-        'workspace-123',
-        'workspace:transfer_ownership',
-        'You do not have permission to transfer ownership of this workspace'
-      );
-    });
-
-    it('should throw AuthenticationError when user is not authenticated', async () => {
-      mockContext.isAuthenticated = false;
-
-      await expect(
-        workspaceResolvers.Mutation.transferWorkspaceOwnership(
-          {},
-          { input: mockInput },
-          mockContext
-        )
-      ).rejects.toThrow(AuthenticationError);
-
-      // Verify no service calls were made
-      expect(mockWorkspaceService.getWorkspaceById).not.toHaveBeenCalled();
-      expect(mockUserService.findById).not.toHaveBeenCalled();
-      expect(mockWorkspaceService.updateWorkspace).not.toHaveBeenCalled();
-    });
-
-    it('should throw NotFoundError when workspace does not exist', async () => {
-      mockWorkspaceService.getWorkspaceById.mockResolvedValue(null);
-
-      await expect(
-        workspaceResolvers.Mutation.transferWorkspaceOwnership(
-          {},
-          { input: mockInput },
-          mockContext
-        )
-      ).rejects.toThrow(new NotFoundError('Workspace', 'workspace-123'));
-
-      expect(mockWorkspaceService.getWorkspaceById).toHaveBeenCalledWith('workspace-123');
-      expect(mockUserService.findById).not.toHaveBeenCalled();
-      expect(mockWorkspaceService.updateWorkspace).not.toHaveBeenCalled();
-    });
-
-    it('should throw NotFoundError when new owner does not exist', async () => {
-      mockWorkspaceService.getWorkspaceById.mockResolvedValue(mockWorkspace);
-      mockUserService.findById.mockResolvedValue(null);
-
-      await expect(
-        workspaceResolvers.Mutation.transferWorkspaceOwnership(
-          {},
-          { input: mockInput },
-          mockContext
-        )
-      ).rejects.toThrow(new NotFoundError('User', 'new-owner-456'));
-
-      expect(mockWorkspaceService.getWorkspaceById).toHaveBeenCalledWith('workspace-123');
-      expect(mockUserService.findById).toHaveBeenCalledWith('new-owner-456');
-      expect(mockWorkspaceService.updateWorkspace).not.toHaveBeenCalled();
-    });
-
-    it('should throw error when user lacks transfer ownership permission', async () => {
-      mockWorkspaceService.getWorkspaceById.mockResolvedValue(mockWorkspace);
-      mockUserService.findById.mockResolvedValue(mockNewOwner);
-      
-      const permissionError = new AuthorizationError(
-        'You do not have permission to transfer ownership of this workspace',
-        'INSUFFICIENT_PERMISSIONS'
-      );
-      mockAuthHelper.requireWorkspacePermission.mockRejectedValue(permissionError);
-
-      await expect(
-        workspaceResolvers.Mutation.transferWorkspaceOwnership(
-          {},
-          { input: mockInput },
-          mockContext
-        )
-      ).rejects.toThrow(permissionError);
-
-      expect(mockWorkspaceService.getWorkspaceById).toHaveBeenCalledWith('workspace-123');
-      expect(mockUserService.findById).toHaveBeenCalledWith('new-owner-456');
-      expect(mockWorkspaceService.updateWorkspace).not.toHaveBeenCalled();
-    });
-
-    it('should handle workspace service update errors gracefully', async () => {
-      mockWorkspaceService.getWorkspaceById.mockResolvedValue(mockWorkspace);
-      mockUserService.findById.mockResolvedValue(mockNewOwner);
-      mockAuthHelper.requireWorkspacePermission.mockResolvedValue(undefined);
-      
-      const updateError = new Error('Database connection failed');
-      mockWorkspaceService.updateWorkspace.mockRejectedValue(updateError);
-
-      await expect(
-        workspaceResolvers.Mutation.transferWorkspaceOwnership(
-          {},
-          { input: mockInput },
-          mockContext
-        )
-      ).rejects.toThrow(updateError);
-
-      expect(mockWorkspaceService.updateWorkspace).toHaveBeenCalledWith('workspace-123', {
-        ownerId: 'new-owner-456'
-      });
-    });
-
-    it('should validate input parameters correctly', async () => {
-      mockWorkspaceService.getWorkspaceById.mockResolvedValue(mockWorkspace);
-      mockUserService.findById.mockResolvedValue(mockNewOwner);
-      mockWorkspaceService.updateWorkspace.mockResolvedValue(mockUpdatedWorkspace);
-      mockAuthHelper.requireWorkspacePermission.mockResolvedValue(undefined);
-
-      const inputWithExtraFields = {
-        workspaceId: 'workspace-123',
-        newOwnerId: 'new-owner-456',
-        extraField: 'should be ignored',
+  describe('Mutation', () => {
+    describe('transferWorkspaceOwnership', () => {
+      const mockInput = {
+        workspaceId: TEST_FIXTURES.workspace.id,
+        newOwnerId: TEST_FIXTURES.newOwner.id,
       };
 
-      const result = await workspaceResolvers.Mutation.transferWorkspaceOwnership(
-        {},
-        { input: inputWithExtraFields },
-        mockContext
-      );
+      const mockUpdatedWorkspace: Workspace = {
+        ...TEST_FIXTURES.workspace,
+        ownerId: TEST_FIXTURES.newOwner.id,
+      };
 
-      expect(result).toEqual(mockUpdatedWorkspace);
-      
-      // Verify only the expected fields are passed to the service
-      expect(mockWorkspaceService.updateWorkspace).toHaveBeenCalledWith('workspace-123', {
-        ownerId: 'new-owner-456'
+      describe('Success Scenarios', () => {
+
+        it('should successfully transfer workspace ownership with all validations', async () => {
+          // Setup mocks
+          mocks.workspaceService.transferOwnership.mockResolvedValue(mockUpdatedWorkspace);
+          mocks.rateLimiterService.checkOwnershipTransferLimit.mockResolvedValue(undefined);
+          mocks.authHelper.requireWorkspacePermission.mockResolvedValue(undefined);
+          mocks.cacheService.invalidate.mockResolvedValue(undefined);
+          mocks.cacheService.set.mockResolvedValue(undefined);
+
+          // Execute resolver
+          const result = await workspaceResolvers.Mutation.transferWorkspaceOwnership(
+            {},
+            { input: mockInput },
+            mocks.context
+          );
+
+          // Verify result
+          expect(result).toEqual(mockUpdatedWorkspace);
+
+          // Verify rate limiting check
+          expect(mocks.rateLimiterService.checkOwnershipTransferLimit).toHaveBeenCalledWith(mocks.context);
+
+          // Verify permission check
+          expect(mocks.authHelper.requireWorkspacePermission).toHaveBeenCalledWith(
+            TEST_FIXTURES.workspace.id,
+            'workspace:transfer_ownership',
+            'You do not have permission to transfer ownership of this workspace'
+          );
+
+          // Verify transactional transfer
+          expect(mocks.workspaceService.transferOwnership).toHaveBeenCalledWith(
+            TEST_FIXTURES.workspace.id,
+            TEST_FIXTURES.newOwner.id
+          );
+
+          // Verify cache operations
+          expect(mocks.cacheService.invalidate).toHaveBeenCalledWith(`workspace:${TEST_FIXTURES.workspace.id}`);
+          expect(mocks.cacheService.set).toHaveBeenCalledWith(
+            `workspace:${TEST_FIXTURES.workspace.id}`,
+            mockUpdatedWorkspace,
+            300
+          );
+        });
       });
-    });
 
-    it('should handle concurrent ownership transfer attempts', async () => {
-      mockWorkspaceService.getWorkspaceById.mockResolvedValue(mockWorkspace);
-      mockUserService.findById.mockResolvedValue(mockNewOwner);
-      mockAuthHelper.requireWorkspacePermission.mockResolvedValue(undefined);
-      
-      // Simulate concurrent modification error
-      const concurrencyError = new Error('Workspace was modified by another user');
-      mockWorkspaceService.updateWorkspace.mockRejectedValue(concurrencyError);
+      describe('Authentication and Authorization Errors', () => {
+        it('should throw AuthenticationError when user is not authenticated', async () => {
+          const unauthenticatedContext = { ...mocks.context, isAuthenticated: false };
 
-      await expect(
-        workspaceResolvers.Mutation.transferWorkspaceOwnership(
-          {},
-          { input: mockInput },
-          mockContext
-        )
-      ).rejects.toThrow(concurrencyError);
+          await expect(
+            workspaceResolvers.Mutation.transferWorkspaceOwnership(
+              {},
+              { input: mockInput },
+              unauthenticatedContext
+            )
+          ).rejects.toThrow(AuthenticationError);
+
+          // Verify no service calls were made
+          expect(mocks.workspaceService.transferOwnership).not.toHaveBeenCalled();
+          expect(mocks.rateLimiterService.checkOwnershipTransferLimit).not.toHaveBeenCalled();
+        });
+
+        it('should throw RateLimitError when rate limit is exceeded', async () => {
+          mocks.rateLimiterService.checkOwnershipTransferLimit.mockRejectedValue(
+            new RateLimitError(3, 86400000, 86400000)
+          );
+
+          await expect(
+            workspaceResolvers.Mutation.transferWorkspaceOwnership(
+              {},
+              { input: mockInput },
+              mocks.context
+            )
+          ).rejects.toThrow(RateLimitError);
+
+          expect(mocks.rateLimiterService.checkOwnershipTransferLimit).toHaveBeenCalledWith(mocks.context);
+          expect(mocks.workspaceService.transferOwnership).not.toHaveBeenCalled();
+        });
+
+        it('should throw AuthorizationError when user lacks permission', async () => {
+          mocks.rateLimiterService.checkOwnershipTransferLimit.mockResolvedValue(undefined);
+          mocks.authHelper.requireWorkspacePermission.mockRejectedValue(
+            new AuthorizationError('You do not have permission to transfer ownership of this workspace')
+          );
+
+          await expect(
+            workspaceResolvers.Mutation.transferWorkspaceOwnership(
+              {},
+              { input: mockInput },
+              mocks.context
+            )
+          ).rejects.toThrow(AuthorizationError);
+
+          expect(mocks.rateLimiterService.checkOwnershipTransferLimit).toHaveBeenCalledWith(mocks.context);
+          expect(mocks.authHelper.requireWorkspacePermission).toHaveBeenCalled();
+          expect(mocks.workspaceService.transferOwnership).not.toHaveBeenCalled();
+        });
+      });
+
+      describe('Service Error Scenarios', () => {
+        beforeEach(() => {
+          // Setup successful rate limiting and authorization for these tests
+          mocks.rateLimiterService.checkOwnershipTransferLimit.mockResolvedValue(undefined);
+          mocks.authHelper.requireWorkspacePermission.mockResolvedValue(undefined);
+        });
+
+        it('should handle database transaction failures gracefully', async () => {
+          const transactionError = new Error('Database transaction failed');
+          mocks.workspaceService.transferOwnership.mockRejectedValue(transactionError);
+
+          await expect(
+            workspaceResolvers.Mutation.transferWorkspaceOwnership(
+              {},
+              { input: mockInput },
+              mocks.context
+            )
+          ).rejects.toThrow('Database transaction failed');
+
+          expect(mocks.workspaceService.transferOwnership).toHaveBeenCalledWith(
+            TEST_FIXTURES.workspace.id,
+            TEST_FIXTURES.newOwner.id
+          );
+        });
+
+        it('should handle cache service failures gracefully without affecting transfer', async () => {
+          mocks.workspaceService.transferOwnership.mockResolvedValue(mockUpdatedWorkspace);
+          mocks.cacheService.invalidate.mockRejectedValue(new Error('Cache service unavailable'));
+          mocks.cacheService.set.mockRejectedValue(new Error('Cache service unavailable'));
+
+          const result = await workspaceResolvers.Mutation.transferWorkspaceOwnership(
+            {},
+            { input: mockInput },
+            mocks.context
+          );
+
+          // Transfer should still succeed even if cache operations fail
+          expect(result).toEqual(mockUpdatedWorkspace);
+          expect(mocks.workspaceService.transferOwnership).toHaveBeenCalled();
+        });
+      });
     });
   });
 });

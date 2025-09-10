@@ -375,6 +375,50 @@ export class WorkspaceService {
   }
 
   /**
+   * Transfer workspace ownership with transaction safety
+   * Ensures atomic operation for ownership transfer
+   */
+  async transferOwnership(workspaceId: string, newOwnerId: string): Promise<Workspace> {
+    return database.transaction(async (trx) => {
+      try {
+        // Check if workspace exists within transaction
+        const existingWorkspace = await trx(this.tableName)
+          .where('id', workspaceId)
+          .first();
+
+        if (!existingWorkspace) {
+          throw new NotFoundError('Workspace', workspaceId);
+        }
+
+        // Update workspace ownership within transaction
+        const [updatedWorkspace] = await trx(this.tableName)
+          .where('id', workspaceId)
+          .update({
+            owner_id: newOwnerId,
+            updated_at: new Date(),
+          })
+          .returning('*');
+
+        logger.info('Workspace ownership transferred', {
+          workspaceId,
+          previousOwnerId: existingWorkspace.owner_id,
+          newOwnerId,
+        });
+
+        return this.mapDbWorkspaceToWorkspace(updatedWorkspace);
+
+      } catch (error) {
+        logger.error('Failed to transfer workspace ownership', {
+          workspaceId,
+          newOwnerId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        throw error;
+      }
+    });
+  }
+
+  /**
    * Map database workspace record to Workspace interface
    */
   private mapDbWorkspaceToWorkspace(dbWorkspace: any): Workspace {

@@ -229,8 +229,8 @@ describe('End-to-End Permission Scenarios', () => {
             mutation {
               createCanvas(input: {
                 workspaceId: "${testWorkspace.id}"
-                name: "Editor Canvas"
-                description: "Canvas created by editor"
+                name: "Member Canvas"
+                description: "Canvas created by member"
               }) {
                 id
                 name
@@ -241,7 +241,7 @@ describe('End-to-End Permission Scenarios', () => {
 
       expect(createCanvasResponse.status).toBe(200);
       expect(createCanvasResponse.body.data.createCanvas).toBeDefined();
-      expect(createCanvasResponse.body.data.createCanvas.name).toBe('Editor Canvas');
+      expect(createCanvasResponse.body.data.createCanvas.name).toBe('Member Canvas');
 
       // Test 2: Can create cards
       const createCardResponse = await request(app)
@@ -255,8 +255,8 @@ describe('End-to-End Permission Scenarios', () => {
             mutation {
               createCard(input: {
                 workspaceId: "${testWorkspace.id}"
-                title: "Editor Card"
-                content: "Card created by editor"
+                title: "Member Card"
+                content: "Card created by member"
               }) {
                 id
                 name
@@ -267,7 +267,7 @@ describe('End-to-End Permission Scenarios', () => {
 
       expect(createCardResponse.status).toBe(200);
       expect(createCardResponse.body.data.createCard).toBeDefined();
-      expect(createCardResponse.body.data.createCard.title).toBe('Editor Card');
+      expect(createCardResponse.body.data.createCard.title).toBe('Member Card');
 
       // Test 3: Can update existing content
       const updateCanvasResponse = await request(app)

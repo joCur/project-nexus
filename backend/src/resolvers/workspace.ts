@@ -8,12 +8,17 @@ import { createContextLogger } from '@/utils/logger';
 import { GraphQLContext } from '@/types';
 import { WorkspaceAuthorizationService } from '@/services/workspaceAuthorization';
 import { createAuthorizationHelper } from '@/utils/authorizationHelper';
+import { rateLimiterService } from '@/services/rateLimiter';
 
 /**
  * GraphQL resolvers for workspace management operations
  */
 
 const logger = createContextLogger({ service: 'WorkspaceResolvers' });
+
+// Constants
+const SESSION_MAX_AGE_MS = 15 * 60 * 1000; // 15 minutes
+const CACHE_TTL_SECONDS = 300; // 5 minutes
 
 export const workspaceResolvers = {
   Query: {
@@ -317,21 +322,36 @@ export const workspaceResolvers = {
         throw new AuthenticationError();
       }
 
+      // Validate session freshness for sensitive operation
+      if (context.auth0Payload) {
+        const sessionAge = Date.now() - (context.auth0Payload.iat * 1000);
+        
+        if (sessionAge > SESSION_MAX_AGE_MS) {
+          throw new AuthenticationError('Session too old for sensitive operation. Please re-authenticate.');
+        }
+      }
+
       const workspaceService = context.dataSources.workspaceService;
       const userService = context.dataSources.userService;
+      const cacheService = context.dataSources.cacheService;
       const { workspaceId, newOwnerId } = input;
 
-      // Check if workspace exists
-      const existingWorkspace = await workspaceService.getWorkspaceById(workspaceId);
+      // Parallel validation of workspace and new owner
+      const [existingWorkspace, newOwner] = await Promise.all([
+        workspaceService.getWorkspaceById(workspaceId),
+        userService.findById(newOwnerId)
+      ]);
+
       if (!existingWorkspace) {
         throw new NotFoundError('Workspace', workspaceId);
       }
 
-      // Check if new owner exists
-      const newOwner = await userService.findById(newOwnerId);
       if (!newOwner) {
         throw new NotFoundError('User', newOwnerId);
       }
+
+      // Check rate limit for ownership transfers
+      await rateLimiterService.checkOwnershipTransferLimit(context);
 
       // Check if user has permission to transfer ownership (must be current owner or admin)
       const authHelper = createAuthorizationHelper(context);
@@ -342,9 +362,18 @@ export const workspaceResolvers = {
       );
 
       try {
-        const updatedWorkspace = await workspaceService.updateWorkspace(workspaceId, {
-          ownerId: newOwnerId
-        });
+        // Use transactional method for ownership transfer
+        const updatedWorkspace = await workspaceService.transferOwnership(workspaceId, newOwnerId);
+
+        // Proactive cache warming for the new owner
+        if (cacheService) {
+          await Promise.all([
+            cacheService.invalidate(`workspace:${workspaceId}`),
+            cacheService.set(`workspace:${workspaceId}`, updatedWorkspace, CACHE_TTL_SECONDS),
+            cacheService.invalidate(`user:${existingWorkspace.ownerId}:workspaces`),
+            cacheService.invalidate(`user:${newOwnerId}:workspaces`)
+          ]);
+        }
 
         logger.info('Workspace ownership transferred via GraphQL', {
           workspaceId,

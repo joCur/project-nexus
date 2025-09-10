@@ -321,7 +321,7 @@ describe('Cross-Workspace Permission Integration Tests', () => {
       );
       expect(charliePermissionsInA).toEqual(['workspace:read', 'card:read']);
 
-      // Charlie should have editor permissions in workspace B
+      // Charlie should have member permissions in workspace B
       const charliePermissionsInB = await mockWorkspaceAuthService.getUserPermissionsInWorkspace(
         'user-charlie',
         workspaces.workspaceB.id

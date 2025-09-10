@@ -25,7 +25,6 @@ import { WorkspaceRole } from '@/types/auth';
 const WORKSPACE_ROLES = {
   OWNER: 'owner' as WorkspaceRole,
   ADMIN: 'admin' as WorkspaceRole,
-  EDITOR: 'editor' as WorkspaceRole,
   MEMBER: 'member' as WorkspaceRole,
   VIEWER: 'viewer' as WorkspaceRole,
 };
@@ -56,11 +55,11 @@ describe('Permission Resolver Integration Tests', () => {
     updatedAt: new Date()
   };
 
-  const editorUser = {
-    id: 'user-editor-456',
-    email: 'editor@example.com',
-    auth0UserId: 'auth0|editor-user-456',
-    name: 'Editor User',
+  const memberUser = {
+    id: 'user-member-456',
+    email: 'member@example.com',
+    auth0UserId: 'auth0|member-user-456',
+    name: 'Member User',
     profileImage: null,
     createdAt: new Date(),
     updatedAt: new Date()
@@ -94,7 +93,7 @@ describe('Permission Resolver Integration Tests', () => {
     name: 'Team Workspace',
     ownerId: testUser.id,
     privacy: 'TEAM',
-    settings: { allowGuestAccess: false, defaultRole: 'editor' },
+    settings: { allowGuestAccess: false, defaultRole: 'member' },
     isDefault: true,
     createdAt: new Date(),
     updatedAt: new Date()
@@ -1514,7 +1513,7 @@ describe('Permission Resolver Integration Tests', () => {
       // Enhanced test using the realistic test fixtures with multiple workspaces and user roles
       const workspaceUserMap = new Map([
         [publicWorkspace.id, { user: viewerUser, role: WORKSPACE_ROLES.VIEWER }],
-        [teamWorkspace.id, { user: editorUser, role: WORKSPACE_ROLES.MEMBER }],
+        [teamWorkspace.id, { user: memberUser, role: WORKSPACE_ROLES.MEMBER }],
         [testWorkspace.id, { user: workspaceOwner, role: WORKSPACE_ROLES.OWNER }],
       ]);
 
@@ -1560,12 +1559,12 @@ describe('Permission Resolver Integration Tests', () => {
       }
 
       // Test 2: Editor user can access team workspace
-      mockUserService.findByAuth0Id.mockResolvedValue(editorUser);
+      mockUserService.findByAuth0Id.mockResolvedValue(memberUser);
       const editorResponse = await request(app)
         .post('/graphql')
         .set('Authorization', `Bearer ${JWT_FIXTURES.VALID_TOKEN}`)
-        .set('x-user-sub', editorUser.auth0UserId)
-        .set('x-user-email', editorUser.email)
+        .set('x-user-sub', memberUser.auth0UserId)
+        .set('x-user-email', memberUser.email)
         .send({
           query: `
             query {
