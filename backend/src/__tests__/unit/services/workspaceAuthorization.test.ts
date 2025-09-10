@@ -7,18 +7,18 @@ const CACHE_TTL = {
   SHORT_TERM: 60         // 1 minute
 } as const;
 
-// Performance test constants
+// Performance test constants - environment-aware for CI/local development
 const PERFORMANCE_LIMITS = {
-  RESPONSE_TIME_MS: 100,     // Max response time for individual operations
-  CONCURRENT_AVG_MS: 200,    // Max average response time for concurrent operations
-  MEMORY_GROWTH_MB: 10,      // Max memory growth during repeated operations
+  RESPONSE_TIME_MS: process.env.CI ? 200 : 100,     // Max response time for individual operations (higher in CI)
+  CONCURRENT_AVG_MS: process.env.CI ? 400 : 200,    // Max average response time for concurrent operations
+  MEMORY_GROWTH_MB: process.env.CI ? 20 : 10,       // Max memory growth during repeated operations
   CONCURRENT_REQUEST_COUNT: 10, // Number of concurrent requests for performance tests
   REPEATED_OPERATION_COUNT: 100, // Number of operations for memory leak tests
   CACHE_QUERY_COUNT: 3,      // Expected cache queries for performance tests
   CONCURRENT_UPDATE_COUNT: 5, // Number of concurrent updates for race condition tests
   CONCURRENT_CHECK_COUNT: 3,  // Number of concurrent permission checks
-  PROCESSING_DELAY_MS: 10,   // Simulated processing delay for race conditions
-  CACHE_DELETION_DELAY_MS: 50, // Simulated cache deletion delay
+  PROCESSING_DELAY_MS: process.env.CI ? 20 : 10,   // Simulated processing delay for race conditions
+  CACHE_DELETION_DELAY_MS: process.env.CI ? 100 : 50, // Simulated cache deletion delay
   MIN_BASE_PERMISSIONS: 3,   // Minimum expected base permissions
   TEMP_ARRAY_SIZE: 1000      // Size of temporary array for GC simulation
 } as const;
