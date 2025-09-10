@@ -300,8 +300,8 @@ describe('End-to-End Permission Scenarios', () => {
       expect(inviteUserResponse.body.errors[0].extensions?.code).toBe('INSUFFICIENT_PERMISSIONS');
 
       // Verify cache was invalidated on role change
-      expect(mockCacheService.del).toHaveBeenCalledWith(`user_context_permissions:${editorUser.id}`);
-      expect(mockCacheService.del).toHaveBeenCalledWith(`user_workspace_permissions:${editorUser.id}:${testWorkspace.id}`);
+      expect(mockCacheService.del).toHaveBeenCalledWith(`user_context_permissions:${memberUser.id}`);
+      expect(mockCacheService.del).toHaveBeenCalledWith(`user_workspace_permissions:${memberUser.id}:${testWorkspace.id}`);
     });
   });
 
@@ -429,7 +429,7 @@ describe('End-to-End Permission Scenarios', () => {
             mutation {
               transferWorkspaceOwnership(input: {
                 workspaceId: "${testWorkspace.id}"
-                newOwnerId: "${editorUser.id}"
+                newOwnerId: "${memberUser.id}"
               }) {
                 id
                 owner {
@@ -451,12 +451,12 @@ describe('End-to-End Permission Scenarios', () => {
     test('removed user loses all workspace permissions immediately', async () => {
       // Setup: User was previously a member, now removed
       mockAuth0Service.validateAuth0Token.mockResolvedValue({
-        sub: editorUser.auth0UserId,
-        email: editorUser.email,
+        sub: memberUser.auth0UserId,
+        email: memberUser.email,
         roles: ['user'],
       });
 
-      mockUserService.findByAuth0Id.mockResolvedValue(editorUser);
+      mockUserService.findByAuth0Id.mockResolvedValue(memberUser);
 
       // Mock removed user - no workspace membership
       mockWorkspaceAuthService.getUserWorkspaceRole.mockResolvedValue(null);
@@ -537,7 +537,7 @@ describe('End-to-End Permission Scenarios', () => {
       mockWorkspaceAuthService.hasPermissionInWorkspace.mockImplementation(
         (userId: string, workspaceId: string, permission: string) => {
           // User still has access to other workspace
-          if (userId === editorUser.id && workspaceId === otherWorkspaceId) {
+          if (userId === memberUser.id && workspaceId === otherWorkspaceId) {
             return Promise.resolve(permission === 'workspace:read');
           }
           return Promise.resolve(false);
@@ -563,8 +563,8 @@ describe('End-to-End Permission Scenarios', () => {
       expect(otherWorkspaceResponse.body.data.workspace).toBeDefined();
 
       // Verify cache was cleared for removed user
-      expect(mockCacheService.del).toHaveBeenCalledWith(`user_context_permissions:${editorUser.id}`);
-      expect(mockCacheService.del).toHaveBeenCalledWith(`user_workspace_permissions:${editorUser.id}:${testWorkspace.id}`);
+      expect(mockCacheService.del).toHaveBeenCalledWith(`user_context_permissions:${memberUser.id}`);
+      expect(mockCacheService.del).toHaveBeenCalledWith(`user_workspace_permissions:${memberUser.id}:${testWorkspace.id}`);
     });
   });
 
@@ -678,7 +678,7 @@ describe('End-to-End Permission Scenarios', () => {
             mutation {
               transferWorkspaceOwnership(input: {
                 workspaceId: "${testWorkspace.id}"
-                newOwnerId: "${editorUser.id}"
+                newOwnerId: "${memberUser.id}"
               }) {
                 id
                 owner {
@@ -761,7 +761,7 @@ describe('End-to-End Permission Scenarios', () => {
     test('permission system maintains consistency across all scenarios', async () => {
       const scenarios = [
         { user: viewerUser, role: 'viewer', canCreate: false, canManage: false, canOwn: false },
-        { user: editorUser, role: 'member', canCreate: true, canManage: false, canOwn: false },
+        { user: memberUser, role: 'member', canCreate: true, canManage: false, canOwn: false },
         { user: adminUser, role: 'admin', canCreate: true, canManage: true, canOwn: false },
         { user: ownerUser, role: 'owner', canCreate: true, canManage: true, canOwn: true }
       ];

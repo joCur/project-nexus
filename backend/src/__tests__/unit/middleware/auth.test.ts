@@ -42,8 +42,8 @@ describe('Authentication Middleware', () => {
   let mockNext: NextFunction;
 
   beforeEach(() => {
-    mockAuth0Service = createMockAuth0Service() as jest.Mocked<Auth0Service>;
-    mockUserService = createMockUserService() as jest.Mocked<UserService>;
+    mockAuth0Service = createMockAuth0Service() as unknown as jest.Mocked<Auth0Service>;
+    mockUserService = createMockUserService() as unknown as jest.Mocked<UserService>;
     mockCacheService = createMockCacheService() as jest.Mocked<CacheService>;
     mockReq = createMockRequest() as AuthenticatedRequest;
     mockRes = createMockResponse();

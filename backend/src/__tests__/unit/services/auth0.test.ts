@@ -68,7 +68,7 @@ describe('Auth0Service', () => {
   beforeEach(() => {
     // Create mock services
     mockCacheService = createMockCacheService() as jest.Mocked<CacheService>;
-    mockUserService = createMockUserService() as jest.Mocked<UserService>;
+    mockUserService = createMockUserService() as unknown as jest.Mocked<UserService>;
 
     // Create mock JWKS client
     mockJwksClient = {
