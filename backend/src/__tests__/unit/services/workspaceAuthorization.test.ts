@@ -574,6 +574,124 @@ describe('WorkspaceAuthorizationService', () => {
     });
   });
 
+  describe('Performance Testing Requirements', () => {
+    describe('response time baselines', () => {
+      test('getUserPermissionsInWorkspace completes within 100ms', async () => {
+        // Mock fast database response
+        const mockMember = {
+          id: 'member-1',
+          workspaceId: 'ws-1',
+          userId: 'user-1',
+          role: 'admin' as WorkspaceRole,
+          permissions: ['custom:fast-permission'],
+          joinedAt: new Date(),
+          isActive: true
+        };
+        
+        jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+        mockCacheService.get.mockResolvedValue(null);
+
+        const startTime = Date.now();
+        await authService.getUserPermissionsInWorkspace('user-1', 'ws-1');
+        const endTime = Date.now();
+        const responseTime = endTime - startTime;
+
+        expect(responseTime).toBeLessThan(100); // Should complete in < 100ms
+      });
+
+      test('hasPermissionInWorkspace completes within 100ms', async () => {
+        const mockMember = {
+          id: 'member-1',
+          workspaceId: 'ws-1',
+          userId: 'user-1',
+          role: 'viewer' as WorkspaceRole,
+          permissions: ['workspace:read'],
+          joinedAt: new Date(),
+          isActive: true
+        };
+        
+        jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+
+        const startTime = Date.now();
+        await authService.hasPermissionInWorkspace('user-1', 'ws-1', 'workspace:read');
+        const endTime = Date.now();
+        const responseTime = endTime - startTime;
+
+        expect(responseTime).toBeLessThan(100); // Should complete in < 100ms
+      });
+    });
+
+    describe('concurrent request performance', () => {
+      test('handles 10 concurrent requests within 200ms average', async () => {
+        // Mock consistent database response
+        const mockMember = {
+          id: 'member-1',
+          workspaceId: 'ws-1',
+          userId: 'user-1',
+          role: 'member' as WorkspaceRole,
+          permissions: ['card:read', 'card:create'],
+          joinedAt: new Date(),
+          isActive: true
+        };
+        
+        jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+        mockCacheService.get.mockResolvedValue(null);
+
+        // Create 10 concurrent requests
+        const startTime = Date.now();
+        const concurrentRequests = Array(10).fill(null).map(() =>
+          authService.getUserPermissionsInWorkspace('user-1', 'ws-1')
+        );
+
+        await Promise.all(concurrentRequests);
+        const endTime = Date.now();
+        const totalTime = endTime - startTime;
+        const averageTime = totalTime / 10;
+
+        expect(averageTime).toBeLessThan(200); // Average should be < 200ms per request
+      });
+    });
+
+    describe('memory stability', () => {
+      test('prevents memory leaks during repeated operations', async () => {
+        const mockMember = {
+          id: 'member-1',
+          workspaceId: 'ws-1', 
+          userId: 'user-1',
+          role: 'admin' as WorkspaceRole,
+          permissions: ['workspace:read', 'workspace:update'],
+          joinedAt: new Date(),
+          isActive: true
+        };
+        
+        jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+        mockCacheService.get.mockResolvedValue(null);
+
+        // Baseline memory usage
+        const initialMemory = process.memoryUsage().heapUsed;
+
+        // Perform 100 operations
+        for (let i = 0; i < 100; i++) {
+          await authService.getUserPermissionsInWorkspace(`user-${i}`, 'ws-1');
+        }
+
+        // Force garbage collection if available
+        if (typeof global.gc === 'function') {
+          global.gc();
+        } else {
+          // Simulate garbage collection pressure
+          const tempArray = new Array(1000).fill('temp-data');
+          tempArray.length = 0;
+        }
+
+        const finalMemory = process.memoryUsage().heapUsed;
+        const memoryGrowth = (finalMemory - initialMemory) / 1024 / 1024; // Convert to MB
+
+        expect(memoryGrowth).toBeLessThan(10); // Should not grow by more than 10MB
+      });
+    });
+  });
+
   describe('permission inheritance and custom permissions', () => {
     test('custom permissions override role restrictions', async () => {
       const mockMember = {
@@ -690,6 +808,304 @@ describe('WorkspaceAuthorizationService', () => {
       await expect(
         authService.getWorkspaceMember('user-1', 'ws-1')
       ).resolves.toBeNull(); // Should handle the null case gracefully
+    });
+  });
+
+  describe('Security Testing Requirements', () => {
+    describe('permission isolation between workspaces', () => {
+      test('prevents cross-workspace permission leakage', async () => {
+        // Mock user with permissions in workspace 1 but not workspace 2
+        const workspace1Member = {
+          id: 'member-1',
+          workspaceId: 'workspace-1',
+          userId: 'user-1',
+          role: 'admin' as WorkspaceRole,
+          permissions: ['workspace:manage_members', 'card:delete'],
+          joinedAt: new Date(),
+          isActive: true
+        };
+
+        const workspace2Member = null; // User not a member of workspace 2
+
+        jest.spyOn(authService, 'getWorkspaceMember')
+          .mockImplementation(async (userId, workspaceId) => {
+            if (workspaceId === 'workspace-1') return workspace1Member;
+            if (workspaceId === 'workspace-2') return workspace2Member;
+            return null;
+          });
+
+        // User should have admin permissions in workspace 1
+        const workspace1Permissions = await authService.getUserPermissionsInWorkspace('user-1', 'workspace-1');
+        expect(workspace1Permissions).toContain('workspace:manage_members');
+        expect(workspace1Permissions).toContain('card:delete');
+
+        // User should have NO permissions in workspace 2
+        const workspace2Permissions = await authService.getUserPermissionsInWorkspace('user-1', 'workspace-2');
+        expect(workspace2Permissions).toEqual([]);
+
+        // Cross-workspace permission checks should fail
+        const hasPermissionWs2 = await authService.hasPermissionInWorkspace('user-1', 'workspace-2', 'workspace:manage_members');
+        expect(hasPermissionWs2).toBe(false);
+      });
+
+      test('validates workspace context isolation in cache keys', async () => {
+        mockCacheService.get.mockResolvedValue(null);
+        mockCacheService.set.mockResolvedValue(undefined);
+
+        const mockMember1 = {
+          id: 'member-1',
+          workspaceId: 'workspace-alpha',
+          userId: 'user-1',
+          role: 'admin' as WorkspaceRole,
+          permissions: ['workspace:admin_access'],
+          joinedAt: new Date(),
+          isActive: true
+        };
+
+        const mockMember2 = {
+          id: 'member-2',
+          workspaceId: 'workspace-beta',
+          userId: 'user-1',
+          role: 'viewer' as WorkspaceRole,
+          permissions: ['workspace:read_only'],
+          joinedAt: new Date(),
+          isActive: true
+        };
+
+        jest.spyOn(authService, 'getWorkspaceMember')
+          .mockImplementation(async (userId, workspaceId) => {
+            if (workspaceId === 'workspace-alpha') return mockMember1;
+            if (workspaceId === 'workspace-beta') return mockMember2;
+            return null;
+          });
+
+        // Generate permissions for both workspaces
+        await authService.getUserPermissionsInWorkspace('user-1', 'workspace-alpha');
+        await authService.getUserPermissionsInWorkspace('user-1', 'workspace-beta');
+
+        // Verify cache keys are workspace-specific
+        expect(mockCacheService.set).toHaveBeenCalledWith(
+          'user_permissions:user-1:workspace-alpha',
+          expect.any(Array),
+          expect.any(Number)
+        );
+        expect(mockCacheService.set).toHaveBeenCalledWith(
+          'user_permissions:user-1:workspace-beta',
+          expect.any(Array),
+          expect.any(Number)
+        );
+
+        // Cache keys should be completely isolated
+        const alphaCall = (mockCacheService.set as jest.Mock).mock.calls.find(call => 
+          call[0] === 'user_permissions:user-1:workspace-alpha'
+        );
+        const betaCall = (mockCacheService.set as jest.Mock).mock.calls.find(call =>
+          call[0] === 'user_permissions:user-1:workspace-beta'
+        );
+
+        expect(alphaCall[1]).toContain('workspace:admin_access');
+        expect(betaCall[1]).toContain('workspace:read_only');
+        expect(alphaCall[1]).not.toContain('workspace:read_only');
+        expect(betaCall[1]).not.toContain('workspace:admin_access');
+      });
+    });
+
+    describe('permission elevation prevention', () => {
+      test('prevents privilege escalation through custom permissions', async () => {
+        const mockMember = {
+          id: 'member-1',
+          workspaceId: 'secure-workspace',
+          userId: 'user-1',
+          role: 'viewer' as WorkspaceRole, // Lowest privilege role
+          permissions: [
+            'card:read',
+            'workspace:read',
+            'malicious:admin_attempt', // Malicious permission that shouldn't grant admin access
+            'workspace:fake_owner', // Another malicious permission
+          ],
+          joinedAt: new Date(),
+          isActive: true
+        };
+
+        jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+
+        const permissions = await authService.getUserPermissionsInWorkspace('user-1', 'secure-workspace');
+
+        // Should have viewer permissions
+        expect(permissions).toContain('card:read');
+        expect(permissions).toContain('workspace:read');
+
+        // Should have the malicious custom permissions (but they don't grant real access)
+        expect(permissions).toContain('malicious:admin_attempt');
+        expect(permissions).toContain('workspace:fake_owner');
+
+        // Should NOT have any elevated permissions beyond viewer role
+        expect(permissions).not.toContain('workspace:delete');
+        expect(permissions).not.toContain('workspace:manage_members');
+        expect(permissions).not.toContain('workspace:transfer_ownership');
+        expect(permissions).not.toContain('card:delete');
+
+        // Verify that malicious permissions don't grant actual admin access
+        const hasDelete = await authService.hasPermissionInWorkspace('user-1', 'secure-workspace', 'workspace:delete');
+        const hasManage = await authService.hasPermissionInWorkspace('user-1', 'secure-workspace', 'workspace:manage_members');
+        
+        expect(hasDelete).toBe(false);
+        expect(hasManage).toBe(false);
+      });
+
+      test('validates role-based permission boundaries', async () => {
+        // Test each role's maximum permissions
+        const roleTests = [
+          {
+            role: 'viewer' as WorkspaceRole,
+            shouldHave: ['workspace:read', 'card:read', 'connection:read'],
+            shouldNotHave: ['workspace:delete', 'card:create', 'workspace:manage_members']
+          },
+          {
+            role: 'member' as WorkspaceRole,
+            shouldHave: ['workspace:read', 'card:create', 'card:update', 'card:delete'],
+            shouldNotHave: ['workspace:delete', 'workspace:manage_members', 'workspace:transfer_ownership']
+          },
+          {
+            role: 'admin' as WorkspaceRole,
+            shouldHave: ['workspace:manage_members', 'workspace:update', 'card:delete'],
+            shouldNotHave: ['workspace:delete', 'workspace:transfer_ownership']
+          }
+        ];
+
+        for (const { role, shouldHave, shouldNotHave } of roleTests) {
+          const mockMember = {
+            id: `member-${role}`,
+            workspaceId: 'test-workspace',
+            userId: `user-${role}`,
+            role,
+            permissions: [], // No custom permissions
+            joinedAt: new Date(),
+            isActive: true
+          };
+
+          jest.spyOn(authService, 'getWorkspaceMember').mockResolvedValue(mockMember);
+
+          const permissions = await authService.getUserPermissionsInWorkspace(`user-${role}`, 'test-workspace');
+
+          // Check required permissions
+          for (const permission of shouldHave) {
+            expect(permissions).toContain(permission);
+          }
+
+          // Check forbidden permissions
+          for (const permission of shouldNotHave) {
+            expect(permissions).not.toContain(permission);
+          }
+        }
+      });
+    });
+
+    describe('workspace context switching security', () => {
+      test('prevents session hijacking across workspace contexts', async () => {
+        // Mock user with different roles in different workspaces
+        const membershipMap = {
+          'corporate-workspace': {
+            id: 'member-corp',
+            workspaceId: 'corporate-workspace',
+            userId: 'user-1',
+            role: 'admin' as WorkspaceRole,
+            permissions: ['workspace:manage_billing', 'workspace:manage_members'],
+            joinedAt: new Date(),
+            isActive: true
+          },
+          'personal-workspace': {
+            id: 'member-personal',
+            workspaceId: 'personal-workspace',
+            userId: 'user-1',
+            role: 'viewer' as WorkspaceRole,
+            permissions: ['workspace:read'],
+            joinedAt: new Date(),
+            isActive: true
+          }
+        };
+
+        jest.spyOn(authService, 'getWorkspaceMember')
+          .mockImplementation(async (userId, workspaceId) => {
+            return membershipMap[workspaceId] || null;
+          });
+
+        // Simulate rapid context switching
+        const corporatePermissions = await authService.getUserPermissionsInWorkspace('user-1', 'corporate-workspace');
+        const personalPermissions = await authService.getUserPermissionsInWorkspace('user-1', 'personal-workspace');
+
+        // Verify permissions are correctly isolated per workspace
+        expect(corporatePermissions).toContain('workspace:manage_billing');
+        expect(corporatePermissions).toContain('workspace:manage_members');
+        
+        expect(personalPermissions).toContain('workspace:read');
+        expect(personalPermissions).not.toContain('workspace:manage_billing');
+        expect(personalPermissions).not.toContain('workspace:manage_members');
+
+        // Verify no cross-contamination between contexts
+        const corporateHasBilling = await authService.hasPermissionInWorkspace('user-1', 'corporate-workspace', 'workspace:manage_billing');
+        const personalHasBilling = await authService.hasPermissionInWorkspace('user-1', 'personal-workspace', 'workspace:manage_billing');
+
+        expect(corporateHasBilling).toBe(true);
+        expect(personalHasBilling).toBe(false);
+      });
+
+      test('validates cache isolation during context switching', async () => {
+        mockCacheService.get.mockResolvedValue(null);
+        const cacheSetCalls: Array<{key: string, value: any}> = [];
+        
+        mockCacheService.set.mockImplementation(async (key: string, value: any) => {
+          cacheSetCalls.push({ key, value });
+          return undefined;
+        });
+
+        const workspaceRoles = {
+          'ws-secure': {
+            id: 'member-secure',
+            workspaceId: 'ws-secure',
+            userId: 'user-1',
+            role: 'admin' as WorkspaceRole,
+            permissions: ['security:audit', 'workspace:manage_security'],
+            joinedAt: new Date(),
+            isActive: true
+          },
+          'ws-public': {
+            id: 'member-public',
+            workspaceId: 'ws-public', 
+            userId: 'user-1',
+            role: 'member' as WorkspaceRole,
+            permissions: ['content:publish'],
+            joinedAt: new Date(),
+            isActive: true
+          }
+        };
+
+        jest.spyOn(authService, 'getWorkspaceMember')
+          .mockImplementation(async (userId, workspaceId) => {
+            return workspaceRoles[workspaceId] || null;
+          });
+
+        // Rapidly switch between workspace contexts
+        await authService.getUserPermissionsInWorkspace('user-1', 'ws-secure');
+        await authService.getUserPermissionsInWorkspace('user-1', 'ws-public'); 
+        await authService.getUserPermissionsInWorkspace('user-1', 'ws-secure');
+
+        // Verify each workspace has isolated cache entries
+        const secureCacheEntries = cacheSetCalls.filter(call => call.key.includes('ws-secure'));
+        const publicCacheEntries = cacheSetCalls.filter(call => call.key.includes('ws-public'));
+
+        expect(secureCacheEntries.length).toBeGreaterThan(0);
+        expect(publicCacheEntries.length).toBeGreaterThan(0);
+
+        // Verify cache values are workspace-specific
+        const securePermissions = secureCacheEntries[0].value;
+        const publicPermissions = publicCacheEntries[0].value;
+
+        expect(securePermissions).toContain('security:audit');
+        expect(securePermissions).toContain('workspace:manage_security');
+        expect(publicPermissions).toContain('content:publish');
+        expect(publicPermissions).not.toContain('security:audit');
+      });
     });
   });
 
