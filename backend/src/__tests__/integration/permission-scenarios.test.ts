@@ -41,13 +41,13 @@ describe('End-to-End Permission Scenarios', () => {
 
   // Test data with const assertions
   const VIEWER_PERMISSIONS = ['workspace:read', 'canvas:read', 'card:read'] as const;
-  const EDITOR_PERMISSIONS = ['workspace:read', 'canvas:read', 'canvas:create', 'canvas:update', 'card:read', 'card:create', 'card:update'] as const;
+  const MEMBER_PERMISSIONS = ['workspace:read', 'canvas:read', 'canvas:create', 'canvas:update', 'card:read', 'card:create', 'card:update'] as const;
   const ADMIN_PERMISSIONS = ['workspace:read', 'workspace:update', 'canvas:read', 'canvas:create', 'canvas:update', 'canvas:delete', 'card:read', 'card:create', 'card:update', 'card:delete', 'member:invite', 'member:remove', 'member:update_role'] as const;
 
   // Test workspace and users
   const testWorkspace = createMockWorkspace({ id: 'ws-test', name: 'Test Workspace' });
   const viewerUser = createMockUser({ id: 'user-viewer', email: 'viewer@test.com', auth0UserId: 'auth0|viewer' });
-  const editorUser = createMockUser({ id: 'user-editor', email: 'editor@test.com', auth0UserId: 'auth0|editor' });
+  const memberUser = createMockUser({ id: 'user-member', email: 'member@test.com', auth0UserId: 'auth0|member' });
   const adminUser = createMockUser({ id: 'user-admin', email: 'admin@test.com', auth0UserId: 'auth0|admin' });
   const ownerUser = createMockUser({ id: 'user-owner', email: 'owner@test.com', auth0UserId: 'auth0|owner' });
 
@@ -178,25 +178,25 @@ describe('End-to-End Permission Scenarios', () => {
     });
   });
 
-  describe('Scenario 2: User promoted to editor → can create/edit content', () => {
-    test('promoted editor gains create and edit permissions', async () => {
-      // Setup: User is promoted from viewer to editor
+  describe('Scenario 2: User promoted to member → can create/edit content', () => {
+    test('promoted member gains create and edit permissions', async () => {
+      // Setup: User is promoted from viewer to member
       mockAuth0Service.validateAuth0Token.mockResolvedValue({
-        sub: editorUser.auth0UserId,
-        email: editorUser.email,
+        sub: memberUser.auth0UserId,
+        email: memberUser.email,
         roles: ['user'],
       } as const);
 
-      mockUserService.findByAuth0Id.mockResolvedValue(editorUser);
+      mockUserService.findByAuth0Id.mockResolvedValue(memberUser);
 
-      // Mock editor permissions after promotion
-      mockWorkspaceAuthService.getUserWorkspaceRole.mockResolvedValue('member'); // member = editor
-      mockWorkspaceAuthService.getUserPermissionsInWorkspace.mockResolvedValue([...EDITOR_PERMISSIONS]);
+      // Mock member permissions after promotion
+      mockWorkspaceAuthService.getUserWorkspaceRole.mockResolvedValue('member');
+      mockWorkspaceAuthService.getUserPermissionsInWorkspace.mockResolvedValue([...MEMBER_PERMISSIONS]);
 
       mockWorkspaceAuthService.hasPermissionInWorkspace.mockImplementation(
         (userId: string, workspaceId: string, permission: string) => {
-          if (userId === editorUser.id && workspaceId === testWorkspace.id) {
-            return Promise.resolve(EDITOR_PERMISSIONS.includes(permission as any));
+          if (userId === memberUser.id && workspaceId === testWorkspace.id) {
+            return Promise.resolve(MEMBER_PERMISSIONS.includes(permission as any));
           }
           return Promise.resolve(false);
         }

@@ -284,7 +284,7 @@ export const authTypeDefs = gql`
   enum WorkspaceRole {
     OWNER
     ADMIN
-    EDITOR
+    MEMBER
     VIEWER
   }
 
