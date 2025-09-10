@@ -216,6 +216,7 @@ export const authTypeDefs = gql`
     privacy: WorkspacePrivacy
     settings: JSON
     isDefault: Boolean
+    ownerId: ID
   }
 
   input WorkspaceInviteInput {
@@ -233,6 +234,11 @@ export const authTypeDefs = gql`
 
   input AcceptInviteInput {
     token: String!
+  }
+
+  input TransferOwnershipInput {
+    workspaceId: ID!
+    newOwnerId: ID!
   }
 
   input PaginationInput {
@@ -422,6 +428,7 @@ export const authTypeDefs = gql`
     updateWorkspaceMember(workspaceId: ID!, userId: ID!, input: WorkspaceMemberUpdateInput!): WorkspaceMember!
     removeWorkspaceMember(workspaceId: ID!, userId: ID!): Boolean!
     leaveWorkspace(workspaceId: ID!): Boolean!
+    transferWorkspaceOwnership(input: TransferOwnershipInput!): Workspace!
     
     assignRole(userId: ID!, role: UserRole!): User!
     removeRole(userId: ID!, role: UserRole!): User!

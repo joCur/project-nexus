@@ -27,6 +27,7 @@ const workspaceUpdateSchema = z.object({
   privacy: z.enum(['private', 'team', 'public']).optional(),
   settings: z.record(z.any()).optional(),
   isDefault: z.boolean().optional(),
+  ownerId: z.string().uuid('Invalid owner ID format').optional(),
 });
 
 // Types
@@ -54,6 +55,7 @@ interface WorkspaceUpdateInput {
   privacy?: 'private' | 'team' | 'public';
   settings?: Record<string, any>;
   isDefault?: boolean;
+  ownerId?: string;
 }
 
 export class WorkspaceService {

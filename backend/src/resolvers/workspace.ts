@@ -306,6 +306,67 @@ export const workspaceResolvers = {
     },
 
     /**
+     * Transfer workspace ownership
+     */
+    transferWorkspaceOwnership: async (
+      _: any,
+      { input }: { input: { workspaceId: string; newOwnerId: string } },
+      context: GraphQLContext
+    ) => {
+      if (!context.isAuthenticated) {
+        throw new AuthenticationError();
+      }
+
+      const workspaceService = context.dataSources.workspaceService;
+      const userService = context.dataSources.userService;
+      const { workspaceId, newOwnerId } = input;
+
+      // Check if workspace exists
+      const existingWorkspace = await workspaceService.getWorkspaceById(workspaceId);
+      if (!existingWorkspace) {
+        throw new NotFoundError('Workspace', workspaceId);
+      }
+
+      // Check if new owner exists
+      const newOwner = await userService.findById(newOwnerId);
+      if (!newOwner) {
+        throw new NotFoundError('User', newOwnerId);
+      }
+
+      // Check if user has permission to transfer ownership (must be current owner or admin)
+      const authHelper = createAuthorizationHelper(context);
+      await authHelper.requireWorkspacePermission(
+        workspaceId,
+        'workspace:transfer_ownership',
+        'You do not have permission to transfer ownership of this workspace'
+      );
+
+      try {
+        const updatedWorkspace = await workspaceService.updateWorkspace(workspaceId, {
+          ownerId: newOwnerId
+        });
+
+        logger.info('Workspace ownership transferred via GraphQL', {
+          workspaceId,
+          previousOwnerId: existingWorkspace.ownerId,
+          newOwnerId,
+          transferredByUserId: context.user?.id,
+        });
+
+        return updatedWorkspace;
+
+      } catch (error) {
+        logger.error('Failed to transfer workspace ownership via GraphQL', {
+          workspaceId,
+          newOwnerId,
+          transferredByUserId: context.user?.id,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        throw error;
+      }
+    },
+
+    /**
      * Create default workspace for current user
      */
     createDefaultWorkspace: async (
