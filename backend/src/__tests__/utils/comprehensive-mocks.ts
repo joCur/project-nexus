@@ -31,7 +31,7 @@ export function createComprehensiveMocks(): ComprehensiveMocks {
     createDefaultWorkspace: jest.fn(),
     searchWorkspaces: jest.fn(),
     mapDbWorkspaceToWorkspace: jest.fn(),
-  } as jest.Mocked<WorkspaceService>;
+  } as any;
 
   // Mock UserService with all methods
   const mockUserService = {
@@ -43,27 +43,34 @@ export function createComprehensiveMocks(): ComprehensiveMocks {
     deleteUser: jest.fn(),
     searchUsers: jest.fn(),
     getUsersByIds: jest.fn(),
-  } as jest.Mocked<UserService>;
+  } as any;
 
   // Mock CacheService with all methods
   const mockCacheService = {
+    connect: jest.fn(),
     get: jest.fn(),
     set: jest.fn(),
-    delete: jest.fn(),
-    invalidate: jest.fn(),
-    clear: jest.fn(),
+    del: jest.fn(),
     exists: jest.fn(),
     expire: jest.fn(),
-    increment: jest.fn(),
-    decrement: jest.fn(),
-  } as jest.Mocked<CacheService>;
+    ttl: jest.fn(),
+    incr: jest.fn(),
+    mset: jest.fn(),
+    mget: jest.fn(),
+    mdel: jest.fn(),
+    clear: jest.fn(),
+    getStats: jest.fn(),
+    healthCheck: jest.fn(),
+    close: jest.fn(),
+    isConnectedToRedis: jest.fn(),
+  } as any;
 
   // Mock RateLimiterService
   const mockRateLimiterService = {
     checkOwnershipTransferLimit: jest.fn(),
     resetLimit: jest.fn(),
     getRateLimitStatus: jest.fn(),
-  } as jest.Mocked<typeof rateLimiterService>;
+  } as any;
 
   // Mock authorization helper
   const mockAuthHelper = {
@@ -86,14 +93,16 @@ export function createComprehensiveMocks(): ComprehensiveMocks {
       displayName: 'Test User',
       createdAt: new Date(),
       updatedAt: new Date(),
-    },
+      roles: [],
+      metadataSyncedAt: new Date(),
+    } as any,
     auth0Payload: {
       sub: 'auth0|test-user-123',
       email: 'test@example.com',
-      email_verified: true,
+      emailVerified: true,
       iat: Math.floor(Date.now() / 1000) - 300, // 5 minutes ago
       exp: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
-    },
+    } as any,
     req: {} as any,
     res: {} as any,
     dataSources: {
@@ -179,6 +188,8 @@ export const TEST_FIXTURES = {
     auth0UserId: 'auth0|new-owner-789',
     emailVerified: true,
     displayName: 'New Owner',
+    roles: [],
+    metadataSyncedAt: new Date('2024-01-01'),
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
   },

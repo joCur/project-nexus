@@ -67,10 +67,12 @@ describe('Workspace Resolvers', () => {
 
         it('should successfully transfer workspace ownership with all validations', async () => {
           // Setup mocks
+          mocks.workspaceService.getWorkspaceById.mockResolvedValue(TEST_FIXTURES.workspace);
+          mocks.userService.findById.mockResolvedValue(TEST_FIXTURES.newOwner);
           mocks.workspaceService.transferOwnership.mockResolvedValue(mockUpdatedWorkspace);
           mocks.rateLimiterService.checkOwnershipTransferLimit.mockResolvedValue(undefined);
           mocks.authHelper.requireWorkspacePermission.mockResolvedValue(undefined);
-          mocks.cacheService.invalidate.mockResolvedValue(undefined);
+          mocks.cacheService.del.mockResolvedValue(undefined);
           mocks.cacheService.set.mockResolvedValue(undefined);
 
           // Execute resolver
@@ -100,7 +102,7 @@ describe('Workspace Resolvers', () => {
           );
 
           // Verify cache operations
-          expect(mocks.cacheService.invalidate).toHaveBeenCalledWith(`workspace:${TEST_FIXTURES.workspace.id}`);
+          expect(mocks.cacheService.del).toHaveBeenCalledWith(`workspace:${TEST_FIXTURES.workspace.id}`);
           expect(mocks.cacheService.set).toHaveBeenCalledWith(
             `workspace:${TEST_FIXTURES.workspace.id}`,
             mockUpdatedWorkspace,
@@ -127,6 +129,8 @@ describe('Workspace Resolvers', () => {
         });
 
         it('should throw RateLimitError when rate limit is exceeded', async () => {
+          mocks.workspaceService.getWorkspaceById.mockResolvedValue(TEST_FIXTURES.workspace);
+          mocks.userService.findById.mockResolvedValue(TEST_FIXTURES.newOwner);
           mocks.rateLimiterService.checkOwnershipTransferLimit.mockRejectedValue(
             new RateLimitError(3, 86400000, 86400000)
           );
@@ -144,6 +148,8 @@ describe('Workspace Resolvers', () => {
         });
 
         it('should throw AuthorizationError when user lacks permission', async () => {
+          mocks.workspaceService.getWorkspaceById.mockResolvedValue(TEST_FIXTURES.workspace);
+          mocks.userService.findById.mockResolvedValue(TEST_FIXTURES.newOwner);
           mocks.rateLimiterService.checkOwnershipTransferLimit.mockResolvedValue(undefined);
           mocks.authHelper.requireWorkspacePermission.mockRejectedValue(
             new AuthorizationError('You do not have permission to transfer ownership of this workspace')
@@ -165,6 +171,9 @@ describe('Workspace Resolvers', () => {
 
       describe('Service Error Scenarios', () => {
         beforeEach(() => {
+          // Setup workspace and user mocks
+          mocks.workspaceService.getWorkspaceById.mockResolvedValue(TEST_FIXTURES.workspace);
+          mocks.userService.findById.mockResolvedValue(TEST_FIXTURES.newOwner);
           // Setup successful rate limiting and authorization for these tests
           mocks.rateLimiterService.checkOwnershipTransferLimit.mockResolvedValue(undefined);
           mocks.authHelper.requireWorkspacePermission.mockResolvedValue(undefined);
@@ -190,7 +199,7 @@ describe('Workspace Resolvers', () => {
 
         it('should handle cache service failures gracefully without affecting transfer', async () => {
           mocks.workspaceService.transferOwnership.mockResolvedValue(mockUpdatedWorkspace);
-          mocks.cacheService.invalidate.mockRejectedValue(new Error('Cache service unavailable'));
+          mocks.cacheService.del.mockRejectedValue(new Error('Cache service unavailable'));
           mocks.cacheService.set.mockRejectedValue(new Error('Cache service unavailable'));
 
           const result = await workspaceResolvers.Mutation.transferWorkspaceOwnership(

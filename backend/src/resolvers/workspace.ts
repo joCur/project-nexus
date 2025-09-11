@@ -367,12 +367,20 @@ export const workspaceResolvers = {
 
         // Proactive cache warming for the new owner
         if (cacheService) {
-          await Promise.all([
-            cacheService.invalidate(`workspace:${workspaceId}`),
-            cacheService.set(`workspace:${workspaceId}`, updatedWorkspace, CACHE_TTL_SECONDS),
-            cacheService.invalidate(`user:${existingWorkspace.ownerId}:workspaces`),
-            cacheService.invalidate(`user:${newOwnerId}:workspaces`)
-          ]);
+          try {
+            await Promise.all([
+              cacheService.del(`workspace:${workspaceId}`),
+              cacheService.set(`workspace:${workspaceId}`, updatedWorkspace, CACHE_TTL_SECONDS),
+              cacheService.del(`user:${existingWorkspace.ownerId}:workspaces`),
+              cacheService.del(`user:${newOwnerId}:workspaces`)
+            ]);
+          } catch (error) {
+            // Cache failures should not affect the transfer operation
+            logger.warn('Cache operations failed during workspace ownership transfer', {
+              workspaceId,
+              error: error instanceof Error ? error.message : 'Unknown cache error'
+            });
+          }
         }
 
         logger.info('Workspace ownership transferred via GraphQL', {
