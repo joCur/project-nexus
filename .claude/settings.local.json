@@ -11,7 +11,8 @@
       "Bash(flutter packages:*)",
       "Bash(flutter test:*)",
       "Bash(sed:*)",
-      "mcp__semgrep__security_check"
+      "mcp__semgrep__security_check",
+      "Bash(npm ls:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
