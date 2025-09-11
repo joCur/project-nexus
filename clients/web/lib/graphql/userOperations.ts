@@ -93,8 +93,8 @@ export const CHECK_USER_PERMISSION = gql`
  * Used for GraphQL context resolution and global permission checking
  */
 export const GET_USER_PERMISSIONS_FOR_CONTEXT = gql`
-  query GetUserPermissionsForContext($userId: ID!) {
-    getUserPermissionsForContext(userId: $userId)
+  query GetUserPermissionsForContext {
+    getUserPermissionsForContext
   }
 `;
 
@@ -158,7 +158,7 @@ export interface CheckUserPermissionData {
 
 // Context permissions (all workspaces)
 export interface GetUserPermissionsForContextVariables {
-  userId: string;
+  // No variables needed - uses authenticated user from context
 }
 
 export interface GetUserPermissionsForContextData {

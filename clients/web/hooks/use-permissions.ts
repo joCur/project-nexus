@@ -8,7 +8,7 @@
  */
 
 import { useQuery } from '@apollo/client';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useEffect, useRef } from 'react';
 import { useAuth } from './use-auth';
 import {
   GET_USER_WORKSPACE_PERMISSIONS,
@@ -22,6 +22,8 @@ import {
   GetUserPermissionsForContextData,
 } from '@/lib/graphql/userOperations';
 import { permissionCacheManager } from '@/lib/apollo-permission-cache';
+import { emitPermissionEvent } from '@/lib/permission-notification-system';
+import { permissionPreloader } from '@/lib/permission-preloader';
 
 /**
  * Cache configuration for permission queries
@@ -107,6 +109,9 @@ export function useWorkspacePermissions(
     notifyOnNetworkStatusChange: true,
   });
 
+  // Track previous permissions for change detection
+  const previousPermissions = useRef<string[]>([]);
+
   // Memoize permissions array to avoid unnecessary re-renders
   const permissions = useMemo(() => {
     if (error && errorPolicy === 'secure-by-default') {
@@ -115,6 +120,69 @@ export function useWorkspacePermissions(
     }
     return data?.getUserWorkspacePermissions || [];
   }, [data, error, errorPolicy]);
+
+  // Detect permission changes and emit events
+  useEffect(() => {
+    if (!user?.sub || !workspaceId || permissions.length === 0) {
+      return;
+    }
+
+    const currentPermissions = [...permissions].sort();
+    const previousPerms = [...previousPermissions.current].sort();
+
+    // Only check for changes if we have previous permissions
+    if (previousPerms.length > 0) {
+      // Find newly granted permissions
+      const grantedPermissions = currentPermissions.filter(
+        perm => !previousPerms.includes(perm)
+      );
+
+      // Find revoked permissions
+      const revokedPermissions = previousPerms.filter(
+        perm => !currentPermissions.includes(perm)
+      );
+
+      // Emit events for granted permissions
+      grantedPermissions.forEach(permission => {
+        emitPermissionEvent({
+          type: 'permissionGranted',
+          timestamp: Date.now(),
+          userId: user.sub,
+          workspaceId,
+          permission,
+        });
+      });
+
+      // Emit events for revoked permissions
+      revokedPermissions.forEach(permission => {
+        emitPermissionEvent({
+          type: 'permissionRevoked',
+          timestamp: Date.now(),
+          userId: user.sub,
+          workspaceId,
+          permission,
+        });
+      });
+    }
+
+    // Update previous permissions reference
+    previousPermissions.current = currentPermissions;
+  }, [permissions, user?.sub, workspaceId]);
+
+  // Handle errors
+  useEffect(() => {
+    if (error && user?.sub && workspaceId) {
+      emitPermissionEvent({
+        type: 'permissionQueryError',
+        timestamp: Date.now(),
+        userId: user.sub,
+        queryType: 'workspace',
+        workspaceId,
+        error: error.message || 'Unknown error',
+        retryCount: 0,
+      });
+    }
+  }, [error, user?.sub, workspaceId]);
 
   // Memoized permission checker function
   const checkPermission = useCallback(
@@ -175,6 +243,21 @@ export function usePermissionCheck(
     return data?.checkUserPermission || false;
   }, [data, error, errorPolicy]);
 
+  // Handle permission check failures
+  useEffect(() => {
+    if (error && user?.sub && workspaceId && permission) {
+      emitPermissionEvent({
+        type: 'permissionCheckFailed',
+        timestamp: Date.now(),
+        userId: user.sub,
+        workspaceId,
+        permission,
+        error: error.message || 'Unknown error',
+        fallbackUsed: errorPolicy === 'secure-by-default',
+      });
+    }
+  }, [error, user?.sub, workspaceId, permission, errorPolicy]);
+
   // Memoized refetch function
   const refetchPermission = useCallback(async () => {
     await refetch();
@@ -202,9 +285,7 @@ export function useContextPermissions(
     GetUserPermissionsForContextData,
     GetUserPermissionsForContextVariables
   >(GET_USER_PERMISSIONS_FOR_CONTEXT, {
-    variables: {
-      userId: user?.sub || '',
-    },
+    variables: {},
     skip: !enabled || !user?.sub,
     fetchPolicy: PERMISSION_CACHE_CONFIG.FETCH_POLICY,
     errorPolicy: PERMISSION_CACHE_CONFIG.ERROR_POLICY,
@@ -314,6 +395,57 @@ export function usePermissionCacheInvalidation() {
 }
 
 /**
+ * Hook for permission preloading optimization
+ * Proactively loads permissions based on user navigation patterns
+ */
+export function usePermissionPreloading() {
+  const { user } = useAuth();
+
+  const initializePreloader = useCallback(
+    (workspaceId?: string): void => {
+      if (!user?.sub) return;
+      
+      permissionPreloader.initialize(user.sub, workspaceId);
+    },
+    [user?.sub]
+  );
+
+  const updateWorkspaceContext = useCallback(
+    (workspaceId: string): void => {
+      if (!user?.sub) return;
+      
+      permissionPreloader.updateWorkspaceContext(user.sub, workspaceId);
+    },
+    [user?.sub]
+  );
+
+  const preloadSpecificPermission = useCallback(
+    async (workspaceId: string, permission: string, priority?: 'low' | 'medium' | 'high'): Promise<boolean> => {
+      if (!user?.sub) return false;
+      
+      return permissionPreloader.preloadPermission(user.sub, workspaceId, permission, priority);
+    },
+    [user?.sub]
+  );
+
+  const getPreloadStatistics = useCallback(() => {
+    return permissionPreloader.getStatistics();
+  }, []);
+
+  const getActivePreloads = useCallback(() => {
+    return permissionPreloader.getActiveRequests();
+  }, []);
+
+  return {
+    initializePreloader,
+    updateWorkspaceContext,
+    preloadSpecificPermission,
+    getPreloadStatistics,
+    getActivePreloads,
+  };
+}
+
+/**
  * Combined permissions hook that provides all permission functionality
  * Convenient for components that need multiple permission features
  */
@@ -326,11 +458,13 @@ export function usePermissions(workspaceId?: string, options: UsePermissionsOpti
   const contextPermissions = useContextPermissions(options);
   const cacheWarming = usePermissionCacheWarming();
   const cacheInvalidation = usePermissionCacheInvalidation();
+  const preloading = usePermissionPreloading();
 
   return {
     ...workspacePermissions,
     contextPermissions,
     cacheWarming,
     cacheInvalidation,
+    preloading,
   };
 }

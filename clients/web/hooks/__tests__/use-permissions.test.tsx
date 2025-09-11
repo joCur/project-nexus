@@ -269,9 +269,7 @@ describe('Permission Hooks', () => {
     const successMock = {
       request: {
         query: GET_USER_PERMISSIONS_FOR_CONTEXT,
-        variables: {
-          userId: mockUser.sub,
-        },
+        variables: {},
       },
       result: {
         data: {
@@ -430,9 +428,7 @@ describe('Permission Hooks', () => {
     const contextPermissionsMock = {
       request: {
         query: GET_USER_PERMISSIONS_FOR_CONTEXT,
-        variables: {
-          userId: mockUser.sub,
-        },
+        variables: {},
       },
       result: {
         data: {

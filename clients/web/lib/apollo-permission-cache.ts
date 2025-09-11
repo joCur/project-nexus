@@ -20,6 +20,7 @@ import {
   CheckUserPermissionVariables,
   CheckUserPermissionData,
 } from './graphql/userOperations';
+import { emitPermissionEvent } from './permission-notification-system';
 
 /**
  * Enhanced permission cache manager with workspace-aware operations
@@ -47,18 +48,44 @@ export class PermissionCacheManager {
       return;
     }
 
+    const startTime = Date.now();
+    let cacheEntries = 0;
+
     try {
       // Always warm context permissions first as they provide global overview
       await this.warmContextPermissions(userId);
+      cacheEntries++;
 
       // Warm specific workspace permissions if provided
       if (priorityWorkspaceIds?.length) {
         await this.warmWorkspacePermissions(userId, priorityWorkspaceIds);
+        cacheEntries += priorityWorkspaceIds.length;
       }
 
+      const duration = Date.now() - startTime;
       console.log(`Permission cache warmed for user: ${userId}`);
+
+      // Emit cache warmed event
+      emitPermissionEvent({
+        type: 'permissionCacheWarmed',
+        timestamp: Date.now(),
+        userId,
+        workspaceIds: priorityWorkspaceIds || [],
+        cacheEntries,
+        duration,
+      });
     } catch (error) {
       console.warn('Failed to warm user permission cache:', error);
+      
+      // Emit cache error event
+      emitPermissionEvent({
+        type: 'permissionQueryError',
+        timestamp: Date.now(),
+        userId,
+        queryType: 'context',
+        error: error instanceof Error ? error.message : String(error),
+        retryCount: 0,
+      });
     }
   }
 
@@ -69,7 +96,7 @@ export class PermissionCacheManager {
     try {
       await apolloClient.query<GetUserPermissionsForContextData, GetUserPermissionsForContextVariables>({
         query: GET_USER_PERMISSIONS_FOR_CONTEXT,
-        variables: { userId },
+        variables: {},
         fetchPolicy: 'cache-first',
         errorPolicy: 'ignore',
       });
@@ -118,13 +145,27 @@ export class PermissionCacheManager {
    * When a user's role changes, we need to invalidate related cache entries
    */
   smartInvalidateUserPermissions(userId: string, affectedWorkspaceId?: string): void {
+    const cacheKeys: string[] = [];
+    
     if (affectedWorkspaceId) {
       // Workspace-specific role change
       permissionCacheUtils.invalidateWorkspacePermissions(userId, affectedWorkspaceId);
+      cacheKeys.push(`workspace_${affectedWorkspaceId}`);
     } else {
       // Global role change - invalidate everything
       permissionCacheUtils.invalidateUserPermissions(userId);
+      cacheKeys.push('all_user_permissions');
     }
+
+    // Emit cache invalidated event
+    emitPermissionEvent({
+      type: 'permissionCacheInvalidated',
+      timestamp: Date.now(),
+      userId,
+      workspaceId: affectedWorkspaceId,
+      cacheKeys,
+      reason: 'role-change',
+    });
 
     // Trigger cache warming for commonly accessed data
     this.scheduleBackgroundCacheWarming(userId, affectedWorkspaceId);

@@ -67,9 +67,7 @@ const mocks = [
   {
     request: {
       query: GET_USER_PERMISSIONS_FOR_CONTEXT,
-      variables: {
-        userId: 'user-123',
-      },
+      variables: {},
     },
     result: {
       data: {

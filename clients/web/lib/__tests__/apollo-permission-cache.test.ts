@@ -167,7 +167,7 @@ describe('Apollo Permission Cache', () => {
       expect(mockApolloClient.query).toHaveBeenNthCalledWith(1, 
         expect.objectContaining({
           query: GET_USER_PERMISSIONS_FOR_CONTEXT,
-          variables: { userId },
+          variables: {},
         })
       );
     });
