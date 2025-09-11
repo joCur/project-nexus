@@ -2,6 +2,7 @@
 
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { WorkspaceLayout } from '@/components/workspace/WorkspaceLayout';
+import { WorkspacePermissionProvider } from '../../../contexts/WorkspacePermissionContext';
 
 interface WorkspaceLayoutProps {
   children: React.ReactNode;
@@ -15,13 +16,15 @@ interface WorkspaceLayoutProps {
  */
 export default function WorkspaceLayoutComponent({ children }: WorkspaceLayoutProps) {
   return (
-    <ProtectedRoute
-      requiredPermissions={['workspace:read']}
-      redirectTo="/workspace"
-    >
-      <WorkspaceLayout>
-        {children}
-      </WorkspaceLayout>
-    </ProtectedRoute>
+    <WorkspacePermissionProvider>
+      <ProtectedRoute
+        requiredPermissions={['workspace:read']}
+        redirectTo="/workspace"
+      >
+        <WorkspaceLayout>
+          {children}
+        </WorkspaceLayout>
+      </ProtectedRoute>
+    </WorkspacePermissionProvider>
   );
 }

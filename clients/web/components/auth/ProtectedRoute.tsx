@@ -6,7 +6,7 @@ import { ExtendedUserProfile, Permissions, Roles } from '@/types/auth';
 import { ReactNode, useEffect, useMemo } from 'react';
 import { Card, CardContent, Button } from '@/components/ui';
 import { announceToScreenReader } from '@/lib/utils';
-import { useWorkspacePermissionContext } from '@/contexts/WorkspacePermissionContext';
+import { useWorkspacePermissionContext } from '../../contexts/WorkspacePermissionContext';
 
 /**
  * Props for ProtectedRoute component
