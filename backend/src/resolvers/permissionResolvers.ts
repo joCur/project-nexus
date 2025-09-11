@@ -163,7 +163,7 @@ export const permissionResolvers = {
      */
     getUserPermissionsForContext: async (
       _: any,
-      { userId }: { userId: string },
+      {}: {},
       context: GraphQLContext
     ): Promise<{ [workspaceId: string]: string[] }> => {
       // Require authentication
@@ -171,39 +171,22 @@ export const permissionResolvers = {
         throw new AuthenticationError('Authentication required');
       }
 
-      // Validate input
-      if (!userId) {
-        throw new ValidationError('userId is required');
-      }
-
       try {
         const authService = new WorkspaceAuthorizationService();
 
-        // Users can only query their own permissions context
-        // This is more restrictive than the other queries as it reveals all workspace access
-        if (context.user.id !== userId) {
-          throw new AuthorizationError(
-            'Can only retrieve permission context for your own user account',
-            'CONTEXT_ACCESS_DENIED',
-            'user:self',
-            []
-          );
-        }
-
-        // Get permissions across all workspaces for the user
-        const permissionsContext = await authService.getUserPermissionsForContext(userId);
+        // Get permissions across all workspaces for the authenticated user
+        // This query only returns the current user's permissions context
+        const permissionsContext = await authService.getUserPermissionsForContext(context.user.id);
 
         logger.info('Retrieved user permissions context', {
-          userId,
+          userId: context.user.id,
           workspaceCount: Object.keys(permissionsContext).length,
-          requestedBy: context.user.id
         });
 
         return permissionsContext;
       } catch (error) {
         logger.error('Failed to get user permissions context', {
-          userId,
-          requestedBy: context.user.id,
+          userId: context.user.id,
           error: error instanceof Error ? error.message : 'Unknown error'
         });
         throw error;

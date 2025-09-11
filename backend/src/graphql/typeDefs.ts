@@ -363,7 +363,7 @@ export const authTypeDefs = gql`
     # Permission queries
     getUserWorkspacePermissions(userId: ID!, workspaceId: ID!): [String!]!
     checkUserPermission(userId: ID!, workspaceId: ID!, permission: String!): Boolean!
-    getUserPermissionsForContext(userId: ID!): JSON!
+    getUserPermissionsForContext: JSON!
     
     # Workspace queries
     workspace(id: ID!): Workspace
