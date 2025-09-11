@@ -360,7 +360,7 @@ export const useSetDefaultCanvas = (): UseCanvasMutationReturn => {
 
       // Server mutation
       const { data } = await setDefaultCanvasMutation({ 
-        variables: { workspaceId, canvasId } 
+        variables: { id: canvasId } 
       });
 
       if (data?.setDefaultCanvas) {
