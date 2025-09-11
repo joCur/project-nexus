@@ -4,6 +4,8 @@
  */
 
 import { gql } from '@apollo/client';
+import fs from 'fs';
+import path from 'path';
 import {
   GET_USER_WORKSPACE_PERMISSIONS,
   CHECK_USER_PERMISSION,
@@ -13,12 +15,8 @@ import {
   GetUserWorkspacePermissionsVariables,
   GetUserWorkspacePermissionsData,
   CheckUserPermissionVariables,
-  CheckUserPermissionData,
-  GetUserPermissionsForContextVariables,
-  GetUserPermissionsForContextData,
   GetCurrentUserData,
   SyncUserVariables,
-  SyncUserData,
 } from '../userOperations';
 
 describe('GraphQL User Operations', () => {
@@ -155,8 +153,6 @@ describe('GraphQL User Operations', () => {
   describe('Caching Strategy Validation', () => {
     it('should document proper caching configuration', () => {
       // Verify that the file contains caching documentation
-      const fs = require('fs');
-      const path = require('path');
       const filePath = path.join(__dirname, '../userOperations.ts');
       const fileContent = fs.readFileSync(filePath, 'utf8');
       
@@ -171,8 +167,6 @@ describe('GraphQL User Operations', () => {
     });
 
     it('should recommend appropriate cache TTL', () => {
-      const fs = require('fs');
-      const path = require('path');
       const filePath = path.join(__dirname, '../userOperations.ts');
       const fileContent = fs.readFileSync(filePath, 'utf8');
       
@@ -181,8 +175,6 @@ describe('GraphQL User Operations', () => {
     });
 
     it('should document Apollo Client integration', () => {
-      const fs = require('fs');
-      const path = require('path');
       const filePath = path.join(__dirname, '../userOperations.ts');
       const fileContent = fs.readFileSync(filePath, 'utf8');
       

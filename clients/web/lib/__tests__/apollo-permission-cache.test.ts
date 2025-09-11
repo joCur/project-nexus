@@ -17,7 +17,6 @@ import {
 import { 
   GET_USER_WORKSPACE_PERMISSIONS,
   GET_USER_PERMISSIONS_FOR_CONTEXT,
-  CHECK_USER_PERMISSION,
 } from '../graphql/userOperations';
 
 // Mock Apollo Client queries

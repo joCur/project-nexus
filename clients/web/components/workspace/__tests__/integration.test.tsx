@@ -72,6 +72,7 @@ describe('Workspace Components Integration', () => {
       error: undefined,
       refetch: jest.fn().mockResolvedValue({}),
       getAllPermissions: jest.fn().mockReturnValue(['workspace:read', 'canvas:create']),
+      checkPermissionInWorkspace: jest.fn().mockReturnValue(true),
     });
 
     mockUseWorkspaceStore.mockImplementation((selector?: any) => {

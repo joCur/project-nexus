@@ -9,6 +9,7 @@
 
 import { apolloClient, permissionCacheUtils } from './apollo-client';
 import { permissionCacheManager } from './apollo-permission-cache';
+import { DocumentNode } from 'graphql';
 
 /**
  * Performance monitoring configuration
@@ -52,7 +53,7 @@ interface QueryPerformance {
   queryName: string;
   duration: number;
   cacheHit: boolean;
-  variables: Record<string, any>;
+  variables: Record<string, unknown>;
   timestamp: number;
   error?: string;
 }
@@ -178,13 +179,14 @@ export class ApolloCacheMonitor {
   /**
    * Extract query name from GraphQL query
    */
-  private extractQueryName(query: any): string {
+  private extractQueryName(query: DocumentNode): string {
     try {
-      if (query?.definitions?.[0]?.name?.value) {
-        return query.definitions[0].name.value;
+      const definition = query?.definitions?.[0] as any;
+      if (definition?.name?.value) {
+        return definition.name.value;
       }
-      if (query?.definitions?.[0]?.selectionSet?.selections?.[0]?.name?.value) {
-        return query.definitions[0].selectionSet.selections[0].name.value;
+      if (definition?.selectionSet?.selections?.[0]?.name?.value) {
+        return definition.selectionSet.selections[0].name.value;
       }
       return 'unknown';
     } catch {

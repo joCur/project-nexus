@@ -57,6 +57,7 @@ describe('WorkspaceLayout', () => {
       error: undefined,
       refetch: jest.fn().mockResolvedValue({}),
       getAllPermissions: jest.fn().mockReturnValue(['workspace:read', 'canvas:create']),
+      checkPermissionInWorkspace: jest.fn().mockReturnValue(true),
     });
 
     // Mock workspace store

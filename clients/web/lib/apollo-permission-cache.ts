@@ -14,8 +14,11 @@ import {
   GET_USER_PERMISSIONS_FOR_CONTEXT,
   CHECK_USER_PERMISSION,
   GetUserWorkspacePermissionsVariables,
+  GetUserWorkspacePermissionsData,
   GetUserPermissionsForContextVariables,
+  GetUserPermissionsForContextData,
   CheckUserPermissionVariables,
+  CheckUserPermissionData,
 } from './graphql/userOperations';
 
 /**
@@ -64,7 +67,7 @@ export class PermissionCacheManager {
    */
   private async warmContextPermissions(userId: string): Promise<void> {
     try {
-      await apolloClient.query<any, GetUserPermissionsForContextVariables>({
+      await apolloClient.query<GetUserPermissionsForContextData, GetUserPermissionsForContextVariables>({
         query: GET_USER_PERMISSIONS_FOR_CONTEXT,
         variables: { userId },
         fetchPolicy: 'cache-first',
@@ -80,7 +83,7 @@ export class PermissionCacheManager {
    */
   private async warmWorkspacePermissions(userId: string, workspaceIds: string[]): Promise<void> {
     const warmingPromises = workspaceIds.map(workspaceId =>
-      apolloClient.query<any, GetUserWorkspacePermissionsVariables>({
+      apolloClient.query<GetUserWorkspacePermissionsData, GetUserWorkspacePermissionsVariables>({
         query: GET_USER_WORKSPACE_PERMISSIONS,
         variables: { userId, workspaceId },
         fetchPolicy: 'cache-first',
@@ -99,7 +102,7 @@ export class PermissionCacheManager {
    */
   async preloadPermissionCheck(userId: string, workspaceId: string, permission: string): Promise<void> {
     try {
-      await apolloClient.query<any, CheckUserPermissionVariables>({
+      await apolloClient.query<CheckUserPermissionData, CheckUserPermissionVariables>({
         query: CHECK_USER_PERMISSION,
         variables: { userId, workspaceId, permission },
         fetchPolicy: 'cache-first',

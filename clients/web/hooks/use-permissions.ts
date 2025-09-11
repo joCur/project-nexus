@@ -7,7 +7,7 @@
  * @see NEX-186 - Frontend permission integration with backend
  */
 
-import { useQuery, useApolloClient } from '@apollo/client';
+import { useQuery } from '@apollo/client';
 import { useCallback, useMemo } from 'react';
 import { useAuth } from './use-auth';
 import {
