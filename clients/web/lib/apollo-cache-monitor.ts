@@ -9,6 +9,7 @@
 
 import { apolloClient, permissionCacheUtils } from './apollo-client';
 import { permissionCacheManager } from './apollo-permission-cache';
+import { apolloCacheCompression } from './apollo-cache-compression';
 import { DocumentNode } from 'graphql';
 
 /**
@@ -44,6 +45,14 @@ interface CacheMetrics {
     single: number;
   };
   errors: number;
+  compression: {
+    enabled: boolean;
+    compressedEntries: number;
+    compressionRatio: number;
+    uncompressedSize: number;
+    compressedSize: number;
+    spaceSavedMB: number;
+  };
 }
 
 /**
@@ -272,6 +281,11 @@ export class ApolloCacheMonitor {
       // Count recent errors
       const errors = recentQueries.filter(q => q.error).length;
 
+      // Get compression metrics
+      const compressionMetrics = apolloCacheCompression.getCacheMetrics();
+      const compressionStats = apolloCacheCompression.getCompressionStats();
+      const spaceSavedMB = (compressionMetrics.uncompressedSize - compressionMetrics.compressedSize) / (1024 * 1024);
+
       const metrics: CacheMetrics = {
         timestamp: Date.now(),
         cacheSize,
@@ -281,6 +295,14 @@ export class ApolloCacheMonitor {
         averageQueryTime,
         permissionQueries,
         errors,
+        compression: {
+          enabled: compressionMetrics.compressionEnabled,
+          compressedEntries: compressionStats.compressedEntries,
+          compressionRatio: compressionStats.compressionRatio,
+          uncompressedSize: compressionMetrics.uncompressedSize,
+          compressedSize: compressionMetrics.compressedSize,
+          spaceSavedMB,
+        },
       };
 
       this.metricsHistory.push(metrics);
@@ -312,6 +334,12 @@ export class ApolloCacheMonitor {
       avgQueryTime: `${metrics.averageQueryTime.toFixed(0)}ms`,
       recentQueries: metrics.permissionQueries,
       errors: metrics.errors,
+      compression: metrics.compression.enabled ? {
+        enabled: true,
+        compressedEntries: metrics.compression.compressedEntries,
+        compressionRatio: `${(metrics.compression.compressionRatio * 100).toFixed(1)}%`,
+        spaceSaved: `${metrics.compression.spaceSavedMB.toFixed(2)} MB`,
+      } : { enabled: false },
     });
   }
 
