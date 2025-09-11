@@ -13,10 +13,13 @@ import { WorkspaceBreadcrumbs } from '../WorkspaceBreadcrumbs';
 import { CanvasSwitcher } from '../CanvasSwitcher';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
 import { useAuth } from '@/hooks/use-auth';
+import { useContextPermissions } from '@/hooks/use-permissions';
 
 // Mock dependencies
 jest.mock('@/stores/workspaceStore');
 jest.mock('@/hooks/use-auth');
+jest.mock('@/hooks/use-permissions');
+jest.mock('@/lib/utils/permissions');
 jest.mock('next/navigation', () => ({
   useRouter: () => ({
     push: jest.fn(),
@@ -36,6 +39,7 @@ jest.mock('../CreateCanvasModal', () => ({
 
 const mockUseWorkspaceStore = useWorkspaceStore as jest.MockedFunction<typeof useWorkspaceStore>;
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
+const mockUseContextPermissions = useContextPermissions as jest.MockedFunction<typeof useContextPermissions>;
 
 describe('Workspace Components Integration', () => {
   beforeEach(() => {
@@ -60,6 +64,14 @@ describe('Workspace Components Integration', () => {
       announceAuthStatus: jest.fn(),
       isLoading: false,
       isAuthenticated: true,
+    });
+
+    mockUseContextPermissions.mockReturnValue({
+      permissionsByWorkspace: { 'workspace-1': ['workspace:read', 'canvas:create'] },
+      loading: false,
+      error: undefined,
+      refetch: jest.fn().mockResolvedValue({}),
+      getAllPermissions: jest.fn().mockReturnValue(['workspace:read', 'canvas:create']),
     });
 
     mockUseWorkspaceStore.mockImplementation((selector?: any) => {
