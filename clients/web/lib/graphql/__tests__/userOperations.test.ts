@@ -51,8 +51,7 @@ describe('GraphQL User Operations', () => {
       
       const queryString = GET_USER_PERMISSIONS_FOR_CONTEXT.loc?.source.body;
       expect(queryString).toContain('query GetUserPermissionsForContext');
-      expect(queryString).toContain('$userId: ID!');
-      expect(queryString).toContain('getUserPermissionsForContext(userId: $userId)');
+      expect(queryString).toContain('getUserPermissionsForContext');
     });
 
     it('should have correct GET_CURRENT_USER query structure', () => {

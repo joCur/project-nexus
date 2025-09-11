@@ -7,6 +7,14 @@
 
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
+import { apolloClient } from '@/lib/apollo-client';
+import { GET_WORKSPACE_CANVASES, CREATE_CANVAS } from '@/lib/graphql/canvasOperations';
+import type {
+  WorkspaceCanvasesQueryVariables,
+  CanvasesConnectionResponse,
+  CreateCanvasMutationVariables,
+  CanvasResponse,
+} from '@/lib/graphql/canvasOperations';
 import type {
   WorkspaceStore,
   WorkspaceContext,
@@ -51,6 +59,41 @@ const DEFAULT_CANVAS_MANAGEMENT: CanvasManagement = {
     fetchError: undefined,
     mutationError: undefined,
   },
+};
+
+/**
+ * Helper function to convert GraphQL CanvasResponse to local Canvas type
+ */
+const convertGraphQLCanvasToLocal = (graphqlCanvas: CanvasResponse): Canvas => {
+  return {
+    id: createCanvasId(graphqlCanvas.id),
+    workspaceId: graphqlCanvas.workspaceId as EntityId,
+    name: graphqlCanvas.name,
+    description: graphqlCanvas.description || '',
+    settings: {
+      isDefault: graphqlCanvas.isDefault,
+      position: { x: 0, y: 0, z: graphqlCanvas.position },
+      zoom: 1.0,
+      grid: {
+        enabled: true,
+        size: 20,
+        color: '#e5e7eb',
+        opacity: 0.3,
+      },
+      background: {
+        type: 'COLOR',
+        color: '#ffffff',
+        opacity: 1.0,
+      },
+    },
+    status: 'active',
+    priority: 'normal',
+    tags: [],
+    metadata: {},
+    createdAt: graphqlCanvas.createdAt,
+    updatedAt: graphqlCanvas.updatedAt,
+    version: 1,
+  };
 };
 
 /**
@@ -465,83 +508,103 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
                 ...state.canvasManagement.loadingStates,
                 fetchingCanvases: true,
               },
+              errors: {
+                ...state.canvasManagement.errors,
+                fetchError: undefined,
+              },
             },
           }));
 
           try {
-            // NOTE: This function is being called from React components
-            // We can't use hooks here, so this should be replaced with a direct GraphQL fetch
-            // For now, this remains as a placeholder until the workspace loading is refactored
-            
-            console.warn('loadWorkspaceCanvases: This should use GraphQL API instead of mock data');
-            console.log('TODO: Replace this with GraphQL fetch to /graphql endpoint');
-            
-            // Temporary: Create a mock canvas for development
-            // This should be removed once proper GraphQL integration is implemented
-            const { canvasManagement } = get();
-            
-            if (canvasManagement.canvases.size === 0) {
-              const defaultCanvasId = createCanvasId(`temp_${workspaceId}_${Date.now()}`);
-              const defaultCanvas: Canvas = {
-                id: defaultCanvasId,
-                workspaceId,
-                name: 'Main Canvas (Local Only)',
-                description: 'Temporary canvas - will be replaced with server data',
-                settings: {
-                  isDefault: true,
-                  position: { x: 0, y: 0, z: 0 },
-                  zoom: 1.0,
-                  grid: {
-                    enabled: true,
-                    size: 20,
-                    color: '#e5e7eb',
-                    opacity: 0.3,
-                  },
-                  background: {
-                    type: 'COLOR',
-                    color: '#ffffff',
-                    opacity: 1.0,
-                  },
-                },
-                status: 'active',
-                priority: 'normal',
-                tags: [],
-                metadata: { isTemporary: true },
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                version: 1,
-              };
+            console.log('Loading workspace canvases via GraphQL API for workspace:', workspaceId);
 
-              set((state) => ({
-                canvasManagement: {
-                  ...state.canvasManagement,
-                  canvases: new Map().set(defaultCanvasId, defaultCanvas),
-                  defaultCanvasId,
-                  loadingStates: {
-                    ...state.canvasManagement.loadingStates,
-                    fetchingCanvases: false,
-                  },
+            // Build GraphQL query variables
+            const variables: WorkspaceCanvasesQueryVariables = {
+              workspaceId: workspaceId,
+              filter: filter ? {
+                isDefault: filter.isDefault,
+                searchQuery: filter.searchQuery,
+              } : undefined,
+              pagination: {
+                page: 1,
+                limit: 100, // Load all canvases for now
+                sortBy: 'position',
+                sortOrder: 'ASC',
+              },
+            };
+
+            // Execute GraphQL query
+            const result = await apolloClient.query<{ workspaceCanvases: CanvasesConnectionResponse }>({
+              query: GET_WORKSPACE_CANVASES,
+              variables,
+              fetchPolicy: 'cache-first',
+              errorPolicy: 'all',
+            });
+
+            if (result.errors && result.errors.length > 0) {
+              throw new Error(`GraphQL errors: ${result.errors.map(e => e.message).join(', ')}`);
+            }
+
+            const canvasesData = result.data?.workspaceCanvases;
+            if (!canvasesData) {
+              throw new Error('No canvas data returned from GraphQL query');
+            }
+
+            console.log(`Successfully loaded ${canvasesData.items.length} canvases from GraphQL API`);
+
+            // Convert GraphQL responses to local Canvas types
+            const canvasMap = new Map<CanvasId, Canvas>();
+            let defaultCanvasId: CanvasId | undefined;
+
+            canvasesData.items.forEach((graphqlCanvas) => {
+              const localCanvas = convertGraphQLCanvasToLocal(graphqlCanvas);
+              canvasMap.set(localCanvas.id, localCanvas);
+              
+              if (localCanvas.settings.isDefault) {
+                defaultCanvasId = localCanvas.id;
+              }
+            });
+
+            // If no canvases exist, we might want to create a default one
+            // This depends on your backend behavior - some systems auto-create, others don't
+            let shouldCreateDefault = false;
+            if (canvasMap.size === 0) {
+              console.log('No canvases found for workspace, checking if we should create a default canvas');
+              shouldCreateDefault = true;
+            }
+
+            // Update store with loaded canvases
+            set((state) => ({
+              canvasManagement: {
+                ...state.canvasManagement,
+                canvases: canvasMap,
+                defaultCanvasId,
+                loadingStates: {
+                  ...state.canvasManagement.loadingStates,
+                  fetchingCanvases: false,
                 },
-                context: {
-                  ...state.context,
-                  currentCanvasId: defaultCanvasId,
-                  canvasName: defaultCanvas.name,
+                errors: {
+                  ...state.canvasManagement.errors,
+                  fetchError: undefined,
                 },
-                isInitialized: true,
-              }));
-            } else {
-              set((state) => ({
-                canvasManagement: {
-                  ...state.canvasManagement,
-                  loadingStates: {
-                    ...state.canvasManagement.loadingStates,
-                    fetchingCanvases: false,
-                  },
-                },
-                isInitialized: true,
-              }));
+              },
+              context: {
+                ...state.context,
+                currentCanvasId: defaultCanvasId || (canvasMap.size > 0 ? Array.from(canvasMap.keys())[0] : undefined),
+                canvasName: defaultCanvasId ? canvasMap.get(defaultCanvasId)?.name : (canvasMap.size > 0 ? Array.from(canvasMap.values())[0]?.name : undefined),
+              },
+              isInitialized: true,
+            }));
+
+            // TODO: Create default canvas if none exist (requires updating createCanvas to use GraphQL)
+            if (shouldCreateDefault) {
+              console.log('No canvases found for workspace - automatic canvas creation is disabled until createCanvas uses GraphQL');
+              // For now, we'll just log this and leave canvas creation to the UI layer
+              // This will be re-enabled once createCanvas method is updated to use GraphQL
             }
           } catch (error) {
+            console.error('Failed to load workspace canvases:', error);
+            
             set((state) => ({
               canvasManagement: {
                 ...state.canvasManagement,
@@ -551,10 +614,12 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
                 },
                 errors: {
                   ...state.canvasManagement.errors,
-                  fetchError: `Failed to load canvases: ${error}`,
+                  fetchError: `Failed to load canvases: ${error instanceof Error ? error.message : String(error)}`,
                 },
               },
             }));
+
+            // Don't throw the error - let the UI handle the error state gracefully
           }
         },
 
