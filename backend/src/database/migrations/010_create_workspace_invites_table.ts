@@ -33,7 +33,7 @@ export async function up(knex: Knex): Promise<void> {
       .nullable()
       .comment('User ID if invitee already has an account');
     
-    table.enu('role', ['admin', 'editor', 'viewer'])
+    table.enu('role', ['admin', 'member', 'viewer'])
       .notNullable()
       .defaultTo('viewer')
       .comment('Role to grant upon acceptance');

@@ -621,7 +621,7 @@ describe('CacheService', () => {
       // Arrange
       mockRedis.ping.mockImplementation(() => {
         return new Promise(resolve => {
-          setTimeout(() => resolve('PONG'), 50);
+          setTimeout(() => resolve('PONG'), 60);
         });
       });
 

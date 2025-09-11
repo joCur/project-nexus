@@ -8,12 +8,17 @@ import { createContextLogger } from '@/utils/logger';
 import { GraphQLContext } from '@/types';
 import { WorkspaceAuthorizationService } from '@/services/workspaceAuthorization';
 import { createAuthorizationHelper } from '@/utils/authorizationHelper';
+import { rateLimiterService } from '@/services/rateLimiter';
 
 /**
  * GraphQL resolvers for workspace management operations
  */
 
 const logger = createContextLogger({ service: 'WorkspaceResolvers' });
+
+// Constants
+const SESSION_MAX_AGE_MS = 15 * 60 * 1000; // 15 minutes
+const CACHE_TTL_SECONDS = 300; // 5 minutes
 
 export const workspaceResolvers = {
   Query: {
@@ -302,6 +307,99 @@ export const workspaceResolvers = {
           error: error instanceof Error ? error.message : 'Unknown error',
         });
         return false;
+      }
+    },
+
+    /**
+     * Transfer workspace ownership
+     */
+    transferWorkspaceOwnership: async (
+      _: any,
+      { input }: { input: { workspaceId: string; newOwnerId: string } },
+      context: GraphQLContext
+    ) => {
+      if (!context.isAuthenticated) {
+        throw new AuthenticationError();
+      }
+
+      // Validate session freshness for sensitive operation
+      if (context.auth0Payload) {
+        const sessionAge = Date.now() - (context.auth0Payload.iat * 1000);
+        
+        if (sessionAge > SESSION_MAX_AGE_MS) {
+          throw new AuthenticationError('Session too old for sensitive operation. Please re-authenticate.');
+        }
+      }
+
+      const workspaceService = context.dataSources.workspaceService;
+      const userService = context.dataSources.userService;
+      const cacheService = context.dataSources.cacheService;
+      const { workspaceId, newOwnerId } = input;
+
+      // Parallel validation of workspace and new owner
+      const [existingWorkspace, newOwner] = await Promise.all([
+        workspaceService.getWorkspaceById(workspaceId),
+        userService.findById(newOwnerId)
+      ]);
+
+      if (!existingWorkspace) {
+        throw new NotFoundError('Workspace', workspaceId);
+      }
+
+      if (!newOwner) {
+        throw new NotFoundError('User', newOwnerId);
+      }
+
+      // Check rate limit for ownership transfers
+      await rateLimiterService.checkOwnershipTransferLimit(context);
+
+      // Check if user has permission to transfer ownership (must be current owner or admin)
+      const authHelper = createAuthorizationHelper(context);
+      await authHelper.requireWorkspacePermission(
+        workspaceId,
+        'workspace:transfer_ownership',
+        'You do not have permission to transfer ownership of this workspace'
+      );
+
+      try {
+        // Use transactional method for ownership transfer
+        const updatedWorkspace = await workspaceService.transferOwnership(workspaceId, newOwnerId);
+
+        // Proactive cache warming for the new owner
+        if (cacheService) {
+          try {
+            await Promise.all([
+              cacheService.del(`workspace:${workspaceId}`),
+              cacheService.set(`workspace:${workspaceId}`, updatedWorkspace, CACHE_TTL_SECONDS),
+              cacheService.del(`user:${existingWorkspace.ownerId}:workspaces`),
+              cacheService.del(`user:${newOwnerId}:workspaces`)
+            ]);
+          } catch (error) {
+            // Cache failures should not affect the transfer operation
+            logger.warn('Cache operations failed during workspace ownership transfer', {
+              workspaceId,
+              error: error instanceof Error ? error.message : 'Unknown cache error'
+            });
+          }
+        }
+
+        logger.info('Workspace ownership transferred via GraphQL', {
+          workspaceId,
+          previousOwnerId: existingWorkspace.ownerId,
+          newOwnerId,
+          transferredByUserId: context.user?.id,
+        });
+
+        return updatedWorkspace;
+
+      } catch (error) {
+        logger.error('Failed to transfer workspace ownership via GraphQL', {
+          workspaceId,
+          newOwnerId,
+          transferredByUserId: context.user?.id,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        throw error;
       }
     },
 

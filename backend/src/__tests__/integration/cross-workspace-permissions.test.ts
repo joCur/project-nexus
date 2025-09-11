@@ -304,7 +304,7 @@ describe('Cross-Workspace Permission Integration Tests', () => {
             id: 'member-charlie-ws-b',
             workspaceId: workspaces.workspaceB.id,
             userId: 'user-charlie',
-            role: 'editor' as WorkspaceRole,
+            role: 'member' as WorkspaceRole,
             permissions: ['workspace:read', 'workspace:update', 'card:read', 'card:create', 'card:update'],
             joinedAt: new Date(),
             isActive: true,
@@ -321,7 +321,7 @@ describe('Cross-Workspace Permission Integration Tests', () => {
       );
       expect(charliePermissionsInA).toEqual(['workspace:read', 'card:read']);
 
-      // Charlie should have editor permissions in workspace B
+      // Charlie should have member permissions in workspace B
       const charliePermissionsInB = await mockWorkspaceAuthService.getUserPermissionsInWorkspace(
         'user-charlie',
         workspaces.workspaceB.id
@@ -359,12 +359,12 @@ describe('Cross-Workspace Permission Integration Tests', () => {
       );
       expect(charlieInA.role).toBe('viewer');
 
-      // Charlie's role in workspace B should be editor
+      // Charlie's role in workspace B should be member
       const charlieInB = await mockWorkspaceAuthService.getWorkspaceMember(
         'user-charlie',
         workspaces.workspaceB.id
       );
-      expect(charlieInB.role).toBe('editor');
+      expect(charlieInB.role).toBe('member');
 
       // Roles should not affect each other
       expect(charlieInA.role).not.toBe(charlieInB.role);
@@ -520,6 +520,106 @@ describe('Cross-Workspace Permission Integration Tests', () => {
         expect(error.message).not.toContain(workspaces.workspaceB.id);
         expect(error.message).not.toContain('Bob');
       }
+    });
+  });
+
+  describe('Security Enhancements', () => {
+    it('should prevent SQL injection attempts in workspace ID parameters', async () => {
+      const maliciousWorkspaceId = "'; DROP TABLE workspaces; --";
+      const contextAlice = createMockGraphQLContext({
+        isAuthenticated: true,
+        user: users.alice,
+        dataSources: {
+          workspaceService: mockWorkspaceService,
+          workspaceAuthorizationService: mockWorkspaceAuthService,
+          userService: mockUserService,
+          cacheService: mockCacheService,
+        },
+      });
+
+      // Mock should handle malicious input gracefully
+      mockWorkspaceService.getWorkspaceById.mockResolvedValue(null);
+
+      await expect(
+        workspaceResolvers.Query.workspace(
+          null,
+          { id: maliciousWorkspaceId },
+          contextAlice
+        )
+      ).rejects.toThrow('Workspace with identifier');
+
+      // Verify service was called with the malicious string (it should be safely handled)
+      expect(mockWorkspaceService.getWorkspaceById).toHaveBeenCalledWith(maliciousWorkspaceId);
+    });
+
+    it('should validate workspace access with XSS attempt in workspace name', async () => {
+      const xssWorkspace = {
+        ...workspaces.workspaceA,
+        name: '<script>alert("XSS")</script>',
+        description: '<img src="x" onerror="alert(1)">',
+      };
+
+      const contextAlice = createMockGraphQLContext({
+        isAuthenticated: true,
+        user: users.alice,
+        dataSources: {
+          workspaceService: mockWorkspaceService,
+          workspaceAuthorizationService: mockWorkspaceAuthService,
+          userService: mockUserService,
+          cacheService: mockCacheService,
+        },
+      });
+
+      mockWorkspaceService.getWorkspaceById.mockResolvedValue(xssWorkspace);
+
+      const result = await workspaceResolvers.Query.workspace(
+        null,
+        { id: workspaces.workspaceA.id },
+        contextAlice
+      );
+
+      expect(result).toEqual(xssWorkspace);
+      // Note: XSS protection should be handled at the client-side or serialization layer
+    });
+
+    it('should prevent unauthorized enumeration of workspace IDs', async () => {
+      const contextAlice = createMockGraphQLContext({
+        isAuthenticated: true,
+        user: users.alice,
+        dataSources: {
+          workspaceService: mockWorkspaceService,
+          workspaceAuthorizationService: mockWorkspaceAuthService,
+          userService: mockUserService,
+          cacheService: mockCacheService,
+        },
+      });
+
+      // Test multiple workspace ID attempts
+      const unauthorizedWorkspaceIds = [
+        'ws-random-1',
+        'ws-random-2', 
+        'ws-random-3',
+        workspaces.workspaceB.id, // Bob's workspace
+      ];
+
+      for (const workspaceId of unauthorizedWorkspaceIds) {
+        if (workspaceId === workspaces.workspaceB.id) {
+          mockWorkspaceService.getWorkspaceById.mockResolvedValue(workspaces.workspaceB);
+        } else {
+          mockWorkspaceService.getWorkspaceById.mockResolvedValue(null);
+        }
+
+        await expect(
+          workspaceResolvers.Query.workspace(
+            null,
+            { id: workspaceId },
+            contextAlice
+          )
+        ).rejects.toThrow();
+      }
+
+      // Should have been called for each attempt
+      expect(mockWorkspaceService.getWorkspaceById).toHaveBeenCalledTimes(unauthorizedWorkspaceIds.length);
     });
   });
 

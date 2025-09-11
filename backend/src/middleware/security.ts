@@ -153,6 +153,46 @@ export const aiRateLimit = rateLimit({
 });
 
 /**
+ * Workspace ownership transfer rate limiting (very strict)
+ */
+export const ownershipTransferRateLimit = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000, // 24 hours
+  max: 3, // Only 3 ownership transfers per day
+  message: {
+    error: 'OWNERSHIP_TRANSFER_RATE_LIMIT_EXCEEDED',
+    message: 'Too many ownership transfer attempts. Please try again later.',
+    retryAfter: 24 * 60 * 60, // seconds
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: Request) => {
+    // Rate limit by authenticated user ID, not IP
+    return (req as any).user?.id || req.ip;
+  },
+  handler: (req: Request, res: Response) => {
+    securityLogger.suspiciousActivity('Ownership transfer rate limit exceeded', {
+      userId: (req as any).user?.id,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+      path: req.path,
+      method: req.method,
+    });
+
+    const error = new RateLimitError(
+      3,
+      24 * 60 * 60 * 1000,
+      24 * 60 * 60 * 1000
+    );
+
+    res.status(error.statusCode).json({
+      error: error.code,
+      message: error.message,
+      retryAfter: error.retryAfter,
+    });
+  },
+});
+
+/**
  * Request logging middleware
  */
 export const requestLogger = (req: Request, res: Response, next: NextFunction) => {
@@ -243,7 +283,8 @@ export const requestSizeLimit = (req: Request, res: Response, next: NextFunction
  */
 const ipRequestCounts = new Map<string, { count: number; firstRequest: number }>();
 const SUSPICIOUS_REQUEST_THRESHOLD = 1000; // requests per hour
-const MONITORING_WINDOW = 60 * 60 * 1000; // 1 hour
+const MONITORING_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const CLEANUP_PROBABILITY = 0.01; // 1% chance to trigger cleanup
 
 export const ipMonitoring = (req: Request, res: Response, next: NextFunction) => {
   const ip = req.ip;
@@ -251,7 +292,7 @@ export const ipMonitoring = (req: Request, res: Response, next: NextFunction) =>
   
   // Get or initialize IP stats
   let stats = ipRequestCounts.get(ip);
-  if (!stats || (now - stats.firstRequest) > MONITORING_WINDOW) {
+  if (!stats || (now - stats.firstRequest) > MONITORING_WINDOW_MS) {
     stats = { count: 0, firstRequest: now };
     ipRequestCounts.set(ip, stats);
   }
@@ -263,15 +304,15 @@ export const ipMonitoring = (req: Request, res: Response, next: NextFunction) =>
     securityLogger.suspiciousActivity('High request volume from IP', {
       ip,
       requestCount: stats.count,
-      timeWindow: MONITORING_WINDOW,
+      timeWindow: MONITORING_WINDOW_MS,
       userAgent: req.headers['user-agent'],
     });
   }
   
   // Clean up old entries periodically
-  if (Math.random() < 0.01) { // 1% chance
+  if (Math.random() < CLEANUP_PROBABILITY) {
     for (const [checkIp, checkStats] of ipRequestCounts.entries()) {
-      if ((now - checkStats.firstRequest) > MONITORING_WINDOW) {
+      if ((now - checkStats.firstRequest) > MONITORING_WINDOW_MS) {
         ipRequestCounts.delete(checkIp);
       }
     }

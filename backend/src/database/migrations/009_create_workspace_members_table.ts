@@ -22,7 +22,7 @@ export async function up(knex: Knex): Promise<void> {
       .notNullable();
     
     // Role and permissions
-    table.enu('role', ['owner', 'admin', 'editor', 'viewer'])
+    table.enu('role', ['owner', 'admin', 'member', 'viewer'])
       .notNullable()
       .defaultTo('viewer');
     

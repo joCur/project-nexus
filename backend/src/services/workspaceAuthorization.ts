@@ -40,8 +40,8 @@ export const WorkspacePermissions = {
     'canvas:read'
   ],
   
-  // Editor permissions (viewer + edit)
-  EDITOR: [
+  // Member permissions (viewer + edit)
+  MEMBER: [
     'workspace:read',
     'card:read',
     'card:create',
@@ -56,7 +56,7 @@ export const WorkspacePermissions = {
     'canvas:update'
   ],
   
-  // Admin permissions (editor + manage)
+  // Admin permissions (member + manage)
   ADMIN: [
     'workspace:read',
     'workspace:update',
@@ -130,6 +130,10 @@ export class WorkspaceAuthorizationService {
       }
       return null;
     } catch (error) {
+      logger.warn('Cache read failed, falling back to database query', {
+        key,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
       // Cache error shouldn't break permission resolution
       return null;
     }
@@ -146,6 +150,10 @@ export class WorkspaceAuthorizationService {
       }
       return null;
     } catch (error) {
+      logger.warn('Cache read failed for permission context, falling back to database query', {
+        key,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
       // Cache error shouldn't break permission resolution
       return null;
     }
@@ -191,11 +199,21 @@ export class WorkspaceAuthorizationService {
     userId: string,
     workspaceId: string
   ): Promise<WorkspaceMember | null> {
-    // Check cache first
+    // Check cache first with error handling
     const cacheKey = `workspace_member:${workspaceId}:${userId}`;
-    const cached = await this.cacheService.get(cacheKey);
-    if (cached) {
-      return cached as unknown as WorkspaceMember;
+    try {
+      const cached = await this.cacheService.get(cacheKey);
+      if (cached) {
+        return cached as unknown as WorkspaceMember;
+      }
+    } catch (error) {
+      logger.warn('Cache read failed for workspace member, proceeding with database query', {
+        cacheKey,
+        userId,
+        workspaceId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      // Continue to database query on cache failure
     }
 
     try {
@@ -502,14 +520,63 @@ export class WorkspaceAuthorizationService {
    * Check if member has specific permission
    */
   private hasPermission(member: WorkspaceMember, permission: string): boolean {
-    // Check role-based permissions
+    // Check role-based permissions first
     const rolePermissions = this.getRolePermissions(member.role);
     if (rolePermissions.includes(permission)) {
       return true;
     }
 
-    // Check additional permissions
-    return member.permissions.includes(permission);
+    // For custom permissions, validate against security restrictions
+    if (member.permissions.includes(permission)) {
+      return this.isCustomPermissionValid(permission, member.role);
+    }
+
+    return false;
+  }
+
+  /**
+   * Validate custom permissions against security restrictions
+   * Prevents privilege escalation through malicious permission injection
+   */
+  private isCustomPermissionValid(permission: string, role: WorkspaceRole): boolean {
+    // Block dangerous system-level permissions regardless of role (except owner)
+    const dangerousPermissions = [
+      'workspace:delete',
+      'workspace:transfer_ownership', 
+      'system:admin_override',
+      'system:root_access',
+      'billing:access_all',
+      'user:impersonate',
+      'workspace:billing_override'
+    ];
+
+    if (dangerousPermissions.includes(permission) && role !== 'owner') {
+      logger.warn('Attempted access to restricted permission blocked', {
+        permission,
+        role,
+        context: 'custom_permission_validation'
+      });
+      return false;
+    }
+
+    // Block admin-level permissions for non-admin/non-owner roles
+    const adminOnlyPermissions = [
+      'workspace:manage_members',
+      'workspace:invite',
+      'workspace:update'
+    ];
+
+    if (adminOnlyPermissions.includes(permission) && !['admin', 'owner'].includes(role)) {
+      logger.warn('Attempted access to admin permission by non-admin user blocked', {
+        permission,
+        role,
+        context: 'role_boundary_validation'
+      });
+      return false;
+    }
+
+    // Allow other custom permissions (legitimate extensions)
+    return true;
   }
 
   /**
@@ -521,8 +588,8 @@ export class WorkspaceAuthorizationService {
         return [...WorkspacePermissions.OWNER];
       case 'admin':
         return [...WorkspacePermissions.ADMIN];
-      case 'member': // Database stores 'member' role but maps to EDITOR permissions for backward compatibility
-        return [...WorkspacePermissions.EDITOR];
+      case 'member': // Database stores 'member' role, maps to MEMBER permissions
+        return [...WorkspacePermissions.MEMBER];
       case 'viewer':
         return [...WorkspacePermissions.VIEWER];
       default:
