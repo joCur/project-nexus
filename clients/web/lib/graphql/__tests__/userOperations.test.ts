@@ -5,11 +5,17 @@
 
 import { gql } from '@apollo/client';
 import {
-  GET_USER_PERMISSIONS,
+  GET_USER_WORKSPACE_PERMISSIONS,
+  CHECK_USER_PERMISSION,
+  GET_USER_PERMISSIONS_FOR_CONTEXT,
   GET_CURRENT_USER,
   SYNC_USER,
-  GetUserPermissionsVariables,
-  GetUserPermissionsData,
+  GetUserWorkspacePermissionsVariables,
+  GetUserWorkspacePermissionsData,
+  CheckUserPermissionVariables,
+  CheckUserPermissionData,
+  GetUserPermissionsForContextVariables,
+  GetUserPermissionsForContextData,
   GetCurrentUserData,
   SyncUserVariables,
   SyncUserData,
@@ -17,15 +23,38 @@ import {
 
 describe('GraphQL User Operations', () => {
   describe('Query Structure Validation', () => {
-    it('should have correct GET_USER_PERMISSIONS query structure', () => {
-      expect(GET_USER_PERMISSIONS).toBeDefined();
-      expect(GET_USER_PERMISSIONS.kind).toBe('Document');
+    it('should have correct GET_USER_WORKSPACE_PERMISSIONS query structure', () => {
+      expect(GET_USER_WORKSPACE_PERMISSIONS).toBeDefined();
+      expect(GET_USER_WORKSPACE_PERMISSIONS.kind).toBe('Document');
       
       // Verify the query contains the expected fields
-      const queryString = GET_USER_PERMISSIONS.loc?.source.body;
-      expect(queryString).toContain('query GetUserPermissions');
+      const queryString = GET_USER_WORKSPACE_PERMISSIONS.loc?.source.body;
+      expect(queryString).toContain('query GetUserWorkspacePermissions');
       expect(queryString).toContain('$userId: ID!');
-      expect(queryString).toContain('getUserPermissions(userId: $userId)');
+      expect(queryString).toContain('$workspaceId: ID!');
+      expect(queryString).toContain('getUserWorkspacePermissions(userId: $userId, workspaceId: $workspaceId)');
+    });
+
+    it('should have correct CHECK_USER_PERMISSION query structure', () => {
+      expect(CHECK_USER_PERMISSION).toBeDefined();
+      expect(CHECK_USER_PERMISSION.kind).toBe('Document');
+      
+      const queryString = CHECK_USER_PERMISSION.loc?.source.body;
+      expect(queryString).toContain('query CheckUserPermission');
+      expect(queryString).toContain('$userId: ID!');
+      expect(queryString).toContain('$workspaceId: ID!');
+      expect(queryString).toContain('$permission: String!');
+      expect(queryString).toContain('checkUserPermission(userId: $userId, workspaceId: $workspaceId, permission: $permission)');
+    });
+
+    it('should have correct GET_USER_PERMISSIONS_FOR_CONTEXT query structure', () => {
+      expect(GET_USER_PERMISSIONS_FOR_CONTEXT).toBeDefined();
+      expect(GET_USER_PERMISSIONS_FOR_CONTEXT.kind).toBe('Document');
+      
+      const queryString = GET_USER_PERMISSIONS_FOR_CONTEXT.loc?.source.body;
+      expect(queryString).toContain('query GetUserPermissionsForContext');
+      expect(queryString).toContain('$userId: ID!');
+      expect(queryString).toContain('getUserPermissionsForContext(userId: $userId)');
     });
 
     it('should have correct GET_CURRENT_USER query structure', () => {
@@ -55,16 +84,17 @@ describe('GraphQL User Operations', () => {
   describe('TypeScript Interface Validation', () => {
     it('should have proper TypeScript interfaces for variables and data', () => {
       // Test variable interfaces
-      const getUserPermissionsVars: GetUserPermissionsVariables = {
-        userId: 'test-user-id'
+      const getUserWorkspacePermissionsVars: GetUserWorkspacePermissionsVariables = {
+        userId: 'test-user-id',
+        workspaceId: 'test-workspace-id'
       };
-      expect(getUserPermissionsVars.userId).toBe('test-user-id');
+      expect(getUserWorkspacePermissionsVars.userId).toBe('test-user-id');
 
       // Test data interfaces
-      const getUserPermissionsData: GetUserPermissionsData = {
-        getUserPermissions: ['workspace:read', 'card:create']
+      const getUserWorkspacePermissionsData: GetUserWorkspacePermissionsData = {
+        getUserWorkspacePermissions: ['workspace:read', 'card:create']
       };
-      expect(getUserPermissionsData.getUserPermissions).toHaveLength(2);
+      expect(getUserWorkspacePermissionsData.getUserWorkspacePermissions).toHaveLength(2);
 
       const getCurrentUserData: GetCurrentUserData = {
         getCurrentUser: {
@@ -95,9 +125,17 @@ describe('GraphQL User Operations', () => {
   });
 
   describe('GraphQL Query Parsing', () => {
-    it('should parse GET_USER_PERMISSIONS without errors', () => {
+    it('should parse permission queries without errors', () => {
       expect(() => {
-        gql`${GET_USER_PERMISSIONS.loc?.source.body}`;
+        gql`${GET_USER_WORKSPACE_PERMISSIONS.loc?.source.body}`;
+      }).not.toThrow();
+      
+      expect(() => {
+        gql`${CHECK_USER_PERMISSION.loc?.source.body}`;
+      }).not.toThrow();
+      
+      expect(() => {
+        gql`${GET_USER_PERMISSIONS_FOR_CONTEXT.loc?.source.body}`;
       }).not.toThrow();
     });
 
@@ -173,25 +211,37 @@ describe('GraphQL User Operations', () => {
       expect(mockErrorResponse.errors[0].extensions.code).toBe('USER_NOT_FOUND');
     });
 
-    it('should be ready for workspace-scoped permission fetching', () => {
+    it('should support workspace-scoped permission fetching', () => {
       // Verify our operations support workspace context
-      const getUserPermissionsVars: GetUserPermissionsVariables = {
-        userId: 'user-123'
+      const getUserWorkspacePermissionsVars: GetUserWorkspacePermissionsVariables = {
+        userId: 'user-123',
+        workspaceId: 'workspace-123'
       };
 
-      // Future: workspaceId parameter should be added
-      // const workspaceScopedVars = { ...getUserPermissionsVars, workspaceId: 'workspace-123' };
+      const checkPermissionVars: CheckUserPermissionVariables = {
+        userId: 'user-123',
+        workspaceId: 'workspace-123',
+        permission: 'canvas:create'
+      };
       
-      expect(getUserPermissionsVars.userId).toBeDefined();
+      expect(getUserWorkspacePermissionsVars.userId).toBeDefined();
+      expect(getUserWorkspacePermissionsVars.workspaceId).toBeDefined();
+      expect(checkPermissionVars.permission).toBeDefined();
     });
   });
 
   describe('Security Validation', () => {
     it('should require authentication for user operations', () => {
       // All our queries should be designed to work with authenticated users only
-      const operations = [GET_USER_PERMISSIONS, GET_CURRENT_USER, SYNC_USER];
+      const operations = [
+        GET_USER_WORKSPACE_PERMISSIONS, 
+        CHECK_USER_PERMISSION, 
+        GET_USER_PERMISSIONS_FOR_CONTEXT,
+        GET_CURRENT_USER, 
+        SYNC_USER
+      ];
       
-      operations.forEach(operation => {
+      operations.forEach((operation) => {
         const operationString = operation.loc?.source.body;
         // These operations should be used with authenticated contexts
         expect(operationString).toBeDefined();
@@ -201,12 +251,12 @@ describe('GraphQL User Operations', () => {
 
     it('should handle permission data securely', () => {
       // Verify that permission data structures don't expose sensitive information
-      const mockPermissionData: GetUserPermissionsData = {
-        getUserPermissions: ['workspace:read', 'card:create', 'connection:update']
+      const mockPermissionData: GetUserWorkspacePermissionsData = {
+        getUserWorkspacePermissions: ['workspace:read', 'card:create', 'connection:update']
       };
 
       // Permissions should be strings, not objects with sensitive data
-      mockPermissionData.getUserPermissions.forEach(permission => {
+      mockPermissionData.getUserWorkspacePermissions.forEach((permission: string) => {
         expect(typeof permission).toBe('string');
         expect(permission).toMatch(/^[a-z]+:[a-z_]+$/); // Format: resource:action
       });

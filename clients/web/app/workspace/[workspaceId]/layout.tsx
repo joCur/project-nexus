@@ -9,12 +9,14 @@ interface WorkspaceLayoutProps {
 
 /**
  * Layout for workspace routes
- * Provides authentication and workspace context
+ * 
+ * Provides authentication and workspace permission context.
+ * Uses the backend permission format (resource:action) for workspace access.
  */
 export default function WorkspaceLayoutComponent({ children }: WorkspaceLayoutProps) {
   return (
     <ProtectedRoute
-      requiredPermissions={['read:workspaces']}
+      requiredPermissions={['workspace:read']}
       redirectTo="/workspace"
     >
       <WorkspaceLayout>

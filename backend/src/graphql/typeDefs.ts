@@ -360,6 +360,11 @@ export const authTypeDefs = gql`
     isOnboardingComplete(userId: ID!): Boolean!
     myOnboardingStatus: OnboardingStatus!
     
+    # Permission queries
+    getUserWorkspacePermissions(userId: ID!, workspaceId: ID!): [String!]!
+    checkUserPermission(userId: ID!, workspaceId: ID!, permission: String!): Boolean!
+    getUserPermissionsForContext(userId: ID!): JSON!
+    
     # Workspace queries
     workspace(id: ID!): Workspace
     workspaces(ownerId: ID!): [Workspace!]!

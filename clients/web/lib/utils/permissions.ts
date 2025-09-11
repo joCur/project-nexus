@@ -1,50 +1,118 @@
 /**
  * Shared permission checking utilities for the frontend
  * 
- * This module provides centralized permission checking logic that warns about
- * the need for backend integration since permissions are no longer stored
- * in Auth0 JWT tokens.
+ * This module provides centralized permission checking logic integrated with
+ * the backend WorkspaceAuthorizationService via GraphQL queries.
  * 
- * @see NEX-183 - Remove Auth0 permission extraction from frontend
+ * @see NEX-186 - Frontend permission integration with backend GraphQL queries
  */
 
 import { ExtendedUserProfile } from '@/types/auth';
-import { logBackendIntegrationWarning, logPermissionCheck, permissionLogger } from './permissionLogger';
+import { permissionLogger } from './permissionLogger';
 
 /**
- * Standard warning message for permission checking
+ * Permission checking context interface
+ * Used to provide workspace context to permission utilities
  */
-const PERMISSION_WARNING_MESSAGE = 'Permission checking now requires backend integration';
+interface PermissionContext {
+  workspaceId?: string;
+  permissions?: string[];
+  permissionsByWorkspace?: { [workspaceId: string]: string[] };
+}
+
+// Global permission context - can be set by workspace providers
+let globalPermissionContext: PermissionContext = {};
+
+/**
+ * Set the global permission context
+ * This allows legacy permission checking functions to work with workspace-scoped permissions
+ */
+export function setPermissionContext(context: PermissionContext): void {
+  globalPermissionContext = context;
+}
+
+/**
+ * Get the current permission context
+ */
+export function getPermissionContext(): PermissionContext {
+  return globalPermissionContext;
+}
+
+/**
+ * Clear the global permission context
+ */
+export function clearPermissionContext(): void {
+  globalPermissionContext = {};
+}
 
 /**
  * Check if a user has a specific permission
  * 
- * @param user - The authenticated user profile
- * @param permission - The permission string to check
- * @returns Always false until backend integration is implemented
+ * This function now integrates with the backend permission system.
+ * It uses the global permission context to determine workspace scope.
+ * For new code, prefer using the usePermissions hook directly.
  * 
- * @deprecated This function will be updated to fetch permissions from backend
+ * @param user - The authenticated user profile  
+ * @param permission - The permission string to check
+ * @param workspaceId - Optional workspace ID (overrides global context)
+ * @returns True if user has the permission, false otherwise
  */
-export function checkUserPermission(user: ExtendedUserProfile | null, permission: string): boolean {
+export function checkUserPermission(
+  user: ExtendedUserProfile | null, 
+  permission: string,
+  workspaceId?: string
+): boolean {
   const startTime = performance.now();
-  const result = false; // Always false until backend integration
   
-  // Use dedicated permission logger
-  logBackendIntegrationWarning(permission, user?.sub);
-  logPermissionCheck(permission, result, user?.sub);
+  if (!user?.sub || !permission) {
+    return false;
+  }
+
+  const context = globalPermissionContext;
+  const targetWorkspaceId = workspaceId || context.workspaceId;
   
+  let result = false;
+
+  try {
+    if (targetWorkspaceId && context.permissionsByWorkspace) {
+      // Check workspace-specific permissions from context
+      const workspacePermissions = context.permissionsByWorkspace[targetWorkspaceId];
+      result = Array.isArray(workspacePermissions) && workspacePermissions.includes(permission);
+    } else if (context.permissions) {
+      // Fall back to general permissions array
+      result = context.permissions.includes(permission);
+    } else {
+      // No permission context available - secure by default
+      result = false;
+      
+      if (process.env.NODE_ENV !== 'test') {
+        console.warn(
+          'Permission check without context. Use usePermissions hook or setPermissionContext.',
+          { permission, userId: user.sub, workspaceId: targetWorkspaceId }
+        );
+      }
+    }
+
+    // Log the permission check
+    permissionLogger.logPermissionCheck(permission, result, user.sub, targetWorkspaceId);
+    
+  } catch (error) {
+    // Secure by default on error
+    result = false;
+    permissionLogger.logError('Permission check failed', {
+      permission,
+      userId: user.sub,
+      workspaceId: targetWorkspaceId
+    });
+  }
+
   // Log performance metrics
   const duration = performance.now() - startTime;
-  permissionLogger.logPerformanceMetric('checkUserPermission', duration, user?.sub, undefined, {
+  permissionLogger.logPerformanceMetric('checkUserPermission', duration, user.sub, targetWorkspaceId, {
     permission,
     result,
   });
-  
-  // TODO: Implement backend permission fetching logic
-  // This could involve:
-  // 1. Storing permissions in React state/context after fetching from backend
-  // 2. Using a GraphQL query to get user permissions
-  // 3. Caching permissions for performance
+
   return result;
 }
 
@@ -53,17 +121,20 @@ export function checkUserPermission(user: ExtendedUserProfile | null, permission
  * 
  * @param user - The authenticated user profile
  * @param permissions - Array of permission strings to check
- * @returns Always false until backend integration is implemented
- * 
- * @deprecated This function will be updated to fetch permissions from backend
+ * @param workspaceId - Optional workspace ID (overrides global context)
+ * @returns True if user has any of the permissions, false otherwise
  */
-export function checkAnyUserPermission(user: ExtendedUserProfile | null, permissions: string[]): boolean {
-  if (process.env.NODE_ENV !== 'test') {
-    console.warn(`${PERMISSION_WARNING_MESSAGE}. Checking permissions:`, permissions);
+export function checkAnyUserPermission(
+  user: ExtendedUserProfile | null, 
+  permissions: string[],
+  workspaceId?: string
+): boolean {
+  if (!user?.sub || !permissions.length) {
+    return false;
   }
-  
-  // TODO: Implement backend permission checking for multiple permissions
-  return false;
+
+  // Use the more efficient approach - check each permission individually
+  return permissions.some(permission => checkUserPermission(user, permission, workspaceId));
 }
 
 /**
@@ -71,17 +142,20 @@ export function checkAnyUserPermission(user: ExtendedUserProfile | null, permiss
  * 
  * @param user - The authenticated user profile
  * @param permissions - Array of permission strings to check
- * @returns Always false until backend integration is implemented
- * 
- * @deprecated This function will be updated to fetch permissions from backend
+ * @param workspaceId - Optional workspace ID (overrides global context)
+ * @returns True if user has all of the permissions, false otherwise
  */
-export function checkAllUserPermissions(user: ExtendedUserProfile | null, permissions: string[]): boolean {
-  if (process.env.NODE_ENV !== 'test') {
-    console.warn(`${PERMISSION_WARNING_MESSAGE}. Checking all permissions:`, permissions);
+export function checkAllUserPermissions(
+  user: ExtendedUserProfile | null, 
+  permissions: string[],
+  workspaceId?: string
+): boolean {
+  if (!user?.sub || !permissions.length) {
+    return false;
   }
-  
-  // TODO: Implement backend permission checking for all permissions
-  return false;
+
+  // All permissions must be present
+  return permissions.every(permission => checkUserPermission(user, permission, workspaceId));
 }
 
 /**
@@ -132,65 +206,54 @@ export function checkAllUserRoles(user: ExtendedUserProfile | null, roles: strin
 }
 
 /**
- * Permission cache interface for backend integration
- * 
- * Caching Strategy:
- * 1. Cache permissions per user per workspace
- * 2. Use TTL-based invalidation (5 minutes)
- * 3. Implement LRU eviction for memory management
- * 4. Support cache warming and preloading
- * 
- * Integration with Apollo Client:
- * - Use Apollo's normalized cache for GraphQL query results
- * - Implement custom cache policies for getUserPermissions
- * - Handle cache invalidation on user/workspace changes
- * 
- * Example implementation:
- * ```typescript
- * const apolloClient = new ApolloClient({
- *   cache: new InMemoryCache({
- *     typePolicies: {
- *       Query: {
- *         fields: {
- *           getUserPermissions: {
- *             keyArgs: ['userId', 'workspaceId'],
- *             merge: false, // Replace data completely
- *           }
- *         }
- *       }
- *     }
- *   })
- * });
- * ```
+ * Backend integration status and utilities
  */
-interface PermissionCacheEntry {
-  permissions: string[];
-  timestamp: number;
-  workspaceId: string;
-  userId: string;
-}
-
-interface PermissionCache {
-  [key: string]: PermissionCacheEntry; // key format: `${userId}:${workspaceId}`
-}
-
-// TODO: Implement permission caching system with Apollo Client integration
-// const permissionCache: PermissionCache = {};
 
 /**
  * Check if backend integration is ready for permission checking
  * 
  * @returns true if backend permission system is enabled
+ * @deprecated Backend integration is now complete. This always returns true.
  */
 export function isBackendIntegrationReady(): boolean {
-  return process.env.NEXT_PUBLIC_BACKEND_PERMISSIONS_ENABLED === 'true';
+  // Backend integration is now complete as of NEX-186
+  return true;
 }
 
 /**
  * Constants for permission checking
  */
 export const PERMISSION_CHECK_CONFIG = {
-  WARNING_MESSAGE: PERMISSION_WARNING_MESSAGE,
   CACHE_TTL_MS: 5 * 60 * 1000, // 5 minutes
   SUPPRESS_WARNINGS_IN_TEST: true,
+  PERFORMANCE_TARGET_CACHED_MS: 100,
+  PERFORMANCE_TARGET_UNCACHED_MS: 500,
 } as const;
+
+/**
+ * Helper functions for workspace permission integration
+ */
+
+/**
+ * Create a workspace-aware permission checker function
+ * Useful for components that need to check multiple permissions in a specific workspace
+ */
+export function createWorkspacePermissionChecker(
+  user: ExtendedUserProfile | null,
+  workspaceId: string
+) {
+  return {
+    hasPermission: (permission: string) => checkUserPermission(user, permission, workspaceId),
+    hasAnyPermission: (permissions: string[]) => checkAnyUserPermission(user, permissions, workspaceId),
+    hasAllPermissions: (permissions: string[]) => checkAllUserPermissions(user, permissions, workspaceId),
+  };
+}
+
+/**
+ * Utility to validate permission string format
+ * Permissions should follow the format: resource:action (e.g., 'canvas:create')
+ */
+export function isValidPermissionFormat(permission: string): boolean {
+  if (typeof permission !== 'string') return false;
+  return /^[a-z]+:[a-z_]+$/.test(permission);
+}
