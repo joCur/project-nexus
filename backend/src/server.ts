@@ -11,6 +11,7 @@ import { makeExecutableSchema } from '@graphql-tools/schema';
 import { env, db as _db, redis as _redis } from '@/config/environment';
 import logger from '@/utils/logger';
 import { setupProcessErrorHandlers } from '@/middleware/error';
+import knex from 'knex';
 
 // GraphQL
 import { typeDefs } from '@/graphql/typeDefs';
@@ -126,6 +127,9 @@ class NexusBackendServer {
       }
       logger.info('Database connection verified');
 
+      // Run database migrations automatically
+      await this.runMigrations();
+
       // Test Auth0 connectivity
       const auth0Health = await this.auth0Service.healthCheck();
       if (auth0Health.status === 'ERROR') {
@@ -137,6 +141,36 @@ class NexusBackendServer {
     } catch (error) {
       logger.error('Service connection failed', {
         error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Run database migrations automatically on startup
+   */
+  private async runMigrations(): Promise<void> {
+    logger.info('Running database migrations...');
+    
+    try {
+      const db = knex(_db);
+      const [currentBatch, migrations] = await db.migrate.latest();
+      
+      if (migrations.length === 0) {
+        logger.info('Database is up to date - no migrations needed');
+      } else {
+        logger.info('Database migrations completed', {
+          batch: currentBatch,
+          migrationsRun: migrations.length,
+          migrations: migrations
+        });
+      }
+      
+      await db.destroy();
+    } catch (error) {
+      logger.error('Database migration failed', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
       });
       throw error;
     }
