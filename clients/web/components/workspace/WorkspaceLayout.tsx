@@ -3,7 +3,6 @@
 import React from 'react';
 import { WorkspaceHeader } from './WorkspaceHeader';
 import { WorkspaceBreadcrumbs } from './WorkspaceBreadcrumbs';
-
 interface WorkspaceLayoutProps {
   children: React.ReactNode;
 }
@@ -20,6 +19,8 @@ interface WorkspaceLayoutProps {
  * - Responsive design with proper spacing
  * - Accessible structure with proper heading hierarchy
  * - Consistent styling across all workspace views
+ * 
+ * Note: WorkspacePermissionProvider should be provided by parent component
  */
 export const WorkspaceLayout: React.FC<WorkspaceLayoutProps> = ({ children }) => {
   return (

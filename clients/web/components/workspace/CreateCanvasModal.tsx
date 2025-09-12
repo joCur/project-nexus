@@ -233,7 +233,6 @@ export const CreateCanvasModal: React.FC<CreateCanvasModalProps> = ({
                 state={errors.name ? 'error' : 'default'}
                 disabled={isCreating}
                 aria-describedby={errors.name ? 'canvas-name-error' : 'canvas-name-description'}
-                autoFocus
               />
               <div id="canvas-name-description" className="mt-1 text-sm text-gray-500">
                 Give your canvas a descriptive name (up to 100 characters)

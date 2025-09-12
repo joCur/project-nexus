@@ -30,7 +30,14 @@ const createAuthMock = (overrides: Partial<ReturnType<typeof useAuth>> = {}): Re
   login: jest.fn(),
   logout: jest.fn(),
   checkPermission: jest.fn(),
+  hasAnyPermission: jest.fn(),
+  hasAllPermissions: jest.fn(),
   hasRole: jest.fn(),
+  createPermissionChecker: jest.fn().mockReturnValue({
+    hasPermission: jest.fn(),
+    hasAnyPermission: jest.fn(),
+    hasAllPermissions: jest.fn(),
+  }),
   refreshUser: jest.fn(),
   ...overrides,
 });

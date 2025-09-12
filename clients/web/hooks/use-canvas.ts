@@ -351,6 +351,7 @@ export const useDeleteCanvas = (): UseCanvasMutationReturn => {
  */
 export const useSetDefaultCanvas = (): UseCanvasMutationReturn => {
   const workspaceStore = useWorkspaceStore();
+  const apolloClient = useApolloClient();
   const [setDefaultCanvasMutation, { loading, error, reset }] = useMutation(SET_DEFAULT_CANVAS);
 
   const mutate = useCallback(async (workspaceId: EntityId, canvasId: CanvasId): Promise<boolean> => {
@@ -360,12 +361,58 @@ export const useSetDefaultCanvas = (): UseCanvasMutationReturn => {
 
       // Server mutation
       const { data } = await setDefaultCanvasMutation({ 
-        variables: { workspaceId, canvasId } 
+        variables: { id: canvasId },
+        update: (cache, { data }) => {
+          if (data?.setDefaultCanvas) {
+            // Update the Apollo cache to handle multiple canvases being default
+            const cacheData = cache.readQuery<{ workspaceCanvases: CanvasesConnectionResponse }>({
+              query: GET_WORKSPACE_CANVASES,
+              variables: { workspaceId },
+            });
+
+            if (cacheData?.workspaceCanvases?.items) {
+              // Update all canvases: set new default to true, others to false
+              const updatedItems = cacheData.workspaceCanvases.items.map(canvas => {
+                if (canvas.id === canvasId) {
+                  // This is the new default canvas
+                  return { ...canvas, isDefault: true };
+                } else if (canvas.isDefault) {
+                  // This was previously default, set to false
+                  return { ...canvas, isDefault: false };
+                }
+                return canvas;
+              });
+
+              // Write the updated data back to cache
+              cache.writeQuery({
+                query: GET_WORKSPACE_CANVASES,
+                variables: { workspaceId },
+                data: {
+                  workspaceCanvases: {
+                    ...cacheData.workspaceCanvases,
+                    items: updatedItems,
+                  },
+                },
+              });
+            }
+          }
+        }
       });
 
       if (data?.setDefaultCanvas) {
         const updatedCanvas = transformBackendCanvasToFrontend(data.setDefaultCanvas);
-        workspaceStore.canvasManagement.canvases.set(updatedCanvas.id, updatedCanvas);
+        
+        // Update workspace store - set new default and clear old ones
+        workspaceStore.canvasManagement.canvases.forEach((canvas, id) => {
+          if (id === canvasId) {
+            // Set this as the new default
+            workspaceStore.canvasManagement.canvases.set(id, { ...canvas, settings: { ...canvas.settings, isDefault: true } });
+          } else if (canvas.settings.isDefault) {
+            // Remove default from other canvases
+            workspaceStore.canvasManagement.canvases.set(id, { ...canvas, settings: { ...canvas.settings, isDefault: false } });
+          }
+        });
+        
         return true;
       }
 
@@ -375,7 +422,7 @@ export const useSetDefaultCanvas = (): UseCanvasMutationReturn => {
       // TODO: Revert optimistic update
       return false;
     }
-  }, [workspaceStore, setDefaultCanvasMutation]);
+  }, [workspaceStore, setDefaultCanvasMutation, apolloClient]);
 
   return {
     mutate,

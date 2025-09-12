@@ -1,6 +1,7 @@
 'use client';
 
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { WorkspacePermissionProvider } from '../../contexts/WorkspacePermissionContext';
 import { useOnboardingStatus } from '@/hooks/use-onboarding-status';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
 import { useRouter } from 'next/navigation';
@@ -122,11 +123,10 @@ function WorkspaceContent() {
 
 export default function WorkspacePage() {
   return (
-    <ProtectedRoute
-      requiredPermissions={['read:workspaces']}
-      redirectTo="/workspace"
-    >
-      <WorkspaceContent />
+    <ProtectedRoute>
+      <WorkspacePermissionProvider>
+        <WorkspaceContent />
+      </WorkspacePermissionProvider>
     </ProtectedRoute>
   );
 }

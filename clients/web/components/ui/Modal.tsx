@@ -155,27 +155,43 @@ export const Modal: React.FC<ModalProps> = ({
     [closeOnOverlayClick, onClose]
   );
 
+  // Track if this is the initial opening to prevent refocusing on re-renders
+  const hasInitializedRef = useRef(false);
+
   // Effects for modal behavior
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      hasInitializedRef.current = false;
+      return;
+    }
 
     // Prevent body scroll
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
-    // Save current focus
-    focusRestorerRef.current.save();
+    // Only do initial setup once when modal opens
+    if (!hasInitializedRef.current) {
+      hasInitializedRef.current = true;
+      
+      // Save current focus
+      focusRestorerRef.current.save();
 
-    // Focus initial element or specific element first
-    const focusTarget = initialFocus?.current;
-    if (focusTarget) {
-      focusTarget.focus();
+      // Focus initial element or specific element first
+      const focusTarget = initialFocus?.current;
+      if (focusTarget) {
+        // Use setTimeout to ensure the element is rendered and focusable
+        setTimeout(() => {
+          if (focusTarget && isOpen) {
+            focusTarget.focus();
+          }
+        }, 0);
+      }
     }
 
-    // Set up focus trapping (skip initial focus if we already focused something)
+    // Set up focus trapping
     let cleanupFocusTrap: (() => void) | undefined;
     if (modalRef.current) {
-      cleanupFocusTrap = trapFocus(modalRef.current, !!focusTarget);
+      cleanupFocusTrap = trapFocus(modalRef.current, false); // Don't auto-focus in trap
     }
 
     // Add escape key listener
@@ -193,10 +209,12 @@ export const Modal: React.FC<ModalProps> = ({
         cleanupFocusTrap();
       }
       
-      // Restore focus
-      focusRestorerRef.current.restore();
+      // Restore focus only when modal is closing
+      if (!isOpen) {
+        focusRestorerRef.current.restore();
+      }
     };
-  }, [isOpen, handleEscape, initialFocus]);
+  }, [isOpen, handleEscape]);
 
   // Don't render if not open
   if (!isOpen) return null;

@@ -7,10 +7,13 @@ import { render, screen } from '@testing-library/react';
 import { WorkspaceLayout } from '../WorkspaceLayout';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
 import { useAuth } from '@/hooks/use-auth';
+import { useContextPermissions } from '@/hooks/use-permissions';
 
 // Mock dependencies
 jest.mock('@/stores/workspaceStore');
 jest.mock('@/hooks/use-auth');
+jest.mock('@/hooks/use-permissions');
+jest.mock('@/lib/utils/permissions');
 
 // Mock child components
 jest.mock('../WorkspaceHeader', () => ({
@@ -23,6 +26,7 @@ jest.mock('../WorkspaceBreadcrumbs', () => ({
 
 const mockUseWorkspaceStore = useWorkspaceStore as jest.MockedFunction<typeof useWorkspaceStore>;
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
+const mockUseContextPermissions = useContextPermissions as jest.MockedFunction<typeof useContextPermissions>;
 
 describe('WorkspaceLayout', () => {
   beforeEach(() => {
@@ -32,11 +36,28 @@ describe('WorkspaceLayout', () => {
       login: jest.fn(),
       logout: jest.fn(),
       checkPermission: jest.fn().mockReturnValue(true),
+      hasAnyPermission: jest.fn().mockReturnValue(true),
+      hasAllPermissions: jest.fn().mockReturnValue(true),
       hasRole: jest.fn().mockReturnValue(true),
+      createPermissionChecker: jest.fn().mockReturnValue({
+        hasPermission: jest.fn().mockReturnValue(true),
+        hasAnyPermission: jest.fn().mockReturnValue(true),
+        hasAllPermissions: jest.fn().mockReturnValue(true),
+      }),
       refreshUser: jest.fn(),
       announceAuthStatus: jest.fn(),
       isLoading: false,
       isAuthenticated: true,
+    });
+
+    // Mock permission hooks
+    mockUseContextPermissions.mockReturnValue({
+      permissionsByWorkspace: { 'workspace-1': ['workspace:read', 'canvas:create'] },
+      loading: false,
+      error: undefined,
+      refetch: jest.fn().mockResolvedValue({}),
+      getAllPermissions: jest.fn().mockReturnValue(['workspace:read', 'canvas:create']),
+      checkPermissionInWorkspace: jest.fn().mockReturnValue(true),
     });
 
     // Mock workspace store

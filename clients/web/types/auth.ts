@@ -180,8 +180,15 @@ export interface SyncUserInput {
 export interface AuthActions {
   login: (options?: LoginOptions) => Promise<void>;
   logout: (options?: LogoutOptions) => Promise<void>;
-  checkPermission: (permission: string) => boolean;
+  checkPermission: (permission: string, workspaceId?: string) => boolean;
+  hasAnyPermission: (permissions: string[], workspaceId?: string) => boolean;
+  hasAllPermissions: (permissions: string[], workspaceId?: string) => boolean;
   hasRole: (role: string) => boolean;
+  createPermissionChecker: (workspaceId: string) => {
+    hasPermission: (permission: string) => boolean;
+    hasAnyPermission: (permissions: string[]) => boolean;
+    hasAllPermissions: (permissions: string[]) => boolean;
+  };
   refreshUser: () => Promise<void>;
 }
 
