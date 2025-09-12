@@ -4,7 +4,7 @@
 #######################
 # Stage 1: Dependencies
 #######################
-FROM node:18-alpine AS dependencies
+FROM node:22-alpine AS dependencies
 
 # Set working directory
 WORKDIR /app
@@ -23,7 +23,7 @@ RUN if [ -f package-lock.json ]; then npm ci --only=production --silent; else np
 #######################
 # Stage 2: Build
 #######################
-FROM node:18-alpine AS build
+FROM node:22-alpine AS build
 
 WORKDIR /app
 
@@ -61,7 +61,7 @@ RUN npm run build
 #######################
 # Stage 3: Production
 #######################
-FROM node:18-alpine AS production
+FROM node:22-alpine AS production
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
@@ -110,7 +110,7 @@ CMD ["node", "server.js"]
 #######################
 # Stage 4: Development
 #######################
-FROM node:18-alpine AS development
+FROM node:22-alpine AS development
 
 # Set working directory
 WORKDIR /app

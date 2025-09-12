@@ -4,7 +4,7 @@
   "description": "Project Nexus Web Client - Next.js 14 with Auth0 Authentication",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p $WEB_PORT",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -21,6 +21,7 @@
     "@heroicons/react": "^2.0.18",
     "@types/lodash-es": "^4.17.12",
     "clsx": "^2.0.0",
+    "dotenv": "^17.2.2",
     "framer-motion": "^12.23.12",
     "graphql": "^16.8.1",
     "konva": "^9.3.22",
