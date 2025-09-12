@@ -20,17 +20,17 @@ services:
       - DOCKER_ENV=true
       # Database connection to postgres service
       - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=nexus_db
-      - POSTGRES_USER=nexus
-      - POSTGRES_PASSWORD=nexus_secure_2024
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB:-nexus_db}
+      - POSTGRES_USER=${POSTGRES_USER:-nexus}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-nexus_secure_2024}
       # Redis connection to redis service
       - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
       # Server ports
-      - BACKEND_PORT=3000
-      - WEB_PORT=3001
+      - BACKEND_PORT=${BACKEND_PORT:-3000}
+      - WEB_PORT=${WEB_PORT:-3001}
     working_dir: /workspaces/project-nexus
     command: sleep infinity
     depends_on:
@@ -49,17 +49,30 @@ services:
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_DB=nexus_db
-      - POSTGRES_USER=nexus
-      - POSTGRES_PASSWORD=nexus_secure_2024
+      - POSTGRES_DB=${POSTGRES_DB:-nexus_db}
+      - POSTGRES_USER=${POSTGRES_USER:-nexus}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-nexus_secure_2024}
       - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256
       - POSTGRES_HOST_AUTH_METHOD=scram-sha-256
+    command: >
+      postgres
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c work_mem=8MB
+      -c maintenance_work_mem=128MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c statement_timeout=300000
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - nexus-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U nexus -d nexus_db"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-nexus} -d $${POSTGRES_DB:-nexus_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -88,8 +101,12 @@ services:
       redis-server 
       --appendonly yes 
       --appendfsync everysec 
-      --maxmemory 256mb 
+      --maxmemory 512mb 
       --maxmemory-policy allkeys-lru
+      --timeout 300
+      --tcp-keepalive 300
+      --tcp-backlog 511
+      --maxclients 1000
 
   #######################
   # Adminer (Database Admin) - Auto-login for development
@@ -103,6 +120,9 @@ services:
     environment:
       - ADMINER_DEFAULT_SERVER=postgres
       - ADMINER_DESIGN=hydra
+      - ADMINER_DEFAULT_USER=${POSTGRES_USER:-nexus}
+      - ADMINER_DEFAULT_PASSWORD=${POSTGRES_PASSWORD:-nexus_secure_2024}
+      - ADMINER_DEFAULT_DB=${POSTGRES_DB:-nexus_db}
     volumes:
       # Auto-login script for development  
       - ./adminer-auto.php:/var/www/html/index.php:ro
@@ -122,8 +142,8 @@ services:
       - "8081:8081"
     environment:
       - REDIS_HOSTS=local:redis:6379
-      - HTTP_USER=admin
-      - HTTP_PASSWORD=admin123
+      - HTTP_USER=${REDIS_COMMANDER_USER:-admin}
+      - HTTP_PASSWORD=${REDIS_COMMANDER_PASSWORD:-admin123}
     networks:
       - nexus-network
     depends_on:
