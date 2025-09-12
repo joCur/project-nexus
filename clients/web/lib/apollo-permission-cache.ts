@@ -238,42 +238,28 @@ export class PermissionCacheManager {
    */
   private performAggressiveCleanup(): void {
     try {
-      // Clear all permission-related cache entries
       const cache = apolloClient.cache;
       
-      // Get cache data and identify permission entries to clear
-      const cacheData = cache.extract();
-      const permissionKeys = Object.keys(cacheData).filter(key =>
-        key.startsWith('ROOT_QUERY.getUserWorkspacePermissions') ||
-        key.startsWith('ROOT_QUERY.checkUserPermission') ||
-        key.startsWith('ROOT_QUERY.getUserPermissionsForContext')
-      );
-
-      // Sort by last access time if available, clear oldest entries first
-      permissionKeys.sort((a, b) => {
-        const entryA = cacheData[a];
-        const entryB = cacheData[b];
-        const timestampA = (entryA && typeof entryA === 'object' && '__cacheTimestamp' in entryA) ? entryA.__cacheTimestamp as number : 0;
-        const timestampB = (entryB && typeof entryB === 'object' && '__cacheTimestamp' in entryB) ? entryB.__cacheTimestamp as number : 0;
-        return timestampA - timestampB; // Oldest first
+      // Use Apollo Client's built-in eviction for permission-related queries
+      cache.evict({
+        id: 'ROOT_QUERY',
+        fieldName: 'getUserWorkspacePermissions'
       });
-
-      // Clear 50% of permission cache entries
-      const entriesToClear = permissionKeys.slice(0, Math.floor(permissionKeys.length / 2));
       
-      entriesToClear.forEach(key => {
-        const fieldName = key.split('.')[1];
-        const args = permissionCacheUtils.parseArgsFromCacheKey(key);
-        
-        cache.evict({
-          id: 'ROOT_QUERY',
-          fieldName,
-          args,
-        });
+      cache.evict({
+        id: 'ROOT_QUERY', 
+        fieldName: 'checkUserPermission'
+      });
+      
+      cache.evict({
+        id: 'ROOT_QUERY',
+        fieldName: 'getUserPermissionsForContext'
       });
 
+      // Run garbage collection to free memory
       cache.gc();
-      console.log(`Aggressive cleanup completed: cleared ${entriesToClear.length} permission cache entries`);
+      
+      console.log('Aggressive cleanup completed: evicted all permission cache entries');
     } catch (error) {
       console.warn('Aggressive cache cleanup failed:', error);
     }

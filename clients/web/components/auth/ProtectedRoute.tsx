@@ -6,7 +6,7 @@ import { ExtendedUserProfile, Permissions, Roles } from '@/types/auth';
 import { ReactNode, useEffect, useMemo } from 'react';
 import { Card, CardContent, Button } from '@/components/ui';
 import { announceToScreenReader } from '@/lib/utils';
-import { useWorkspacePermissionContext } from '../../contexts/WorkspacePermissionContext';
+import { useWorkspacePermissionContextSafe } from '../../contexts/WorkspacePermissionContext';
 
 /**
  * Props for ProtectedRoute component
@@ -294,15 +294,8 @@ function ProtectedRouteInternal({
 }: ProtectedRouteProps) {
   const { user, isLoading, error, checkPermission, hasRole } = useAuth();
   
-  // Try to get workspace permission context (may not be available in all routes)
-  let permissionContext = null;
-  try {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    permissionContext = useWorkspacePermissionContext();
-  } catch {
-    // Context not available - this is fine for routes outside workspace layouts
-    permissionContext = null;
-  }
+  // Get workspace permission context - this may be null if context is not available
+  const permissionContext = useWorkspacePermissionContextSafe();
 
   // Show loading state for auth or permissions
   const isPermissionLoading = permissionContext?.loading || false;

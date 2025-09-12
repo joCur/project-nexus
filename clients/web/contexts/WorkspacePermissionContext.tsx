@@ -137,6 +137,14 @@ export const useWorkspacePermissionContext = (): WorkspacePermissionContextValue
 };
 
 /**
+ * Safe version of useWorkspacePermissionContext that returns null when provider is not available
+ * Use this in components that may or may not be within a WorkspacePermissionProvider
+ */
+export const useWorkspacePermissionContextSafe = (): WorkspacePermissionContextValue | null => {
+  return useContext(WorkspacePermissionContext);
+};
+
+/**
  * Hook for workspace-specific permission checking
  * 
  * Provides convenient permission checking utilities that automatically
