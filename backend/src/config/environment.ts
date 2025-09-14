@@ -98,11 +98,11 @@ export const databaseConfig = {
   },
   acquireConnectionTimeout: config.DB_TIMEOUT,
   migrations: {
-    directory: './migrations',
+    directory: './src/database/migrations',
     tableName: 'knex_migrations',
   },
   seeds: {
-    directory: './seeds',
+    directory: './src/database/seeds',
   },
 };
 

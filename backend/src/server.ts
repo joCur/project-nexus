@@ -11,6 +11,7 @@ import { makeExecutableSchema } from '@graphql-tools/schema';
 import { env, db as _db, redis as _redis } from '@/config/environment';
 import logger from '@/utils/logger';
 import { setupProcessErrorHandlers } from '@/middleware/error';
+import knex from 'knex';
 
 // GraphQL
 import { typeDefs } from '@/graphql/typeDefs';
@@ -126,6 +127,9 @@ class NexusBackendServer {
       }
       logger.info('Database connection verified');
 
+      // Run database migrations automatically
+      await this.runMigrations();
+
       // Test Auth0 connectivity
       const auth0Health = await this.auth0Service.healthCheck();
       if (auth0Health.status === 'ERROR') {
@@ -139,6 +143,90 @@ class NexusBackendServer {
         error: error instanceof Error ? error.message : 'Unknown error',
       });
       throw error;
+    }
+  }
+
+  /**
+   * Run database migrations automatically on startup with enhanced error handling
+   */
+  private async runMigrations(): Promise<void> {
+    logger.info('Running database migrations...');
+    
+    let db: any = null;
+    const maxRetries = 3;
+    let attempt = 1;
+    
+    while (attempt <= maxRetries) {
+      try {
+        db = knex(_db);
+        
+        // Test database connection first
+        await db.raw('SELECT 1');
+        logger.info('Database connection verified for migrations');
+        
+        // Check migration status before running
+        const currentVersion = await db.migrate.currentVersion();
+        logger.info('Current migration version', { version: currentVersion });
+        
+        // Run migrations
+        const [currentBatch, migrations] = await db.migrate.latest();
+        
+        if (migrations.length === 0) {
+          logger.info('Database is up to date - no migrations needed', { 
+            currentVersion,
+            currentBatch 
+          });
+        } else {
+          logger.info('Database migrations completed successfully', {
+            currentVersion,
+            batch: currentBatch,
+            migrationsRun: migrations.length,
+            migrations: migrations,
+            attempt
+          });
+        }
+        
+        await db.destroy();
+        return; // Success, exit retry loop
+        
+      } catch (error) {
+        if (db) {
+          try {
+            await db.destroy();
+          } catch (closeError) {
+            logger.warn('Failed to close database connection after migration error', {
+              closeError: closeError instanceof Error ? closeError.message : 'Unknown error'
+            });
+          }
+        }
+        
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const isLastAttempt = attempt === maxRetries;
+        
+        logger.error(`Database migration failed (attempt ${attempt}/${maxRetries})`, {
+          error: errorMessage,
+          stack: error instanceof Error ? error.stack : undefined,
+          attempt,
+          maxRetries,
+          isLastAttempt,
+          databaseConfig: {
+            host: _db.connection.host,
+            port: _db.connection.port,
+            database: _db.connection.database,
+            user: _db.connection.user
+          }
+        });
+        
+        if (isLastAttempt) {
+          throw new Error(`Database migration failed after ${maxRetries} attempts: ${errorMessage}`);
+        }
+        
+        // Wait before retrying (exponential backoff)
+        const delay = Math.pow(2, attempt - 1) * 1000; // 1s, 2s, 4s
+        logger.info(`Retrying migration in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        attempt++;
+      }
     }
   }
 

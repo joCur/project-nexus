@@ -4,7 +4,7 @@
 #######################
 # Stage 1: Dependencies
 #######################
-FROM node:18-alpine AS dependencies
+FROM node:22-alpine AS dependencies
 
 # Set working directory
 WORKDIR /app
@@ -12,29 +12,36 @@ WORKDIR /app
 # Install system dependencies for native modules
 RUN apk add --no-cache \
     libc6-compat \
+    python3 \
+    make \
+    g++ \
     && rm -rf /var/cache/apk/*
 
 # Copy package files for dependency caching
 COPY package*.json ./
 
 # Install production dependencies only
-RUN if [ -f package-lock.json ]; then npm ci --only=production --silent; else npm install --only=production --silent; fi && npm cache clean --force
+RUN npm install --omit=dev && npm cache clean --force
 
 #######################
 # Stage 2: Build
 #######################
-FROM node:18-alpine AS build
+FROM node:22-alpine AS build
 
 WORKDIR /app
 
 # Install build dependencies
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache \
+    libc6-compat \
+    python3 \
+    make \
+    g++
 
 # Copy package files
 COPY package*.json ./
 
 # Install all dependencies including devDependencies
-RUN if [ -f package-lock.json ]; then npm ci --silent; else npm install --silent; fi
+RUN npm install
 
 # Copy source code and configuration files
 COPY app/ ./app/
@@ -61,7 +68,7 @@ RUN npm run build
 #######################
 # Stage 3: Production
 #######################
-FROM node:18-alpine AS production
+FROM node:22-alpine AS production
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
@@ -110,7 +117,7 @@ CMD ["node", "server.js"]
 #######################
 # Stage 4: Development
 #######################
-FROM node:18-alpine AS development
+FROM node:22-alpine AS development
 
 # Set working directory
 WORKDIR /app
@@ -125,7 +132,7 @@ RUN apk add --no-cache \
 COPY package*.json ./
 
 # Install all dependencies including devDependencies
-RUN if [ -f package-lock.json ]; then npm ci --silent; else npm install --silent; fi
+RUN npm install
 
 # Copy source code and configuration files
 COPY . .

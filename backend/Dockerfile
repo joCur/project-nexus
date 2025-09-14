@@ -4,7 +4,7 @@
 #######################
 # Stage 1: Dependencies
 #######################
-FROM node:24-alpine AS dependencies
+FROM node:22-alpine AS dependencies
 
 # Set working directory
 WORKDIR /app
@@ -26,7 +26,7 @@ RUN npm ci --only=production --silent && npm cache clean --force
 #######################
 # Stage 2: Build
 #######################
-FROM node:24-alpine AS build
+FROM node:22-alpine AS build
 
 WORKDIR /app
 
@@ -49,7 +49,7 @@ RUN npm run build
 #######################
 # Stage 3: Production
 #######################
-FROM node:24-alpine AS production
+FROM node:22-alpine AS production
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
@@ -97,7 +97,7 @@ CMD ["sh", "-c", "npm run migrate:container && node dist/server.js"]
 #######################
 # Stage 4: Development
 #######################
-FROM node:24-alpine AS development
+FROM node:22-alpine AS development
 
 # Set working directory
 WORKDIR /app
