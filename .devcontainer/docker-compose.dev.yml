@@ -43,6 +43,7 @@ services:
       # Server ports
       - BACKEND_PORT=${BACKEND_PORT:-3000}
       - WEB_PORT=${WEB_PORT:-3001}
+      - LINEAR_API_KEY=${LINEAR_API_KEY}
     working_dir: /workspaces/project-nexus
     command: sleep infinity
     depends_on:
