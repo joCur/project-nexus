@@ -3,7 +3,7 @@
   "dockerComposeFile": "docker-compose.dev.yml",
   "service": "devcontainer",
   "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
-  
+
   // Port forwarding for all services
   "forwardPorts": [3000, 3001, 5432, 6379, 8080, 8081],
   "portsAttributes": {
@@ -41,27 +41,27 @@
         "ms-vscode.vscode-typescript-next",
         "bradlc.vscode-tailwindcss",
         "ms-vscode.vscode-json",
-        
+
         // GraphQL
         "graphql.vscode-graphql",
         "graphql.vscode-graphql-syntax",
-        
+
         // Database tools
         "ms-ossdata.vscode-postgresql",
         "cweijan.vscode-redis-client",
-        
+
         // Git and GitHub
         "github.vscode-pull-request-github",
         "github.copilot",
         "github.copilot-chat",
         "eamodio.gitlens",
-        
+
         // Testing and quality
         "ms-vscode.test-adapter-converter",
         "orta.vscode-jest",
         "esbenp.prettier-vscode",
         "ms-vscode.vscode-eslint",
-        
+
         // General development
         "ms-vscode.vscode-docker",
         "ms-azuretools.vscode-docker",
@@ -96,7 +96,7 @@
     "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
   },
 
-  // Simple lifecycle commands  
-  "postCreateCommand": "sudo chown -R vscode:vscode /workspaces/project-nexus && npm install --prefix backend && npm install --prefix clients/web",
+  // Simple lifecycle commands
+  "postCreateCommand": "npm install --prefix backend && npm install --prefix clients/web",
   "postStartCommand": "echo '🚀 DevContainer ready!' && echo '📊 Services:' && echo '  PostgreSQL: localhost:5432' && echo '  Redis: localhost:6379' && echo '  Adminer: http://localhost:8080' && echo '  Redis Commander: http://localhost:8081' && echo '' && echo '🗄️  Adminer login details:' && echo '  Server: postgres' && echo '  Username: nexus' && echo '  Password: nexus_secure_2024' && echo '  Database: nexus_db' && echo '' && echo '💡 Quick Adminer URL:' && echo '  http://localhost:8080/?server=postgres&username=nexus&db=nexus_db'"
 }
