@@ -1,8 +1,8 @@
 {
   "name": "Project Nexus - Full Stack Development",
-  "dockerComposeFile": "docker-compose.dev.yml",
+  "dockerComposeFile": ["docker-compose.dev.yml"],
   "service": "devcontainer",
-  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  "workspaceFolder": "/workspaces/project-nexus",
   
   // Port forwarding for all services
   "forwardPorts": [3000, 3001, 5432, 6379, 8080, 8081],
@@ -96,7 +96,11 @@
     "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
   },
 
-  // Simple lifecycle commands  
+  // Lifecycle commands  
   "postCreateCommand": "sudo chown -R vscode:vscode /workspaces/project-nexus && npm install --prefix backend && npm install --prefix clients/web",
-  "postStartCommand": "echo '🚀 DevContainer ready!' && echo '📊 Services:' && echo '  PostgreSQL: localhost:5432' && echo '  Redis: localhost:6379' && echo '  Adminer: http://localhost:8080' && echo '  Redis Commander: http://localhost:8081' && echo '' && echo '🗄️  Adminer login details:' && echo '  Server: postgres' && echo '  Username: nexus' && echo '  Password: nexus_secure_2024' && echo '  Database: nexus_db' && echo '' && echo '💡 Quick Adminer URL:' && echo '  http://localhost:8080/?server=postgres&username=nexus&db=nexus_db'"
+  "postStartCommand": "echo '🚀 DevContainer ready!' && echo '📊 Services:' && echo '  PostgreSQL: localhost:5432' && echo '  Redis: localhost:6379' && echo '  Adminer: http://localhost:8080' && echo '  Redis Commander: http://localhost:8081' && echo '' && echo '🗄️  Adminer login details:' && echo '  Server: postgres' && echo '  Username: nexus' && echo '  Password: nexus_secure_2024' && echo '  Database: nexus_db' && echo '' && echo '💡 Quick Adminer URL:' && echo '  http://localhost:8080/?server=postgres&username=nexus&db=nexus_db'",
+  
+  // Devcontainer settings
+  "shutdownAction": "stopCompose",
+  "overrideCommand": false
 }
