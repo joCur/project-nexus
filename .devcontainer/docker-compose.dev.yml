@@ -187,7 +187,7 @@ services:
     environment:
       - REDIS_HOSTS=local:redis:6379
       - HTTP_USER=${REDIS_COMMANDER_USER:-admin}
-      - HTTP_PASSWORD=${REDIS_COMMANDER_PASSWORD:-admin123}
+      - HTTP_PASSWORD=${REDIS_COMMANDER_PASSWORD:-redis_dev_2024}
     networks:
       - nexus-network
     depends_on:
