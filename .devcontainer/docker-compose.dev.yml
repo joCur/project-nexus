@@ -1,0 +1,210 @@
+# DevContainer Docker Compose - Simplified for GitHub Codespaces
+# Reuses existing service definitions from main docker-compose.yml
+#
+# SECURITY NOTE: This configuration includes fallback credentials for development convenience.
+# These defaults are only suitable for local development environments.
+# Override using environment variables for any shared or production deployments.
+
+version: '3.8'
+
+services:
+  #######################
+  # DevContainer Service
+  #######################
+  devcontainer:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    container_name: nexus-devcontainer
+    volumes:
+      # Mount the entire workspace for development
+      - ..:/workspaces/project-nexus:cached
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+    environment:
+      - NODE_ENV=development
+      - DOCKER_ENV=true
+      # Database connection to postgres service
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB:-nexus_db}
+      - POSTGRES_USER=${POSTGRES_USER:-nexus}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-nexus_secure_2024}
+      # Redis connection to redis service
+      - REDIS_HOST=redis
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      # Server ports
+      - BACKEND_PORT=${BACKEND_PORT:-3000}
+      - WEB_PORT=${WEB_PORT:-3001}
+    working_dir: /workspaces/project-nexus
+    command: sleep infinity
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - nexus-network
+
+  #######################
+  # PostgreSQL Database with pgvector (from main docker-compose.yml)
+  #######################
+  postgres:
+    image: pgvector/pgvector:pg15
+    container_name: nexus-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-nexus_db}
+      - POSTGRES_USER=${POSTGRES_USER:-nexus}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-nexus_secure_2024}
+      - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256
+      - POSTGRES_HOST_AUTH_METHOD=scram-sha-256
+    command: >
+      postgres
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c work_mem=8MB
+      -c maintenance_work_mem=128MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c statement_timeout=300000
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - nexus-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-nexus} -d $${POSTGRES_DB:-nexus_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  #######################
+  # Redis Cache (from main docker-compose.yml)
+  #######################
+  redis:
+    image: redis:7-alpine
+    container_name: nexus-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.1'
+    volumes:
+      - redis_data:/data
+    networks:
+      - nexus-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    command: >
+      redis-server 
+      --appendonly yes 
+      --appendfsync everysec 
+      --maxmemory 512mb 
+      --maxmemory-policy allkeys-lru
+      --timeout 300
+      --tcp-keepalive 300
+      --tcp-backlog 511
+      --maxclients 1000
+
+  #######################
+  # Adminer (Database Admin) - Auto-login for development
+  #######################
+  adminer:
+    image: adminer:latest
+    container_name: nexus-adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 64M
+          cpus: '0.05'
+    environment:
+      - ADMINER_DEFAULT_SERVER=postgres
+      - ADMINER_DESIGN=hydra
+      - ADMINER_DEFAULT_USER=${POSTGRES_USER:-nexus}
+      - ADMINER_DEFAULT_PASSWORD=${POSTGRES_PASSWORD:-nexus_secure_2024}
+      - ADMINER_DEFAULT_DB=${POSTGRES_DB:-nexus_db}
+    volumes:
+      # Auto-login script for development  
+      - ./adminer-auto.php:/var/www/html/index.php:ro
+    networks:
+      - nexus-network
+    depends_on:
+      - postgres
+
+  #######################
+  # Redis Commander
+  #######################
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: nexus-redis-commander
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 64M
+          cpus: '0.05'
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+      - HTTP_USER=${REDIS_COMMANDER_USER:-admin}
+      - HTTP_PASSWORD=${REDIS_COMMANDER_PASSWORD:-redis_dev_2024}
+    networks:
+      - nexus-network
+    depends_on:
+      - redis
+
+#######################
+# Networks
+#######################
+networks:
+  nexus-network:
+    driver: bridge
+
+#######################
+# Volumes
+#######################
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
