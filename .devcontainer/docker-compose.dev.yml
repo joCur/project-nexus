@@ -1,5 +1,9 @@
 # DevContainer Docker Compose - Simplified for GitHub Codespaces
 # Reuses existing service definitions from main docker-compose.yml
+#
+# SECURITY NOTE: This configuration includes fallback credentials for development convenience.
+# These defaults are only suitable for local development environments.
+# Override using environment variables for any shared or production deployments.
 
 version: '3.8'
 
@@ -15,6 +19,14 @@ services:
     volumes:
       # Mount the entire workspace for development
       - ..:/workspaces/project-nexus:cached
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
     environment:
       - NODE_ENV=development
       - DOCKER_ENV=true
@@ -48,6 +60,14 @@ services:
     restart: unless-stopped
     ports:
       - "5432:5432"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
     environment:
       - POSTGRES_DB=${POSTGRES_DB:-nexus_db}
       - POSTGRES_USER=${POSTGRES_USER:-nexus}
@@ -87,6 +107,14 @@ services:
     restart: unless-stopped
     ports:
       - "6379:6379"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.1'
     volumes:
       - redis_data:/data
     networks:
@@ -117,6 +145,14 @@ services:
     restart: unless-stopped
     ports:
       - "8080:8080"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 64M
+          cpus: '0.05'
     environment:
       - ADMINER_DEFAULT_SERVER=postgres
       - ADMINER_DESIGN=hydra
@@ -140,6 +176,14 @@ services:
     restart: unless-stopped
     ports:
       - "8081:8081"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 64M
+          cpus: '0.05'
     environment:
       - REDIS_HOSTS=local:redis:6379
       - HTTP_USER=${REDIS_COMMANDER_USER:-admin}
