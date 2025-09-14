@@ -21,7 +21,7 @@ RUN apk add --no-cache \
 COPY package*.json ./
 
 # Install production dependencies only
-RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi && npm cache clean --force
+RUN npm install --omit=dev && npm cache clean --force
 
 #######################
 # Stage 2: Build
@@ -41,7 +41,7 @@ RUN apk add --no-cache \
 COPY package*.json ./
 
 # Install all dependencies including devDependencies
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+RUN npm install
 
 # Copy source code and configuration files
 COPY app/ ./app/
@@ -132,7 +132,7 @@ RUN apk add --no-cache \
 COPY package*.json ./
 
 # Install all dependencies including devDependencies
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+RUN npm install
 
 # Copy source code and configuration files
 COPY . .
