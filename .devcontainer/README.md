@@ -41,22 +41,22 @@ Use the service management script for manual control:
 
 ```bash
 # Start all services
-./scripts/start-services.sh start
+./.devcontainer/scripts/start-services.sh start
 
 # Check service status
-./scripts/start-services.sh status
+./.devcontainer/scripts/start-services.sh status
 
 # Stop all services
-./scripts/start-services.sh stop
+./.devcontainer/scripts/start-services.sh stop
 
 # Restart services
-./scripts/start-services.sh restart
+./.devcontainer/scripts/start-services.sh restart
 
 # Start individual services
-./scripts/start-services.sh postgres
-./scripts/start-services.sh redis
-./scripts/start-services.sh adminer
-./scripts/start-services.sh redis-commander
+./.devcontainer/scripts/start-services.sh postgres
+./.devcontainer/scripts/start-services.sh redis
+./.devcontainer/scripts/start-services.sh adminer
+./.devcontainer/scripts/start-services.sh redis-commander
 ```
 
 ### Quick Status Check
@@ -79,7 +79,8 @@ Use the service management script for manual control:
 
 ### Database Reset
 ```bash
-./scripts/db-reset.sh
+# Use the comprehensive database setup script
+./.devcontainer/scripts/setup-database.sh
 ```
 
 ## 🌐 Port Mapping
@@ -171,10 +172,10 @@ psql -h localhost -U nexus -d nexus_db
 ### Services Not Starting
 ```bash
 # Check service status
-./scripts/start-services.sh status
+./.devcontainer/scripts/start-services.sh status
 
 # Restart all services
-./scripts/start-services.sh restart
+./.devcontainer/scripts/start-services.sh restart
 
 # Check logs
 tail -f /var/log/postgresql/postgresql-15-main.log
@@ -187,10 +188,7 @@ tail -f /tmp/redis-commander.log
 # Test database connection
 pg_isready -h localhost -p 5432 -U nexus
 
-# Reset database
-./scripts/db-reset.sh
-
-# Manual database setup
+# Manual database setup and reset
 ./.devcontainer/scripts/setup-database.sh
 ```
 
