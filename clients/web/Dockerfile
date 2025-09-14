@@ -12,13 +12,16 @@ WORKDIR /app
 # Install system dependencies for native modules
 RUN apk add --no-cache \
     libc6-compat \
+    python3 \
+    make \
+    g++ \
     && rm -rf /var/cache/apk/*
 
 # Copy package files for dependency caching
 COPY package*.json ./
 
 # Install production dependencies only
-RUN if [ -f package-lock.json ]; then npm ci --only=production --silent; else npm install --only=production --silent; fi && npm cache clean --force
+RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi && npm cache clean --force
 
 #######################
 # Stage 2: Build
@@ -28,13 +31,17 @@ FROM node:22-alpine AS build
 WORKDIR /app
 
 # Install build dependencies
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache \
+    libc6-compat \
+    python3 \
+    make \
+    g++
 
 # Copy package files
 COPY package*.json ./
 
 # Install all dependencies including devDependencies
-RUN if [ -f package-lock.json ]; then npm ci --silent; else npm install --silent; fi
+RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
 # Copy source code and configuration files
 COPY app/ ./app/
@@ -125,7 +132,7 @@ RUN apk add --no-cache \
 COPY package*.json ./
 
 # Install all dependencies including devDependencies
-RUN if [ -f package-lock.json ]; then npm ci --silent; else npm install --silent; fi
+RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
 # Copy source code and configuration files
 COPY . .
