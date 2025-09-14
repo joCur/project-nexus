@@ -3,10 +3,6 @@
   "version": "1.0.0",
   "description": "AI-powered visual knowledge workspace",
   "private": true,
-  "workspaces": [
-    "backend",
-    "clients/web"
-  ],
   "scripts": {
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd clients/web && npm run dev",
