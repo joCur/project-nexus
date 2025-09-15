@@ -69,7 +69,7 @@ RUN echo "host all all 0.0.0.0/0 scram-sha-256" >> /etc/postgresql/15/main/pg_hb
     && echo "shared_buffers = 256MB" >> /etc/postgresql/15/main/postgresql.conf
 
 # Set up workspace directory
-RUN mkdir -p /workspaces/project-nexus && chown vscode:vscode /workspaces/project-nexus
+RUN mkdir -p /workspaces/project-nexus
 
 # Create supervisor configuration directory and copy config
 RUN mkdir -p /etc/supervisor/conf.d \
