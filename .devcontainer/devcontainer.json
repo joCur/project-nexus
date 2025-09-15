@@ -4,10 +4,12 @@
     "dockerfile": "Dockerfile",
     "context": "."
   },
-  "workspaceFolder": "/workspaces/project-nexus",
+  "workspaceFolder": "/workspaces",
 
   // Port forwarding for all services
   "forwardPorts": [3000, 3001, 5432, 6379, 8080, 8081],
+  // Required for coder workspaces
+  "appPort": ["3000:3000", "3001:3001", "5432:5432", "6279:6279", "8080:8080", "8081:8081"],
   "portsAttributes": {
     "3000": {
       "label": "Backend API (GraphQL)",
