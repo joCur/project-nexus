@@ -9,7 +9,6 @@
   // Port forwarding for all services
   "forwardPorts": [3000, 3001, 5432, 6379, 8080, 8081],
   // Required for coder workspaces
-  "appPort": ["13337:13337", "3000:3000", "3001:3001", "5432:5432", "6279:6279", "8080:8080", "8081:8081"],
   "portsAttributes": {
     "3000": {
       "label": "Backend API (GraphQL)",
@@ -98,11 +97,7 @@
   // Features to install
   "features": {
     "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {},
-    "ghcr.io/robbert229/devcontainer-features/postgresql-client:1": {},
-    "ghcr.io/coder/devcontainer-features/code-server:1": {
-            "port": 13337,
-            "host": "0.0.0.0"
-    }
+    "ghcr.io/robbert229/devcontainer-features/postgresql-client:1": {}
   },
 
   // Container environment variables
