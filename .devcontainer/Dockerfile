@@ -2,6 +2,10 @@
 # Includes PostgreSQL, Redis, Adminer, Redis Commander, and development tools
 FROM node:22-bookworm
 
+ARG USERNAME=vscode
+ARG USER_UID=1000
+ARG USER_GID=$USER_UID
+
 # Install system dependencies and database servers
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # Development tools
@@ -55,11 +59,13 @@ RUN mkdir -p /var/www/html \
 # Copy custom Adminer auto-login script
 COPY adminer-auto.php /var/www/html/index.php
 
-# Create non-root user for development
-RUN useradd -m -s /bin/bash vscode \
-    && usermod -aG sudo vscode \
-    && echo 'vscode ALL=(root) NOPASSWD: /usr/bin/apt, /usr/bin/apt-get, /bin/systemctl, /usr/bin/npm, /usr/bin/supervisord, /usr/bin/supervisorctl' >> /etc/sudoers
-
+# Create the user
+RUN groupadd --gid $USER_GID $USERNAME \
+    && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
+    && apt-get update \
+    && apt-get install -y sudo \
+    && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
+    && chmod 0440 /etc/sudoers.d/$USERNAME
 # Set up PostgreSQL data directory and configuration
 RUN mkdir -p /var/lib/postgresql/data \
     && chown -R postgres:postgres /var/lib/postgresql/data \
@@ -94,7 +100,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD node --version && npm --version && pg_isready -U postgres && redis-cli ping || exit 1
 
 # Switch to development user
-USER vscode
+USER $USERNAME
 
 # Set working directory
 WORKDIR /workspaces/project-nexus
