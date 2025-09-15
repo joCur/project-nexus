@@ -2,10 +2,6 @@
 # Includes PostgreSQL, Redis, Adminer, Redis Commander, and development tools
 FROM node:22-bookworm
 
-ARG USERNAME=vscode
-ARG USER_UID=1000
-ARG USER_GID=$USER_UID
-
 # Install system dependencies and database servers
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # Development tools
@@ -59,18 +55,11 @@ RUN mkdir -p /var/www/html \
 # Copy custom Adminer auto-login script
 COPY adminer-auto.php /var/www/html/index.php
 
-# Create the user
-RUN groupadd --gid $USER_GID $USERNAME \
-    && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
-    && apt-get update \
-    && apt-get install -y sudo \
-    && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
-    && chmod 0440 /etc/sudoers.d/$USERNAME
 # Set up PostgreSQL data directory and configuration
 RUN mkdir -p /var/lib/postgresql/data \
     && chown -R postgres:postgres /var/lib/postgresql/data \
     && chmod 700 /var/lib/postgresql/data \
-    && sudo -u postgres /usr/lib/postgresql/15/bin/initdb -D /var/lib/postgresql/data
+    && su - postgres -c "/usr/lib/postgresql/15/bin/initdb -D /var/lib/postgresql/data"
 
 # Configure PostgreSQL
 RUN echo "host all all 0.0.0.0/0 scram-sha-256" >> /etc/postgresql/15/main/pg_hba.conf \
@@ -98,9 +87,6 @@ RUN id -u www-data &>/dev/null || useradd -r -s /bin/false www-data
 # Health check to ensure container is ready
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD node --version && npm --version && pg_isready -U postgres && redis-cli ping || exit 1
-
-# Switch to development user
-USER $USERNAME
 
 # Set working directory
 WORKDIR /workspaces/project-nexus
