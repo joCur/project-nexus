@@ -25,7 +25,8 @@
     "clean": "rm -rf node_modules backend/node_modules clients/web/node_modules backend/dist clients/web/.next"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "dotenv-cli": "^7.3.0"
   },
   "engines": {
     "node": ">=22.0.0",

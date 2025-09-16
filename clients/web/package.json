@@ -4,7 +4,7 @@
   "description": "Project Nexus Web Client - Next.js 14 with Auth0 Authentication",
   "private": true,
   "scripts": {
-    "dev": "next dev -p $WEB_PORT",
+    "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

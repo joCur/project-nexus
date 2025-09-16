@@ -24,14 +24,7 @@ export default function WorkspacePage() {
   
   const [hasTriedCreateDefault, setHasTriedCreateDefault] = useState(false);
 
-  useEffect(() => {
-    if (workspaceId) {
-      // Set current workspace if different
-      if (context.currentWorkspaceId !== workspaceId) {
-        setCurrentWorkspace(workspaceId, `Workspace ${workspaceId}`);
-      }
-    }
-  }, [workspaceId, context.currentWorkspaceId, setCurrentWorkspace]);
+  // Workspace context is now set by the layout, so we don't need to set it here
 
   useEffect(() => {
     // Handle canvas loading and default creation

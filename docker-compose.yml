@@ -1,145 +1,4 @@
-# Project Nexus - Docker Compose Configuration
-# Supports both development and production environments
-# Services: Backend API, PostgreSQL with pgvector, Redis Cache
-
-version: '3.8'
-
 services:
-  #######################
-  # Web Frontend Service
-  #######################
-  web:
-    build:
-      context: ./clients/web
-      dockerfile: Dockerfile
-      target: ${DOCKER_TARGET:-production}
-      args:
-        - NODE_ENV=${NODE_ENV:-production}
-    container_name: nexus-web
-    restart: unless-stopped
-    ports:
-      - "${WEB_PORT:-3001}:3000"
-    environment:
-      # Node.js Configuration
-      - NODE_ENV=${NODE_ENV:-production}
-      - NEXT_TELEMETRY_DISABLED=1
-      - PORT=3000
-      - HOSTNAME=0.0.0.0
-      
-      # Auth0 Configuration
-      - AUTH0_SECRET=${AUTH0_SECRET:-your-auth0-secret-change-in-production}
-      - AUTH0_BASE_URL=${AUTH0_BASE_URL:-http://localhost:3001}
-      - AUTH0_DOMAIN=${AUTH0_DOMAIN}
-      - AUTH0_ISSUER_BASE_URL=${AUTH0_ISSUER_BASE_URL:-https://${AUTH0_DOMAIN}}
-      - AUTH0_CLIENT_ID=${AUTH0_CLIENT_ID}
-      - AUTH0_CLIENT_SECRET=${AUTH0_CLIENT_SECRET}
-      - AUTH0_AUDIENCE=${AUTH0_AUDIENCE:-}
-      
-      # API Configuration
-      - GRAPHQL_ENDPOINT=${GRAPHQL_ENDPOINT:-http://backend:3000/graphql}
-      - API_BASE_URL=${API_BASE_URL:-http://backend:3000}
-      
-    volumes:
-      # Production volumes are minimal - development overrides will add hot-reload volumes
-      # Build cache and node_modules persistence for production
-      - nexus_web_build_cache:/app/.next
-      - nexus_web_prod_modules:/app/node_modules
-    depends_on:
-      backend:
-        condition: service_healthy
-    networks:
-      - nexus-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-  #######################
-  # Backend API Service
-  #######################
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-      target: ${DOCKER_TARGET:-production}
-      args:
-        - NODE_ENV=${NODE_ENV:-production}
-    container_name: nexus-backend
-    restart: unless-stopped
-    ports:
-      - "${BACKEND_PORT:-3000}:${BACKEND_PORT:-3000}"
-    environment:
-      # Node.js Configuration
-      - NODE_ENV=${NODE_ENV:-production}
-      - DOCKER_ENV=true
-      - BACKEND_PORT=${BACKEND_PORT:-3000}
-      
-      # Database Configuration
-      - POSTGRES_DB=${POSTGRES_DB:-nexus_db}
-      - POSTGRES_USER=${POSTGRES_USER:-nexus}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-nexus_secure_2024}
-      - POSTGRES_PORT=5432
-      - DB_POOL_MIN=${DB_POOL_MIN:-2}
-      - DB_POOL_MAX=${DB_POOL_MAX:-10}
-      - DB_TIMEOUT=${DB_TIMEOUT:-30000}
-      
-      # Redis Configuration
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
-      - REDIS_DB=${REDIS_DB:-0}
-      
-      # Auth0 Configuration
-      - AUTH0_DOMAIN=${AUTH0_DOMAIN}
-      - AUTH0_CLIENT_ID=${AUTH0_CLIENT_ID}
-      - AUTH0_CLIENT_SECRET=${AUTH0_CLIENT_SECRET}
-      - AUTH0_AUDIENCE=${AUTH0_AUDIENCE:-}
-      - AUTH0_MANAGEMENT_CLIENT_ID=${AUTH0_MANAGEMENT_CLIENT_ID}
-      - AUTH0_MANAGEMENT_CLIENT_SECRET=${AUTH0_MANAGEMENT_CLIENT_SECRET}
-      
-      # JWT Configuration
-      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
-      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-24h}
-      
-      # API Configuration
-      - API_VERSION=${API_VERSION:-v1}
-      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3001,http://web:3000}
-      - RATE_LIMIT_WINDOW=${RATE_LIMIT_WINDOW:-15}
-      - RATE_LIMIT_MAX=${RATE_LIMIT_MAX:-100}
-      
-      # OpenAI Configuration (for embeddings)
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - OPENAI_MODEL=${OPENAI_MODEL:-text-embedding-ada-002}
-      
-      # Logging Configuration
-      - LOG_LEVEL=${LOG_LEVEL:-info}
-      - LOG_FORMAT=${LOG_FORMAT:-json}
-      
-      # Security Configuration
-      - BCRYPT_ROUNDS=${BCRYPT_ROUNDS:-12}
-      - SESSION_SECRET=${SESSION_SECRET:-your-session-secret-change-in-production}
-      
-    volumes:
-      # Production volumes are minimal - development overrides will add hot-reload volumes
-      # Logs persistence
-      - nexus_logs:/app/logs
-      # Production node_modules persistence
-      - nexus_backend_prod_modules:/app/node_modules
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - nexus-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health/ready"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-
   #######################
   # PostgreSQL Database with pgvector
   #######################
@@ -235,11 +94,14 @@ services:
     environment:
       - ADMINER_DEFAULT_SERVER=postgres
       - ADMINER_DESIGN=hydra
+      - ADMINER_DEFAULT_USER=${POSTGRES_USER:-nexus}
+      - ADMINER_DEFAULT_PASSWORD=${POSTGRES_PASSWORD:-nexus_secure_2024}
+      - ADMINER_DEFAULT_DB=${POSTGRES_DB:-nexus_db}
+    volumes:
+      # Auto-login script for development convenience
+      - ./adminer-auto.php:/var/www/html/index.php:ro
     networks:
       - nexus-network
-    profiles:
-      - development
-      - admin
     depends_on:
       - postgres
 
@@ -258,9 +120,6 @@ services:
       - HTTP_PASSWORD=${REDIS_COMMANDER_PASSWORD:-admin123}
     networks:
       - nexus-network
-    profiles:
-      - development
-      - admin
     depends_on:
       - redis
 
