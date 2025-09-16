@@ -121,7 +121,5 @@
 
   // Lifecycle commands
   "postCreateCommand": "npm install --prefix backend && npm install --prefix clients/web",
-  "postStartCommand": "supervisord -c /etc/supervisor/conf.d/supervisord.conf && sleep 5 && echo '🚀 DevContainer ready!' && echo '📊 Services:' && echo '  PostgreSQL: localhost:5432' && echo '  Redis: localhost:6379' && echo '  Adminer: http://localhost:8080' && echo '  Redis Commander: http://localhost:8081' && echo '' && echo '🗄️  Adminer login details:' && echo '  Server: localhost' && echo '  Username: nexus' && echo '  Password: nexus_secure_2024' && echo '  Database: nexus_db' && echo '' && echo '💡 Quick Adminer URL:' && echo '  http://localhost:8080/?server=localhost&username=nexus&db=nexus_db'",
-
-  // DevContainer settings
+  "postStartCommand": "/workspaces/project-nexus/.devcontainer/start-services.sh"
 }
