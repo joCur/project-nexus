@@ -24,11 +24,13 @@ function WorkspaceAccessValidator({ children }: { children: React.ReactNode }) {
   const { setCurrentWorkspace } = useWorkspaceStore();
   const context = useWorkspaceStore((state) => state.context);
   const [hasCheckedAccess, setHasCheckedAccess] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   const {
     permissionsByWorkspace,
     loading: permissionsLoading,
-    error: permissionsError
+    error: permissionsError,
+    refetch
   } = useContextPermissions({
     enabled: !!user?.sub,
     errorPolicy: 'secure-by-default',
@@ -46,23 +48,40 @@ function WorkspaceAccessValidator({ children }: { children: React.ReactNode }) {
     if (!permissionsLoading && permissionsByWorkspace && workspaceId && !hasCheckedAccess) {
       const workspacePermissions = permissionsByWorkspace[workspaceId];
       const hasWorkspaceRead = workspacePermissions && workspacePermissions.includes('workspace:read');
+      const totalWorkspaces = Object.keys(permissionsByWorkspace).length;
 
-      if (!hasWorkspaceRead && Object.keys(permissionsByWorkspace).length > 0) {
-        // User has other workspaces but not access to this specific one
-        console.error(`User does not have access to workspace: ${workspaceId}`);
-        // Redirect to first available workspace or main workspace page
-        const availableWorkspaces = Object.keys(permissionsByWorkspace);
-        if (availableWorkspaces.length > 0) {
-          window.location.href = `/workspace/${availableWorkspaces[0]}`;
-        } else {
-          window.location.href = '/workspace';
-        }
+      // If user has access to the requested workspace, allow access
+      if (hasWorkspaceRead) {
+        setHasCheckedAccess(true);
         return;
       }
 
+      // Special handling for potential onboarding scenario
+      // If no workspaces are found and we haven't retried yet, try refetching
+      if (totalWorkspaces === 0 && retryCount < 2) {
+        setRetryCount(prev => prev + 1);
+        refetch();
+        return;
+      }
+
+      // If user has no workspaces at all after retries, redirect to workspace page
+      if (totalWorkspaces === 0) {
+        window.location.href = '/workspace';
+        return;
+      }
+
+      // If user has other workspaces but not access to this specific one
+      if (totalWorkspaces > 0 && !hasWorkspaceRead) {
+        // Redirect to first available workspace
+        const availableWorkspaces = Object.keys(permissionsByWorkspace);
+        window.location.href = `/workspace/${availableWorkspaces[0]}`;
+        return;
+      }
+
+      // Default: allow access (this handles edge cases)
       setHasCheckedAccess(true);
     }
-  }, [permissionsLoading, permissionsByWorkspace, workspaceId, hasCheckedAccess]);
+  }, [permissionsLoading, permissionsByWorkspace, workspaceId, hasCheckedAccess, retryCount, refetch]);
 
   // Show loading while checking permissions
   if (permissionsLoading || !hasCheckedAccess) {
