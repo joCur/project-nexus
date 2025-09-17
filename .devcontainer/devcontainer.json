@@ -1,13 +1,18 @@
 {
   "name": "Project Nexus - Full Stack Development",
-  "build": {
-    "dockerfile": "Dockerfile",
-    "context": "."
-  },
+  "dockerComposeFile": [
+    "docker-compose.yml"
+  ],
+  "service": "workspace",
+  "runServices": [
+    "postgres",
+    "redis",
+    "adminer"
+  ],
   "workspaceFolder": "/workspaces/project-nexus",
 
   // Port forwarding for all services
-  "forwardPorts": [3000, 3001, 5432, 6379, 8080, 8081],
+  "forwardPorts": [3000, 3001, 5432, 6379, 8080],
   // Required for coder workspaces
   "portsAttributes": {
     "3000": {
@@ -29,10 +34,6 @@
     "8080": {
       "label": "Adminer (Database Admin)",
       "onAutoForward": "openBrowserOnce"
-    },
-    "8081": {
-      "label": "Redis Commander",
-      "onAutoForward": "silent"
     }
   },
 
@@ -55,9 +56,6 @@
 
         // Git and GitHub
         "github.vscode-pull-request-github",
-        "github.copilot",
-        "github.copilot-chat",
-        "eamodio.gitlens",
 
         // Testing and quality
         "ms-vscode.test-adapter-converter",
@@ -66,9 +64,6 @@
         "ms-vscode.vscode-eslint",
 
         // General development
-        "ms-vscode.vscode-docker",
-        "ms-azuretools.vscode-docker",
-        "ms-vscode.remote-containers",
         "redhat.vscode-yaml",
         "ms-vscode.vscode-markdown"
       ],
@@ -96,30 +91,29 @@
 
   // Features to install
   "features": {
-    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {},
-    "ghcr.io/robbert229/devcontainer-features/postgresql-client:1": {}
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
   },
 
   // Container environment variables
   "containerEnv": {
     "NODE_ENV": "development",
-    "POSTGRES_HOST": "localhost",
+    "POSTGRES_HOST": "postgres",
     "POSTGRES_PORT": "5432",
     "POSTGRES_DB": "nexus_db",
     "POSTGRES_USER": "nexus",
     "POSTGRES_PASSWORD": "nexus_secure_2024",
-    "REDIS_HOST": "localhost",
+    "REDIS_HOST": "redis",
     "REDIS_PORT": "6379",
     "REDIS_PASSWORD": "",
     "BACKEND_PORT": "3000",
     "WEB_PORT": "3001",
-    "ADMINER_DEFAULT_SERVER": "localhost",
+    "ADMINER_DEFAULT_SERVER": "postgres",
     "ADMINER_DEFAULT_USER": "nexus",
     "ADMINER_DEFAULT_PASSWORD": "nexus_secure_2024",
-    "ADMINER_DEFAULT_DB": "nexus_db"
+    "ADMINER_DEFAULT_DB": "nexus_db",
+    "DOCKER_ENV": "true"
   },
 
   // Lifecycle commands
-  "postCreateCommand": "npm install --prefix backend && npm install --prefix clients/web",
-  "postStartCommand": "/workspaces/project-nexus/.devcontainer/start-services.sh"
+  "postCreateCommand": "npm i && npm install --prefix backend && npm install --prefix clients/web"
 }
