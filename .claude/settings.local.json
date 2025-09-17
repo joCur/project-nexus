@@ -1,11 +1,5 @@
 {
   "includeCoAuthoredBy": false,
-  "enabledMcpjsonServers": [
-    "playwright",
-    "context7",
-    "semgrep",
-    "linear-server"
-  ],
   "permissions": {
     "allow": [
       "WebFetch(domain:api.miramedical.io)",
@@ -55,9 +49,18 @@
       "mcp__linear-server__create_comment",
       "Bash(gh pr view:*)",
       "mcp__linear-server__get_issue",
-      "mcp__linear-server__create_comment"
+      "mcp__linear-server__create_comment",
+      "Bash(lsof:*)",
+      "Bash(netstat:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "playwright",
+    "context7",
+    "semgrep",
+    "linear-server"
+  ]
 }

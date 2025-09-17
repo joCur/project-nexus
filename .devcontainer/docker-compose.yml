@@ -9,6 +9,9 @@ services:
       DOCKER_ENV: "true"
       POSTGRES_HOST: postgres
       REDIS_HOST: redis
+    ports:
+      - "3000:3000"
+      - "3001:3001"
     volumes:
       - ..:/workspaces/project-nexus:cached
       - workspace-node-home:/home/node

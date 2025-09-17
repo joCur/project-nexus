@@ -1,15 +1,16 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { useMutation, gql } from '@apollo/client';
 import { useAuth } from '@/hooks/use-auth';
+import { CACHE_KEYS, CACHE_OPTIONS, localCache } from '@/lib/client-cache';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
+import { gql, useMutation } from '@apollo/client';
+import { useRouter } from 'next/navigation';
+import React, { useCallback, useState } from 'react';
 
 // Step components
 import { ProfileSetupStep } from './steps/ProfileSetupStep';
-import { WorkspaceIntroStep } from './steps/WorkspaceIntroStep';
 import { WelcomeStep } from './steps/WelcomeStep';
+import { WorkspaceIntroStep } from './steps/WorkspaceIntroStep';
 
 // Shared components
 import { ProgressIndicator } from './shared/ProgressIndicator';
@@ -77,7 +78,7 @@ const TOTAL_STEPS = 3;
 
 export const OnboardingFlow: React.FC = () => {
   const router = useRouter();
-  const { } = useAuth();
+  const { user } = useAuth();
   const { setCurrentWorkspace } = useWorkspaceStore();
   const [updateOnboardingProgress] = useMutation(UPDATE_ONBOARDING_PROGRESS);
   const [completeOnboardingWorkflow] = useMutation(COMPLETE_ONBOARDING_WORKFLOW);
@@ -138,29 +139,53 @@ export const OnboardingFlow: React.FC = () => {
 
       if (data?.completeOnboardingWorkflow?.success) {
         const result = data.completeOnboardingWorkflow;
-        
+        const workspace = result.workspace;
+        const profile = result.profile;
+        const onboarding = result.onboarding;
+
+        if (user?.sub) {
+          const cacheKey = `${CACHE_KEYS.ONBOARDING_STATUS}:${user.sub}`;
+
+          // Clear legacy cache entries to prevent stale redirects
+          localStorage.removeItem(`onboarding_status:${user.sub}`);
+
+          localCache.set(
+            cacheKey,
+            {
+              isComplete: true,
+              currentStep: onboarding?.completed ? TOTAL_STEPS : onboarding?.currentStep || TOTAL_STEPS,
+              hasProfile: Boolean(profile?.id),
+              hasWorkspace: Boolean(workspace?.id),
+              profile,
+              onboarding,
+              workspace,
+            },
+            CACHE_OPTIONS.ONBOARDING_STATUS,
+          );
+        }
+
         // Extract workspace ID from the response
-        if (result.workspace?.id) {
-          const workspaceId = result.workspace.id;
-          const workspaceName = result.workspace.name;
+        if (workspace?.id) {
+          const workspaceId = workspace.id;
+          const workspaceName = workspace.name;
           
           // Store the workspace context
           setCurrentWorkspace(workspaceId, workspaceName);
           
           // Redirect to the specific workspace
-          router.push(`/workspace/${workspaceId}`);
+          router.push(`/workspace/${workspaceId}?from=onboarding`);
           return;
         }
       }
 
       // Fallback to generic workspace route if no workspace ID
-      router.push('/workspace');
+      router.push('/workspace?from=onboarding');
     } catch (error) {
       console.error('Failed to complete onboarding:', error);
       // Still redirect - user can update profile later
-      router.push('/workspace');
+      router.push('/workspace?from=onboarding');
     }
-  }, [router, setCurrentWorkspace, completeOnboardingWorkflow]);
+  }, [router, setCurrentWorkspace, completeOnboardingWorkflow, user?.sub]);
 
   const nextStep = useCallback(async () => {
     // Use functional setState to get the most current state

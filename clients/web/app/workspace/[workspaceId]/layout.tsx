@@ -3,7 +3,7 @@
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { WorkspaceLayout } from '@/components/workspace/WorkspaceLayout';
 import { WorkspacePermissionProvider } from '../../../contexts/WorkspacePermissionContext';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
 import { useEffect, useState } from 'react';
 import { useContextPermissions } from '@/hooks/use-permissions';
@@ -20,6 +20,8 @@ interface WorkspaceLayoutProps {
 function WorkspaceAccessValidator({ children }: { children: React.ReactNode }) {
   const params = useParams();
   const workspaceId = params.workspaceId as EntityId;
+  const searchParams = useSearchParams();
+  const fromOnboarding = searchParams?.get('from') === 'onboarding';
   const { user } = useAuth();
   const { setCurrentWorkspace } = useWorkspaceStore();
   const context = useWorkspaceStore((state) => state.context);
@@ -45,6 +47,12 @@ function WorkspaceAccessValidator({ children }: { children: React.ReactNode }) {
 
   // Check workspace access once permissions are loaded
   useEffect(() => {
+    if (fromOnboarding && !hasCheckedAccess) {
+      // Skip strict permission gate right after onboarding to avoid redirect loops
+      setHasCheckedAccess(true);
+      return;
+    }
+
     if (!permissionsLoading && permissionsByWorkspace && workspaceId && !hasCheckedAccess) {
       const workspacePermissions = permissionsByWorkspace[workspaceId];
       const hasWorkspaceRead = workspacePermissions && workspacePermissions.includes('workspace:read');
@@ -81,7 +89,7 @@ function WorkspaceAccessValidator({ children }: { children: React.ReactNode }) {
       // Default: allow access (this handles edge cases)
       setHasCheckedAccess(true);
     }
-  }, [permissionsLoading, permissionsByWorkspace, workspaceId, hasCheckedAccess, retryCount, refetch]);
+  }, [permissionsLoading, permissionsByWorkspace, workspaceId, hasCheckedAccess, retryCount, refetch, fromOnboarding]);
 
   // Show loading while checking permissions
   if (permissionsLoading || !hasCheckedAccess) {

@@ -412,7 +412,8 @@ export const authTypeDefs = gql`
     
     # Onboarding mutations
     updateOnboardingProgress(input: OnboardingProgressUpdateInput!): UserOnboarding!
-    completeOnboarding(input: OnboardingCompleteInput!): UserOnboarding!
+    # TODO: DEPRECATED - Remove after all clients use completeOnboardingWorkflow
+    completeOnboarding(input: OnboardingCompleteInput!): UserOnboarding! @deprecated(reason: "Use completeOnboardingWorkflow instead - this only marks completion without creating workspace/profile")
     resetOnboarding(userId: ID!): Boolean!
     
     # Onboarding workflow mutations

@@ -4,7 +4,7 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { WorkspacePermissionProvider } from '../../contexts/WorkspacePermissionContext';
 import { useOnboardingStatus } from '@/hooks/use-onboarding-status';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect } from 'react';
 import logger from '@/lib/logger';
 
@@ -20,11 +20,14 @@ import logger from '@/lib/logger';
  */
 function WorkspaceContent() {
   const router = useRouter();
-  const { 
-    status: onboardingStatus, 
-    isLoading: onboardingLoading, 
+  const searchParams = useSearchParams();
+  const fromOnboarding = searchParams.get('from') === 'onboarding';
+
+  const {
+    status: onboardingStatus,
+    isLoading: onboardingLoading,
     isInitialLoad,
-    error: onboardingError 
+    error: onboardingError
   } = useOnboardingStatus();
   const context = useWorkspaceStore((state) => state.context);
   const setCurrentWorkspace = useWorkspaceStore((state) => state.setCurrentWorkspace);
@@ -32,6 +35,12 @@ function WorkspaceContent() {
 
   // Check onboarding status and redirect if needed
   useEffect(() => {
+    // Skip onboarding check if we're coming from onboarding completion
+    if (fromOnboarding) {
+      logger.info('Skipping onboarding check - user just completed onboarding');
+      return;
+    }
+
     // Only redirect after we have a definitive status (not during initial load)
     // This prevents race conditions where users might be redirected incorrectly
     if (!onboardingLoading && !isInitialLoad && onboardingStatus && !onboardingStatus.isComplete) {
@@ -67,7 +76,7 @@ function WorkspaceContent() {
       
       router.replace(`/workspace/${defaultWorkspaceId}` as any);
     }
-  }, [onboardingLoading, isInitialLoad, onboardingStatus, router, context.currentWorkspaceId, setCurrentWorkspace, isInitialized]);
+  }, [fromOnboarding, onboardingLoading, isInitialLoad, onboardingStatus, router, context.currentWorkspaceId, setCurrentWorkspace, isInitialized]);
 
   // Show loading while checking onboarding status (only on initial load)
   if (onboardingLoading && isInitialLoad) {
