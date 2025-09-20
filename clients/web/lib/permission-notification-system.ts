@@ -232,7 +232,7 @@ export class PermissionNotificationSystemImpl implements PermissionNotificationS
    */
   private getDebounceKey(event: PermissionEvent): string {
     // Create a unique key based on event type and context
-    const parts = [event.type];
+    const parts: string[] = [event.type];
 
     if (event.userId) {
       parts.push(event.userId);
