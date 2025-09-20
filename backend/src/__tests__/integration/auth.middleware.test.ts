@@ -5,9 +5,9 @@
  */
 
 import request from 'supertest';
-import express, { Express } from 'express';
+import express, { type Application } from 'express';
 import { ApolloServer } from '@apollo/server';
-import { expressMiddleware } from '@apollo/server/express4';
+import { expressMiddleware } from '@as-integrations/express5';
 import { createAuthMiddleware, createGraphQLContext } from '@/middleware/auth';
 import { authResolvers } from '@/resolvers/auth';
 import { GraphQLContext } from '@/types';
@@ -21,7 +21,7 @@ import {
 import { JWT_FIXTURES, USER_FIXTURES, REQUEST_FIXTURES } from '../utils/test-fixtures';
 
 describe('Auth Middleware Integration Tests', () => {
-  let app: Express;
+  let app: Application;
   let server: ApolloServer<GraphQLContext>;
   let mockAuth0Service: any;
   let mockUserService: any;

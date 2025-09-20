@@ -28,7 +28,7 @@ const completeOnboardingSchema = z.object({
       workspaceName: z.string().min(1, 'Workspace name is required').max(100),
       privacy: z.enum(['PRIVATE', 'TEAM', 'PUBLIC']).optional().default('PRIVATE'),
       notifications: z.boolean().optional().default(true),
-    }).and(z.record(z.string(), z.boolean())).optional(),
+    }).loose().optional(),
   }),
   tutorialProgress: z.record(z.string(), z.boolean()).optional().default({}),
 });

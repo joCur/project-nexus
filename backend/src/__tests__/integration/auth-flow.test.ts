@@ -1,7 +1,7 @@
 import request from 'supertest';
 import express from 'express';
 import { ApolloServer } from '@apollo/server';
-import { expressMiddleware } from '@apollo/server/express4';
+import { expressMiddleware } from '@as-integrations/express5';
 import { Auth0Service } from '@/services/auth0';
 import { UserService } from '@/services/user';
 import { CacheService } from '@/services/cache';
