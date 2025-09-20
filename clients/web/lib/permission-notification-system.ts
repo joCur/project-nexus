@@ -14,8 +14,6 @@ import {
   PermissionEventListenerOptions,
   PermissionNotificationSystem,
   PermissionNotificationPreferences,
-  PermissionAuditLogger,
-  PermissionAuditLogEntry,
 } from '@/types/permission-events.types';
 import { enhancedPermissionAuditLogger } from './permission-audit-logger';
 import { permissionLogger } from './structured-logger';
@@ -33,6 +31,23 @@ const DEFAULT_PREFERENCES: PermissionNotificationPreferences = {
 };
 
 /**
+ * Debounce configuration for permission events
+ */
+const DEBOUNCE_CONFIG = {
+  // Events that should be debounced
+  debouncedEventTypes: [
+    'permissionGranted',
+    'permissionRevoked',
+    'roleChanged',
+    'permissionCacheInvalidated',
+  ] as PermissionEventType[],
+  // Debounce delay in milliseconds
+  debounceDelay: 500,
+  // Maximum number of grouped events in a single emission
+  maxGroupedEvents: 10,
+};
+
+/**
  * Event listener registration
  */
 interface EventListenerRegistration {
@@ -46,11 +61,15 @@ interface EventListenerRegistration {
  */
 export class PermissionNotificationSystemImpl implements PermissionNotificationSystem {
   private static instance: PermissionNotificationSystemImpl;
-  
+
   private listeners = new Map<PermissionEventType, EventListenerRegistration[]>();
   private globalListeners: EventListenerRegistration[] = [];
   private preferences: PermissionNotificationPreferences = { ...DEFAULT_PREFERENCES };
   private listenerIdCounter = 0;
+
+  // Debouncing state
+  private debouncedEvents = new Map<string, PermissionEvent[]>();
+  private debounceTimers = new Map<string, NodeJS.Timeout>();
 
   /**
    * Singleton instance getter
@@ -136,7 +155,7 @@ export class PermissionNotificationSystemImpl implements PermissionNotificationS
   }
 
   /**
-   * Emit a permission event
+   * Emit a permission event with optional debouncing
    */
   emit(event: PermissionEvent): void {
     try {
@@ -145,33 +164,165 @@ export class PermissionNotificationSystemImpl implements PermissionNotificationS
         return;
       }
 
-      // Log to console if enabled
-      if (this.preferences.enableConsoleLogging) {
-        this.logToConsole(event);
+      // Check if event should be debounced
+      if (this.shouldDebounceEvent(event)) {
+        this.handleDebouncedEvent(event);
+        return;
       }
 
-      // Log to structured logger
-      this.logToStructuredLogger(event);
-
-      // Log to audit system if enabled
-      if (this.preferences.enableAuditLogging) {
-        enhancedPermissionAuditLogger.log(event);
-      }
-
-      // Notify specific event listeners
-      const eventListeners = this.listeners.get(event.type) || [];
-      this.notifyListeners(eventListeners, event);
-
-      // Notify global listeners
-      this.notifyListeners(this.globalListeners, event);
-
-      // Show toast notification if enabled
-      if (this.preferences.enableToastNotifications) {
-        this.showToastNotification(event);
-      }
+      // Process event immediately if not debounced
+      this.processEvent(event);
 
     } catch (error) {
       console.error('Error processing permission event:', error);
+    }
+  }
+
+  /**
+   * Check if an event should be debounced
+   */
+  private shouldDebounceEvent(event: PermissionEvent): boolean {
+    return DEBOUNCE_CONFIG.debouncedEventTypes.includes(event.type);
+  }
+
+  /**
+   * Handle debounced event
+   */
+  private handleDebouncedEvent(event: PermissionEvent): void {
+    const key = this.getDebounceKey(event);
+
+    // Add event to debounced collection
+    if (!this.debouncedEvents.has(key)) {
+      this.debouncedEvents.set(key, []);
+    }
+    const events = this.debouncedEvents.get(key)!;
+
+    // Limit the number of grouped events
+    if (events.length < DEBOUNCE_CONFIG.maxGroupedEvents) {
+      events.push(event);
+    }
+
+    // Clear existing timer
+    const existingTimer = this.debounceTimers.get(key);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+    }
+
+    // Set new debounce timer
+    const timer = setTimeout(() => {
+      const eventsToProcess = this.debouncedEvents.get(key) || [];
+      this.debouncedEvents.delete(key);
+      this.debounceTimers.delete(key);
+
+      // Process all debounced events
+      if (eventsToProcess.length === 1) {
+        // Single event, process normally
+        this.processEvent(eventsToProcess[0]);
+      } else if (eventsToProcess.length > 1) {
+        // Multiple events, process as batch
+        this.processBatchedEvents(eventsToProcess);
+      }
+    }, DEBOUNCE_CONFIG.debounceDelay);
+
+    this.debounceTimers.set(key, timer);
+  }
+
+  /**
+   * Get debounce key for an event
+   */
+  private getDebounceKey(event: PermissionEvent): string {
+    // Create a unique key based on event type and context
+    const parts = [event.type];
+
+    if (event.userId) {
+      parts.push(event.userId);
+    }
+
+    if (event.workspaceId) {
+      parts.push(event.workspaceId);
+    }
+
+    // For specific permission events, include the permission name
+    if ('permission' in event && typeof (event as any).permission === 'string') {
+      parts.push((event as any).permission);
+    }
+
+    return parts.join(':');
+  }
+
+  /**
+   * Process a single event
+   */
+  private processEvent(event: PermissionEvent): void {
+    // Log to console if enabled
+    if (this.preferences.enableConsoleLogging) {
+      this.logToConsole(event);
+    }
+
+    // Log to structured logger
+    this.logToStructuredLogger(event);
+
+    // Log to audit system if enabled
+    if (this.preferences.enableAuditLogging) {
+      enhancedPermissionAuditLogger.log(event);
+    }
+
+    // Notify specific event listeners
+    const eventListeners = this.listeners.get(event.type) || [];
+    this.notifyListeners(eventListeners, event);
+
+    // Notify global listeners
+    this.notifyListeners(this.globalListeners, event);
+
+    // Show toast notification if enabled
+    if (this.preferences.enableToastNotifications) {
+      this.showToastNotification(event);
+    }
+  }
+
+  /**
+   * Process multiple batched events
+   */
+  private processBatchedEvents(events: PermissionEvent[]): void {
+    if (events.length === 0) return;
+
+    // Create a summary event for batched events
+    const firstEvent = events[0];
+    const summaryEvent: PermissionEvent = {
+      ...firstEvent,
+      type: firstEvent.type,
+      timestamp: Date.now(),
+      metadata: {
+        ...firstEvent.metadata,
+        batched: true,
+        batchSize: events.length,
+        eventTypes: events.map(e => e.type),
+      },
+    };
+
+    // Log batch summary
+    if (this.preferences.enableConsoleLogging) {
+      console.log(`🔐 [Batched] ${events.length} ${firstEvent.type} events:`, events);
+    }
+
+    // Log to structured logger
+    this.logToStructuredLogger(summaryEvent);
+
+    // Log each event to audit system
+    if (this.preferences.enableAuditLogging) {
+      events.forEach(event => {
+        enhancedPermissionAuditLogger.log(event);
+      });
+    }
+
+    // Notify listeners with summary event
+    const eventListeners = this.listeners.get(firstEvent.type) || [];
+    this.notifyListeners(eventListeners, summaryEvent);
+    this.notifyListeners(this.globalListeners, summaryEvent);
+
+    // Show single toast for batched events
+    if (this.preferences.enableToastNotifications) {
+      this.showBatchedToastNotification(events);
     }
   }
 
@@ -194,6 +345,11 @@ export class PermissionNotificationSystemImpl implements PermissionNotificationS
   clear(): void {
     this.listeners.clear();
     this.globalListeners = [];
+
+    // Clear any pending debounced events
+    this.debounceTimers.forEach(timer => clearTimeout(timer));
+    this.debounceTimers.clear();
+    this.debouncedEvents.clear();
   }
 
   /**
@@ -286,7 +442,7 @@ export class PermissionNotificationSystemImpl implements PermissionNotificationS
    */
   private removeListener(registration: EventListenerRegistration): void {
     // Remove from specific event listeners
-    for (const [eventType, listeners] of this.listeners.entries()) {
+    for (const listeners of this.listeners.values()) {
       const index = listeners.findIndex(l => l.id === registration.id);
       if (index >= 0) {
         listeners.splice(index, 1);
@@ -370,6 +526,37 @@ export class PermissionNotificationSystemImpl implements PermissionNotificationS
   }
 
   /**
+   * Show toast notification for batched events
+   */
+  private showBatchedToastNotification(events: PermissionEvent[]): void {
+    if (events.length === 0) return;
+
+    const firstEvent = events[0];
+    let message = '';
+
+    switch (firstEvent.type) {
+      case 'permissionGranted':
+        message = `${events.length} permissions have been granted`;
+        break;
+      case 'permissionRevoked':
+        message = `${events.length} permissions have been revoked`;
+        break;
+      case 'roleChanged':
+        message = `Multiple role changes have been applied`;
+        break;
+      case 'permissionCacheInvalidated':
+        message = `Permission cache has been refreshed`;
+        break;
+      default:
+        message = `${events.length} permission changes occurred`;
+    }
+
+    console.log(`🔔 Permission Notification (Batched): ${message}`);
+    // TODO: Integrate with actual toast notification system
+    // toast.show({ message, type: 'info' });
+  }
+
+  /**
    * Log event to structured logger
    */
   private logToStructuredLogger(event: PermissionEvent): void {
@@ -449,130 +636,6 @@ export class PermissionNotificationSystemImpl implements PermissionNotificationS
       default:
         return null;
     }
-  }
-}
-
-/**
- * Permission audit logger implementation
- */
-class PermissionAuditLoggerImpl implements PermissionAuditLogger {
-  private static instance: PermissionAuditLoggerImpl;
-  private entries: PermissionAuditLogEntry[] = [];
-  private maxEntries = 1000; // Limit memory usage
-
-  /**
-   * Singleton instance getter
-   */
-  static getInstance(): PermissionAuditLoggerImpl {
-    if (!PermissionAuditLoggerImpl.instance) {
-      PermissionAuditLoggerImpl.instance = new PermissionAuditLoggerImpl();
-    }
-    return PermissionAuditLoggerImpl.instance;
-  }
-
-  /**
-   * Log a permission event
-   */
-  log(event: PermissionEvent, level: PermissionAuditLogEntry['level'] = 'info'): void {
-    try {
-      const entry: PermissionAuditLogEntry = {
-        id: `audit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        timestamp: new Date(),
-        event,
-        level: this.determineLogLevel(event, level),
-        source: 'frontend',
-        context: {
-          userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
-          sessionId: this.getSessionId(),
-        },
-      };
-
-      this.entries.push(entry);
-
-      // Maintain memory limits
-      if (this.entries.length > this.maxEntries) {
-        this.entries.splice(0, this.entries.length - this.maxEntries);
-      }
-
-      // In production, this would send to backend audit service
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔍 Audit Log:', entry);
-      }
-    } catch (error) {
-      console.error('Failed to log permission audit entry:', error);
-    }
-  }
-
-  /**
-   * Get audit log entries with optional filtering
-   */
-  getEntries(filter?: {
-    userId?: string;
-    workspaceId?: string;
-    eventType?: PermissionEventType;
-    timeRange?: { from: Date; to: Date };
-    level?: PermissionAuditLogEntry['level'];
-  }): PermissionAuditLogEntry[] {
-    let filtered = [...this.entries];
-
-    if (filter) {
-      filtered = filtered.filter(entry => {
-        if (filter.userId && entry.event.userId !== filter.userId) return false;
-        if (filter.workspaceId && entry.event.workspaceId !== filter.workspaceId) return false;
-        if (filter.eventType && entry.event.type !== filter.eventType) return false;
-        if (filter.level && entry.level !== filter.level) return false;
-        if (filter.timeRange) {
-          const entryTime = entry.timestamp.getTime();
-          if (entryTime < filter.timeRange.from.getTime() || entryTime > filter.timeRange.to.getTime()) {
-            return false;
-          }
-        }
-        return true;
-      });
-    }
-
-    return filtered.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-  }
-
-  /**
-   * Clean up old audit log entries
-   */
-  cleanup(olderThan: Date): number {
-    const beforeCount = this.entries.length;
-    this.entries = this.entries.filter(entry => entry.timestamp >= olderThan);
-    return beforeCount - this.entries.length;
-  }
-
-  /**
-   * Determine appropriate log level for event
-   */
-  private determineLogLevel(event: PermissionEvent, providedLevel: PermissionAuditLogEntry['level']): PermissionAuditLogEntry['level'] {
-    // If level is explicitly provided, use it
-    if (providedLevel !== 'info') {
-      return providedLevel;
-    }
-
-    // Auto-determine level based on event type
-    switch (event.type) {
-      case 'permissionCheckFailed':
-      case 'permissionQueryError':
-        return 'error';
-      case 'permissionRevoked':
-      case 'workspaceAccessRevoked':
-        return 'warn';
-      case 'roleChanged':
-        return 'warn';
-      default:
-        return 'info';
-    }
-  }
-
-  /**
-   * Get current session ID
-   */
-  private getSessionId(): string {
-    // In a real app, this would be managed by auth system
-    return 'session_' + Math.random().toString(36).substr(2, 9);
   }
 }
 

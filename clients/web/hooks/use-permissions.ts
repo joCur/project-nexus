@@ -8,7 +8,7 @@
  */
 
 import { useQuery } from '@apollo/client';
-import { useCallback, useMemo, useEffect, useRef } from 'react';
+import { useCallback, useMemo, useEffect, useRef, useState } from 'react';
 import { useAuth } from './use-auth';
 import {
   GET_USER_WORKSPACE_PERMISSIONS,
@@ -31,14 +31,19 @@ import { permissionPreloader } from '@/lib/permission-preloader';
 const PERMISSION_CACHE_CONFIG = {
   // 5 minutes TTL as specified in requirements
   TTL_MS: 5 * 60 * 1000,
-  
+
   // Apollo Client cache policies
   FETCH_POLICY: 'cache-first' as const,
   ERROR_POLICY: 'all' as const,
-  
+
   // Performance targets from requirements
   PERFORMANCE_TARGET_CACHED_MS: 100,
   PERFORMANCE_TARGET_UNCACHED_MS: 500,
+
+  // Retry configuration
+  MAX_RETRY_ATTEMPTS: 3,
+  RETRY_DELAY_MS: 1000,
+  RETRY_BACKOFF_MULTIPLIER: 2,
 } as const;
 
 /**
@@ -92,6 +97,8 @@ export function useWorkspacePermissions(
 ): WorkspacePermissionsResult {
   const { user } = useAuth();
   const { enabled = true, errorPolicy = 'secure-by-default' } = options;
+  const [retryCount, setRetryCount] = useState(0);
+  const retryTimeoutRef = useRef<NodeJS.Timeout>();
 
   const { data, loading, error, refetch } = useQuery<
     GetUserWorkspacePermissionsData,
@@ -169,7 +176,7 @@ export function useWorkspacePermissions(
     previousPermissions.current = currentPermissions;
   }, [permissions, user?.sub, workspaceId]);
 
-  // Handle errors
+  // Handle errors with retry logic
   useEffect(() => {
     if (error && user?.sub && workspaceId) {
       emitPermissionEvent({
@@ -179,10 +186,37 @@ export function useWorkspacePermissions(
         queryType: 'workspace',
         workspaceId,
         error: error.message || 'Unknown error',
-        retryCount: 0,
+        retryCount,
       });
+
+      // Implement exponential backoff retry logic
+      if (retryCount < PERMISSION_CACHE_CONFIG.MAX_RETRY_ATTEMPTS) {
+        const delay = PERMISSION_CACHE_CONFIG.RETRY_DELAY_MS *
+                     Math.pow(PERMISSION_CACHE_CONFIG.RETRY_BACKOFF_MULTIPLIER, retryCount);
+
+        console.log(`Retrying workspace permissions query (attempt ${retryCount + 1}/${PERMISSION_CACHE_CONFIG.MAX_RETRY_ATTEMPTS}) after ${delay}ms`);
+
+        retryTimeoutRef.current = setTimeout(() => {
+          setRetryCount(prev => prev + 1);
+          refetch();
+        }, delay);
+      } else {
+        console.error('Max retry attempts reached for workspace permissions query');
+      }
     }
-  }, [error, user?.sub, workspaceId]);
+
+    // Clear retry count on successful fetch
+    if (!error && retryCount > 0) {
+      setRetryCount(0);
+    }
+
+    // Cleanup timeout on unmount or when dependencies change
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+    };
+  }, [error, user?.sub, workspaceId, retryCount, refetch]);
 
   // Memoized permission checker function
   const checkPermission = useCallback(
@@ -218,6 +252,8 @@ export function usePermissionCheck(
 ): PermissionCheckResult {
   const { user } = useAuth();
   const { enabled = true, errorPolicy = 'secure-by-default' } = options;
+  const [retryCount, setRetryCount] = useState(0);
+  const retryTimeoutRef = useRef<NodeJS.Timeout>();
 
   const { data, loading, error, refetch } = useQuery<
     CheckUserPermissionData,
@@ -243,7 +279,7 @@ export function usePermissionCheck(
     return data?.checkUserPermission || false;
   }, [data, error, errorPolicy]);
 
-  // Handle permission check failures
+  // Handle permission check failures with retry logic
   useEffect(() => {
     if (error && user?.sub && workspaceId && permission) {
       emitPermissionEvent({
@@ -255,8 +291,35 @@ export function usePermissionCheck(
         error: error.message || 'Unknown error',
         fallbackUsed: errorPolicy === 'secure-by-default',
       });
+
+      // Implement exponential backoff retry logic
+      if (retryCount < PERMISSION_CACHE_CONFIG.MAX_RETRY_ATTEMPTS) {
+        const delay = PERMISSION_CACHE_CONFIG.RETRY_DELAY_MS *
+                     Math.pow(PERMISSION_CACHE_CONFIG.RETRY_BACKOFF_MULTIPLIER, retryCount);
+
+        console.log(`Retrying permission check (attempt ${retryCount + 1}/${PERMISSION_CACHE_CONFIG.MAX_RETRY_ATTEMPTS}) after ${delay}ms`);
+
+        retryTimeoutRef.current = setTimeout(() => {
+          setRetryCount(prev => prev + 1);
+          refetch();
+        }, delay);
+      } else {
+        console.error('Max retry attempts reached for permission check');
+      }
     }
-  }, [error, user?.sub, workspaceId, permission, errorPolicy]);
+
+    // Clear retry count on successful fetch
+    if (!error && retryCount > 0) {
+      setRetryCount(0);
+    }
+
+    // Cleanup timeout on unmount or when dependencies change
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+    };
+  }, [error, user?.sub, workspaceId, permission, errorPolicy, retryCount, refetch]);
 
   // Memoized refetch function
   const refetchPermission = useCallback(async () => {
