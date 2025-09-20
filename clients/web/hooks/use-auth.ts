@@ -3,7 +3,13 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useMemo, useEffect } from 'react';
 import { announceToScreenReader } from '@/lib/utils';
 import { navigationUtils } from '@/lib/navigation';
-import { checkUserPermission, checkUserRole } from '@/lib/utils/permissions';
+import { 
+  checkUserPermission, 
+  checkUserRole, 
+  checkAnyUserPermission, 
+  checkAllUserPermissions,
+  createWorkspacePermissionChecker 
+} from '@/lib/utils/permissions';
 import { ExtendedUserProfile, LoginOptions, LogoutOptions, UseAuthReturn, AuthState, AUTH0_CLAIM_URLS } from '@/types/auth';
 
 /**
@@ -124,11 +130,14 @@ export function useAuth(): UseAuthReturn {
 
   /**
    * Check if user has a specific permission
-   * Note: This now requires backend integration to fetch permissions
-   * TODO: Implement backend permission fetching logic
+   * This is a convenience method that uses the global permission context.
+   * For workspace-specific permission checks, use the usePermissions hook directly.
+   * 
+   * @param permission - The permission to check
+   * @param workspaceId - Optional workspace ID (overrides global context)
    */
-  const checkPermission = useCallback((permission: string): boolean => {
-    return checkUserPermission(extendedUser, permission);
+  const checkPermission = useCallback((permission: string, workspaceId?: string): boolean => {
+    return checkUserPermission(extendedUser, permission, workspaceId);
   }, [extendedUser]);
 
   /**
@@ -170,6 +179,32 @@ export function useAuth(): UseAuthReturn {
   }, [router]);
 
   /**
+   * Check if user has any of the specified permissions
+   * @param permissions - Array of permissions to check
+   * @param workspaceId - Optional workspace ID (overrides global context)
+   */
+  const hasAnyPermission = useCallback((permissions: string[], workspaceId?: string): boolean => {
+    return checkAnyUserPermission(extendedUser, permissions, workspaceId);
+  }, [extendedUser]);
+
+  /**
+   * Check if user has all of the specified permissions
+   * @param permissions - Array of permissions to check
+   * @param workspaceId - Optional workspace ID (overrides global context)
+   */
+  const hasAllPermissions = useCallback((permissions: string[], workspaceId?: string): boolean => {
+    return checkAllUserPermissions(extendedUser, permissions, workspaceId);
+  }, [extendedUser]);
+
+  /**
+   * Create a workspace-specific permission checker
+   * @param workspaceId - The workspace ID to create checker for
+   */
+  const createPermissionChecker = useCallback((workspaceId: string) => {
+    return createWorkspacePermissionChecker(extendedUser, workspaceId);
+  }, [extendedUser]);
+
+  /**
    * Announce authentication status to screen readers
    */
   const announceAuthStatus = useCallback((message: string, priority: 'polite' | 'assertive' = 'polite') => {
@@ -187,7 +222,10 @@ export function useAuth(): UseAuthReturn {
     login,
     logout,
     checkPermission,
+    hasAnyPermission,
+    hasAllPermissions,
     hasRole,
+    createPermissionChecker,
     refreshUser,
     announceAuthStatus,
   };

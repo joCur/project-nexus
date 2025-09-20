@@ -12,9 +12,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence, useSpring, useTransform } from 'framer-motion';
 import { CheckCircleIcon, ExclamationTriangleIcon, InformationCircleIcon } from '@heroicons/react/24/solid';
-import { useCanvasStore } from '@/stores/canvasStore';
-import { useWorkspaceStore } from '@/stores/workspaceStore';
-import type { CanvasId } from '@/types/workspace.types';
 
 // Canvas switching transition overlay
 interface CanvasSwitchOverlayProps {
@@ -215,11 +212,11 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
   size = 'md',
 }) => {
   const progressValue = useSpring(progress, { stiffness: 100, damping: 30 });
+  const circumference = 2 * Math.PI * 45; // radius = 45
+  const offset = useTransform(progressValue, [0, 100], [circumference, 0]);
+  const widthValue = useTransform(progressValue, value => `${value}%`);
 
   if (variant === 'circular') {
-    const circumference = 2 * Math.PI * 45; // radius = 45
-    const offset = useTransform(progressValue, [0, 100], [circumference, 0]);
-    
     const sizeClasses = {
       sm: 'w-8 h-8',
       md: 'w-12 h-12',
@@ -270,10 +267,7 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
       <div className="canvas-progress-bar">
         <motion.div
           className="canvas-progress-fill"
-          style={{
-            width: progressValue.get() + '%',
-            transition: 'width 0.3s ease',
-          }}
+          style={{ width: widthValue }}
         />
       </div>
     </div>
@@ -374,18 +368,23 @@ export const Notification: React.FC<NotificationProps> = ({
 export const NotificationContainer: React.FC = () => {
   const [notifications, setNotifications] = useState<NotificationProps[]>([]);
 
-  const addNotification = useCallback((notification: Omit<NotificationProps, 'id' | 'onDismiss'>) => {
-    const id = Date.now().toString();
-    setNotifications(prev => [...prev, { ...notification, id, onDismiss: removeNotification }]);
-  }, []);
-
   const removeNotification = useCallback((id: string) => {
     setNotifications(prev => prev.filter(n => n.id !== id));
   }, []);
 
+  const addNotification = useCallback((notification: Omit<NotificationProps, 'id' | 'onDismiss'>) => {
+    const id = Date.now().toString();
+    setNotifications(prev => [...prev, { ...notification, id, onDismiss: removeNotification }]);
+  }, [removeNotification]);
+
   // Expose methods globally for easy access
   useEffect(() => {
     (window as any).showNotification = addNotification;
+    return () => {
+      if ((window as any).showNotification === addNotification) {
+        delete (window as any).showNotification;
+      }
+    };
   }, [addNotification]);
 
   return (
@@ -587,7 +586,7 @@ export const CanvasActionButton: React.FC<CanvasActionButtonProps> = ({
   );
 };
 
-export default {
+const canvasTransitionComponents = {
   CanvasSwitchOverlay,
   LoadingSkeleton,
   ProgressIndicator,
@@ -597,3 +596,5 @@ export default {
   AnimatedTooltip,
   CanvasActionButton,
 };
+
+export default canvasTransitionComponents;

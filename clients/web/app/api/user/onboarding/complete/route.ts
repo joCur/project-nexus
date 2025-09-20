@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { completedAt, totalDuration, userChoices, persona, finalStep, tutorialProgress } = body;
+    const { completedAt, userChoices, persona, tutorialProgress } = body;
 
     // Validate required fields
     if (!completedAt || !userChoices || !persona) {
@@ -37,20 +37,57 @@ export async function POST(request: NextRequest) {
     }
 
     // Call backend GraphQL API for onboarding completion
+    // Using completeOnboardingWorkflow to ensure workspace is created
     const graphqlQuery = `
-      mutation CompleteOnboarding($input: OnboardingCompleteInput!) {
-        completeOnboarding(input: $input) {
-          id
-          completed
-          completedAt
-          finalStep
-          tutorialProgress
+      mutation CompleteOnboardingWorkflow($input: OnboardingWorkflowCompleteInput!) {
+        completeOnboardingWorkflow(input: $input) {
+          success
+          profile {
+            id
+            fullName
+            displayName
+          }
+          onboarding {
+            id
+            completed
+            completedAt
+            finalStep
+            tutorialProgress
+          }
+          workspace {
+            id
+            name
+            privacy
+          }
         }
       }
     `;
 
+    // Map persona to UserProfileRole enum
+    const roleMap: { [key: string]: string } = {
+      'student': 'STUDENT',
+      'academic': 'RESEARCHER',
+      'researcher': 'RESEARCHER',
+      'writer': 'CREATIVE',
+      'creator': 'CREATIVE',
+      'designer': 'CREATIVE',
+      'professional': 'BUSINESS',
+      'explorer': 'OTHER',
+      'general': 'OTHER',
+    };
+
     const graphqlVariables = {
       input: {
+        userProfile: {
+          fullName: userChoices?.fullName || session.user.name || 'New User',
+          displayName: userChoices?.displayName || session.user.nickname || session.user.name || 'New User',
+          role: roleMap[persona?.toLowerCase()] || 'OTHER',
+          preferences: {
+            workspaceName: userChoices?.workspaceName || 'My Workspace',
+            privacy: 'PRIVATE',
+            notifications: true,
+          },
+        },
         tutorialProgress: tutorialProgress || {},
       },
     };
@@ -81,24 +118,15 @@ export async function POST(request: NextRequest) {
       throw new Error('GraphQL query failed');
     }
 
-    const onboardingResult = result.data.completeOnboarding;
-
-    console.log('Onboarding completed:', {
-      userId: session.user.sub,
-      completedAt,
-      totalDuration,
-      userChoices,
-      persona,
-      finalStep,
-      tutorialProgress,
-      result: onboardingResult,
-    });
+    const workflowResult = result.data.completeOnboardingWorkflow;
 
     return NextResponse.json({
       success: true,
       message: 'Onboarding completed successfully',
       data: {
-        onboarding: onboardingResult,
+        onboarding: workflowResult.onboarding,
+        profile: workflowResult.profile,
+        workspace: workflowResult.workspace,
       },
     });
 

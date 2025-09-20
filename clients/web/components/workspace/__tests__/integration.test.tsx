@@ -10,13 +10,15 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { WorkspaceLayout } from '../WorkspaceLayout';
 import { WorkspaceHeader } from '../WorkspaceHeader';
 import { WorkspaceBreadcrumbs } from '../WorkspaceBreadcrumbs';
-import { CanvasSwitcher } from '../CanvasSwitcher';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
 import { useAuth } from '@/hooks/use-auth';
+import { useContextPermissions } from '@/hooks/use-permissions';
 
 // Mock dependencies
 jest.mock('@/stores/workspaceStore');
 jest.mock('@/hooks/use-auth');
+jest.mock('@/hooks/use-permissions');
+jest.mock('@/lib/utils/permissions');
 jest.mock('next/navigation', () => ({
   useRouter: () => ({
     push: jest.fn(),
@@ -36,6 +38,7 @@ jest.mock('../CreateCanvasModal', () => ({
 
 const mockUseWorkspaceStore = useWorkspaceStore as jest.MockedFunction<typeof useWorkspaceStore>;
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
+const mockUseContextPermissions = useContextPermissions as jest.MockedFunction<typeof useContextPermissions>;
 
 describe('Workspace Components Integration', () => {
   beforeEach(() => {
@@ -48,11 +51,27 @@ describe('Workspace Components Integration', () => {
       login: jest.fn(),
       logout: jest.fn(),
       checkPermission: jest.fn().mockReturnValue(true),
+      hasAnyPermission: jest.fn().mockReturnValue(true),
+      hasAllPermissions: jest.fn().mockReturnValue(true),
       hasRole: jest.fn().mockReturnValue(true),
+      createPermissionChecker: jest.fn().mockReturnValue({
+        hasPermission: jest.fn().mockReturnValue(true),
+        hasAnyPermission: jest.fn().mockReturnValue(true),
+        hasAllPermissions: jest.fn().mockReturnValue(true),
+      }),
       refreshUser: jest.fn(),
       announceAuthStatus: jest.fn(),
       isLoading: false,
       isAuthenticated: true,
+    });
+
+    mockUseContextPermissions.mockReturnValue({
+      permissionsByWorkspace: { 'workspace-1': ['workspace:read', 'canvas:create'] },
+      loading: false,
+      error: undefined,
+      refetch: jest.fn().mockResolvedValue({}),
+      getAllPermissions: jest.fn().mockReturnValue(['workspace:read', 'canvas:create']),
+      checkPermissionInWorkspace: jest.fn().mockReturnValue(true),
     });
 
     mockUseWorkspaceStore.mockImplementation((selector?: any) => {
@@ -128,7 +147,14 @@ describe('Workspace Components Integration', () => {
         login: jest.fn(),
         logout: mockLogout,
         checkPermission: jest.fn().mockReturnValue(true),
+        hasAnyPermission: jest.fn().mockReturnValue(true),
+        hasAllPermissions: jest.fn().mockReturnValue(true),
         hasRole: jest.fn().mockReturnValue(true),
+        createPermissionChecker: jest.fn().mockReturnValue({
+          hasPermission: jest.fn().mockReturnValue(true),
+          hasAnyPermission: jest.fn().mockReturnValue(true),
+          hasAllPermissions: jest.fn().mockReturnValue(true),
+        }),
         refreshUser: jest.fn(),
         announceAuthStatus: jest.fn(),
         isLoading: false,

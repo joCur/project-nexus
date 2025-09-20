@@ -406,7 +406,7 @@ export const AdvancedFeaturesStep: React.FC<OnboardingStepProps> = ({
                 </span>
               </div>
               <p className="text-text-secondary">
-                Select the features you're most interested in trying out first.
+                Select the features you&rsquo;re most interested in trying out first.
               </p>
             </div>
           )}
@@ -476,10 +476,10 @@ export const AdvancedFeaturesStep: React.FC<OnboardingStepProps> = ({
           {selectedFeatures.length > 0 && (
             <div className="bg-primary-50 border border-primary-200 rounded-lg p-6 text-center">
               <h3 className="font-semibold text-primary-700 mb-2">
-                Great choices! You've selected {selectedFeatures.length} features
+                Great choices! You&rsquo;ve selected {selectedFeatures.length} features
               </h3>
               <p className="text-primary-600 text-sm mb-4">
-                We'll highlight these features in your workspace and provide guided tutorials when you're ready.
+                We&rsquo;ll highlight these features in your workspace and provide guided tutorials when you&rsquo;re ready.
               </p>
               
               <Button

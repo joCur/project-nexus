@@ -360,6 +360,11 @@ export const authTypeDefs = gql`
     isOnboardingComplete(userId: ID!): Boolean!
     myOnboardingStatus: OnboardingStatus!
     
+    # Permission queries
+    getUserWorkspacePermissions(userId: ID!, workspaceId: ID!): [String!]!
+    checkUserPermission(userId: ID!, workspaceId: ID!, permission: String!): Boolean!
+    getUserPermissionsForContext: JSON!
+    
     # Workspace queries
     workspace(id: ID!): Workspace
     workspaces(ownerId: ID!): [Workspace!]!
@@ -407,7 +412,8 @@ export const authTypeDefs = gql`
     
     # Onboarding mutations
     updateOnboardingProgress(input: OnboardingProgressUpdateInput!): UserOnboarding!
-    completeOnboarding(input: OnboardingCompleteInput!): UserOnboarding!
+    # TODO: DEPRECATED - Remove after all clients use completeOnboardingWorkflow
+    completeOnboarding(input: OnboardingCompleteInput!): UserOnboarding! @deprecated(reason: "Use completeOnboardingWorkflow instead - this only marks completion without creating workspace/profile")
     resetOnboarding(userId: ID!): Boolean!
     
     # Onboarding workflow mutations

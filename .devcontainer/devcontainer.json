@@ -91,7 +91,8 @@
 
   // Features to install
   "features": {
-    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
   },
 
   // Container environment variables
@@ -115,5 +116,5 @@
   },
 
   // Lifecycle commands
-  "postCreateCommand": "npm install --prefix backend && npm install --prefix clients/web"
+  "postCreateCommand": "npm i && npm install --prefix backend && npm install --prefix clients/web"
 }

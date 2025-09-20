@@ -3,10 +3,10 @@
 import { withPageAuthRequired } from '@auth0/nextjs-auth0/client';
 import { useAuth } from '@/hooks/use-auth';
 import { ExtendedUserProfile, Permissions, Roles } from '@/types/auth';
-import { useRouter } from 'next/navigation';
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useMemo } from 'react';
 import { Card, CardContent, Button } from '@/components/ui';
 import { announceToScreenReader } from '@/lib/utils';
+import { useWorkspacePermissionContextSafe } from '../../contexts/WorkspacePermissionContext';
 
 /**
  * Props for ProtectedRoute component
@@ -277,6 +277,9 @@ function UnauthorizedAccess({
 
 /**
  * Internal ProtectedRoute component that handles authorization logic
+ * 
+ * Updated to use the real backend permission system with workspace-aware context.
+ * Integrates with WorkspacePermissionContext for automatic permission management.
  */
 function ProtectedRouteInternal({
   children,
@@ -290,55 +293,63 @@ function ProtectedRouteInternal({
   onUnauthorized,
 }: ProtectedRouteProps) {
   const { user, isLoading, error, checkPermission, hasRole } = useAuth();
-  const router = useRouter();
+  
+  // Get workspace permission context - this may be null if context is not available
+  const permissionContext = useWorkspacePermissionContextSafe();
 
-  // Check authorization when user state changes
-  useEffect(() => {
-    if (!isLoading && user) {
-      const isAuthorized = checkAuthorization(
-        user,
-        requiredPermissions,
-        requiredRoles,
-        requireAllPermissions,
-        requireAllRoles,
-        authorize,
-        checkPermission,
-        hasRole
-      );
+  // Show loading state for auth or permissions
+  const isPermissionLoading = permissionContext?.loading || false;
+  const totalLoading = isLoading || isPermissionLoading;
 
-      if (!isAuthorized) {
-        if (onUnauthorized) {
-          onUnauthorized();
-        } else if (redirectTo !== window.location.pathname) {
-          // Use window.location.href to avoid Next.js App Router typing issues
-          // This is safer than type assertions and works consistently across route types
-          window.location.href = redirectTo;
-        }
-      }
+  // Memoize authorization check to avoid unnecessary recalculations
+  const isAuthorized = useMemo(() => {
+    if (!user || totalLoading) {
+      return false;
     }
+
+    return checkAuthorization(
+      user,
+      requiredPermissions,
+      requiredRoles,
+      requireAllPermissions,
+      requireAllRoles,
+      authorize,
+      checkPermission,
+      hasRole
+    );
   }, [
     user,
-    isLoading,
+    totalLoading,
     requiredPermissions,
     requiredRoles,
     requireAllPermissions,
     requireAllRoles,
     authorize,
-    redirectTo,
-    onUnauthorized,
-    router,
     checkPermission,
     hasRole,
   ]);
 
+  // Handle unauthorized access with redirect
+  useEffect(() => {
+    if (!totalLoading && user && !isAuthorized) {
+      if (onUnauthorized) {
+        onUnauthorized();
+      } else if (redirectTo !== window.location.pathname) {
+        // Use window.location.href for reliable redirection
+        window.location.href = redirectTo;
+      }
+    }
+  }, [totalLoading, user, isAuthorized, onUnauthorized, redirectTo]);
+
   // Show loading state
-  if (isLoading) {
+  if (totalLoading) {
     return fallback || <AuthLoadingSpinner />;
   }
 
   // Show error state
-  if (error) {
-    return <AuthError error={error} />;
+  if (error || permissionContext?.error) {
+    const displayError = error || permissionContext?.error;
+    return <AuthError error={displayError!} />;
   }
 
   // Check if user is authenticated
@@ -346,24 +357,20 @@ function ProtectedRouteInternal({
     return <AuthLoadingSpinner />;
   }
 
-  // Check authorization
-  const isAuthorized = checkAuthorization(
-    user,
-    requiredPermissions,
-    requiredRoles,
-    requireAllPermissions,
-    requireAllRoles,
-    authorize,
-    checkPermission,
-    hasRole
-  );
-
+  // Show unauthorized state
   if (!isAuthorized) {
     return (
       <UnauthorizedAccess
         requiredPermissions={requiredPermissions}
         requiredRoles={requiredRoles}
-        onRetry={() => window.location.reload()}
+        onRetry={() => {
+          // Refetch permissions if context is available
+          if (permissionContext?.refetch) {
+            permissionContext.refetch();
+          } else {
+            window.location.reload();
+          }
+        }}
       />
     );
   }
@@ -420,15 +427,16 @@ function checkAuthorization(
  * 
  * This component provides:
  * - Automatic authentication requirement
- * - Permission-based access control
+ * - Permission-based access control with backend integration
  * - Role-based access control
+ * - Workspace-aware permission checking
  * - Custom authorization logic
  * - Proper loading and error states
  * - Configurable redirect behavior
  * 
  * Usage:
  * ```tsx
- * <ProtectedRoute requiredPermissions={[Permissions.READ_CARDS]}>
+ * <ProtectedRoute requiredPermissions={[Permissions.CARD_READ]}>
  *   <CardsPage />
  * </ProtectedRoute>
  * ```
@@ -493,6 +501,26 @@ export function WorkspaceRoute({ children, ...props }: Omit<ProtectedRouteProps,
   return (
     <ProtectedRoute
       requiredPermissions={[Permissions.WORKSPACE_READ]}
+      redirectTo="/workspace"
+      {...props}
+    >
+      {children}
+    </ProtectedRoute>
+  );
+}
+
+/**
+ * Utility component for routes that require specific workspace permissions
+ * Uses the backend permission format (resource:action)
+ */
+export function WorkspacePermissionRoute({ 
+  children, 
+  requiredPermissions = [Permissions.WORKSPACE_READ],
+  ...props 
+}: ProtectedRouteProps) {
+  return (
+    <ProtectedRoute
+      requiredPermissions={requiredPermissions}
       redirectTo="/workspace"
       {...props}
     >

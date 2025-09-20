@@ -228,6 +228,13 @@ export const onboardingResolvers = {
 
     /**
      * Complete onboarding process
+     *
+     * @deprecated This mutation only marks onboarding as complete without creating
+     * workspace or profile. Use `completeOnboardingWorkflow` instead which handles
+     * the full onboarding completion including workspace/profile creation.
+     *
+     * TODO: Remove this mutation after confirming all clients use completeOnboardingWorkflow
+     * See: https://github.com/your-repo/issues/XXX
      */
     completeOnboarding: async (
       _: any,

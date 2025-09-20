@@ -2,8 +2,8 @@
 
 import { useAuth } from '@/hooks/use-auth';
 import { useOnboardingStatus } from '@/hooks/use-onboarding-status';
-import { useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function HomePage() {
   const { user, isLoading, login, logout } = useAuth();
@@ -33,9 +33,11 @@ export default function HomePage() {
               <>
                 <div className="flex items-center space-x-2">
                   {user.picture && (
-                    <img
+                    <Image
                       src={user.picture}
-                      alt={user.name || user.email}
+                      alt={user.name || user.email || 'User avatar'}
+                      width={32}
+                      height={32}
                       className="h-8 w-8 rounded-full"
                     />
                   )}

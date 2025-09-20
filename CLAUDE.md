@@ -172,15 +172,11 @@ gh pr merge 19 --squash --delete-branch
 - **Code Style**: Follow existing patterns, use TypeScript strictly, maintain test coverage
 - **Linear Workflow**: Always update ticket state and properties throughout development process
 - **Agent Usage**: Try to always use the correct sub agent, when working on a process e.g. using the senior backend agent when working on the backend
+- never implement development versions of features that mock the real implementation, unless otherwise stated.
 
 ## Documentation References
 
 - [Elevator Pitch](./README.md)
-- [Design Guidelines](./design-documentation/)
-- [Product Manager Documentation](./project-documentation/product-manager-output.md)
-- [Technical Architecture](./project-documentation/technical-architecture.md)
-- [Testing Guide](./TESTING.md)
-
-## Memory
-
-- never implement development versions of features that mock the real implementation, unless otherwise stated.
+- [Design Guidelines](./docs/design-documentation/)
+- [Product Manager Documentation](./docs/project-documentation/product-manager-output.md)
+- [Technical Architecture](./docs/project-documentation/technical-architecture.md)

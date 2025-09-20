@@ -414,7 +414,7 @@ export const CompletionStep: React.FC<OnboardingStepProps> = ({
           </h1>
           
           <p className="text-xl text-text-secondary mb-2">
-            You've successfully completed your Project Nexus onboarding
+            You&rsquo;ve successfully completed your Project Nexus onboarding
           </p>
           
           <p className="text-text-tertiary">

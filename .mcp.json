@@ -3,9 +3,7 @@
     "playwright": {
       "type": "stdio",
       "command": "npx",
-      "args": [
-        "@playwright/mcp@latest"
-      ],
+      "args": ["@playwright/mcp@latest"],
       "env": {}
     },
     "context7": {
@@ -17,8 +15,8 @@
       "url": "https://mcp.semgrep.ai/mcp"
     },
     "linear-server": {
-        "command": "npx",
-        "args": ["-y", "mcp-remote", "https://mcp.linear.app/sse"]
+      "command": "npx",
+      "args": ["-y", "@tacticlaunch/mcp-linear"]
     }
   }
 }

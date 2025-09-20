@@ -2,9 +2,10 @@
  * CreateCanvasModal Component Tests
  */
 
+/* eslint-disable @typescript-eslint/no-var-requires */
+
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { useRouter } from 'next/navigation';
 import { CreateCanvasModal } from '../CreateCanvasModal';
 import { useWorkspaceStore } from '@/stores/workspaceStore';

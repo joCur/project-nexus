@@ -69,12 +69,32 @@
 import { gql } from '@apollo/client';
 
 /**
- * Query to get user permissions from backend
- * Fetches permissions for the current authenticated user
+ * Query to get user permissions for a specific workspace
+ * Fetches permissions for a user in a given workspace
  */
-export const GET_USER_PERMISSIONS = gql`
-  query GetUserPermissions($userId: ID!) {
-    getUserPermissions(userId: $userId)
+export const GET_USER_WORKSPACE_PERMISSIONS = gql`
+  query GetUserWorkspacePermissions($userId: ID!, $workspaceId: ID!) {
+    getUserWorkspacePermissions(userId: $userId, workspaceId: $workspaceId)
+  }
+`;
+
+/**
+ * Query to check if user has a specific permission in a workspace
+ * More efficient than fetching all permissions when checking a single permission
+ */
+export const CHECK_USER_PERMISSION = gql`
+  query CheckUserPermission($userId: ID!, $workspaceId: ID!, $permission: String!) {
+    checkUserPermission(userId: $userId, workspaceId: $workspaceId, permission: $permission)
+  }
+`;
+
+/**
+ * Query to get user permissions across all their workspaces
+ * Used for GraphQL context resolution and global permission checking
+ */
+export const GET_USER_PERMISSIONS_FOR_CONTEXT = gql`
+  query GetUserPermissionsForContext {
+    getUserPermissionsForContext
   }
 `;
 
@@ -112,14 +132,37 @@ export const SYNC_USER = gql`
 `;
 
 /**
- * Types for user operations
+ * Types for permission operations
  */
-export interface GetUserPermissionsVariables {
+
+// Workspace-specific permission queries
+export interface GetUserWorkspacePermissionsVariables {
   userId: string;
+  workspaceId: string;
 }
 
-export interface GetUserPermissionsData {
-  getUserPermissions: string[];
+export interface GetUserWorkspacePermissionsData {
+  getUserWorkspacePermissions: string[];
+}
+
+// Single permission check
+export interface CheckUserPermissionVariables {
+  userId: string;
+  workspaceId: string;
+  permission: string;
+}
+
+export interface CheckUserPermissionData {
+  checkUserPermission: boolean;
+}
+
+// Context permissions (all workspaces)
+export interface GetUserPermissionsForContextVariables {
+  // No variables needed - uses authenticated user from context
+}
+
+export interface GetUserPermissionsForContextData {
+  getUserPermissionsForContext: { [workspaceId: string]: string[] };
 }
 
 export interface GetCurrentUserData {

@@ -1,7 +1,6 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useWorkspaceStore } from '@/stores/workspaceStore';
 import { useCanvases, useCreateCanvas } from '@/hooks/use-canvas';
 import { useEffect, useState } from 'react';
 import type { EntityId } from '@/types/common.types';
@@ -15,23 +14,13 @@ export default function WorkspacePage() {
   const router = useRouter();
   const workspaceId = params.workspaceId as EntityId;
   
-  const { setCurrentWorkspace } = useWorkspaceStore();
-  const context = useWorkspaceStore((state) => state.context);
-  
   // Use GraphQL hooks to fetch canvases
   const { canvases, loading: canvasesLoading, error: canvasesError } = useCanvases(workspaceId);
   const { mutate: createCanvas, loading: creatingCanvas } = useCreateCanvas();
   
   const [hasTriedCreateDefault, setHasTriedCreateDefault] = useState(false);
 
-  useEffect(() => {
-    if (workspaceId) {
-      // Set current workspace if different
-      if (context.currentWorkspaceId !== workspaceId) {
-        setCurrentWorkspace(workspaceId, `Workspace ${workspaceId}`);
-      }
-    }
-  }, [workspaceId, context.currentWorkspaceId, setCurrentWorkspace]);
+  // Workspace context is now set by the layout, so we don't need to set it here
 
   useEffect(() => {
     // Handle canvas loading and default creation

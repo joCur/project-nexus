@@ -174,8 +174,8 @@ export const DELETE_CANVAS = gql`
  */
 export const SET_DEFAULT_CANVAS = gql`
   ${CANVAS_CORE_FIELDS}
-  mutation SetDefaultCanvas($workspaceId: ID!, $canvasId: ID!) {
-    setDefaultCanvas(workspaceId: $workspaceId, canvasId: $canvasId) {
+  mutation SetDefaultCanvas($id: ID!) {
+    setDefaultCanvas(id: $id) {
       ...CanvasCoreFields
     }
   }
@@ -312,8 +312,7 @@ export interface DeleteCanvasMutationVariables {
 }
 
 export interface SetDefaultCanvasMutationVariables {
-  workspaceId: string;
-  canvasId: string;
+  id: string;
 }
 
 export interface DuplicateCanvasMutationVariables {
