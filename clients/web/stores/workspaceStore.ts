@@ -550,7 +550,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
               throw new Error('No canvas data returned from GraphQL query');
             }
 
-            console.log(`Successfully loaded ${canvasesData.items.length} canvases from GraphQL API`);
 
             // Convert GraphQL responses to local Canvas types
             const canvasMap = new Map<CanvasId, Canvas>();
@@ -569,7 +568,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
             // This depends on your backend behavior - some systems auto-create, others don't
             let shouldCreateDefault = false;
             if (canvasMap.size === 0) {
-              console.log('No canvases found for workspace, checking if we should create a default canvas');
               shouldCreateDefault = true;
             }
 
@@ -598,7 +596,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 
             // TODO: Create default canvas if none exist (requires updating createCanvas to use GraphQL)
             if (shouldCreateDefault) {
-              console.log('No canvases found for workspace - automatic canvas creation is disabled until createCanvas uses GraphQL');
               // For now, we'll just log this and leave canvas creation to the UI layer
               // This will be re-enabled once createCanvas method is updated to use GraphQL
             }

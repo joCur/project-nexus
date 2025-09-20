@@ -469,7 +469,7 @@ export class ApolloCacheCompression {
         uncompressedSize: 0,
         compressedSize: 0,
         compressionRatio: 0,
-        compressionEnabled: COMPRESSION_CONFIG.ENABLED,
+        compressionEnabled: false,
       };
     }
   }

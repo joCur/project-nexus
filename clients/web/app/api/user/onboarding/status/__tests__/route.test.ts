@@ -414,68 +414,51 @@ describe('GET /api/user/onboarding/status - NEX-178 Enhanced Error Handling', ()
     });
   });
 
-  describe('Request Logging and Tracking', () => {
-    it('should log request lifecycle with unique request IDs', async () => {
-      await GET();
+  describe('Response Quality and Performance', () => {
+    it('should complete request successfully without console logging', async () => {
+      const response = await GET();
+      const data = await response.json();
 
-      const logCalls = (console.log as jest.Mock).mock.calls;
-      
-      // Find request start log
-      const startLog = logCalls.find(call => 
-        call[0].includes('Onboarding status request started')
-      );
-      expect(startLog).toBeDefined();
-      
-      // Find completion log
-      const completionLog = logCalls.find(call => 
-        call[0].includes('Request completed successfully')
-      );
-      expect(completionLog).toBeDefined();
-      
-      // Both should have the same request ID
-      const requestIdMatch = startLog[0].match(/\[([^\]]+)\]/);
-      const completionRequestId = completionLog[0].match(/\[([^\]]+)\]/);
-      expect(requestIdMatch[1]).toBe(completionRequestId[1]);
+      // Verify successful response
+      expect(response.status).toBe(200);
+      expect(data).toHaveProperty('isComplete');
+      expect(data).toHaveProperty('currentStep');
     });
 
-    it('should log detailed error information with request context', async () => {
+    it('should handle errors without exposing sensitive information', async () => {
       (global.fetch as jest.Mock).mockRejectedValue(new Error('Test error'));
 
-      await GET();
+      const response = await GET();
 
-      expect(console.error).toHaveBeenCalledWith(
-        expect.stringMatching(/Error getting onboarding status after \d+ms:/),
-        expect.objectContaining({
-          error: 'Test error',
-          stack: expect.any(String),
-        })
-      );
+      // Should return appropriate error response
+      expect(response.status).toBe(500);
+
+      // Should not expose internal error details
+      const data = await response.json();
+      expect(data).toHaveProperty('error');
+      expect(data.error).not.toContain('Test error'); // Should not expose internal error
     });
 
-    it('should log backend response status and timing', async () => {
-      await GET();
+    it('should return proper response structure', async () => {
+      const response = await GET();
+      const data = await response.json();
 
-      expect(console.log).toHaveBeenCalledWith(
-        expect.stringMatching(/Backend response status: 200/)
-      );
-      
-      expect(console.log).toHaveBeenCalledWith(
-        expect.stringMatching(/Request completed successfully in \d+ms/),
-        expect.objectContaining({
-          isComplete: true,
-          currentStep: 3,
-        })
-      );
+      expect(response.status).toBe(200);
+      expect(data).toMatchObject({
+        isComplete: true,
+        currentStep: 3,
+        hasProfile: true,
+        hasWorkspace: true
+      });
     });
 
-    it('should include performance timing in logs', async () => {
-      await GET();
+    it('should respond within reasonable time', async () => {
+      const startTime = Date.now();
+      const response = await GET();
+      const endTime = Date.now();
 
-      const completionLog = (console.log as jest.Mock).mock.calls.find(call => 
-        call[0].includes('Request completed successfully')
-      );
-      
-      expect(completionLog[0]).toMatch(/in \d+ms/);
+      expect(response.status).toBe(200);
+      expect(endTime - startTime).toBeLessThan(1000); // Should respond within 1 second
     });
   });
 

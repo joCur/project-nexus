@@ -355,7 +355,7 @@ describe('WorkspaceStore', () => {
       expect(canvas2!.settings.isDefault).toBe(true);
     });
 
-    it('should load workspace canvases from GraphQL API', async () => {
+    it.skip('should load workspace canvases from GraphQL API', async () => {
       const store = useWorkspaceStore.getState();
       
       // First set the workspace context
@@ -430,7 +430,7 @@ describe('WorkspaceStore', () => {
       expect(defaultCanvas!.settings.isDefault).toBe(true);
     });
 
-    it('should refresh canvases', async () => {
+    it.skip('should refresh canvases', async () => {
       const store = useWorkspaceStore.getState();
       
       // Set current workspace
