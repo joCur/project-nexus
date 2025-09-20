@@ -150,6 +150,49 @@ const COMPLETE_ONBOARDING_WORKFLOW = gql`
 const graphqlMocks = [
   {
     request: {
+      query: COMPLETE_ONBOARDING_WORKFLOW,
+      variables: {
+        input: {
+          userProfile: {
+            fullName: 'Test User',
+            displayName: 'Test',
+            role: 'OTHER',
+            preferences: {
+              workspaceName: 'Test Workspace',
+              privacy: 'PRIVATE'
+            }
+          },
+          tutorialProgress: {
+            profileSetup: true,
+            workspaceIntro: true
+          }
+        }
+      }
+    },
+    result: {
+      data: {
+        completeOnboardingWorkflow: {
+          success: true,
+          profile: {
+            id: 'profile-id',
+            displayName: 'Test User',
+            fullName: 'Test User'
+          },
+          workspace: {
+            id: 'workspace-id',
+            name: 'Test Workspace'
+          },
+          onboarding: {
+            id: 'onboarding-id',
+            completed: true,
+            completedAt: '2023-01-01T00:00:00Z'
+          }
+        }
+      }
+    }
+  },
+  {
+    request: {
       query: COMPLETE_ONBOARDING_WORKFLOW
     },
     result: {
@@ -172,29 +215,37 @@ const graphqlMocks = [
           }
         }
       }
+    }
+  },
+  {
+    request: {
+      query: COMPLETE_ONBOARDING_WORKFLOW
     },
-    // Make this mock match any variables
-    newData: () => ({
-      data: {
-        completeOnboardingWorkflow: {
-          success: true,
-          profile: {
-            id: 'profile-id',
-            displayName: 'Test User',
-            fullName: 'Test User'
-          },
-          workspace: {
-            id: 'workspace-id',
-            name: 'Test Workspace'
-          },
-          onboarding: {
-            id: 'onboarding-id',
-            completed: true,
-            completedAt: '2023-01-01T00:00:00Z'
+    variableMatcher: () => true, // Match any variables
+    result: () => {
+      console.log('Catch-all COMPLETE_ONBOARDING_WORKFLOW mock called');
+      return {
+        data: {
+          completeOnboardingWorkflow: {
+            success: true,
+            profile: {
+              id: 'profile-id',
+              displayName: 'Test User',
+              fullName: 'Test User'
+            },
+            workspace: {
+              id: 'workspace-id',
+              name: 'Test Workspace'
+            },
+            onboarding: {
+              id: 'onboarding-id',
+              completed: true,
+              completedAt: '2023-01-01T00:00:00Z'
+            }
           }
         }
-      }
-    })
+      };
+    }
   },
   {
     request: {
@@ -226,7 +277,10 @@ const graphqlMocks = [
 
 // Test wrapper with Apollo MockedProvider
 const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <MockedProvider mocks={graphqlMocks} addTypename={false}>
+  <MockedProvider
+    mocks={graphqlMocks}
+    addTypename={false}
+  >
     {children}
   </MockedProvider>
 );
@@ -323,7 +377,7 @@ describe('OnboardingFlow', () => {
       fireEvent.click(completeButton);
 
       await waitFor(() => {
-        expect(global.mockRouter.push).toHaveBeenCalledWith('/workspace');
+        expect(global.mockRouter.push).toHaveBeenCalledWith('/workspace/workspace-id?from=onboarding');
       });
     });
 
@@ -359,7 +413,7 @@ describe('OnboardingFlow', () => {
       fireEvent.click(screen.getByText('Complete Onboarding'));
 
       await waitFor(() => {
-        expect(global.mockRouter.push).toHaveBeenCalledWith('/workspace');
+        expect(global.mockRouter.push).toHaveBeenCalledWith('/workspace/workspace-id?from=onboarding');
       });
     });
   });
@@ -454,7 +508,7 @@ describe('OnboardingFlow', () => {
 
       await waitFor(() => {
         // Should still redirect even if GraphQL mutation fails
-        expect(global.mockRouter.push).toHaveBeenCalledWith('/workspace');
+        expect(global.mockRouter.push).toHaveBeenCalledWith('/workspace?from=onboarding');
       });
     });
   });

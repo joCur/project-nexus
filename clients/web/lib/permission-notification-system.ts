@@ -290,7 +290,6 @@ export class PermissionNotificationSystemImpl implements PermissionNotificationS
     const firstEvent = events[0];
     const summaryEvent: PermissionEvent = {
       ...firstEvent,
-      type: firstEvent.type,
       timestamp: Date.now(),
       metadata: {
         ...firstEvent.metadata,

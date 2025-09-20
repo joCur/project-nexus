@@ -3,7 +3,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWorkspaceStore, workspaceSelectors } from '@/stores/workspaceStore';
-import { Button, IconButton } from '@/components/ui';
 import { CreateCanvasModal } from './CreateCanvasModal';
 
 /**

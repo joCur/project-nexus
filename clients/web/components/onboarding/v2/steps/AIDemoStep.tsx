@@ -468,7 +468,7 @@ export const AIDemoStep: React.FC<OnboardingStepProps> = ({
                 </h3>
                 
                 <p className="text-text-secondary mb-6 leading-relaxed">
-                  You've just experienced how our AI can automatically discover and suggest 
+                  You&rsquo;ve just experienced how our AI can automatically discover and suggest 
                   meaningful relationships between your ideas. This helps you build a richer, 
                   more interconnected knowledge graph.
                 </p>
@@ -500,7 +500,7 @@ export const AIDemoStep: React.FC<OnboardingStepProps> = ({
             </div>
             
             <div className="flex items-center space-x-4">
-              {connections.map((connection, index) => (
+              {connections.map((connection) => (
                 <div
                   key={connection.id}
                   className={cn(

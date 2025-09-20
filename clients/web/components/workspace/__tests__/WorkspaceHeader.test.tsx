@@ -17,6 +17,14 @@ jest.mock('../CanvasSwitcher', () => ({
   CanvasSwitcher: () => <div data-testid="canvas-switcher">Canvas Switcher</div>,
 }));
 
+// Mock Next.js Image component
+jest.mock('next/image', () => ({
+  __esModule: true,
+  default: function MockImage({ src, alt, ...props }: any) {
+    return <img src={src} alt={alt} {...props} />;
+  },
+}));
+
 const mockLogout = jest.fn();
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockUseWorkspaceStore = useWorkspaceStore as jest.MockedFunction<typeof useWorkspaceStore>;

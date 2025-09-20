@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
+import Image from 'next/image';
 import { OnboardingStepProps, UserPersona } from '@/types/onboarding';
 import { useAuth } from '@/hooks/use-auth';
 
@@ -245,9 +246,11 @@ export const WelcomeStep: React.FC<OnboardingStepProps> = ({
           {user && (
             <div className="inline-flex items-center bg-white rounded-lg px-4 py-2 shadow-sm">
               {user.picture && (
-                <img
+                <Image
                   src={user.picture}
-                  alt=""
+                  alt={user.name || user.email || 'User avatar'}
+                  width={32}
+                  height={32}
                   className="w-8 h-8 rounded-full mr-3"
                 />
               )}
@@ -309,7 +312,7 @@ export const WelcomeStep: React.FC<OnboardingStepProps> = ({
                 onClick={() => setShowPersonaDetails(true)}
                 className="animate-bounce-gentle"
               >
-                Let's Get Started
+                Let&rsquo;s Get Started
               </Button>
             </div>
           ) : (
@@ -320,7 +323,7 @@ export const WelcomeStep: React.FC<OnboardingStepProps> = ({
                   Tell us about yourself
                 </h2>
                 <p className="text-lg text-text-secondary max-w-2xl mx-auto">
-                  Choose the profile that best describes how you'll use Project Nexus. 
+                  Choose the profile that best describes how you&rsquo;ll use Project Nexus. 
                   This helps us tailor your experience and provide relevant examples.
                 </p>
               </div>
@@ -351,10 +354,10 @@ export const WelcomeStep: React.FC<OnboardingStepProps> = ({
                       </div>
                     </div>
                     <h3 className="text-lg font-semibold text-primary-700 mb-2">
-                      Perfect! You're all set as a {personas.find(p => p.id === selectedPersona)?.title}.
+                      Perfect! You&rsquo;re all set as a {personas.find(p => p.id === selectedPersona)?.title}.
                     </h3>
                     <p className="text-primary-600">
-                      We'll customize your experience with relevant examples and features 
+                      We&rsquo;ll customize your experience with relevant examples and features 
                       that work best for your use case.
                     </p>
                   </div>

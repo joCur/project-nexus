@@ -8,8 +8,6 @@
  */
 
 import { apolloClient } from './apollo-client';
-import { permissionCacheManager } from './apollo-permission-cache';
-import { emitPermissionEvent } from './permission-notification-system';
 import {
   GET_USER_WORKSPACE_PERMISSIONS,
   GET_USER_PERMISSIONS_FOR_CONTEXT,
@@ -347,7 +345,7 @@ export class PermissionPreloader {
       startTime: Date.now(),
       priority: 'high',
       source,
-      promise: this.executeContextPreload(userId),
+      promise: this.executeContextPreload(),
     };
 
     this.activeRequests.set(requestId, request);
@@ -431,7 +429,7 @@ export class PermissionPreloader {
   /**
    * Execute context permission preload
    */
-  private async executeContextPreload(userId: string): Promise<void> {
+  private async executeContextPreload(): Promise<void> {
     try {
       await apolloClient.query<GetUserPermissionsForContextData, GetUserPermissionsForContextVariables>({
         query: GET_USER_PERMISSIONS_FOR_CONTEXT,

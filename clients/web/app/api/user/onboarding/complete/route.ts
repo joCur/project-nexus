@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { completedAt, totalDuration, userChoices, persona, finalStep, tutorialProgress } = body;
+    const { completedAt, userChoices, persona, tutorialProgress } = body;
 
     // Validate required fields
     if (!completedAt || !userChoices || !persona) {

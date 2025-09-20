@@ -10,7 +10,6 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { WorkspaceLayout } from '../WorkspaceLayout';
 import { WorkspaceHeader } from '../WorkspaceHeader';
 import { WorkspaceBreadcrumbs } from '../WorkspaceBreadcrumbs';
-import { CanvasSwitcher } from '../CanvasSwitcher';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
 import { useAuth } from '@/hooks/use-auth';
 import { useContextPermissions } from '@/hooks/use-permissions';

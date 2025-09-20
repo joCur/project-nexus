@@ -16,7 +16,6 @@ import type {
   PermissionEvent,
   PermissionGrantedEvent,
   PermissionRevokedEvent,
-  PermissionCacheInvalidatedEvent,
 } from '../../types/permission-events.types';
 
 describe('Permission Notification System', () => {

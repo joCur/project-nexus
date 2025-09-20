@@ -7,7 +7,6 @@
 
 import {
   EnhancedPermissionAuditLogger,
-  enhancedPermissionAuditLogger,
   getAuditLogStatistics,
   exportAuditLog,
   clearAuditLog,
@@ -15,7 +14,6 @@ import {
 import type {
   PermissionEvent,
   PermissionGrantedEvent,
-  PermissionRevokedEvent,
   PermissionAuditLogEntry,
 } from '../../types/permission-events.types';
 
@@ -111,7 +109,7 @@ describe('Enhanced Permission Audit Logger', () => {
         },
       ];
 
-      events.forEach(({ event, expectedLevel }) => {
+      events.forEach(({ event }) => {
         logger.log(event);
       });
 

@@ -29,8 +29,8 @@ jest.mock('@/types/workspace.types', () => {
 });
 
 // Mock Apollo Client
-const mockQuery = jest.fn();
-const mockMutate = jest.fn();
+const mockQuery = jest.fn() as jest.MockedFunction<any>;
+const mockMutate = jest.fn() as jest.MockedFunction<any>;
 
 jest.mock('@/lib/apollo-client', () => ({
   apolloClient: {

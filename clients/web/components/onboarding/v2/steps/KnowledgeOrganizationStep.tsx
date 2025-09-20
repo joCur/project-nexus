@@ -176,7 +176,7 @@ export const KnowledgeOrganizationStep: React.FC<OnboardingStepProps> = ({
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [placedCards, setPlacedCards] = useState<Record<string, string>>({});
-  const [draggedCard, setDraggedCard] = useState<string | null>(null);
+  const [, setDraggedCard] = useState<string | null>(null);
 
   // Initial cards to organize
   const cards = [
@@ -279,7 +279,7 @@ export const KnowledgeOrganizationStep: React.FC<OnboardingStepProps> = ({
     // Check if this completes a cluster
     const cluster = clusters.find(c => c.title === clusterId);
     if (cluster) {
-      const clusterCards = Object.entries(placedCards).filter(([_, cId]) => cId === clusterId);
+      const clusterCards = Object.entries(placedCards).filter(([, cId]) => cId === clusterId);
       
       // Auto-advance when first cluster is properly filled
       if (currentStep === 1 && clusterId === 'Strategic Planning' && clusterCards.length === 1) {
@@ -424,7 +424,7 @@ export const KnowledgeOrganizationStep: React.FC<OnboardingStepProps> = ({
                 </h3>
                 
                 <p className="text-text-secondary mb-6 leading-relaxed">
-                  You've successfully organized your knowledge cards into meaningful clusters. 
+                  You&rsquo;ve successfully organized your knowledge cards into meaningful clusters. 
                   This spatial approach helps your brain naturally recognize patterns and relationships 
                   between concepts.
                 </p>
@@ -469,7 +469,7 @@ export const KnowledgeOrganizationStep: React.FC<OnboardingStepProps> = ({
             
             <div className="flex items-center space-x-2">
               {clusters.map((cluster) => {
-                const clusterCards = Object.entries(placedCards).filter(([_, cId]) => cId === cluster.title);
+                const clusterCards = Object.entries(placedCards).filter(([, cId]) => cId === cluster.title);
                 return (
                   <div key={cluster.id} className="flex items-center space-x-1">
                     <div className={`w-2 h-2 rounded-full bg-${cluster.color}-500`} />

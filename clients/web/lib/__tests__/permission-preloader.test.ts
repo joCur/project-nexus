@@ -5,7 +5,8 @@
  * including pattern learning, navigation prediction, and performance optimization.
  */
 
-import { PermissionPreloader, permissionPreloader } from '../permission-preloader';
+import { PermissionPreloader } from '../permission-preloader';
+import { apolloClient } from '../apollo-client';
 
 // Mock dependencies
 jest.mock('../apollo-client', () => ({
@@ -13,6 +14,9 @@ jest.mock('../apollo-client', () => ({
     query: jest.fn(),
   },
 }));
+
+// Type the mocked apollo client
+const mockedApolloClient = jest.mocked(apolloClient);
 
 jest.mock('../apollo-permission-cache', () => ({
   permissionCacheManager: {
@@ -49,7 +53,6 @@ Object.defineProperty(document, 'addEventListener', {
 
 describe('Permission Preloader', () => {
   let preloader: PermissionPreloader;
-  const { apolloClient } = require('../apollo-client');
 
   beforeEach(() => {
     // Reset singleton instance for clean test state
@@ -62,8 +65,10 @@ describe('Permission Preloader', () => {
     jest.clearAllMocks();
     
     // Mock successful query responses
-    apolloClient.query.mockResolvedValue({
+    mockedApolloClient.query.mockResolvedValue({
       data: { permissions: ['read', 'write'] },
+      loading: false,
+      networkStatus: 7,
     });
   });
 
@@ -156,7 +161,7 @@ describe('Permission Preloader', () => {
     });
 
     it('should handle preload failures gracefully', async () => {
-      apolloClient.query.mockRejectedValueOnce(new Error('Network error'));
+      mockedApolloClient.query.mockRejectedValueOnce(new Error('Network error'));
       
       const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
       
@@ -321,7 +326,7 @@ describe('Permission Preloader', () => {
       await new Promise(resolve => setTimeout(resolve, 100));
       
       // Should have preloaded workspace2 based on pattern
-      const callArgs = apolloClient.query.mock.calls;
+      const callArgs = mockedApolloClient.query.mock.calls;
       const workspacePreloadCall = callArgs.find((call: any) => 
         call[0].query === 'GET_USER_WORKSPACE_PERMISSIONS' &&
         call[0].variables.workspaceId === 'workspace2'
@@ -364,7 +369,7 @@ describe('Permission Preloader', () => {
     });
 
     it('should track failed requests', async () => {
-      apolloClient.query.mockRejectedValueOnce(new Error('Network error'));
+      mockedApolloClient.query.mockRejectedValueOnce(new Error('Network error'));
       
       await preloader.preloadPermission('user123', 'workspace456', 'read');
       
@@ -377,8 +382,12 @@ describe('Permission Preloader', () => {
 
     it('should calculate average preload time', async () => {
       // Mock a delay in the query
-      apolloClient.query.mockImplementation(() => 
-        new Promise(resolve => setTimeout(() => resolve({ data: {} }), 100))
+      mockedApolloClient.query.mockImplementation(() =>
+        new Promise(resolve => setTimeout(() => resolve({
+          data: {},
+          loading: false,
+          networkStatus: 7
+        }), 100))
       );
       
       await preloader.preloadPermission('user123', 'workspace456', 'read');
@@ -508,7 +517,7 @@ describe('Permission Preloader', () => {
     });
 
     it('should handle query timeouts appropriately', async () => {
-      apolloClient.query.mockImplementation(() => 
+      mockedApolloClient.query.mockImplementation(() => 
         new Promise((_, reject) => 
           setTimeout(() => reject(new Error('Timeout')), 3000)
         )

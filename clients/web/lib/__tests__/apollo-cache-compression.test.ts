@@ -5,6 +5,8 @@
  * including compression algorithms, performance metrics, and integration.
  */
 
+/* eslint-disable @typescript-eslint/no-var-requires */
+
 import LZString from 'lz-string';
 import { ApolloCacheCompression } from '../apollo-cache-compression';
 
@@ -290,7 +292,7 @@ describe('Apollo Cache Compression', () => {
 
       const startTime = Date.now();
       const compressMethod = (compression as any).compressEntry;
-      const result = await compressMethod.call(
+      await compressMethod.call(
         compression, 
         'test-key', 
         veryLargeData

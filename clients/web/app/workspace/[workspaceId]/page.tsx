@@ -1,7 +1,6 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useWorkspaceStore } from '@/stores/workspaceStore';
 import { useCanvases, useCreateCanvas } from '@/hooks/use-canvas';
 import { useEffect, useState } from 'react';
 import type { EntityId } from '@/types/common.types';
@@ -14,9 +13,6 @@ export default function WorkspacePage() {
   const params = useParams();
   const router = useRouter();
   const workspaceId = params.workspaceId as EntityId;
-  
-  const { setCurrentWorkspace } = useWorkspaceStore();
-  const context = useWorkspaceStore((state) => state.context);
   
   // Use GraphQL hooks to fetch canvases
   const { canvases, loading: canvasesLoading, error: canvasesError } = useCanvases(workspaceId);

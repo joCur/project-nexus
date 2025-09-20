@@ -53,7 +53,7 @@ export class PermissionCacheManager {
 
     try {
       // Always warm context permissions first as they provide global overview
-      await this.warmContextPermissions(userId);
+      await this.warmContextPermissions();
       cacheEntries++;
 
       // Warm specific workspace permissions if provided
@@ -92,7 +92,7 @@ export class PermissionCacheManager {
   /**
    * Warm context permissions (all workspaces for a user)
    */
-  private async warmContextPermissions(userId: string): Promise<void> {
+  private async warmContextPermissions(): Promise<void> {
     try {
       await apolloClient.query<GetUserPermissionsForContextData, GetUserPermissionsForContextVariables>({
         query: GET_USER_PERMISSIONS_FOR_CONTEXT,
@@ -183,7 +183,7 @@ export class PermissionCacheManager {
           await this.warmWorkspacePermissions(userId, [workspaceId]);
         } else {
           // Warm context permissions
-          await this.warmContextPermissions(userId);
+          await this.warmContextPermissions();
         }
       } catch (error) {
         console.warn('Background cache warming failed:', error);

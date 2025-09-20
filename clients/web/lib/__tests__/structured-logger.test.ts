@@ -9,7 +9,6 @@ import {
   StructuredLogger,
   ChildLogger,
   LogLevel,
-  logger,
   permissionLogger,
   cacheLogger,
 } from '../structured-logger';

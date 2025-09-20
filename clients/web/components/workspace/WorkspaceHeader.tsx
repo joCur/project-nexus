@@ -3,6 +3,7 @@
 import React from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { useWorkspaceStore, workspaceSelectors } from '@/stores/workspaceStore';
+import Image from 'next/image';
 import { Button } from '@/components/ui';
 import { CanvasSwitcher } from './CanvasSwitcher';
 
@@ -65,9 +66,11 @@ export const WorkspaceHeader: React.FC = () => {
             {/* User Profile Info */}
             <div className="flex items-center space-x-3">
               {user?.picture && (
-                <img
+                <Image
                   src={user.picture}
                   alt={`Profile picture for ${user.name || user.email}`}
+                  width={32}
+                  height={32}
                   className="h-8 w-8 rounded-full border border-gray-200"
                 />
               )}
