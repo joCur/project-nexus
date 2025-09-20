@@ -9,7 +9,7 @@ import { useCallback, useEffect } from 'react';
 import {
   useQuery,
   useMutation,
-  // useSubscription, // 🚨 TODO: Uncomment when subscriptions are re-enabled
+  // useSubscription, // 🚨 TODO: Uncomment when subscriptions are re-enabled - See "GraphQL Subscriptions Status" in Notion
   useApolloClient
 } from '@apollo/client';
 import {
@@ -246,11 +246,13 @@ export const useCardOperations = (workspaceId: EntityId) => {
    * Reason: Backend subscriptions return null for non-nullable fields
    * Likely cause: Authentication/permission issues in subscription resolvers
    *
+   * @see Notion documentation: "GraphQL Subscriptions Status" for detailed re-enabling steps
    * @see TodoWrite: "Re-enable card subscriptions in useCardOperations hook"
    */
 
-  // 🚨 CARD SUBSCRIPTIONS DISABLED - Search for "TODO.*subscriptions" to find all disabled locations
-  console.log('🚨 Card subscriptions disabled - authentication/permission issues in backend');
+  // 🚨 CARD SUBSCRIPTIONS DISABLED - See "GraphQL Subscriptions Status" in Notion for details
+  // 🚨 Card subscriptions disabled - authentication/permission issues in backend
+  // Related documentation: "GraphQL Subscriptions Status" in Notion
 
   // TODO: Re-enable these card subscriptions when backend auth issues are resolved:
   /*
@@ -300,7 +302,7 @@ export const useCardOperations = (workspaceId: EntityId) => {
 
       return localCardId;
     } catch (error) {
-      console.error('Failed to create card:', error);
+      // Failed to create card
       return null;
     }
   }, [store, workspaceId, createCardMutation]);
@@ -321,7 +323,7 @@ export const useCardOperations = (workspaceId: EntityId) => {
 
       return !!data?.updateCard;
     } catch (error) {
-      console.error('Failed to update card:', error);
+      // Failed to update card
       // TODO: Revert optimistic update
       return false;
     }
@@ -340,7 +342,7 @@ export const useCardOperations = (workspaceId: EntityId) => {
 
       return !!data?.deleteCard;
     } catch (error) {
-      console.error('Failed to delete card:', error);
+      // Failed to delete card
       // TODO: Revert optimistic delete
       return false;
     }
@@ -367,7 +369,7 @@ export const useCardOperations = (workspaceId: EntityId) => {
         });
       }
     } catch (error) {
-      console.error('Failed to sync cards from server:', error);
+      // Failed to sync cards from server
     }
   }, [refetchCards, store]);
 

@@ -7,6 +7,7 @@
  * - Apollo cache consistency and optimistic updates
  *
  * Note: Subscriptions are temporarily disabled due to backend auth issues
+ * See: "GraphQL Subscriptions Status" in Notion for re-enabling details
  */
 
 import { render, screen, waitFor } from '@testing-library/react';
@@ -45,7 +46,7 @@ const TestCanvasManager = ({ workspaceId }: { workspaceId: EntityId }) => {
   const { canvases, loading: canvasesLoading } = useCanvases(workspaceId);
   const { mutate: setDefault, loading: setDefaultLoading } = useSetDefaultCanvas();
 
-  // Subscriptions disabled (logs warning only)
+  // Subscriptions disabled (logs warning only) - See "GraphQL Subscriptions Status" in Notion
   useCanvasSubscriptions(workspaceId);
 
   // Find default canvas from Apollo data

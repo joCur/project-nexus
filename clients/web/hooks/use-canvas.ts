@@ -9,7 +9,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   useQuery,
   useMutation,
-  // useSubscription, // 🚨 TODO: Uncomment when subscriptions are re-enabled
+  // useSubscription, // 🚨 TODO: Uncomment when subscriptions are re-enabled - See "GraphQL Subscriptions Status" in Notion
   useApolloClient,
   gql
 } from '@apollo/client';
@@ -153,8 +153,7 @@ export const useCanvases = (
   useEffect(() => {
     const handleFocus = () => {
       if (workspaceId && !loading) {
-        console.log('Window focused, refetching canvas data');
-        apolloRefetch().catch(console.warn);
+        apolloRefetch().catch(() => {});
       }
     };
 
@@ -281,20 +280,20 @@ export const useCreateCanvas = (): UseCanvasMutationReturn => {
                 }
               }
             } catch (cacheError) {
-              console.warn('Failed to update Apollo cache after canvas creation:', cacheError);
+              // Cache update failed silently
             }
           }
         }
       });
 
       if (data?.createCanvas) {
-        console.log('Canvas created successfully:', data.createCanvas.id);
+        // Canvas created successfully
         return createCanvasId(data.createCanvas.id);
       }
 
       return null;
     } catch (err) {
-      console.error('Failed to create canvas:', err);
+      // Canvas creation failed
       storeRef.current?.setError?.('mutation', `Failed to create canvas: ${err instanceof Error ? err.message : String(err)}`);
       return null;
     }
@@ -335,13 +334,13 @@ export const useUpdateCanvas = (): UseCanvasMutationReturn => {
       });
 
       if (data?.updateCanvas) {
-        console.log('Canvas updated successfully:', params.id);
+        // Canvas updated successfully
         return true;
       }
 
       return false;
     } catch (err) {
-      console.error('Failed to update canvas:', err);
+      // Canvas update failed
       storeRef.current?.setError?.('mutation', `Failed to update canvas: ${err instanceof Error ? err.message : String(err)}`);
       return false;
     }
@@ -389,13 +388,13 @@ export const useDeleteCanvas = (): UseCanvasMutationReturn => {
       });
 
       if (data?.deleteCanvas) {
-        console.log('Canvas deleted successfully:', canvasId);
+        // Canvas deleted successfully
         return true;
       }
 
       return false;
     } catch (err) {
-      console.error('Failed to delete canvas:', err);
+      // Canvas deletion failed
       storeRef.current?.setError?.('mutation', `Failed to delete canvas: ${err instanceof Error ? err.message : String(err)}`);
       return false;
     }
@@ -441,7 +440,7 @@ export const useSetDefaultCanvas = (): UseCanvasMutationReturn => {
                   variables: { workspaceId },
                 });
               } catch (error) {
-                console.debug('Workspace canvases query not in cache, skipping cache update');
+                // Workspace canvases query not in cache, skipping cache update
               }
 
               if (cacheData?.workspaceCanvases?.items) {
@@ -479,20 +478,20 @@ export const useSetDefaultCanvas = (): UseCanvasMutationReturn => {
                 },
               });
             } catch (cacheError) {
-              console.warn('Failed to update Apollo cache for default canvas:', cacheError);
+              // Failed to update Apollo cache for default canvas
             }
           }
         }
       });
 
       if (data?.setDefaultCanvas) {
-        console.log('Default canvas set successfully:', canvasId);
+        // Default canvas set successfully
         return true;
       }
 
       return false;
     } catch (err) {
-      console.error('Failed to set default canvas:', err);
+      // Failed to set default canvas
       storeRef.current?.setError?.('mutation', `Failed to set default canvas: ${err instanceof Error ? err.message : String(err)}`);
       return false;
     }
@@ -537,13 +536,13 @@ export const useDuplicateCanvas = (): UseCanvasMutationReturn => {
       });
 
       if (data?.duplicateCanvas) {
-        console.log('Canvas duplicated successfully:', data.duplicateCanvas.id);
+        // Canvas duplicated successfully
         return createCanvasId(data.duplicateCanvas.id);
       }
 
       return null;
     } catch (err) {
-      console.error('Failed to duplicate canvas:', err);
+      // Failed to duplicate canvas
       storeRef.current?.setError?.('mutation', `Failed to duplicate canvas: ${err instanceof Error ? err.message : String(err)}`);
       return null;
     }
@@ -567,12 +566,14 @@ export const useDuplicateCanvas = (): UseCanvasMutationReturn => {
  * Reason: Backend subscriptions return null for non-nullable fields
  * Likely cause: Authentication/permission issues in subscription resolvers
  *
+ * @see Notion documentation: "GraphQL Subscriptions Status" for detailed re-enabling steps
  * @see TodoWrite: "Re-enable canvas subscriptions in useCanvasSubscriptions hook"
  */
 export const useCanvasSubscriptions = (workspaceId: EntityId | undefined) => {
-  // 🚨 SUBSCRIPTIONS DISABLED - Search for "TODO.*subscriptions" to find all disabled locations
+  // 🚨 SUBSCRIPTIONS DISABLED - See "GraphQL Subscriptions Status" in Notion for details
 
-  console.log('🚨 Canvas subscriptions disabled - authentication/permission issues in backend');
+  // 🚨 Canvas subscriptions disabled - authentication/permission issues in backend
+  // Related documentation: "GraphQL Subscriptions Status" in Notion
 
   // TODO: Re-enable these subscriptions when backend auth issues are resolved:
   /*
@@ -581,11 +582,11 @@ export const useCanvasSubscriptions = (workspaceId: EntityId | undefined) => {
     skip: !workspaceId,
     onData: ({ data }) => {
       if (data?.data?.canvasCreated) {
-        console.log('Canvas created via subscription:', data.data.canvasCreated.id);
+        // Canvas created via subscription
       }
     },
     onError: (error) => {
-      console.error('Canvas created subscription error:', error);
+      // Canvas created subscription error
     },
   });
 
