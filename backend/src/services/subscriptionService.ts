@@ -11,7 +11,7 @@ import { Connection } from '@/types/ConnectionTypes';
 const logger = createContextLogger({ service: 'SubscriptionService' });
 
 // Create PubSub instance - in production, use Redis PubSub
-export const pubSub = new PubSub();
+export const pubSub = new PubSub<Record<string, unknown>>();
 
 // Event names for card subscriptions
 export const CARD_EVENTS = {

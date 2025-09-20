@@ -14,22 +14,22 @@ const environmentSchema = z.object({
   // Application Configuration
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   DOCKER_ENV: z.string().optional().transform(val => val === 'true'),
-  BACKEND_PORT: z.string().transform(Number).default('3000'),
+  BACKEND_PORT: z.string().transform(Number).default(3000),
   API_VERSION: z.string().default('v1'),
   
   // Database Configuration
   POSTGRES_DB: z.string().min(1, 'POSTGRES_DB is required'),
   POSTGRES_USER: z.string().min(1, 'POSTGRES_USER is required'),
   POSTGRES_PASSWORD: z.string().min(1, 'POSTGRES_PASSWORD is required'),
-  POSTGRES_PORT: z.string().transform(Number).default('5432'),
-  DB_POOL_MIN: z.string().transform(Number).default('2'),
-  DB_POOL_MAX: z.string().transform(Number).default('10'),
-  DB_TIMEOUT: z.string().transform(Number).default('30000'),
+  POSTGRES_PORT: z.string().transform(Number).default(5432),
+  DB_POOL_MIN: z.string().transform(Number).default(2),
+  DB_POOL_MAX: z.string().transform(Number).default(10),
+  DB_TIMEOUT: z.string().transform(Number).default(30000),
   
   // Redis Configuration
-  REDIS_PORT: z.string().transform(Number).default('6379'),
+  REDIS_PORT: z.string().transform(Number).default(6379),
   REDIS_PASSWORD: z.string().optional().default(''),
-  REDIS_DB: z.string().transform(Number).default('0'),
+  REDIS_DB: z.string().transform(Number).default(0),
   
   // Auth0 Configuration
   AUTH0_DOMAIN: z.string().min(1, 'AUTH0_DOMAIN is required'),
@@ -45,9 +45,9 @@ const environmentSchema = z.object({
   
   // Security Configuration
   CORS_ORIGIN: z.string().default('http://localhost:3001,http://localhost:3000'),
-  RATE_LIMIT_WINDOW: z.string().transform(Number).default('15'),
-  RATE_LIMIT_MAX: z.string().transform(Number).default('100'),
-  BCRYPT_ROUNDS: z.string().transform(Number).default('12'),
+  RATE_LIMIT_WINDOW: z.string().transform(Number).default(15),
+  RATE_LIMIT_MAX: z.string().transform(Number).default(100),
+  BCRYPT_ROUNDS: z.string().transform(Number).default(12),
   SESSION_SECRET: z.string().min(32, 'SESSION_SECRET must be at least 32 characters'),
   
   // OpenAI Configuration
@@ -70,7 +70,7 @@ function validateEnvironment(): Environment {
     return environmentSchema.parse(process.env);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const missingVars = error.errors.map(err => `${err.path.join('.')}: ${err.message}`);
+      const missingVars = error.issues.map(err => `${err.path.join('.')}: ${err.message}`);
       throw new Error(`Environment validation failed:\n${missingVars.join('\n')}`);
     }
     throw error;

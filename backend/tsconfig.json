@@ -1,48 +1,72 @@
 {
-  "compilerOptions": {
-    "target": "ES2020",
-    "module": "commonjs",
-    "lib": ["ES2020"],
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "strict": false,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "removeComments": true,
-    "noImplicitAny": false,
-    "noImplicitReturns": false,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedIndexedAccess": false,
-    "exactOptionalPropertyTypes": false,
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"],
-      "@/config/*": ["src/config/*"],
-      "@/services/*": ["src/services/*"],
-      "@/resolvers/*": ["src/resolvers/*"],
-      "@/middleware/*": ["src/middleware/*"],
-      "@/types/*": ["src/types/*"],
-      "@/utils/*": ["src/utils/*"]
-    },
-    "types": ["node", "jest"]
-  },
-  "include": [
-    "src/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "**/*.test.ts",
-    "**/*.spec.ts"
-  ],
-  "ts-node": {
-    "require": ["tsconfig-paths/register"]
-  }
+    "compilerOptions":  {
+                            "target":  "ES2020",
+                            "module":  "commonjs",
+                            "lib":  [
+                                        "ES2020"
+                                    ],
+                            "outDir":  "./dist",
+                            "rootDir":  "./src",
+                            "strict":  false,
+                            "esModuleInterop":  true,
+                            "skipLibCheck":  true,
+                            "forceConsistentCasingInFileNames":  true,
+                            "resolveJsonModule":  true,
+                            "declaration":  true,
+                            "declarationMap":  true,
+                            "sourceMap":  true,
+                            "removeComments":  true,
+                            "noImplicitAny":  false,
+                            "noImplicitReturns":  false,
+                            "noFallthroughCasesInSwitch":  true,
+                            "noUncheckedIndexedAccess":  false,
+                            "exactOptionalPropertyTypes":  false,
+                            "experimentalDecorators":  true,
+                            "emitDecoratorMetadata":  true,
+                            "baseUrl":  ".",
+                            "paths":  {
+                                          "@/*":  [
+                                                      "src/*"
+                                                  ],
+                                          "@/config/*":  [
+                                                             "src/config/*"
+                                                         ],
+                                          "@/services/*":  [
+                                                               "src/services/*"
+                                                           ],
+                                          "@/resolvers/*":  [
+                                                                "src/resolvers/*"
+                                                            ],
+                                          "@/middleware/*":  [
+                                                                 "src/middleware/*"
+                                                             ],
+                                          "@/types/*":  [
+                                                            "src/types/*"
+                                                        ],
+                                          "@/utils/*":  [
+                                                            "src/utils/*"
+                                                        ],
+                                          "graphql-ws/use/ws":  [
+                                                                    "node_modules/graphql-ws/dist/use/ws"
+                                                                ]
+                                      },
+                            "types":  [
+                                          "node",
+                                          "jest"
+                                      ]
+                        },
+    "include":  [
+                    "src/**/*"
+                ],
+    "exclude":  [
+                    "node_modules",
+                    "dist",
+                    "**/*.test.ts",
+                    "**/*.spec.ts"
+                ],
+    "ts-node":  {
+                    "require":  [
+                                    "tsconfig-paths/register"
+                                ]
+                }
 }

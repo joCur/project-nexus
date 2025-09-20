@@ -183,7 +183,7 @@ export const validationErrorHandler = (error: any, req: Request, res: Response, 
     );
 
     // Add validation details
-    (validationError as any).details = error.details || error.errors;
+    (validationError as any).details = error.details || error.issues;
 
     return next(validationError);
   }

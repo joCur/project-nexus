@@ -599,7 +599,7 @@ export const cardResolvers = {
      */
     cardCreated: {
       subscribe: withFilter(
-        () => pubSub.asyncIterator([CARD_EVENTS.CARD_CREATED]),
+        () => pubSub.asyncIterableIterator([CARD_EVENTS.CARD_CREATED]),
         async (payload, variables, context: GraphQLContext) => {
           if (!context.isAuthenticated) {
             return false;
@@ -632,7 +632,7 @@ export const cardResolvers = {
      */
     cardUpdated: {
       subscribe: withFilter(
-        () => pubSub.asyncIterator([CARD_EVENTS.CARD_UPDATED]),
+        () => pubSub.asyncIterableIterator([CARD_EVENTS.CARD_UPDATED]),
         async (payload, variables, context: GraphQLContext) => {
           if (!context.isAuthenticated) {
             return false;
@@ -665,7 +665,7 @@ export const cardResolvers = {
      */
     cardDeleted: {
       subscribe: withFilter(
-        () => pubSub.asyncIterator([CARD_EVENTS.CARD_DELETED]),
+        () => pubSub.asyncIterableIterator([CARD_EVENTS.CARD_DELETED]),
         async (payload, variables, context: GraphQLContext) => {
           if (!context.isAuthenticated) {
             return false;
@@ -700,7 +700,7 @@ export const cardResolvers = {
      */
     cardMoved: {
       subscribe: withFilter(
-        () => pubSub.asyncIterator([CARD_EVENTS.CARD_MOVED]),
+        () => pubSub.asyncIterableIterator([CARD_EVENTS.CARD_MOVED]),
         async (payload, variables, context: GraphQLContext) => {
           if (!context.isAuthenticated) {
             return false;
@@ -733,7 +733,7 @@ export const cardResolvers = {
      */
     userJoinedCanvas: {
       subscribe: withFilter(
-        () => pubSub.asyncIterator([WORKSPACE_EVENTS.USER_JOINED_CANVAS]),
+        () => pubSub.asyncIterableIterator([WORKSPACE_EVENTS.USER_JOINED_CANVAS]),
         async (payload, variables, context: GraphQLContext) => {
           if (!context.isAuthenticated) {
             return false;
@@ -757,7 +757,7 @@ export const cardResolvers = {
      */
     userLeftCanvas: {
       subscribe: withFilter(
-        () => pubSub.asyncIterator([WORKSPACE_EVENTS.USER_LEFT_CANVAS]),
+        () => pubSub.asyncIterableIterator([WORKSPACE_EVENTS.USER_LEFT_CANVAS]),
         async (payload, variables, context: GraphQLContext) => {
           if (!context.isAuthenticated) {
             return false;

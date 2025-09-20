@@ -936,7 +936,7 @@ export const connectionResolvers = {
      */
     connectionCreated: {
       subscribe: withFilter(
-        () => pubSub.asyncIterator([CONNECTION_EVENTS.CONNECTION_CREATED]),
+        () => pubSub.asyncIterableIterator([CONNECTION_EVENTS.CONNECTION_CREATED]),
         async (payload, variables, context: GraphQLContext) => {
           if (!context.isAuthenticated) {
             return false;
@@ -959,7 +959,7 @@ export const connectionResolvers = {
      */
     connectionUpdated: {
       subscribe: withFilter(
-        () => pubSub.asyncIterator([CONNECTION_EVENTS.CONNECTION_UPDATED]),
+        () => pubSub.asyncIterableIterator([CONNECTION_EVENTS.CONNECTION_UPDATED]),
         async (payload, variables, context: GraphQLContext) => {
           if (!context.isAuthenticated) {
             return false;
@@ -982,7 +982,7 @@ export const connectionResolvers = {
      */
     connectionDeleted: {
       subscribe: withFilter(
-        () => pubSub.asyncIterator([CONNECTION_EVENTS.CONNECTION_DELETED]),
+        () => pubSub.asyncIterableIterator([CONNECTION_EVENTS.CONNECTION_DELETED]),
         async (payload, variables, context: GraphQLContext) => {
           if (!context.isAuthenticated) {
             return false;

@@ -99,7 +99,7 @@ export class CardService {
 
     } catch (error) {
       if (error instanceof z.ZodError) {
-        throw new ValidationError(error.errors[0]?.message || 'Validation failed');
+        throw new ValidationError(error.issues[0]?.message || 'Validation failed');
       }
 
       logger.error('Failed to create card', {
@@ -345,7 +345,7 @@ export class CardService {
 
     } catch (error) {
       if (error instanceof z.ZodError) {
-        throw new ValidationError(error.errors[0]?.message || 'Validation failed');
+        throw new ValidationError(error.issues[0]?.message || 'Validation failed');
       }
 
       logger.error('Failed to update card', {

@@ -22,7 +22,6 @@ import {
   pubSub 
 } from '@/services/subscriptionService';
 import { withFilter } from 'graphql-subscriptions';
-import { WorkspaceAuthorizationService } from '@/services/workspaceAuthorization';
 
 /**
  * GraphQL resolvers for Canvas management operations (NEX-174)
@@ -61,8 +60,7 @@ export const canvasResolvers = {
         }
 
         // Authorization check - users can only access canvases in workspaces they have access to
-        const authService = context.dataSources.workspaceAuthorizationService;
-        const hasAccess = await authService.hasWorkspaceAccess(
+        const hasAccess = await context.dataSources.workspaceAuthorizationService.hasWorkspaceAccess(
           context.user!.id,
           canvas.workspaceId,
           'canvas:read'
@@ -117,8 +115,7 @@ export const canvasResolvers = {
 
       try {
         // Authorization check - verify workspace access
-        const authService = context.dataSources.workspaceAuthorizationService;
-        await authService.requirePermission(
+        await context.dataSources.workspaceAuthorizationService.requirePermission(
           context.user!.id,
           workspaceId,
           'canvas:read',
@@ -182,8 +179,7 @@ export const canvasResolvers = {
 
       try {
         // Authorization check - verify workspace access
-        const authService = context.dataSources.workspaceAuthorizationService;
-        await authService.requirePermission(
+        await context.dataSources.workspaceAuthorizationService.requirePermission(
           context.user!.id,
           workspaceId,
           'canvas:read',
@@ -227,8 +223,7 @@ export const canvasResolvers = {
 
       try {
         // Authorization check - verify workspace access for canvas creation
-        const authService = context.dataSources.workspaceAuthorizationService;
-        await authService.requirePermission(
+        await context.dataSources.workspaceAuthorizationService.requirePermission(
           context.user!.id,
           input.workspaceId,
           'canvas:create',
@@ -290,8 +285,7 @@ export const canvasResolvers = {
         }
 
         // Authorization check - verify workspace access for canvas updates
-        const authService = context.dataSources.workspaceAuthorizationService;
-        await authService.requirePermission(
+        await context.dataSources.workspaceAuthorizationService.requirePermission(
           context.user!.id,
           existingCanvas.workspaceId,
           'canvas:update',
@@ -351,8 +345,7 @@ export const canvasResolvers = {
         }
 
         // Authorization check - verify workspace access for canvas deletion
-        const authService = context.dataSources.workspaceAuthorizationService;
-        await authService.requirePermission(
+        await context.dataSources.workspaceAuthorizationService.requirePermission(
           context.user!.id,
           existingCanvas.workspaceId,
           'canvas:delete',
@@ -500,15 +493,14 @@ export const canvasResolvers = {
      */
     canvasCreated: {
       subscribe: withFilter(
-        () => pubSub.asyncIterator([CANVAS_EVENTS.CANVAS_CREATED]),
+        () => pubSub.asyncIterableIterator([CANVAS_EVENTS.CANVAS_CREATED]),
         async (payload, variables, context: GraphQLContext) => {
           if (!context.isAuthenticated) {
             return false;
           }
 
           // Verify user has access to the workspace
-          const authService = context.dataSources.workspaceAuthorizationService;
-          const hasAccess = await authService.hasWorkspaceAccess(
+          const hasAccess = await context.dataSources.workspaceAuthorizationService.hasWorkspaceAccess(
             context.user!.id,
             variables.workspaceId,
             'canvas:read'
@@ -524,15 +516,14 @@ export const canvasResolvers = {
      */
     canvasUpdated: {
       subscribe: withFilter(
-        () => pubSub.asyncIterator([CANVAS_EVENTS.CANVAS_UPDATED]),
+        () => pubSub.asyncIterableIterator([CANVAS_EVENTS.CANVAS_UPDATED]),
         async (payload, variables, context: GraphQLContext) => {
           if (!context.isAuthenticated) {
             return false;
           }
 
           // Verify user has access to the workspace
-          const authService = context.dataSources.workspaceAuthorizationService;
-          const hasAccess = await authService.hasWorkspaceAccess(
+          const hasAccess = await context.dataSources.workspaceAuthorizationService.hasWorkspaceAccess(
             context.user!.id,
             variables.workspaceId,
             'canvas:read'
@@ -548,15 +539,14 @@ export const canvasResolvers = {
      */
     canvasDeleted: {
       subscribe: withFilter(
-        () => pubSub.asyncIterator([CANVAS_EVENTS.CANVAS_DELETED]),
+        () => pubSub.asyncIterableIterator([CANVAS_EVENTS.CANVAS_DELETED]),
         async (payload, variables, context: GraphQLContext) => {
           if (!context.isAuthenticated) {
             return false;
           }
 
           // Verify user has access to the workspace
-          const authService = context.dataSources.workspaceAuthorizationService;
-          const hasAccess = await authService.hasWorkspaceAccess(
+          const hasAccess = await context.dataSources.workspaceAuthorizationService.hasWorkspaceAccess(
             context.user!.id,
             variables.workspaceId,
             'canvas:read'
@@ -671,3 +661,4 @@ export const canvasResolvers = {
     },
   },
 };
+

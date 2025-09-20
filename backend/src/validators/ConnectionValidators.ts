@@ -66,7 +66,7 @@ export const ConnectionSchema = z.object({
   confidence: ConfidenceSchema,
   style: ConnectionStyleSchema,
   label: ConnectionLabelSchema.optional(),
-  metadata: z.record(z.any()),
+  metadata: z.record(z.string(), z.unknown()),
   createdBy: z.string().uuid(),
   isVisible: z.boolean(),
   aiReasoning: z.string()
@@ -99,7 +99,7 @@ export const CreateConnectionInputSchema = z.object({
   confidence: ConfidenceSchema.default(ConnectionConstraints.DEFAULT_CONFIDENCE),
   style: ConnectionStyleSchema.partial().optional(),
   label: ConnectionLabelSchema.optional(),
-  metadata: z.record(z.any()).default({}),
+  metadata: z.record(z.string(), z.unknown()).default({}),
   aiReasoning: z.string()
     .max(ConnectionConstraints.MAX_REASONING_LENGTH)
     .optional(),
@@ -122,7 +122,7 @@ export const UpdateConnectionInputSchema = z.object({
   confidence: ConfidenceSchema.optional(),
   style: ConnectionStyleSchema.partial().optional(),
   label: ConnectionLabelSchema.optional(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
   isVisible: z.boolean().optional(),
   aiReasoning: z.string()
     .max(ConnectionConstraints.MAX_REASONING_LENGTH)

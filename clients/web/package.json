@@ -22,7 +22,7 @@
     "@types/lodash-es": "^4.17.12",
     "clsx": "^2.0.0",
     "dotenv": "^17.2.2",
-    "framer-motion": "^12.23.12",
+    "framer-motion": "^12.23.16",
     "graphql": "^16.8.1",
     "konva": "^9.3.22",
     "lodash-es": "^4.17.21",
@@ -42,7 +42,7 @@
     "@testing-library/react": "^14.1.2",
     "@testing-library/user-event": "^14.5.1",
     "@types/jest": "^29.5.14",
-    "@types/node": "^20.8.10",
+    "@types/node": "^22.9.0",
     "@types/react": "^18.2.37",
     "@types/react-dom": "^18.2.15",
     "@typescript-eslint/eslint-plugin": "^6.10.0",
@@ -58,8 +58,8 @@
     "typescript": "^5.9.2"
   },
   "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=9.0.0"
+    "node": ">=22.0.0",
+    "npm": ">=10.0.0"
   },
   "keywords": [
     "nextjs",

@@ -175,7 +175,7 @@ export class CanvasService {
 
     } catch (error) {
       if (error instanceof z.ZodError) {
-        throw new ValidationError(error.errors[0]?.message || 'Validation failed');
+        throw new ValidationError(error.issues[0]?.message || 'Validation failed');
       }
 
       if (error instanceof CanvasNameConflictError) {
@@ -270,7 +270,7 @@ export class CanvasService {
 
     } catch (error) {
       if (error instanceof z.ZodError) {
-        throw new ValidationError(error.errors[0]?.message || 'Validation failed');
+        throw new ValidationError(error.issues[0]?.message || 'Validation failed');
       }
 
       if (error instanceof CanvasNameConflictError) {
@@ -571,7 +571,7 @@ export class CanvasService {
 
     } catch (error) {
       if (error instanceof z.ZodError) {
-        throw new ValidationError(error.errors[0]?.message || 'Validation failed');
+        throw new ValidationError(error.issues[0]?.message || 'Validation failed');
       }
 
       logger.error('Failed to duplicate canvas', {
