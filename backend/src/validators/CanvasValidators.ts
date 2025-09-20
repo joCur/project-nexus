@@ -104,7 +104,7 @@ export const CanvasThemeSchema = z.object({
   mode: z.enum(['light', 'dark', 'auto']),
   background: HexColorSchema,
   accent: HexColorSchema,
-  customColors: z.record(HexColorSchema),
+  customColors: z.record(z.string(), HexColorSchema),
 });
 
 export const CanvasFeaturesSchema = z.object({
@@ -129,7 +129,7 @@ export const DefaultCardStyleSchema = z.object({
 });
 
 export const DefaultCardSettingsSchema = z.object({
-  dimensions: z.record(CanvasDimensionsSchema),
+  dimensions: z.record(z.string(), CanvasDimensionsSchema),
   style: DefaultCardStyleSchema,
 });
 
@@ -165,7 +165,7 @@ export const UserCanvasDataSchema = z.object({
   recentCards: z.array(z.string().uuid()).max(50),
   recentColors: z.array(HexColorSchema).max(20),
   recentTags: z.array(z.string()).max(50),
-  customShortcuts: z.record(z.string()),
+  customShortcuts: z.record(z.string(), z.string()),
   favoriteTools: z.array(z.string()).max(20),
   tutorialCompleted: z.boolean(),
   tipsEnabled: z.boolean(),
@@ -441,3 +441,4 @@ export type UpdateCanvasSessionInput = z.infer<typeof UpdateCanvasSessionInputSc
 export type ViewportState = z.infer<typeof ViewportStateSchema>;
 export type CanvasConfig = z.infer<typeof CanvasConfigSchema>;
 export type UserCanvasPreferences = z.infer<typeof UserCanvasPreferencesSchema>;
+

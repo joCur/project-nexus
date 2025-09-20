@@ -7,7 +7,6 @@ import {
   GENERIC_ERROR_MESSAGES, 
   DEBUG_ERROR_MESSAGES, 
   getErrorMessage,
-  createErrorInfo,
   isDevelopmentMode 
 } from '@/constants/errorCodes';
 

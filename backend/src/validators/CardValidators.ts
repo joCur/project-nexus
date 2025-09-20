@@ -45,7 +45,7 @@ const cardDimensionsSchema = z.object({
     .max(CardConstraints.DIMENSIONS_MAX_HEIGHT, `Height must be <= ${CardConstraints.DIMENSIONS_MAX_HEIGHT}`),
 });
 
-const cardMetadataSchema = z.record(z.any()).refine(
+const cardMetadataSchema = z.record(z.string(), z.unknown()).refine(
   (metadata) => {
     const jsonString = JSON.stringify(metadata);
     return jsonString.length <= 10000; // 10KB limit for metadata

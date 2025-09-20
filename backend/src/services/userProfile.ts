@@ -20,7 +20,7 @@ const userProfileCreateSchema = z.object({
   displayName: z.string().min(1).max(100).optional(),
   timezone: z.string().max(100).optional(),
   role: z.enum(['student', 'researcher', 'creative', 'business', 'other']).optional(),
-  preferences: z.record(z.any()).optional().default({}),
+  preferences: z.record(z.string(), z.unknown()).optional().default({}),
 });
 
 const userProfileUpdateSchema = z.object({
@@ -28,7 +28,7 @@ const userProfileUpdateSchema = z.object({
   displayName: z.string().min(1).max(100).optional(),
   timezone: z.string().max(100).optional(),
   role: z.enum(['student', 'researcher', 'creative', 'business', 'other']).optional(),
-  preferences: z.record(z.any()).optional(),
+  preferences: z.record(z.string(), z.unknown()).optional(),
 });
 
 // Types
@@ -150,7 +150,7 @@ export class UserProfileService {
 
     } catch (error) {
       if (error instanceof z.ZodError) {
-        throw new ValidationError(error.errors[0]?.message || 'Validation failed');
+        throw new ValidationError(error.issues[0]?.message || 'Validation failed');
       }
 
       // Handle PostgreSQL constraint violations (e.g., concurrent creation)
@@ -228,7 +228,7 @@ export class UserProfileService {
 
     } catch (error) {
       if (error instanceof z.ZodError) {
-        throw new ValidationError(error.errors[0]?.message || 'Validation failed');
+        throw new ValidationError(error.issues[0]?.message || 'Validation failed');
       }
 
       logger.error('Failed to update user profile', {
@@ -351,3 +351,4 @@ export class UserProfileService {
     };
   }
 }
+

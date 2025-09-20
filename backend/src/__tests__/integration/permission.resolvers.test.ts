@@ -5,7 +5,7 @@
  */
 
 import request from 'supertest';
-import { Express } from 'express';
+import express  from 'express';
 import { createTestApp } from '../utils/test-helpers';
 import { 
   createMockAuth0Service,
@@ -30,7 +30,7 @@ const WORKSPACE_ROLES = {
 };
 
 describe('Permission Resolver Integration Tests', () => {
-  let app: Express;
+  let app: express.Application;
   let mockAuth0Service: any;
   let mockUserService: any;
   let mockCacheService: any;

@@ -3,9 +3,10 @@ import { Auth0User, Auth0TokenPayload, User } from '@/types/auth';
 import { randomUUID } from 'crypto';
 import express from 'express';
 import { ApolloServer } from '@apollo/server';
-import { expressMiddleware } from '@apollo/server/express4';
+import { expressMiddleware } from '@as-integrations/express5';
 import { typeDefs } from '@/graphql/typeDefs';
 import { resolvers } from '@/resolvers';
+import { GraphQLContext } from '@/types';
 
 /**
  * Test helper utilities for authentication testing
@@ -662,7 +663,7 @@ export const ERROR_SCENARIOS = {
 // Global mock services that can be accessed by tests
 export let testMockServices: any = {};
 
-export async function createTestApp() {
+export async function createTestApp(): Promise<express.Application> {
   // Using imported modules
   
   const app = express();
@@ -717,21 +718,26 @@ export async function createTestApp() {
   });
   
   // Create Apollo Server
-  const server = new ApolloServer({
+  const server = new ApolloServer<GraphQLContext>({
     typeDefs,
-    resolvers,
+    resolvers: resolvers as any,
   });
   
   await server.start();
   
   // GraphQL endpoint
-  app.use('/graphql', expressMiddleware(server, {
-    context: async ({ req }: { req: any }) => ({
+  app.use('/graphql', expressMiddleware<GraphQLContext>(server, {
+    context: async ({ req, res }: { req: any; res: any }) => ({
       isAuthenticated: req.isAuthenticated,
       user: req.user,
       dataSources: testMockServices,
+      req,
+      res,
     }),
   }));
-  
+
+
+
+
   return app;
 }

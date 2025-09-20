@@ -508,24 +508,54 @@ describe('CanvasService', () => {
     beforeEach(() => {
       jest.spyOn(canvasService, 'getCanvasById').mockResolvedValue(expectedCanvas);
       mockWorkspaceAuth.requirePermission.mockResolvedValue(mockWorkspaceMember);
-      jest.spyOn(canvasService as any, 'clearDefaultCanvas').mockResolvedValue(undefined);
     });
 
-    it('should set canvas as default successfully', async () => {
-      const mockKnexQuery = {
-        where: jest.fn().mockReturnThis(),
-        update: jest.fn().mockReturnThis(),
-        returning: jest.fn().mockReturnThis(),
-      };
-      mockKnexDb.knex.mockReturnValue(mockKnexQuery);
-
+    it('should set canvas as default successfully with transaction', async () => {
       const defaultDbCanvas = { ...mockDbCanvas, is_default: true };
-      mockDatabase.query.mockResolvedValue([defaultDbCanvas]);
+
+      // Mock transaction callback
+      mockDatabase.transaction.mockImplementation(async (callback) => {
+        const mockTrx = jest.fn() as any;
+
+        // Mock transaction query builder that returns proper chain
+        mockTrx.mockImplementation(() => ({
+          where: jest.fn().mockReturnThis(),
+          update: jest.fn().mockResolvedValue(1), // Clear existing default returns count
+        }));
+
+        // Override for specific queries within transaction
+        mockTrx
+          .mockReturnValueOnce({
+            where: jest.fn().mockReturnThis(),
+            update: jest.fn().mockResolvedValue(1), // Clear operation
+          })
+          .mockReturnValueOnce({
+            where: jest.fn().mockReturnThis(),
+            update: jest.fn().mockReturnThis(),
+            returning: jest.fn().mockResolvedValue([defaultDbCanvas]), // Set default operation
+          })
+          .mockReturnValueOnce({
+            where: jest.fn().mockReturnThis(),
+            select: jest.fn().mockResolvedValue([{ id: testCanvasId, name: 'Test Canvas' }]), // Validation
+          });
+
+        return await callback(mockTrx);
+      });
 
       const result = await canvasService.setDefaultCanvas(testCanvasId, testUserId);
 
       expect(result.isDefault).toBe(true);
-      expect(canvasService['clearDefaultCanvas']).toHaveBeenCalledWith(testWorkspaceId);
+      expect(mockDatabase.transaction).toHaveBeenCalled();
+    });
+
+    it('should return early if canvas is already default', async () => {
+      const defaultCanvas = { ...expectedCanvas, isDefault: true };
+      jest.spyOn(canvasService, 'getCanvasById').mockResolvedValue(defaultCanvas);
+
+      const result = await canvasService.setDefaultCanvas(testCanvasId, testUserId);
+
+      expect(result).toEqual(defaultCanvas);
+      expect(mockDatabase.transaction).not.toHaveBeenCalled();
     });
 
     it('should throw NotFoundError when canvas does not exist', async () => {
@@ -533,6 +563,44 @@ describe('CanvasService', () => {
 
       await expect(canvasService.setDefaultCanvas(testCanvasId, testUserId))
         .rejects.toThrow(NotFoundError);
+    });
+
+    it('should throw error if validation fails after update', async () => {
+      mockDatabase.transaction.mockImplementation(async (callback) => {
+        const mockTrx = jest.fn() as any;
+
+        // Override for specific queries within transaction
+        mockTrx
+          .mockReturnValueOnce({
+            where: jest.fn().mockReturnThis(),
+            update: jest.fn().mockResolvedValue(1), // Clear operation
+          })
+          .mockReturnValueOnce({
+            where: jest.fn().mockReturnThis(),
+            update: jest.fn().mockReturnThis(),
+            returning: jest.fn().mockResolvedValue([mockDbCanvas]), // Set default operation
+          })
+          .mockReturnValueOnce({
+            where: jest.fn().mockReturnThis(),
+            select: jest.fn().mockResolvedValue([
+              { id: testCanvasId, name: 'Test Canvas' },
+              { id: 'another-id', name: 'Another Canvas' }
+            ]), // Validation returns multiple defaults
+          });
+
+        return await callback(mockTrx);
+      });
+
+      await expect(canvasService.setDefaultCanvas(testCanvasId, testUserId))
+        .rejects.toThrow('Database constraint violation: Found 2 default canvases');
+    });
+
+    it('should handle transaction rollback on error', async () => {
+      const transactionError = new Error('Transaction failed');
+      mockDatabase.transaction.mockRejectedValue(transactionError);
+
+      await expect(canvasService.setDefaultCanvas(testCanvasId, testUserId))
+        .rejects.toThrow('Transaction failed');
     });
   });
 

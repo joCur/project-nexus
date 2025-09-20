@@ -23,7 +23,7 @@ const httpLink = createHttpLink({
 const authLink = setContext(async (_, { headers }) => {
   try {
     // Get the access token from Auth0
-    console.log('Apollo authLink: Fetching access token...');
+    // Apollo authLink: Fetching access token...
     const response = await fetch('/api/auth/token', {
       method: 'GET',
       credentials: 'include',
@@ -33,14 +33,14 @@ const authLink = setContext(async (_, { headers }) => {
     if (response.ok) {
       const data = await response.json();
       token = data.accessToken;
-      console.log('Apollo authLink: Access token retrieved successfully');
+      // Apollo authLink: Access token retrieved successfully
     } else if (response.status === 401) {
       // User is not authenticated - redirect to login
-      console.warn('Apollo authLink: User not authenticated, redirecting to login');
+      // Apollo authLink: User not authenticated, redirecting to login
       window.location.href = '/api/auth/login';
       return { headers };
     } else {
-      console.warn('Apollo authLink: Failed to get auth token:', response.status, response.statusText);
+      // Apollo authLink: Failed to get auth token
     }
 
     const requestHeaders = {
@@ -48,14 +48,11 @@ const authLink = setContext(async (_, { headers }) => {
       ...(token && { authorization: `Bearer ${token}` }),
     };
     
-    console.log('Apollo authLink: Request headers:', {
-      hasAuthorization: !!requestHeaders.authorization,
-      headerKeys: Object.keys(requestHeaders)
-    });
+    // Apollo authLink: Request headers logged
 
     return { headers: requestHeaders };
   } catch (error) {
-    console.warn('Apollo authLink: Failed to get auth token for GraphQL request:', error);
+    // Apollo authLink: Failed to get auth token for GraphQL request
     return { headers };
   }
 });
@@ -66,9 +63,7 @@ const authLink = setContext(async (_, { headers }) => {
 const errorLink = onError(({ graphQLErrors, networkError }) => {
   if (graphQLErrors) {
     graphQLErrors.forEach(({ message, locations, path, extensions }) => {
-      console.error(
-        `GraphQL error: Message: ${message}, Location: ${locations}, Path: ${path}`
-      );
+      // GraphQL error logged
       
       // Handle authentication errors
       if (extensions?.code === 'UNAUTHENTICATED') {
@@ -79,14 +74,7 @@ const errorLink = onError(({ graphQLErrors, networkError }) => {
   }
 
   if (networkError) {
-    console.error(`Apollo Client Network error:`, networkError);
-    console.error('Network error details:', {
-      message: networkError.message,
-      name: networkError.name,
-      stack: networkError.stack,
-      statusCode: (networkError as any).statusCode,
-      result: (networkError as any).result
-    });
+    // Apollo Client Network error and details logged
     
     // Handle specific network errors
     if ('statusCode' in networkError && networkError.statusCode === 401) {
@@ -97,12 +85,15 @@ const errorLink = onError(({ graphQLErrors, networkError }) => {
 });
 
 /**
- * Cache configuration constants for permission queries
+ * Cache configuration constants
  */
-const PERMISSION_CACHE_CONFIG = {
-  // 5 minutes TTL as specified in NEX-186 requirements
-  TTL_MS: 5 * 60 * 1000,
-  
+const CACHE_CONFIG = {
+  // Permission cache TTL - 5 minutes as specified in NEX-186 requirements
+  PERMISSION_TTL_MS: 5 * 60 * 1000,
+
+  // Canvas data cache TTL - 10 minutes for canvas lists and data
+  CANVAS_TTL_MS: 10 * 60 * 1000,
+
   // Maximum cache size to prevent memory issues (approximately)
   MAX_CACHE_SIZE_KB: 10 * 1024, // 10MB
 };
@@ -130,31 +121,61 @@ export const apolloClient = new ApolloClient({
       Workspace: {
         fields: {
           canvases: {
-            // Merge strategy for canvas lists
+            // Merge strategy for canvas lists with deduplication
             merge(existing = [], incoming) {
-              return [...existing, ...incoming];
+              // Create a Map to deduplicate by canvas ID
+              const canvasMap = new Map();
+
+              // Add existing canvases first
+              existing.forEach((canvas: any) => {
+                if (canvas?.id) {
+                  canvasMap.set(canvas.id, canvas);
+                }
+              });
+
+              // Add incoming canvases, overwriting existing ones with same ID
+              incoming.forEach((canvas: any) => {
+                if (canvas?.id) {
+                  canvasMap.set(canvas.id, canvas);
+                }
+              });
+
+              return Array.from(canvasMap.values());
             },
           },
         },
       },
-      // Permission-specific caching policies for NEX-186
+      // Cache policies for queries
       Query: {
         fields: {
-          // Workspace-scoped permission caching
+          // Canvas data caching with TTL
+          workspaceCanvases: {
+            // Cache key includes workspaceId and filter for isolation
+            keyArgs: ['workspaceId', 'filter'],
+            merge: false, // Replace entirely for consistency
+          },
+
+          canvas: {
+            // Cache individual canvas by ID
+            keyArgs: ['id'],
+            merge: false,
+          },
+
+          // Permission-specific caching policies for NEX-186
           getUserWorkspacePermissions: {
             // Cache key includes userId and workspaceId for workspace isolation
             keyArgs: ['userId', 'workspaceId'],
             // Replace cached data completely to avoid merge issues
             merge: false,
           },
-          
+
           // Single permission check caching
           checkUserPermission: {
             // Cache key includes userId, workspaceId, and specific permission
             keyArgs: ['userId', 'workspaceId', 'permission'],
             merge: false,
           },
-          
+
           // Context permissions (all workspaces) caching
           getUserPermissionsForContext: {
             // Cache key includes only userId since this covers all workspaces
@@ -170,11 +191,11 @@ export const apolloClient = new ApolloClient({
   defaultOptions: {
     watchQuery: {
       errorPolicy: 'all', // Return partial data on error
-      fetchPolicy: 'cache-and-network', // Always check network for updates
+      fetchPolicy: 'cache-first', // Use cache first, then network
     },
     query: {
       errorPolicy: 'all',
-      fetchPolicy: 'cache-first',
+      fetchPolicy: 'cache-first', // Use cache first, then network
     },
     mutate: {
       errorPolicy: 'all',
@@ -195,7 +216,7 @@ export const permissionCacheUtils = {
       const cacheData = apolloClient.cache.extract();
       return JSON.stringify(cacheData).length;
     } catch (error) {
-      console.warn('Failed to calculate cache size:', error);
+      // Failed to calculate cache size
       return 0;
     }
   },
@@ -205,7 +226,7 @@ export const permissionCacheUtils = {
    */
   isCacheSizeExceeded(): boolean {
     const currentSize = this.getCacheSize();
-    const maxSizeBytes = PERMISSION_CACHE_CONFIG.MAX_CACHE_SIZE_KB * 1024;
+    const maxSizeBytes = CACHE_CONFIG.MAX_CACHE_SIZE_KB * 1024;
     return currentSize > maxSizeBytes;
   },
 
@@ -229,7 +250,7 @@ export const permissionCacheUtils = {
           const entry = cacheData[key];
           if (entry && typeof entry === 'object' && 
               '__cacheTimestamp' in entry &&
-              (now - (entry.__cacheTimestamp as number)) > PERMISSION_CACHE_CONFIG.TTL_MS) {
+              (now - (entry.__cacheTimestamp as number)) > CACHE_CONFIG.PERMISSION_TTL_MS) {
             // Entry is expired, evict it
             const fieldName = key.split('.')[1];
             const args = this.parseArgsFromCacheKey(key);
@@ -246,9 +267,9 @@ export const permissionCacheUtils = {
       // Run garbage collection to clean up evicted entries
       cache.gc();
       
-      console.log('Expired permission cache entries cleared');
+      // Expired permission cache entries cleared
     } catch (error) {
-      console.warn('Failed to clear expired permission cache:', error);
+      // Failed to clear expired permission cache
     }
   },
 
@@ -285,15 +306,15 @@ export const permissionCacheUtils = {
         fetchPolicy: 'cache-first',
         errorPolicy: 'ignore', // Don't fail the entire warming process
       }).catch(error => {
-        console.warn('Failed to warm cache for workspace:', { workspaceId, error });
+        // Failed to warm cache for workspace
       })
     );
 
     try {
       await Promise.allSettled(warmingPromises);
-      console.log(`Permission cache warmed for ${workspaceIds.length} workspaces`);
+      // Permission cache warmed for workspaces
     } catch (error) {
-      console.warn('Permission cache warming failed:', error);
+      // Permission cache warming failed
     }
   },
 
@@ -324,9 +345,9 @@ export const permissionCacheUtils = {
       });
       
       cache.gc();
-      console.log(`All permission cache invalidated for user: ${userId}`);
+      // All permission cache invalidated for user
     } catch (error) {
-      console.warn('Failed to invalidate user permissions:', error);
+      // Failed to invalidate user permissions
     }
   },
 
@@ -352,9 +373,9 @@ export const permissionCacheUtils = {
       });
       
       cache.gc();
-      console.log(`Workspace permission cache invalidated for user: ${userId}, workspace: ${workspaceId}`);
+      // Workspace permission cache invalidated for user
     } catch (error) {
-      console.warn('Failed to invalidate workspace permissions:', error);
+      // Failed to invalidate workspace permissions
     }
   },
 
@@ -368,13 +389,13 @@ export const permissionCacheUtils = {
       
       // Check cache size and warn if exceeded
       if (this.isCacheSizeExceeded()) {
-        console.warn('Permission cache size exceeded limit, consider clearing cache');
+        // Permission cache size exceeded limit, consider clearing cache
         // Could implement automatic cache clearing here if needed
       }
       
-      console.log('Permission cache maintenance completed');
+      // Permission cache maintenance completed
     } catch (error) {
-      console.warn('Permission cache maintenance failed:', error);
+      // Permission cache maintenance failed
     }
   },
 };
@@ -387,7 +408,7 @@ if (typeof window !== 'undefined') {
   // Only run in browser environment
   setInterval(() => {
     permissionCacheUtils.performMaintenance();
-  }, PERMISSION_CACHE_CONFIG.TTL_MS); // Run maintenance at TTL interval
+  }, CACHE_CONFIG.PERMISSION_TTL_MS); // Run maintenance at TTL interval
 }
 
 /**

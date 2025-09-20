@@ -5,9 +5,9 @@
  */
 
 import request from 'supertest';
-import express, { Express } from 'express';
+import express from 'express';
 import { ApolloServer } from '@apollo/server';
-import { expressMiddleware } from '@apollo/server/express4';
+import { expressMiddleware } from '@as-integrations/express5';
 import { randomUUID } from 'crypto';
 import { 
   createTestApp,
@@ -34,7 +34,7 @@ function createMockWorkspace(overrides: any = {}) {
 }
 
 describe('End-to-End Permission Scenarios', () => {
-  let app: Express;
+  let app: express.Application;
   let mockAuth0Service: any;
   let mockUserService: any;
   let mockCacheService: any;

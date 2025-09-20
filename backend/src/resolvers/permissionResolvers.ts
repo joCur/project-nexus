@@ -163,7 +163,7 @@ export const permissionResolvers = {
      */
     getUserPermissionsForContext: async (
       _: any,
-      {}: {},
+      _args: Record<string, never>,
       context: GraphQLContext
     ): Promise<{ [workspaceId: string]: string[] }> => {
       // Require authentication

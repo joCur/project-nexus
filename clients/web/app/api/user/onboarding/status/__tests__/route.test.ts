@@ -104,17 +104,17 @@ describe('GET /api/user/onboarding/status - NEX-178 Enhanced Error Handling', ()
       expect(data.code).toBe('NO_SESSION');
     });
 
-    it('should handle access token failure gracefully', async () => {
+    it('should throw error on access token failure in any environment', async () => {
       mockGetAccessToken.mockRejectedValue(new Error('Token fetch failed'));
 
       const response = await GET();
+      const data = await response.json();
 
-      expect(response.status).toBe(200);
-      expect(console.warn).toHaveBeenCalledWith(
-        expect.stringMatching(/Failed to get access token, using development mode:/),
-        expect.any(Error)
-      );
+      expect(response.status).toBe(500);
+      expect(data.error).toBe('Auth0 token service temporarily unavailable');
+      expect(data.code).toBe('AUTH0_TOKEN_ERROR');
     });
+
 
     it('should include user context in headers', async () => {
       await GET();
@@ -462,37 +462,16 @@ describe('GET /api/user/onboarding/status - NEX-178 Enhanced Error Handling', ()
     });
   });
 
-  describe('Development Mode Support', () => {
-    it('should work without access token in development', async () => {
+  describe('Authentication Requirements', () => {
+    it('should require valid access token for all requests', async () => {
       mockGetAccessToken.mockRejectedValue(new Error('No access token available'));
 
       const response = await GET();
+      const data = await response.json();
 
-      expect(response.status).toBe(200);
-      expect(global.fetch).toHaveBeenCalledWith(
-        `${mockBackendUrl}/graphql`,
-        expect.objectContaining({
-          headers: expect.not.objectContaining({
-            'Authorization': expect.any(String),
-          }),
-        })
-      );
-    });
-
-    it('should include user context headers for development authentication', async () => {
-      mockGetAccessToken.mockRejectedValue(new Error('Development mode'));
-
-      await GET();
-
-      expect(global.fetch).toHaveBeenCalledWith(
-        `${mockBackendUrl}/graphql`,
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            'X-User-Sub': mockUser.sub,
-            'X-User-Email': mockUser.email,
-          }),
-        })
-      );
+      expect(response.status).toBe(500);
+      expect(data.error).toBe('Auth0 token service temporarily unavailable');
+      expect(data.code).toBe('AUTH0_TOKEN_ERROR');
     });
   });
 

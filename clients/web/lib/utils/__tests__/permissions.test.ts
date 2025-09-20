@@ -20,14 +20,14 @@ import {
   isBackendIntegrationReady,
 } from '../permissions';
 import { ExtendedUserProfile } from '@/types/auth';
-import * as permissionLogger from '../permissionLogger';
+import { permissionLogger } from '../../structured-logger';
 
-// Mock the permission logger
-jest.mock('../permissionLogger', () => ({
+// Mock the structured logger
+jest.mock('../../structured-logger', () => ({
   permissionLogger: {
-    logPermissionCheck: jest.fn(),
-    logError: jest.fn(),
-    logPerformanceMetric: jest.fn(),
+    debug: jest.fn(),
+    error: jest.fn(),
+    info: jest.fn(),
   },
 }));
 
@@ -129,57 +129,66 @@ describe('Permission Utilities', () => {
       expect(checkUserPermission(mockUser, 'workspace:read')).toBe(false);
     });
 
-    it.skip('should handle errors gracefully', () => {
+    it('should handle errors gracefully', () => {
       // Mock permissionLogger to throw error during logging
-      const originalLogPermissionCheck = permissionLogger.permissionLogger.logPermissionCheck;
-      permissionLogger.permissionLogger.logPermissionCheck = jest.fn().mockImplementation(() => {
+      const originalDebug = permissionLogger.debug;
+      permissionLogger.debug = jest.fn().mockImplementation(() => {
         throw new Error('Logging error');
       });
-      
+
       setPermissionContext({ permissions: mockPermissions });
-      
+
       // Should handle the error and return false
       expect(checkUserPermission(mockUser, 'workspace:read')).toBe(false);
-      expect(permissionLogger.permissionLogger.logError).toHaveBeenCalledWith(
+      expect(permissionLogger.error).toHaveBeenCalledWith(
         'Permission check failed',
+        expect.any(Error),
         expect.objectContaining({
           permission: 'workspace:read',
           userId: mockUser.sub,
           workspaceId: undefined
-        })
+        }),
+        ['permission-error']
       );
-      
+
       // Restore original mock
-      permissionLogger.permissionLogger.logPermissionCheck = originalLogPermissionCheck;
+      permissionLogger.debug = originalDebug;
     });
 
-    it.skip('should log permission checks', () => {
+    it('should log permission checks', () => {
       setPermissionContext({ permissions: mockPermissions });
-      
-      checkUserPermission(mockUser, 'workspace:read');
-      
-      expect(permissionLogger.permissionLogger.logPermissionCheck).toHaveBeenCalledWith(
-        'workspace:read',
-        true,
-        mockUser.sub,
-        undefined
-      );
-    });
 
-    it.skip('should log performance metrics', () => {
-      setPermissionContext({ permissions: mockPermissions });
-      
       checkUserPermission(mockUser, 'workspace:read');
-      
-      expect(permissionLogger.permissionLogger.logPerformanceMetric).toHaveBeenCalledWith(
-        'checkUserPermission',
-        expect.any(Number),
-        mockUser.sub,
-        undefined,
+
+      expect(permissionLogger.debug).toHaveBeenCalledWith(
+        'Permission check: workspace:read = true',
         expect.objectContaining({
+          userId: mockUser.sub,
           permission: 'workspace:read',
           result: true,
-        })
+          source: 'permission-system'
+        }),
+        ['permission-check']
+      );
+    });
+
+    it('should log performance metrics', () => {
+      setPermissionContext({ permissions: mockPermissions });
+
+      checkUserPermission(mockUser, 'workspace:read');
+
+      expect(permissionLogger.info).toHaveBeenCalledWith(
+        expect.stringMatching(/Permission check completed in \d+\.\d+ms/),
+        expect.objectContaining({
+          userId: mockUser.sub,
+          permission: 'workspace:read',
+          result: true,
+          source: 'permission-system',
+          performance: expect.objectContaining({
+            duration: expect.any(Number)
+          })
+        }),
+        ['permission-performance']
       );
     });
   });

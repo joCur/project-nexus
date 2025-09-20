@@ -17,12 +17,12 @@ const logger = createContextLogger({ service: 'OnboardingService' });
 const onboardingProgressSchema = z.object({
   userId: z.string().uuid('Invalid user ID format'),
   currentStep: z.number().min(1).max(10),
-  tutorialProgress: z.record(z.boolean()).optional().default({}),
+  tutorialProgress: z.record(z.string(), z.boolean()).optional().default({}),
 });
 
 const onboardingCompleteSchema = z.object({
   userId: z.string().uuid('Invalid user ID format'),
-  tutorialProgress: z.record(z.boolean()).optional().default({}),
+  tutorialProgress: z.record(z.string(), z.boolean()).optional().default({}),
 });
 
 // Database model types (snake_case as returned from database)
@@ -236,10 +236,10 @@ export class OnboardingService {
         logger.error('Validation error in onboarding update', {
           requestId,
           userId: input.userId,
-          validationErrors: error.errors,
+          validationErrors: error.issues,
           timestamp: new Date().toISOString()
         });
-        throw new ValidationError(error.errors[0]?.message || 'Validation failed');
+        throw new ValidationError(error.issues[0]?.message || 'Validation failed');
       }
 
       logger.error('Failed to update onboarding progress', {
@@ -373,10 +373,10 @@ export class OnboardingService {
         logger.error('Validation error in onboarding completion', {
           requestId,
           userId: input.userId,
-          validationErrors: error.errors,
+          validationErrors: error.issues,
           timestamp: new Date().toISOString()
         });
-        throw new ValidationError(error.errors[0]?.message || 'Validation failed');
+        throw new ValidationError(error.issues[0]?.message || 'Validation failed');
       }
 
       logger.error('Failed to complete onboarding', {
@@ -484,3 +484,5 @@ export class OnboardingService {
     };
   }
 }
+
+

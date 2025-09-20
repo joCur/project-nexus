@@ -1,4 +1,4 @@
-import { gql } from 'apollo-server-express';
+import { gql } from 'graphql-tag';
 
 /**
  * Canvas GraphQL Type Definitions (NEX-96)

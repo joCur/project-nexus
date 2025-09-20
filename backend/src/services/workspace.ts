@@ -18,14 +18,14 @@ const workspaceCreateSchema = z.object({
   name: z.string().min(1, 'Workspace name is required').max(100),
   ownerId: z.string().uuid('Invalid owner ID format'),
   privacy: z.enum(['private', 'team', 'public']).optional().default('private'),
-  settings: z.record(z.any()).optional().default({}),
+  settings: z.record(z.string(), z.unknown()).optional().default({}),
   isDefault: z.boolean().optional().default(false),
 });
 
 const workspaceUpdateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   privacy: z.enum(['private', 'team', 'public']).optional(),
-  settings: z.record(z.any()).optional(),
+  settings: z.record(z.string(), z.unknown()).optional(),
   isDefault: z.boolean().optional(),
   ownerId: z.string().uuid('Invalid owner ID format').optional(),
 });
@@ -170,7 +170,7 @@ export class WorkspaceService {
 
     } catch (error) {
       if (error instanceof z.ZodError) {
-        throw new ValidationError(error.errors[0]?.message || 'Validation failed');
+        throw new ValidationError(error.issues[0]?.message || 'Validation failed');
       }
 
       logger.error('Failed to create workspace', {
@@ -241,7 +241,7 @@ export class WorkspaceService {
 
     } catch (error) {
       if (error instanceof z.ZodError) {
-        throw new ValidationError(error.errors[0]?.message || 'Validation failed');
+        throw new ValidationError(error.issues[0]?.message || 'Validation failed');
       }
 
       logger.error('Failed to update workspace', {
@@ -434,3 +434,4 @@ export class WorkspaceService {
     };
   }
 }
+

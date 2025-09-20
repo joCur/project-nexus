@@ -4,11 +4,14 @@
 
 import React from 'react';
 import { render, screen } from '@testing-library/react';
+import { MockedProvider } from '@apollo/client/testing';
 import { WorkspaceBreadcrumbs } from '../WorkspaceBreadcrumbs';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
+import { useCanvas } from '@/hooks/use-canvas';
 
 // Mock dependencies
 jest.mock('@/stores/workspaceStore');
+jest.mock('@/hooks/use-canvas');
 
 // Mock Next.js Link component
 jest.mock('next/link', () => {
@@ -20,10 +23,26 @@ jest.mock('next/link', () => {
 });
 
 const mockUseWorkspaceStore = useWorkspaceStore as jest.MockedFunction<typeof useWorkspaceStore>;
+const mockUseCanvas = useCanvas as jest.MockedFunction<typeof useCanvas>;
+
+// Test wrapper with Apollo provider
+const TestWrapper = ({ children }: { children: React.ReactNode }) => (
+  <MockedProvider mocks={[]} addTypename={false}>
+    {children}
+  </MockedProvider>
+);
 
 describe('WorkspaceBreadcrumbs', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+
+    // Default mock for useCanvas hook
+    mockUseCanvas.mockReturnValue({
+      canvas: undefined,
+      loading: false,
+      error: undefined,
+      refetch: jest.fn(),
+    });
   });
 
   describe('No workspace context', () => {
@@ -37,17 +56,16 @@ describe('WorkspaceBreadcrumbs', () => {
             canvasName: undefined,
           },
         };
-        
+
         if (!selector) return mockStore;
-        
-        if (selector.toString().includes('getCurrentCanvas')) {
-          return { id: undefined, name: undefined, canvas: undefined };
-        }
-        
         return selector(mockStore);
       });
 
-      const { container } = render(<WorkspaceBreadcrumbs />);
+      const { container } = render(
+        <TestWrapper>
+          <WorkspaceBreadcrumbs />
+        </TestWrapper>
+      );
       expect(container.firstChild).toBeNull();
     });
   });
@@ -63,23 +81,22 @@ describe('WorkspaceBreadcrumbs', () => {
             canvasName: undefined,
           },
         };
-        
+
         if (!selector) return mockStore;
-        
-        if (selector.toString().includes('getCurrentCanvas')) {
-          return { id: undefined, name: undefined, canvas: undefined };
-        }
-        
         return selector(mockStore);
       });
     });
 
     it('renders breadcrumbs for workspace level', () => {
-      render(<WorkspaceBreadcrumbs />);
-      
+      render(
+        <TestWrapper>
+          <WorkspaceBreadcrumbs />
+        </TestWrapper>
+      );
+
       const nav = screen.getByRole('navigation', { name: 'Breadcrumb' });
       expect(nav).toBeInTheDocument();
-      
+
       // Should show Dashboard -> Workspace (current)
       expect(screen.getByRole('link', { name: 'Navigate to Dashboard' })).toHaveAttribute('href', '/');
       expect(screen.getByText('Test Workspace')).toBeInTheDocument();
@@ -96,18 +113,17 @@ describe('WorkspaceBreadcrumbs', () => {
             canvasName: undefined,
           },
         };
-        
+
         if (!selector) return mockStore;
-        
-        if (selector.toString().includes('getCurrentCanvas')) {
-          return { id: undefined, name: undefined, canvas: undefined };
-        }
-        
         return selector(mockStore);
       });
 
-      render(<WorkspaceBreadcrumbs />);
-      
+      render(
+        <TestWrapper>
+          <WorkspaceBreadcrumbs />
+        </TestWrapper>
+      );
+
       expect(screen.getByText('Workspace workspace-1')).toBeInTheDocument();
     });
   });
@@ -123,35 +139,42 @@ describe('WorkspaceBreadcrumbs', () => {
             canvasName: 'Main Canvas',
           },
         };
-        
+
         if (!selector) return mockStore;
-        
-        if (selector.toString().includes('getCurrentCanvas')) {
-          return { 
-            id: 'canvas-1', 
-            name: 'Main Canvas', 
-            canvas: { name: 'Main Canvas' } 
-          };
-        }
-        
         return selector(mockStore);
+      });
+
+      // Mock useCanvas to return canvas data
+      mockUseCanvas.mockReturnValue({
+        canvas: {
+          id: 'canvas-1',
+          name: 'Main Canvas',
+          workspaceId: 'workspace-1',
+        } as any,
+        loading: false,
+        error: undefined,
+        refetch: jest.fn(),
       });
     });
 
     it('renders full breadcrumb hierarchy', () => {
-      render(<WorkspaceBreadcrumbs />);
-      
+      render(
+        <TestWrapper>
+          <WorkspaceBreadcrumbs />
+        </TestWrapper>
+      );
+
       const nav = screen.getByRole('navigation', { name: 'Breadcrumb' });
       expect(nav).toBeInTheDocument();
-      
+
       // Dashboard link
       expect(screen.getByRole('link', { name: 'Navigate to Dashboard' }))
         .toHaveAttribute('href', '/');
-      
+
       // Workspace link
       expect(screen.getByRole('link', { name: 'Navigate to Test Workspace' }))
         .toHaveAttribute('href', '/workspace/workspace-1');
-      
+
       // Current canvas (not a link)
       expect(screen.getByText('Main Canvas')).toHaveAttribute('aria-current', 'page');
       expect(screen.queryByRole('link', { name: /Main Canvas/ })).not.toBeInTheDocument();
@@ -167,22 +190,25 @@ describe('WorkspaceBreadcrumbs', () => {
             canvasName: undefined,
           },
         };
-        
+
         if (!selector) return mockStore;
-        
-        if (selector.toString().includes('getCurrentCanvas')) {
-          return { 
-            id: 'canvas-1', 
-            name: undefined, 
-            canvas: undefined 
-          };
-        }
-        
         return selector(mockStore);
       });
 
-      render(<WorkspaceBreadcrumbs />);
-      
+      // Mock useCanvas to return no canvas data
+      mockUseCanvas.mockReturnValue({
+        canvas: undefined,
+        loading: false,
+        error: undefined,
+        refetch: jest.fn(),
+      });
+
+      render(
+        <TestWrapper>
+          <WorkspaceBreadcrumbs />
+        </TestWrapper>
+      );
+
       expect(screen.getByText('Canvas')).toBeInTheDocument();
       expect(screen.getByText('Canvas')).toHaveAttribute('aria-current', 'page');
     });
@@ -199,26 +225,32 @@ describe('WorkspaceBreadcrumbs', () => {
             canvasName: 'Main Canvas',
           },
         };
-        
+
         if (!selector) return mockStore;
-        
-        if (selector.toString().includes('getCurrentCanvas')) {
-          return { 
-            id: 'canvas-1', 
-            name: 'Main Canvas', 
-            canvas: { name: 'Main Canvas' } 
-          };
-        }
-        
         return selector(mockStore);
       });
 
-      const { container } = render(<WorkspaceBreadcrumbs />);
-      
+      mockUseCanvas.mockReturnValue({
+        canvas: {
+          id: 'canvas-1',
+          name: 'Main Canvas',
+          workspaceId: 'workspace-1',
+        } as any,
+        loading: false,
+        error: undefined,
+        refetch: jest.fn(),
+      });
+
+      const { container } = render(
+        <TestWrapper>
+          <WorkspaceBreadcrumbs />
+        </TestWrapper>
+      );
+
       // Should have 2 separators for 3 breadcrumb items
       const separators = container.querySelectorAll('svg');
       expect(separators).toHaveLength(2);
-      
+
       separators.forEach(separator => {
         expect(separator).toHaveAttribute('aria-hidden', 'true');
       });
@@ -234,18 +266,17 @@ describe('WorkspaceBreadcrumbs', () => {
             canvasName: undefined,
           },
         };
-        
+
         if (!selector) return mockStore;
-        
-        if (selector.toString().includes('getCurrentCanvas')) {
-          return { id: undefined, name: undefined, canvas: undefined };
-        }
-        
         return selector(mockStore);
       });
 
-      const { container } = render(<WorkspaceBreadcrumbs />);
-      
+      const { container } = render(
+        <TestWrapper>
+          <WorkspaceBreadcrumbs />
+        </TestWrapper>
+      );
+
       // Should have 1 separator for 2 breadcrumb items
       const separators = container.querySelectorAll('svg');
       expect(separators).toHaveLength(1);
@@ -263,46 +294,64 @@ describe('WorkspaceBreadcrumbs', () => {
             canvasName: 'Main Canvas',
           },
         };
-        
+
         if (!selector) return mockStore;
-        
-        if (selector.toString().includes('getCurrentCanvas')) {
-          return { 
-            id: 'canvas-1', 
-            name: 'Main Canvas', 
-            canvas: { name: 'Main Canvas' } 
-          };
-        }
-        
         return selector(mockStore);
+      });
+
+      mockUseCanvas.mockReturnValue({
+        canvas: {
+          id: 'canvas-1',
+          name: 'Main Canvas',
+          workspaceId: 'workspace-1',
+        } as any,
+        loading: false,
+        error: undefined,
+        refetch: jest.fn(),
       });
     });
 
     it('uses semantic nav element with proper label', () => {
-      render(<WorkspaceBreadcrumbs />);
-      
+      render(
+        <TestWrapper>
+          <WorkspaceBreadcrumbs />
+        </TestWrapper>
+      );
+
       const nav = screen.getByRole('navigation', { name: 'Breadcrumb' });
       expect(nav).toBeInTheDocument();
     });
 
     it('uses ordered list for breadcrumb structure', () => {
-      render(<WorkspaceBreadcrumbs />);
-      
+      render(
+        <TestWrapper>
+          <WorkspaceBreadcrumbs />
+        </TestWrapper>
+      );
+
       const list = screen.getByRole('list');
       expect(list).toBeInTheDocument();
       expect(list.tagName).toBe('OL');
     });
 
     it('marks current page with aria-current', () => {
-      render(<WorkspaceBreadcrumbs />);
-      
+      render(
+        <TestWrapper>
+          <WorkspaceBreadcrumbs />
+        </TestWrapper>
+      );
+
       const currentPage = screen.getByText('Main Canvas');
       expect(currentPage).toHaveAttribute('aria-current', 'page');
     });
 
     it('has accessible link labels', () => {
-      render(<WorkspaceBreadcrumbs />);
-      
+      render(
+        <TestWrapper>
+          <WorkspaceBreadcrumbs />
+        </TestWrapper>
+      );
+
       expect(screen.getByRole('link', { name: 'Navigate to Dashboard' }))
         .toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'Navigate to Test Workspace' }))
@@ -310,8 +359,12 @@ describe('WorkspaceBreadcrumbs', () => {
     });
 
     it('hides decorative separators from screen readers', () => {
-      const { container } = render(<WorkspaceBreadcrumbs />);
-      
+      const { container } = render(
+        <TestWrapper>
+          <WorkspaceBreadcrumbs />
+        </TestWrapper>
+      );
+
       const separators = container.querySelectorAll('svg');
       separators.forEach(separator => {
         expect(separator).toHaveAttribute('aria-hidden', 'true');
@@ -330,24 +383,30 @@ describe('WorkspaceBreadcrumbs', () => {
             canvasName: 'Main Canvas',
           },
         };
-        
+
         if (!selector) return mockStore;
-        
-        if (selector.toString().includes('getCurrentCanvas')) {
-          return { 
-            id: 'canvas-1', 
-            name: 'Main Canvas', 
-            canvas: { name: 'Main Canvas' } 
-          };
-        }
-        
         return selector(mockStore);
+      });
+
+      mockUseCanvas.mockReturnValue({
+        canvas: {
+          id: 'canvas-1',
+          name: 'Main Canvas',
+          workspaceId: 'workspace-1',
+        } as any,
+        loading: false,
+        error: undefined,
+        refetch: jest.fn(),
       });
     });
 
     it('has correct href attributes', () => {
-      render(<WorkspaceBreadcrumbs />);
-      
+      render(
+        <TestWrapper>
+          <WorkspaceBreadcrumbs />
+        </TestWrapper>
+      );
+
       expect(screen.getByRole('link', { name: 'Navigate to Dashboard' }))
         .toHaveAttribute('href', '/');
       expect(screen.getByRole('link', { name: 'Navigate to Test Workspace' }))
@@ -355,8 +414,12 @@ describe('WorkspaceBreadcrumbs', () => {
     });
 
     it('applies hover and focus styles to links', () => {
-      render(<WorkspaceBreadcrumbs />);
-      
+      render(
+        <TestWrapper>
+          <WorkspaceBreadcrumbs />
+        </TestWrapper>
+      );
+
       const links = screen.getAllByRole('link');
       links.forEach(link => {
         expect(link).toHaveClass('hover:text-gray-700', 'focus:text-gray-700', 'transition-colors');

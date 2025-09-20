@@ -276,8 +276,8 @@ export const ErrorFactory = {
    * Create a validation error from Zod error
    */
   fromZodError: (error: any): ValidationError => {
-    if (error.errors && error.errors.length > 0) {
-      const firstError = error.errors[0];
+    if (error.issues && error.issues.length > 0) {
+      const firstError = error.issues[0];
       return new ValidationError(
         `${firstError.path.join('.')}: ${firstError.message}`,
         firstError.path.join('.'),
