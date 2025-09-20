@@ -102,23 +102,40 @@ describe('CreateCanvasModal', () => {
       refresh: jest.fn(),
     } as any);
 
+    // Mock simplified workspace store
     mockUseWorkspaceStore.mockImplementation((selector?: any) => {
       const mockStore = {
-        setCurrentCanvas: mockSetCurrentCanvas,
-        canvasManagement: {
+        context: {
+          currentWorkspaceId: 'workspace-1',
+          currentCanvasId: undefined,
+          workspaceName: 'Test Workspace',
+          canvasName: undefined,
+        },
+        uiState: {
           loadingStates: {
+            fetchingCanvases: false,
             creatingCanvas: false,
+            updatingCanvas: false,
+            deletingCanvas: false,
+            settingDefault: false,
+            duplicatingCanvas: false,
+          },
+          errors: {
+            fetchError: undefined,
+            mutationError: undefined,
           },
         },
+        isInitialized: true,
+        setCurrentWorkspace: jest.fn(),
+        setCurrentCanvas: mockSetCurrentCanvas,
+        switchCanvas: jest.fn(),
+        clearContext: jest.fn(),
+        setCanvasLoading: jest.fn(),
+        setError: jest.fn(),
+        clearErrors: jest.fn(),
       };
 
-      if (!selector) return mockStore;
-      
-      if (selector.toString().includes('loadingStates.creatingCanvas')) {
-        return false;
-      }
-      
-      return selector(mockStore);
+      return selector ? selector(mockStore) : mockStore;
     });
 
     // Mock canvas hooks
@@ -366,19 +383,6 @@ describe('CreateCanvasModal', () => {
 
   describe('Loading States', () => {
     it('shows loading state during creation', () => {
-      mockUseWorkspaceStore.mockImplementation((selector?: any) => {
-        if (selector?.toString().includes('loadingStates.creatingCanvas')) {
-          return true;
-        }
-        return {
-          createCanvas: mockCreateCanvas,
-          setDefaultCanvas: mockSetDefaultCanvas,
-          canvasManagement: {
-            loadingStates: { creatingCanvas: true },
-          },
-        };
-      });
-
       // Mock the hook to return loading state
       const { useCreateCanvas } = require('@/hooks/use-canvas');
       (useCreateCanvas as jest.Mock).mockReturnValue({
@@ -387,27 +391,14 @@ describe('CreateCanvasModal', () => {
         error: null,
         reset: jest.fn(),
       });
-      
+
       render(<CreateCanvasModal {...defaultProps} />);
-      
+
       expect(screen.getByRole('button', { name: /Creating.../ })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Creating.../ })).toBeDisabled();
     });
 
     it('disables form fields during creation', () => {
-      mockUseWorkspaceStore.mockImplementation((selector?: any) => {
-        if (selector?.toString().includes('loadingStates.creatingCanvas')) {
-          return true;
-        }
-        return {
-          createCanvas: mockCreateCanvas,
-          setDefaultCanvas: mockSetDefaultCanvas,
-          canvasManagement: {
-            loadingStates: { creatingCanvas: true },
-          },
-        };
-      });
-
       // Mock the hook to return loading state
       const { useCreateCanvas } = require('@/hooks/use-canvas');
       (useCreateCanvas as jest.Mock).mockReturnValue({
@@ -416,28 +407,15 @@ describe('CreateCanvasModal', () => {
         error: null,
         reset: jest.fn(),
       });
-      
+
       render(<CreateCanvasModal {...defaultProps} />);
-      
+
       expect(screen.getByLabelText(/Canvas Name/)).toBeDisabled();
       expect(screen.getByLabelText(/Description/)).toBeDisabled();
       expect(screen.getByLabelText(/Set as default canvas/)).toBeDisabled();
     });
 
     it('prevents modal close during creation', () => {
-      mockUseWorkspaceStore.mockImplementation((selector?: any) => {
-        if (selector?.toString().includes('loadingStates.creatingCanvas')) {
-          return true;
-        }
-        return {
-          createCanvas: mockCreateCanvas,
-          setDefaultCanvas: mockSetDefaultCanvas,
-          canvasManagement: {
-            loadingStates: { creatingCanvas: true },
-          },
-        };
-      });
-
       // Mock the hook to return loading state
       const { useCreateCanvas } = require('@/hooks/use-canvas');
       (useCreateCanvas as jest.Mock).mockReturnValue({
@@ -446,12 +424,12 @@ describe('CreateCanvasModal', () => {
         error: null,
         reset: jest.fn(),
       });
-      
+
       const onClose = jest.fn();
       render(<CreateCanvasModal {...defaultProps} onClose={onClose} />);
-      
+
       fireEvent.click(screen.getByRole('button', { name: /Cancel/ }));
-      
+
       expect(onClose).not.toHaveBeenCalled();
     });
   });
@@ -527,19 +505,6 @@ describe('CreateCanvasModal', () => {
     });
 
     it('announces loading state to screen readers', () => {
-      mockUseWorkspaceStore.mockImplementation((selector?: any) => {
-        if (selector?.toString().includes('loadingStates.creatingCanvas')) {
-          return true;
-        }
-        return {
-          createCanvas: mockCreateCanvas,
-          setDefaultCanvas: mockSetDefaultCanvas,
-          canvasManagement: {
-            loadingStates: { creatingCanvas: true },
-          },
-        };
-      });
-
       // Mock the hook to return loading state
       const { useCreateCanvas } = require('@/hooks/use-canvas');
       (useCreateCanvas as jest.Mock).mockReturnValue({
@@ -548,9 +513,9 @@ describe('CreateCanvasModal', () => {
         error: null,
         reset: jest.fn(),
       });
-      
+
       render(<CreateCanvasModal {...defaultProps} />);
-      
+
       expect(screen.getByText('Creating canvas, please wait...')).toHaveClass('sr-only');
       expect(screen.getByText('Creating canvas, please wait...')).toHaveAttribute('aria-live', 'polite');
     });

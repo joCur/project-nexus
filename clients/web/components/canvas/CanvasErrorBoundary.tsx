@@ -2,7 +2,6 @@
 
 import React, { Component, ReactNode } from 'react';
 import { Button } from '@/components/ui/Button';
-import { cn } from '@/lib/utils';
 
 /**
  * Error information passed to error boundary
