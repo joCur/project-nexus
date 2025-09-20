@@ -14,39 +14,32 @@ import { getSession, getAccessToken } from '@auth0/nextjs-auth0';
 export async function GET() {
   const requestId = Math.random().toString(36).substring(2, 9);
 
-  console.log(`[${requestId}] Onboarding status request started`);
-  
   try {
-    // Check session with detailed logging
-    console.log(`[${requestId}] Checking Auth0 session...`);
+    // Check session
     const session = await getSession();
-    
+
     if (!session?.user) {
-      console.log(`[${requestId}] No session found, returning 401`);
       return NextResponse.json(
-        { 
+        {
           error: 'Authentication required',
           code: 'NO_SESSION',
-          requestId 
+          requestId
         },
         { status: 401 }
       );
     }
-
-    console.log(`[${requestId}] Session found for user: ${session.user.sub}`);
 
     // Get access token with graceful fallback for development
     let accessToken: string | undefined;
     try {
       const tokenResult = await getAccessToken();
       accessToken = tokenResult.accessToken;
-      console.log(`[${requestId}] Access token obtained successfully`);
     } catch (error) {
-      console.warn(`[${requestId}] Failed to get access token, using development mode:`, error);
+      // Fallback to development mode if token retrieval fails
+      // Failed to get access token, using development mode
     }
 
     // Call backend GraphQL API to get onboarding status
-    console.log(`[${requestId}] Calling backend GraphQL API...`);
     const graphqlQuery = `
       query GetMyOnboardingStatus {
         myOnboardingStatus {
@@ -73,12 +66,10 @@ export async function GET() {
     `;
 
     const backendUrl = process.env.API_BASE_URL || 'http://backend:3000';
-    console.log(`[${requestId}] Backend URL: ${backendUrl}/graphql`);
 
     // Create AbortController for request timeout
     const controller = new AbortController();
     const timeout = setTimeout(() => {
-      console.warn(`[${requestId}] Request timeout after 10 seconds`);
       controller.abort();
     }, 10000); // 10 second timeout
 
@@ -103,15 +94,8 @@ export async function GET() {
       clearTimeout(timeout);
     }
 
-    console.log(`[${requestId}] Backend response status: ${backendResponse.status}`);
-
     if (!backendResponse.ok) {
       const errorText = await backendResponse.text().catch(() => 'Unknown error');
-      console.error(`[${requestId}] Backend API error:`, {
-        status: backendResponse.status,
-        statusText: backendResponse.statusText,
-        body: errorText,
-      });
 
       // Return specific error codes instead of defaulting to incomplete
       if (backendResponse.status === 404) {
@@ -141,10 +125,8 @@ export async function GET() {
     }
 
     const result = await backendResponse.json();
-    console.log(`[${requestId}] GraphQL response received`);
 
     if (result.errors) {
-      console.error(`[${requestId}] GraphQL errors:`, result.errors);
       
       // Check for specific GraphQL error types
       const hasAuthError = result.errors.some((error: { extensions?: { code?: string }; message?: string }) => 
@@ -168,7 +150,6 @@ export async function GET() {
 
     const status = result.data?.myOnboardingStatus;
     if (!status) {
-      console.error(`[${requestId}] No onboarding status data in response`);
       throw new Error('Invalid response format: missing onboarding status data');
     }
 

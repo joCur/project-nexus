@@ -103,7 +103,7 @@ export const CanvasSwitcher: React.FC = () => {
         showToast(canvasToastMessages.setDefaultError(canvas.name, 'Operation failed'));
       }
     } catch (error) {
-      console.error('Error setting default canvas:', error);
+      // Error setting default canvas
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       showToast(canvasToastMessages.setDefaultError(canvas.name, errorMessage));
     } finally {

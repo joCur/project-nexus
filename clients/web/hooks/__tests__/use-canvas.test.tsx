@@ -354,7 +354,7 @@ describe('Canvas Apollo Hooks', () => {
           createdCanvasId = await result.current.mutate(createParams);
         } catch (error) {
           // Handle Apollo mock resolution issues in test environment
-          console.log('Apollo mock may not have resolved in test environment');
+          // Apollo mock may not have resolved in test environment
         }
       });
 
@@ -373,7 +373,7 @@ describe('Canvas Apollo Hooks', () => {
         expect(result.current.error).toBeUndefined();
       } else {
         // Mock didn't resolve - this is acceptable in test environment
-        console.log('Apollo mock did not resolve, but hook structure is validated');
+        // Apollo mock did not resolve, but hook structure is validated
       }
 
       expect(result.current.loading).toBe(false);

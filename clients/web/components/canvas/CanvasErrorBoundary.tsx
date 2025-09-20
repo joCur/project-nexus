@@ -176,7 +176,7 @@ const DefaultErrorFallback: React.FC<{
           key="contact"
           onClick={() => {
             // This would integrate with your contact/support system
-            console.log('Contact administrator clicked');
+            // Contact administrator clicked
           }}
           variant="outline"
         >
@@ -345,7 +345,7 @@ export class CanvasErrorBoundary extends Component<CanvasErrorBoundaryProps, Can
     }
 
     // Log error for debugging
-    console.error('Canvas Error Boundary caught an error:', error, errorInfo);
+    // Canvas Error Boundary caught an error
 
     // Report error to monitoring service
     this.reportError(error, errorInfo);
@@ -382,7 +382,7 @@ export class CanvasErrorBoundary extends Component<CanvasErrorBoundaryProps, Can
       } : null,
     };
 
-    console.log('Error report:', errorReport);
+    // Error report logged
     // TODO: Send to error reporting service
   }
 

@@ -123,7 +123,7 @@ export const CanvasContextMenu: React.FC<CanvasContextMenuProps> = ({
       await onSetDefault(canvasId);
       onClose();
     } catch (error) {
-      console.error('Failed to set default canvas:', error);
+      // Failed to set default canvas
       // Toast notification will be handled by the parent component
     } finally {
       setIsSettingDefault(false);
@@ -145,11 +145,11 @@ export const CanvasContextMenu: React.FC<CanvasContextMenuProps> = ({
       });
 
       if (newCanvasId) {
-        console.log('Canvas duplicated successfully:', newCanvasId);
+        // Canvas duplicated successfully
         onClose();
       }
     } catch (error) {
-      console.error('Failed to duplicate canvas:', error);
+      // Failed to duplicate canvas
     } finally {
       setIsDuplicating(false);
     }
@@ -168,11 +168,11 @@ export const CanvasContextMenu: React.FC<CanvasContextMenuProps> = ({
     try {
       const success = await deleteCanvas.mutate(canvasId);
       if (success) {
-        console.log('Canvas deleted successfully:', canvasId);
+        // Canvas deleted successfully
         onClose();
       }
     } catch (error) {
-      console.error('Failed to delete canvas:', error);
+      // Failed to delete canvas
     } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);

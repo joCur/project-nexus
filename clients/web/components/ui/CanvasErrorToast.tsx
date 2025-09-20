@@ -50,7 +50,7 @@ export const canvasToastMessages = {
       label: 'Fix Now',
       onClick: () => {
         // This will be implemented to resolve the conflict
-        console.log('Fixing multiple defaults...');
+        // Fixing multiple defaults...
       },
     },
   }),
