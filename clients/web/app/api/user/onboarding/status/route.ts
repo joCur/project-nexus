@@ -1,5 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getSession, getAccessToken } from '@auth0/nextjs-auth0';
+import {
+  classifyError,
+  AuthenticationError,
+  BackendError,
+  Auth0TokenError,
+  ErrorCode
+} from '@/lib/errors/api-errors';
 
 /**
  * Get user's onboarding status from backend
@@ -19,24 +26,31 @@ export async function GET() {
     const session = await getSession();
 
     if (!session?.user) {
-      return NextResponse.json(
-        {
-          error: 'Authentication required',
-          code: 'NO_SESSION',
-          requestId
-        },
-        { status: 401 }
+      const authError = new AuthenticationError(
+        ErrorCode.NO_SESSION,
+        'Authentication required',
+        { requestId }
       );
+      return NextResponse.json(authError.toJSON(), { status: authError.statusCode });
     }
 
-    // Get access token with graceful fallback for development
-    let accessToken: string | undefined;
+    // Get access token - this is required for proper authentication
+    let accessToken: string;
     try {
       const tokenResult = await getAccessToken();
+      if (!tokenResult.accessToken) {
+        throw new Error('No access token returned from Auth0');
+      }
       accessToken = tokenResult.accessToken;
     } catch (error) {
-      // Fallback to development mode if token retrieval fails
-      // Failed to get access token, using development mode
+      // Auth0 token errors are internal service failures, not authentication failures
+      throw new Auth0TokenError(
+        'Auth0 token service temporarily unavailable',
+        {
+          cause: error instanceof Error ? error : new Error('Auth0 token retrieval failed'),
+          requestId
+        }
+      );
     }
 
     // Call backend GraphQL API to get onboarding status
@@ -97,28 +111,24 @@ export async function GET() {
     if (!backendResponse.ok) {
       const errorText = await backendResponse.text().catch(() => 'Unknown error');
 
-      // Return specific error codes instead of defaulting to incomplete
       if (backendResponse.status === 404) {
-        return NextResponse.json(
-          { 
-            error: 'User not found in backend system',
-            code: 'USER_NOT_FOUND',
-            requestId 
-          },
-          { status: 404 }
+        const backendError = new BackendError(
+          ErrorCode.USER_NOT_FOUND,
+          'User not found in backend system',
+          404,
+          { requestId }
         );
+        return NextResponse.json(backendError.toJSON(), { status: backendError.statusCode });
       }
 
       if (backendResponse.status >= 500) {
-        return NextResponse.json(
-          { 
-            error: 'Backend service temporarily unavailable',
-            code: 'BACKEND_ERROR',
-            requestId,
-            retryAfter: 30 // suggest retry after 30 seconds
-          },
-          { status: 503 }
+        const backendError = new BackendError(
+          ErrorCode.BACKEND_ERROR,
+          'Backend service temporarily unavailable',
+          503,
+          { requestId, retryAfter: 30 }
         );
+        return NextResponse.json(backendError.toJSON(), { status: backendError.statusCode });
       }
 
       throw new Error(`Backend API error: ${backendResponse.status} - ${errorText}`);
@@ -127,22 +137,19 @@ export async function GET() {
     const result = await backendResponse.json();
 
     if (result.errors) {
-      
       // Check for specific GraphQL error types
-      const hasAuthError = result.errors.some((error: { extensions?: { code?: string }; message?: string }) => 
+      const hasAuthError = result.errors.some((error: { extensions?: { code?: string }; message?: string }) =>
         error.extensions?.code === 'UNAUTHENTICATED' ||
         error.message?.includes('Authentication')
       );
 
       if (hasAuthError) {
-        return NextResponse.json(
-          { 
-            error: 'Authentication failed with backend',
-            code: 'BACKEND_AUTH_ERROR',
-            requestId 
-          },
-          { status: 401 }
+        const authError = new AuthenticationError(
+          ErrorCode.BACKEND_AUTH_ERROR,
+          'Authentication failed with backend',
+          { requestId }
         );
+        return NextResponse.json(authError.toJSON(), { status: authError.statusCode });
       }
 
       throw new Error(`GraphQL query failed: ${result.errors[0]?.message || 'Unknown GraphQL error'}`);
@@ -166,45 +173,8 @@ export async function GET() {
     return NextResponse.json(responseData);
 
   } catch (error) {
-    // Handle specific error types
-    if (error instanceof Error) {
-      // Timeout errors
-      if (error.name === 'AbortError') {
-        return NextResponse.json(
-          { 
-            error: 'Request timeout - backend service is slow to respond',
-            code: 'REQUEST_TIMEOUT',
-            requestId,
-            retryAfter: 10
-          },
-          { status: 408 }
-        );
-      }
-
-      // Network errors (connection refused, etc.)
-      if (error.message.includes('fetch failed') || error.message.includes('ECONNREFUSED')) {
-        return NextResponse.json(
-          { 
-            error: 'Cannot connect to backend service',
-            code: 'BACKEND_UNREACHABLE',
-            requestId,
-            retryAfter: 30
-          },
-          { status: 503 }
-        );
-      }
-    }
-    
-    // For any other unexpected errors, return 500 but don't default to "incomplete" status
-    // The client hook will preserve existing cached status on 500 errors
-    return NextResponse.json(
-      { 
-        error: 'Internal server error occurred while fetching onboarding status',
-        code: 'INTERNAL_ERROR',
-        requestId,
-        message: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    );
+    // Use the error classification system to handle errors properly
+    const apiError = classifyError(error, requestId);
+    return NextResponse.json(apiError.toJSON(), { status: apiError.statusCode });
   }
 }

@@ -420,7 +420,7 @@ export class PermissionNotificationSystemImpl implements PermissionNotificationS
           this.removeListener(registration);
         }
       } catch (error) {
-        // Error in permission event listener
+        // Error in permission event listener - silently continue with other listeners
       }
     }
   }
