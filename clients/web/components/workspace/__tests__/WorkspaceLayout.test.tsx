@@ -60,7 +60,7 @@ describe('WorkspaceLayout', () => {
       checkPermissionInWorkspace: jest.fn().mockReturnValue(true),
     });
 
-    // Mock workspace store
+    // Mock simplified workspace store
     mockUseWorkspaceStore.mockReturnValue({
       context: {
         currentWorkspaceId: 'workspace-1',
@@ -68,9 +68,7 @@ describe('WorkspaceLayout', () => {
         workspaceName: 'Test Workspace',
         canvasName: 'Test Canvas',
       },
-      canvasManagement: {
-        canvases: new Map(),
-        defaultCanvasId: undefined,
+      uiState: {
         loadingStates: {
           fetchingCanvases: false,
           creatingCanvas: false,
@@ -89,21 +87,9 @@ describe('WorkspaceLayout', () => {
       setCurrentCanvas: jest.fn(),
       switchCanvas: jest.fn(),
       clearContext: jest.fn(),
-      createCanvas: jest.fn(),
-      updateCanvas: jest.fn(),
-      deleteCanvas: jest.fn(),
-      duplicateCanvas: jest.fn(),
-      setDefaultCanvas: jest.fn(),
-      loadWorkspaceCanvases: jest.fn(),
-      refreshCanvases: jest.fn(),
-      updateCanvasSettings: jest.fn(),
-      saveCurrentViewport: jest.fn(),
-      getCanvas: jest.fn(),
-      getDefaultCanvas: jest.fn(),
-      getCurrentCanvas: jest.fn(),
-      getCanvasesByFilter: jest.fn(),
-      clearErrors: jest.fn(),
+      setCanvasLoading: jest.fn(),
       setError: jest.fn(),
+      clearErrors: jest.fn(),
     });
   });
 

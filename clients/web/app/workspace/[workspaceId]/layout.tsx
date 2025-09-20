@@ -7,6 +7,7 @@ import { useParams, useSearchParams } from 'next/navigation';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
 import { useEffect, useState } from 'react';
 import { useContextPermissions } from '@/hooks/use-permissions';
+import { useCanvasSubscriptions } from '@/hooks/use-canvas';
 import { useAuth } from '@/hooks/use-auth';
 import type { EntityId } from '@/types/common.types';
 
@@ -44,6 +45,9 @@ function WorkspaceAccessValidator({ children }: { children: React.ReactNode }) {
       setCurrentWorkspace(workspaceId, `Workspace ${workspaceId}`);
     }
   }, [workspaceId, context.currentWorkspaceId, setCurrentWorkspace]);
+
+  // Initialize canvas subscriptions for real-time updates
+  useCanvasSubscriptions(workspaceId);
 
   // Check workspace access once permissions are loaded
   useEffect(() => {

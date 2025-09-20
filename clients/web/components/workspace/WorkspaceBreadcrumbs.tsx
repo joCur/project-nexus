@@ -2,7 +2,8 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { useWorkspaceStore, workspaceSelectors } from '@/stores/workspaceStore';
+import { useWorkspaceStore } from '@/stores/workspaceStore';
+import { useCanvas } from '@/hooks/use-canvas';
 
 /**
  * Breadcrumb navigation component for workspace views
@@ -24,12 +25,14 @@ import { useWorkspaceStore, workspaceSelectors } from '@/stores/workspaceStore';
  */
 export const WorkspaceBreadcrumbs: React.FC = () => {
   const context = useWorkspaceStore((state) => state.context);
-  const currentCanvasData = useWorkspaceStore(workspaceSelectors.getCurrentCanvas);
-  
+
   const workspaceId = context.currentWorkspaceId;
   const workspaceName = context.workspaceName || `Workspace ${workspaceId}`;
-  const canvasName = currentCanvasData.name || 'Canvas';
   const canvasId = context.currentCanvasId;
+
+  // Get current canvas data from Apollo
+  const { canvas: currentCanvas } = useCanvas(canvasId);
+  const canvasName = currentCanvas?.name || 'Canvas';
 
   // Don't render if no workspace context
   if (!workspaceId) {

@@ -39,7 +39,7 @@ const CANVAS_WITH_RELATIONS = gql`
       name
       ownerId
     }
-    owner {
+    createdByUser {
       id
       email
       displayName

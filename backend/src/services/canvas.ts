@@ -373,9 +373,11 @@ export class CanvasService {
   }
 
   /**
-   * Set canvas as default
+   * Set canvas as default with transaction safety and validation
    */
   async setDefaultCanvas(canvasId: string, userId: string): Promise<Canvas> {
+    const operationStartTime = Date.now();
+
     try {
       // Check if canvas exists
       const existingCanvas = await this.getCanvasById(canvasId);
@@ -391,36 +393,106 @@ export class CanvasService {
         'Insufficient permissions to set default canvas'
       );
 
-      // Clear existing default
-      await this.clearDefaultCanvas(existingCanvas.workspaceId);
+      // If already default, return early
+      if (existingCanvas.isDefault) {
+        logger.info('Canvas already set as default, returning existing canvas', {
+          canvasId,
+          workspaceId: existingCanvas.workspaceId,
+          userId,
+        });
+        return existingCanvas;
+      }
 
-      // Set new default
-      const [updatedDbCanvas] = await database.query<any[]>(
-        knex(this.tableName)
+      logger.info('Starting setDefaultCanvas operation', {
+        canvasId,
+        workspaceId: existingCanvas.workspaceId,
+        userId,
+        previousDefault: existingCanvas.isDefault,
+      });
+
+      // Execute operation in transaction for atomicity
+      const result = await database.transaction(async (trx) => {
+        // Clear existing default within transaction
+        const clearResult = await trx(this.tableName)
+          .where('workspace_id', existingCanvas.workspaceId)
+          .where('is_default', true)
+          .update({
+            is_default: false,
+            updated_at: new Date(),
+          });
+
+        logger.debug('Cleared existing default canvases', {
+          workspaceId: existingCanvas.workspaceId,
+          clearedCount: clearResult,
+          canvasId,
+          userId,
+        });
+
+        // Set new default within transaction
+        const [updatedDbCanvas] = await trx(this.tableName)
           .where('id', canvasId)
           .update({
             is_default: true,
             updated_at: new Date(),
           })
-          .returning('*'),
-        'canvas_set_default'
-      );
+          .returning('*');
 
-      const updatedCanvas = this.mapDbCanvasToCanvas(updatedDbCanvas);
+        if (!updatedDbCanvas) {
+          throw new Error('Failed to update canvas as default - canvas may have been deleted');
+        }
 
-      logger.info('Canvas set as default', {
+        // Validate that only one default exists after operation
+        const defaultCanvases = await trx(this.tableName)
+          .where('workspace_id', existingCanvas.workspaceId)
+          .where('is_default', true)
+          .select('id', 'name');
+
+        if (defaultCanvases.length !== 1) {
+          throw new Error(
+            `Database constraint violation: Found ${defaultCanvases.length} default canvases in workspace ${existingCanvas.workspaceId}, expected exactly 1`
+          );
+        }
+
+        if (defaultCanvases[0].id !== canvasId) {
+          throw new Error(
+            `Database constraint violation: Expected canvas ${canvasId} to be default, but found ${defaultCanvases[0].id}`
+          );
+        }
+
+        logger.debug('Validated single default canvas constraint', {
+          workspaceId: existingCanvas.workspaceId,
+          defaultCanvasId: defaultCanvases[0].id,
+          defaultCanvasName: defaultCanvases[0].name,
+          canvasId,
+          userId,
+        });
+
+        return updatedDbCanvas;
+      });
+
+      const updatedCanvas = this.mapDbCanvasToCanvas(result);
+      const operationDuration = Date.now() - operationStartTime;
+
+      logger.info('Canvas set as default successfully', {
         canvasId,
         workspaceId: existingCanvas.workspaceId,
+        canvasName: updatedCanvas.name,
         userId,
+        operationDurationMs: operationDuration,
+        wasAlreadyDefault: false,
       });
 
       return updatedCanvas;
 
     } catch (error) {
+      const operationDuration = Date.now() - operationStartTime;
+
       logger.error('Failed to set default canvas', {
         canvasId,
         userId,
+        operationDurationMs: operationDuration,
         error: error instanceof Error ? error.message : 'Unknown error',
+        errorStack: error instanceof Error ? error.stack : undefined,
       });
       throw error;
     }

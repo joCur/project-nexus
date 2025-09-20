@@ -82,7 +82,7 @@ const mocks = [
 
 describe('WorkspacePermissionContext', () => {
   beforeEach(() => {
-    // Mock workspace store state
+    // Mock simplified workspace store state
     mockUseWorkspaceStore.mockReturnValue({
       context: {
         currentWorkspaceId: 'workspace-1',
@@ -90,9 +90,7 @@ describe('WorkspacePermissionContext', () => {
         currentCanvasId: undefined,
         canvasName: undefined,
       },
-      canvasManagement: {
-        canvases: new Map(),
-        defaultCanvasId: undefined,
+      uiState: {
         loadingStates: {
           fetchingCanvases: false,
           creatingCanvas: false,
@@ -106,26 +104,14 @@ describe('WorkspacePermissionContext', () => {
           mutationError: undefined,
         },
       },
-      isInitialized: false,
+      isInitialized: true,
       setCurrentWorkspace: jest.fn(),
       setCurrentCanvas: jest.fn(),
       switchCanvas: jest.fn(),
       clearContext: jest.fn(),
-      createCanvas: jest.fn(),
-      updateCanvas: jest.fn(),
-      deleteCanvas: jest.fn(),
-      duplicateCanvas: jest.fn(),
-      setDefaultCanvas: jest.fn(),
-      loadWorkspaceCanvases: jest.fn(),
-      refreshCanvases: jest.fn(),
-      updateCanvasSettings: jest.fn(),
-      saveCurrentViewport: jest.fn(),
-      getCanvas: jest.fn(),
-      getDefaultCanvas: jest.fn(),
-      getCurrentCanvas: jest.fn(),
-      getCanvasesByFilter: jest.fn(),
-      clearErrors: jest.fn(),
+      setCanvasLoading: jest.fn(),
       setError: jest.fn(),
+      clearErrors: jest.fn(),
     });
   });
 
@@ -175,7 +161,7 @@ describe('WorkspacePermissionContext', () => {
   it('should handle workspace changes', () => {
     let currentWorkspaceId = 'workspace-1';
 
-    // Mock workspace store that can change
+    // Mock simplified workspace store that can change
     mockUseWorkspaceStore.mockImplementation(() => ({
       context: {
         currentWorkspaceId,
@@ -183,9 +169,7 @@ describe('WorkspacePermissionContext', () => {
         currentCanvasId: undefined,
         canvasName: undefined,
       },
-      canvasManagement: {
-        canvases: new Map(),
-        defaultCanvasId: undefined,
+      uiState: {
         loadingStates: {
           fetchingCanvases: false,
           creatingCanvas: false,
@@ -206,21 +190,9 @@ describe('WorkspacePermissionContext', () => {
       setCurrentCanvas: jest.fn(),
       switchCanvas: jest.fn(),
       clearContext: jest.fn(),
-      createCanvas: jest.fn(),
-      updateCanvas: jest.fn(),
-      deleteCanvas: jest.fn(),
-      duplicateCanvas: jest.fn(),
-      setDefaultCanvas: jest.fn(),
-      loadWorkspaceCanvases: jest.fn(),
-      refreshCanvases: jest.fn(),
-      updateCanvasSettings: jest.fn(),
-      saveCurrentViewport: jest.fn(),
-      getCanvas: jest.fn(),
-      getDefaultCanvas: jest.fn(),
-      getCurrentCanvas: jest.fn(),
-      getCanvasesByFilter: jest.fn(),
-      clearErrors: jest.fn(),
+      setCanvasLoading: jest.fn(),
       setError: jest.fn(),
+      clearErrors: jest.fn(),
     }));
 
     const { rerender } = render(
@@ -254,6 +226,7 @@ describe('WorkspacePermissionContext', () => {
 
 describe('useWorkspacePermissions hook', () => {
   beforeEach(() => {
+    // Mock simplified workspace store
     mockUseWorkspaceStore.mockReturnValue({
       context: {
         currentWorkspaceId: 'workspace-1',
@@ -261,9 +234,7 @@ describe('useWorkspacePermissions hook', () => {
         currentCanvasId: undefined,
         canvasName: undefined,
       },
-      canvasManagement: {
-        canvases: new Map(),
-        defaultCanvasId: undefined,
+      uiState: {
         loadingStates: {
           fetchingCanvases: false,
           creatingCanvas: false,
@@ -282,21 +253,9 @@ describe('useWorkspacePermissions hook', () => {
       setCurrentCanvas: jest.fn(),
       switchCanvas: jest.fn(),
       clearContext: jest.fn(),
-      createCanvas: jest.fn(),
-      updateCanvas: jest.fn(),
-      deleteCanvas: jest.fn(),
-      duplicateCanvas: jest.fn(),
-      setDefaultCanvas: jest.fn(),
-      loadWorkspaceCanvases: jest.fn(),
-      refreshCanvases: jest.fn(),
-      updateCanvasSettings: jest.fn(),
-      saveCurrentViewport: jest.fn(),
-      getCanvas: jest.fn(),
-      getDefaultCanvas: jest.fn(),
-      getCurrentCanvas: jest.fn(),
-      getCanvasesByFilter: jest.fn(),
-      clearErrors: jest.fn(),
+      setCanvasLoading: jest.fn(),
       setError: jest.fn(),
+      clearErrors: jest.fn(),
     });
   });
 

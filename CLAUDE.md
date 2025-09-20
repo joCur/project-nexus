@@ -173,6 +173,7 @@ gh pr merge 19 --squash --delete-branch
 - **Linear Workflow**: Always update ticket state and properties throughout development process
 - **Agent Usage**: Try to always use the correct sub agent, when working on a process e.g. using the senior backend agent when working on the backend
 - never implement development versions of features that mock the real implementation, unless otherwise stated.
+- **Documentation**: When documenting anything always place it in the [Docs folder](./docs/)
 
 ## Documentation References
 

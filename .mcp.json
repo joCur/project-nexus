@@ -17,6 +17,10 @@
     "linear-server": {
       "command": "npx",
       "args": ["-y", "@tacticlaunch/mcp-linear"]
+    },
+    "notion": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://mcp.notion.com/mcp"]
     }
   }
 }

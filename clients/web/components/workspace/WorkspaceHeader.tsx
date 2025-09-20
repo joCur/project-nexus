@@ -2,7 +2,8 @@
 
 import React from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import { useWorkspaceStore, workspaceSelectors } from '@/stores/workspaceStore';
+import { useWorkspaceStore } from '@/stores/workspaceStore';
+import { useCanvases } from '@/hooks/use-canvas';
 import Image from 'next/image';
 import { Button } from '@/components/ui';
 import { CanvasSwitcher } from './CanvasSwitcher';
@@ -30,8 +31,11 @@ import { CanvasSwitcher } from './CanvasSwitcher';
 export const WorkspaceHeader: React.FC = () => {
   const { user, logout } = useAuth();
   const context = useWorkspaceStore((state) => state.context);
-  const canvasCount = useWorkspaceStore(workspaceSelectors.getCanvasCount);
-  
+
+  // Use Apollo hook for canvas count
+  const { canvases } = useCanvases(context.currentWorkspaceId);
+  const canvasCount = canvases.length;
+
   const workspaceName = context.workspaceName || 'Knowledge Workspace';
 
   return (

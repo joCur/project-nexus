@@ -13,8 +13,7 @@ import { getSession, getAccessToken } from '@auth0/nextjs-auth0';
  */
 export async function GET() {
   const requestId = Math.random().toString(36).substring(2, 9);
-  const startTime = Date.now();
-  
+
   console.log(`[${requestId}] Onboarding status request started`);
   
   try {

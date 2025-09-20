@@ -6,11 +6,11 @@
  */
 
 import { useCallback, useEffect } from 'react';
-import { 
-  useQuery, 
-  useMutation, 
-  useSubscription,
-  useApolloClient 
+import {
+  useQuery,
+  useMutation,
+  // useSubscription, // 🚨 TODO: Uncomment when subscriptions are re-enabled
+  useApolloClient
 } from '@apollo/client';
 import {
   GET_CARDS,
@@ -240,56 +240,33 @@ export const useCardOperations = (workspaceId: EntityId) => {
 
   /**
    * Subscribe to real-time card events and sync with store
+   *
+   * ⚠️ TEMPORARILY DISABLED - TODO: Re-enable real-time card subscriptions
+   *
+   * Reason: Backend subscriptions return null for non-nullable fields
+   * Likely cause: Authentication/permission issues in subscription resolvers
+   *
+   * @see TodoWrite: "Re-enable card subscriptions in useCardOperations hook"
    */
+
+  // 🚨 CARD SUBSCRIPTIONS DISABLED - Search for "TODO.*subscriptions" to find all disabled locations
+  console.log('🚨 Card subscriptions disabled - authentication/permission issues in backend');
+
+  // TODO: Re-enable these card subscriptions when backend auth issues are resolved:
+  /*
   useSubscription(CARD_CREATED_SUBSCRIPTION, {
     variables: { workspaceId },
     onData: ({ data }) => {
       if (data?.data?.cardCreated) {
         const card = transformBackendCardToFrontend(data.data.cardCreated);
-        // Create card in store when received from subscription
-        store.createCard({
-          type: card.content.type,
-          position: card.position,
-          content: card.content,
-          dimensions: card.dimensions,
-          style: card.style,
-        });
+        store.createCard({ ... });
       }
     },
   });
 
-  useSubscription(CARD_UPDATED_SUBSCRIPTION, {
-    variables: { workspaceId },
-    onData: ({ data }) => {
-      if (data?.data?.cardUpdated) {
-        const card = transformBackendCardToFrontend(data.data.cardUpdated);
-        // Update card in store
-        store.updateCard({
-          id: card.id,
-          updates: {
-            content: card.content,
-            position: card.position,
-            dimensions: card.dimensions,
-            style: card.style,
-            tags: card.tags,
-            metadata: card.metadata,
-            status: card.status,
-            priority: card.priority,
-            updatedAt: card.updatedAt,
-          },
-        });
-      }
-    },
-  });
-
-  useSubscription(CARD_DELETED_SUBSCRIPTION, {
-    variables: { workspaceId },
-    onData: ({ data }) => {
-      if (data?.data?.cardDeleted) {
-        store.deleteCard(data.data.cardDeleted as CardId);
-      }
-    },
-  });
+  useSubscription(CARD_UPDATED_SUBSCRIPTION, { ... });
+  useSubscription(CARD_DELETED_SUBSCRIPTION, { ... });
+  */
 
   // ============================================================================
   // API METHODS

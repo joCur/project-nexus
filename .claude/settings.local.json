@@ -51,7 +51,10 @@
       "mcp__linear-server__get_issue",
       "mcp__linear-server__create_comment",
       "Bash(lsof:*)",
-      "Bash(netstat:*)"
+      "Bash(netstat:*)",
+      "Bash(npx tsc:*)",
+      "mcp__notion__notion-search",
+      "mcp__notion__notion-create-pages"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"
@@ -61,6 +64,7 @@
     "playwright",
     "context7",
     "semgrep",
-    "linear-server"
+    "linear-server",
+    "notion"
   ]
 }
