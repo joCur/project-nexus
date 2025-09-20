@@ -7,6 +7,8 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { useRouter } from 'next/navigation';
 import { CanvasSwitcher } from '../CanvasSwitcher';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
+import { useSetDefaultCanvas } from '@/hooks/use-canvas';
+import { useToast } from '@/components/ui/CanvasErrorToast';
 import type { Canvas } from '@/types/workspace.types';
 
 // Mock dependencies
@@ -14,6 +16,19 @@ jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
 }));
 jest.mock('@/stores/workspaceStore');
+
+// Mock canvas hooks
+jest.mock('@/hooks/use-canvas', () => ({
+  useSetDefaultCanvas: jest.fn(),
+}));
+
+// Mock toast hook
+jest.mock('@/components/ui/CanvasErrorToast', () => ({
+  useToast: jest.fn(),
+  canvasToastMessages: {
+    multipleDefaultsWarning: jest.fn(),
+  },
+}));
 
 // Mock CreateCanvasModal
 jest.mock('../CreateCanvasModal', () => ({
@@ -29,6 +44,8 @@ jest.mock('../CreateCanvasModal', () => ({
 const mockPush = jest.fn();
 const mockUseRouter = useRouter as jest.Mock;
 const mockUseWorkspaceStore = useWorkspaceStore as jest.MockedFunction<typeof useWorkspaceStore>;
+const mockUseSetDefaultCanvas = useSetDefaultCanvas as jest.Mock;
+const mockUseToast = useToast as jest.Mock;
 
 // Sample canvas data
 const sampleCanvases: Canvas[] = [
@@ -131,28 +148,59 @@ describe('CanvasSwitcher', () => {
       setError: jest.fn(),
     };
 
+    // Add a getCurrentCanvas method to the mock store
+    mockStore.getCurrentCanvas = jest.fn(() =>
+      sampleCanvases.find(c => c.id === mockStore.context.currentCanvasId) || sampleCanvases[0]
+    );
+
     mockUseWorkspaceStore.mockImplementation((selector?: any) => {
       if (!selector) return mockStore;
-      
-      // Handle different selectors
-      if (selector.toString().includes('getAllCanvases')) {
-        return Array.from(mockStore.canvasManagement.canvases.values());
+
+      // Since our memoized selectors are closures, we need to just call the selector with the mock store
+      try {
+        return selector(mockStore);
+      } catch (error) {
+        // If selector fails, provide fallback values based on property names
+        const selectorStr = selector.toString();
+
+        if (selectorStr.includes('getAllCanvases')) {
+          return Array.from(mockStore.canvasManagement.canvases.values());
+        }
+        if (selectorStr.includes('getCurrentCanvas')) {
+          return {
+            id: mockStore.context.currentCanvasId,
+            name: mockStore.context.canvasName,
+            canvas: mockStore.getCurrentCanvas(),
+          };
+        }
+        if (selectorStr.includes('getCanvasCount')) {
+          return mockStore.canvasManagement.canvases.size;
+        }
+        if (selectorStr.includes('isLoading')) {
+          return false;
+        }
+
+        // Default fallback
+        return undefined;
       }
-      if (selector.toString().includes('getCurrentCanvas')) {
-        return {
-          id: mockStore.context.currentCanvasId,
-          name: mockStore.context.canvasName,
-          canvas: sampleCanvases.find(c => c.id === mockStore.context.currentCanvasId) || sampleCanvases[0],
-        };
-      }
-      if (selector.toString().includes('getCanvasCount')) {
-        return mockStore.canvasManagement.canvases.size;
-      }
-      if (selector.toString().includes('isLoading')) {
-        return false;
-      }
-      
-      return selector(mockStore);
+    });
+
+    // Mock the canvas hooks
+    mockUseSetDefaultCanvas.mockReturnValue({
+      mutate: jest.fn(),
+      loading: false,
+      error: null,
+      reset: jest.fn(),
+    });
+
+    // Mock the toast hook
+    mockUseToast.mockReturnValue({
+      showToast: jest.fn(),
+      dismissToast: jest.fn(),
+      dismissAll: jest.fn(),
+      notifications: [],
+      showCanvasSuccess: jest.fn(),
+      showCanvasError: jest.fn(),
     });
   });
 

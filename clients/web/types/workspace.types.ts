@@ -187,59 +187,40 @@ export interface CanvasSort {
 }
 
 // ============================================================================
-// STORE INTERFACES
+// STORE INTERFACES (SIMPLIFIED)
 // ============================================================================
 
 /**
- * Workspace store state
+ * Simplified workspace store interface (Apollo handles canvas data)
+ * Only responsible for navigation context and UI state
  */
-export interface WorkspaceState {
+export interface WorkspaceStore {
+  // Core state
   context: WorkspaceContext;
-  canvasManagement: CanvasManagement;
+  uiState: {
+    loadingStates: {
+      fetchingCanvases: boolean;
+      creatingCanvas: boolean;
+      updatingCanvas: boolean;
+      deletingCanvas: boolean;
+      settingDefault: boolean;
+    };
+    errors: {
+      fetch?: string;
+      mutation?: string;
+    };
+  };
   isInitialized: boolean;
-}
 
-/**
- * Workspace store actions
- */
-export interface WorkspaceActions {
-  // Context management
+  // Navigation actions
   setCurrentWorkspace: (workspaceId: EntityId, workspaceName?: string) => void;
   setCurrentCanvas: (canvasId: CanvasId, canvasName?: string) => void;
-  switchCanvas: (canvasId: CanvasId) => Promise<void>;
-  clearContext: () => void;
 
-  // Canvas CRUD operations
-  createCanvas: (params: CreateCanvasParams) => Promise<CanvasId | null>;
-  updateCanvas: (params: UpdateCanvasParams) => Promise<boolean>;
-  deleteCanvas: (canvasId: CanvasId) => Promise<boolean>;
-  duplicateCanvas: (params: DuplicateCanvasParams) => Promise<CanvasId | null>;
-  
-  // Canvas management
-  setDefaultCanvas: (workspaceId: EntityId, canvasId: CanvasId) => Promise<boolean>;
-  syncCanvasWithBackend: (canvas: Canvas) => void;
-  loadWorkspaceCanvases: (workspaceId: EntityId, filter?: CanvasFilter) => Promise<void>;
-  refreshCanvases: () => Promise<void>;
-  
-  // Canvas settings
-  updateCanvasSettings: (canvasId: CanvasId, settings: Partial<CanvasSettings>) => Promise<boolean>;
-  saveCurrentViewport: (position: CanvasPosition, zoom: number) => Promise<void>;
-  
-  // Utility
-  getCanvas: (canvasId: CanvasId) => Canvas | undefined;
-  getDefaultCanvas: () => Canvas | undefined;
-  getCurrentCanvas: () => Canvas | undefined;
-  getCanvasesByFilter: (filter: CanvasFilter) => Canvas[];
-  
-  // Error handling
+  // UI state management
+  setCanvasLoading: (operation: keyof WorkspaceStore['uiState']['loadingStates'], loading: boolean) => void;
+  setError: (type: 'fetch' | 'mutation', error?: string) => void;
   clearErrors: () => void;
-  setError: (type: 'fetch' | 'mutation', error: string) => void;
 }
-
-/**
- * Complete workspace store interface
- */
-export interface WorkspaceStore extends WorkspaceState, WorkspaceActions {}
 
 // ============================================================================
 // CANVAS CONTEXT TYPES

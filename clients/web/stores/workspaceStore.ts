@@ -1,35 +1,18 @@
 /**
  * Workspace Store Implementation
- * 
- * Manages workspace context, canvas operations, and integration
- * with the GraphQL API for canvas CRUD operations.
+ *
+ * Manages workspace navigation context and UI state only.
+ * Canvas data is now managed entirely by Apollo GraphQL cache.
  */
 
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import { apolloClient } from '@/lib/apollo-client';
-import { GET_WORKSPACE_CANVASES, CREATE_CANVAS } from '@/lib/graphql/canvasOperations';
 import type {
-  WorkspaceCanvasesQueryVariables,
-  CanvasesConnectionResponse,
-  CreateCanvasMutationVariables,
-  CanvasResponse,
-} from '@/lib/graphql/canvasOperations';
-import type {
-  WorkspaceStore,
   WorkspaceContext,
-  CanvasManagement,
-  Canvas,
   CanvasId,
-  CreateCanvasParams,
-  UpdateCanvasParams,
-  DuplicateCanvasParams,
-  CanvasFilter,
-  CanvasSettings,
 } from '@/types/workspace.types';
 import { createCanvasId } from '@/types/workspace.types';
 import type { EntityId } from '@/types/common.types';
-import type { CanvasPosition } from '@/types/canvas.types';
 
 /**
  * Default workspace context
@@ -42,11 +25,9 @@ const DEFAULT_CONTEXT: WorkspaceContext = {
 };
 
 /**
- * Default canvas management state
+ * Default UI state for canvas operations
  */
-const DEFAULT_CANVAS_MANAGEMENT: CanvasManagement = {
-  canvases: new Map(),
-  defaultCanvasId: undefined,
+const DEFAULT_UI_STATE = {
   loadingStates: {
     fetchingCanvases: false,
     creatingCanvas: false,
@@ -62,50 +43,36 @@ const DEFAULT_CANVAS_MANAGEMENT: CanvasManagement = {
 };
 
 /**
- * Helper function to convert GraphQL CanvasResponse to local Canvas type
+ * Simplified workspace store interface - UI state and navigation only
  */
-const convertGraphQLCanvasToLocal = (graphqlCanvas: CanvasResponse): Canvas => {
-  return {
-    id: createCanvasId(graphqlCanvas.id),
-    workspaceId: graphqlCanvas.workspaceId as EntityId,
-    name: graphqlCanvas.name,
-    description: graphqlCanvas.description || '',
-    settings: {
-      isDefault: graphqlCanvas.isDefault,
-      position: { x: 0, y: 0, z: graphqlCanvas.position },
-      zoom: 1.0,
-      grid: {
-        enabled: true,
-        size: 20,
-        color: '#e5e7eb',
-        opacity: 0.3,
-      },
-      background: {
-        type: 'COLOR',
-        color: '#ffffff',
-        opacity: 1.0,
-      },
-    },
-    status: 'active',
-    priority: 'normal',
-    tags: [],
-    metadata: {},
-    createdAt: graphqlCanvas.createdAt,
-    updatedAt: graphqlCanvas.updatedAt,
-    version: 1,
-  };
-};
+interface SimplifiedWorkspaceStore {
+  // State
+  context: WorkspaceContext;
+  uiState: typeof DEFAULT_UI_STATE;
+  isInitialized: boolean;
+
+  // Context management
+  setCurrentWorkspace: (workspaceId: EntityId, workspaceName?: string) => void;
+  setCurrentCanvas: (canvasId: CanvasId, canvasName?: string) => void;
+  switchCanvas: (canvasId: CanvasId) => Promise<void>;
+  clearContext: () => void;
+
+  // UI state management
+  setCanvasLoading: (operation: keyof typeof DEFAULT_UI_STATE.loadingStates, loading: boolean) => void;
+  setError: (type: 'fetch' | 'mutation', error?: string) => void;
+  clearErrors: () => void;
+}
 
 /**
- * Workspace store implementation
+ * Simplified workspace store implementation
  */
-export const useWorkspaceStore = create<WorkspaceStore>()(
+export const useWorkspaceStore = create<SimplifiedWorkspaceStore>()(
   devtools(
     persist(
       (set, get) => ({
         // State
         context: DEFAULT_CONTEXT,
-        canvasManagement: DEFAULT_CANVAS_MANAGEMENT,
+        uiState: DEFAULT_UI_STATE,
         isInitialized: false,
 
         // Context management
@@ -114,17 +81,9 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
             context: {
               ...state.context,
               currentWorkspaceId: workspaceId,
-              workspaceName,
-              // Clear canvas context when workspace changes
-              currentCanvasId: undefined,
-              canvasName: undefined,
+              workspaceName: workspaceName || `Workspace ${workspaceId}`,
             },
-            // Clear canvas data when workspace changes
-            canvasManagement: {
-              ...DEFAULT_CANVAS_MANAGEMENT,
-              canvases: new Map(), // Create a fresh Map instance
-            },
-            isInitialized: false,
+            isInitialized: true,
           }));
         },
 
@@ -133,652 +92,54 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
             context: {
               ...state.context,
               currentCanvasId: canvasId,
-              canvasName,
+              canvasName: canvasName || `Canvas ${canvasId}`,
             },
           }));
         },
 
-        switchCanvas: async (canvasId: CanvasId) => {
-          const { canvasManagement } = get();
-          const canvas = canvasManagement.canvases.get(canvasId);
-          
-          if (canvas) {
-            get().setCurrentCanvas(canvasId, canvas.name);
-            return;
-          }
-          
-          // If canvas not in cache, trigger a load
-          // This would typically integrate with the GraphQL hook
-          console.warn(`Canvas ${canvasId} not found in local cache`);
+        switchCanvas: async (canvasId: CanvasId): Promise<void> => {
+          // Just update the context - canvas data comes from Apollo
+          const { setCurrentCanvas } = get();
+          setCurrentCanvas(canvasId);
         },
 
         clearContext: () => {
           set({
             context: DEFAULT_CONTEXT,
-            canvasManagement: {
-              ...DEFAULT_CANVAS_MANAGEMENT,
-              canvases: new Map(), // Create a fresh Map instance
-            },
+            uiState: DEFAULT_UI_STATE,
             isInitialized: false,
           });
         },
 
-        // Canvas CRUD operations (stubs - will be enhanced by hooks)
-        createCanvas: async (params: CreateCanvasParams): Promise<CanvasId | null> => {
+        // UI state management
+        setCanvasLoading: (operation: keyof typeof DEFAULT_UI_STATE.loadingStates, loading: boolean) => {
           set((state) => ({
-            canvasManagement: {
-              ...state.canvasManagement,
+            uiState: {
+              ...state.uiState,
               loadingStates: {
-                ...state.canvasManagement.loadingStates,
-                creatingCanvas: true,
+                ...state.uiState.loadingStates,
+                [operation]: loading,
               },
             },
           }));
-
-          try {
-            // Validate required parameters
-            if (!params.workspaceId || !params.name) {
-              throw new Error('Missing required parameters: workspaceId and name are required');
-            }
-
-            // This will be replaced by the actual GraphQL mutation in hooks
-            const newCanvasId = createCanvasId(`canvas_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
-            
-            const newCanvas: Canvas = {
-              id: newCanvasId,
-              workspaceId: params.workspaceId,
-              name: params.name,
-              description: params.description,
-              settings: {
-                isDefault: false,
-                position: { x: 0, y: 0, z: 0 },
-                zoom: 1.0,
-                grid: {
-                  enabled: true,
-                  size: 20,
-                  color: '#e5e7eb',
-                  opacity: 0.3,
-                },
-                background: {
-                  type: 'COLOR',
-                  color: '#ffffff',
-                  opacity: 1.0,
-                },
-                ...params.settings,
-              },
-              status: 'active',
-              priority: params.priority || 'normal',
-              tags: params.tags || [],
-              metadata: params.metadata || {},
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-              version: 1,
-            };
-
-            set((state) => ({
-              canvasManagement: {
-                ...state.canvasManagement,
-                canvases: new Map(state.canvasManagement.canvases).set(newCanvasId, newCanvas),
-                loadingStates: {
-                  ...state.canvasManagement.loadingStates,
-                  creatingCanvas: false,
-                },
-              },
-            }));
-
-            return newCanvasId;
-          } catch (error) {
-            set((state) => ({
-              canvasManagement: {
-                ...state.canvasManagement,
-                loadingStates: {
-                  ...state.canvasManagement.loadingStates,
-                  creatingCanvas: false,
-                },
-                errors: {
-                  ...state.canvasManagement.errors,
-                  mutationError: `Failed to create canvas: ${error}`,
-                },
-              },
-            }));
-            return null;
-          }
         },
 
-        updateCanvas: async (params: UpdateCanvasParams): Promise<boolean> => {
+        setError: (type: 'fetch' | 'mutation', error?: string) => {
           set((state) => ({
-            canvasManagement: {
-              ...state.canvasManagement,
-              loadingStates: {
-                ...state.canvasManagement.loadingStates,
-                updatingCanvas: true,
-              },
-            },
-          }));
-
-          try {
-            const { canvasManagement } = get();
-            const existingCanvas = canvasManagement.canvases.get(params.id);
-            
-            if (!existingCanvas) {
-              throw new Error('Canvas not found');
-            }
-
-            const updatedCanvas: Canvas = {
-              ...existingCanvas,
-              ...params.updates,
-              settings: params.updates.settings
-                ? { ...existingCanvas.settings, ...params.updates.settings }
-                : existingCanvas.settings,
-              updatedAt: new Date().toISOString(),
-              version: existingCanvas.version + 1,
-            };
-
-            set((state) => ({
-              canvasManagement: {
-                ...state.canvasManagement,
-                canvases: new Map(state.canvasManagement.canvases).set(params.id, updatedCanvas),
-                loadingStates: {
-                  ...state.canvasManagement.loadingStates,
-                  updatingCanvas: false,
-                },
-              },
-            }));
-
-            return true;
-          } catch (error) {
-            set((state) => ({
-              canvasManagement: {
-                ...state.canvasManagement,
-                loadingStates: {
-                  ...state.canvasManagement.loadingStates,
-                  updatingCanvas: false,
-                },
-                errors: {
-                  ...state.canvasManagement.errors,
-                  mutationError: `Failed to update canvas: ${error}`,
-                },
-              },
-            }));
-            return false;
-          }
-        },
-
-        deleteCanvas: async (canvasId: CanvasId): Promise<boolean> => {
-          set((state) => ({
-            canvasManagement: {
-              ...state.canvasManagement,
-              loadingStates: {
-                ...state.canvasManagement.loadingStates,
-                deletingCanvas: true,
-              },
-            },
-          }));
-
-          try {
-            set((state) => {
-              const newCanvases = new Map(state.canvasManagement.canvases);
-              newCanvases.delete(canvasId);
-
-              return {
-                canvasManagement: {
-                  ...state.canvasManagement,
-                  canvases: newCanvases,
-                  defaultCanvasId: state.canvasManagement.defaultCanvasId === canvasId
-                    ? undefined
-                    : state.canvasManagement.defaultCanvasId,
-                  loadingStates: {
-                    ...state.canvasManagement.loadingStates,
-                    deletingCanvas: false,
-                  },
-                },
-                context: state.context.currentCanvasId === canvasId
-                  ? { ...state.context, currentCanvasId: undefined, canvasName: undefined }
-                  : state.context,
-              };
-            });
-
-            return true;
-          } catch (error) {
-            set((state) => ({
-              canvasManagement: {
-                ...state.canvasManagement,
-                loadingStates: {
-                  ...state.canvasManagement.loadingStates,
-                  deletingCanvas: false,
-                },
-                errors: {
-                  ...state.canvasManagement.errors,
-                  mutationError: `Failed to delete canvas: ${error}`,
-                },
-              },
-            }));
-            return false;
-          }
-        },
-
-        duplicateCanvas: async (params: DuplicateCanvasParams): Promise<CanvasId | null> => {
-          set((state) => ({
-            canvasManagement: {
-              ...state.canvasManagement,
-              loadingStates: {
-                ...state.canvasManagement.loadingStates,
-                duplicatingCanvas: true,
-              },
-            },
-          }));
-
-          try {
-            const { canvasManagement } = get();
-            const originalCanvas = canvasManagement.canvases.get(params.id);
-            
-            if (!originalCanvas) {
-              throw new Error('Original canvas not found');
-            }
-
-            const duplicateId = createCanvasId(`canvas_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
-            
-            const duplicatedCanvas: Canvas = {
-              ...originalCanvas,
-              id: duplicateId,
-              name: params.name,
-              description: params.description || originalCanvas.description,
-              settings: {
-                ...originalCanvas.settings,
-                isDefault: false, // Duplicates are never default
-              },
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-              version: 1,
-            };
-
-            set((state) => ({
-              canvasManagement: {
-                ...state.canvasManagement,
-                canvases: new Map(state.canvasManagement.canvases).set(duplicateId, duplicatedCanvas),
-                loadingStates: {
-                  ...state.canvasManagement.loadingStates,
-                  duplicatingCanvas: false,
-                },
-              },
-            }));
-
-            return duplicateId;
-          } catch (error) {
-            set((state) => ({
-              canvasManagement: {
-                ...state.canvasManagement,
-                loadingStates: {
-                  ...state.canvasManagement.loadingStates,
-                  duplicatingCanvas: false,
-                },
-                errors: {
-                  ...state.canvasManagement.errors,
-                  mutationError: `Failed to duplicate canvas: ${error}`,
-                },
-              },
-            }));
-            return null;
-          }
-        },
-
-        // Canvas management
-        setDefaultCanvas: async (workspaceId: EntityId, canvasId: CanvasId): Promise<boolean> => {
-          set((state) => ({
-            canvasManagement: {
-              ...state.canvasManagement,
-              loadingStates: {
-                ...state.canvasManagement.loadingStates,
-                settingDefault: true,
-              },
-            },
-          }));
-
-          try {
-            // Check if canvas exists
-            const { canvasManagement } = get();
-            if (!canvasManagement.canvases.has(canvasId)) {
-              throw new Error('Canvas not found');
-            }
-
-            // Optimistic update: atomically update default canvas state
-            set((state) => {
-              const newCanvases = new Map(state.canvasManagement.canvases);
-              const currentTime = new Date().toISOString();
-
-              // Atomically remove default from all canvases and set new default
-              for (const [id, canvas] of newCanvases) {
-                const isNewDefault = id === canvasId;
-                const wasDefault = canvas.settings.isDefault;
-
-                // Only update if there's an actual change
-                if (isNewDefault !== wasDefault) {
-                  newCanvases.set(id, {
-                    ...canvas,
-                    settings: { ...canvas.settings, isDefault: isNewDefault },
-                    updatedAt: currentTime,
-                    version: canvas.version + 1,
-                  });
-                }
-              }
-
-              return {
-                canvasManagement: {
-                  ...state.canvasManagement,
-                  canvases: newCanvases,
-                  defaultCanvasId: canvasId,
-                  loadingStates: {
-                    ...state.canvasManagement.loadingStates,
-                    settingDefault: false,
-                  },
-                },
-              };
-            });
-
-            return true;
-          } catch (error) {
-            set((state) => ({
-              canvasManagement: {
-                ...state.canvasManagement,
-                loadingStates: {
-                  ...state.canvasManagement.loadingStates,
-                  settingDefault: false,
-                },
-                errors: {
-                  ...state.canvasManagement.errors,
-                  mutationError: `Failed to set default canvas: ${error}`,
-                },
-              },
-            }));
-            return false;
-          }
-        },
-
-        // Sync canvas state with backend after mutation success
-        syncCanvasWithBackend: (canvas: Canvas): void => {
-          set((state) => {
-            const newCanvases = new Map(state.canvasManagement.canvases);
-            newCanvases.set(canvas.id, canvas);
-
-            // Update default canvas ID if this canvas is default
-            const newDefaultCanvasId = canvas.settings.isDefault
-              ? canvas.id
-              : state.canvasManagement.defaultCanvasId;
-
-            return {
-              canvasManagement: {
-                ...state.canvasManagement,
-                canvases: newCanvases,
-                defaultCanvasId: newDefaultCanvasId,
-              },
-            };
-          });
-        },
-
-        loadWorkspaceCanvases: async (workspaceId: EntityId, filter?: CanvasFilter): Promise<void> => {
-          set((state) => ({
-            canvasManagement: {
-              ...state.canvasManagement,
-              loadingStates: {
-                ...state.canvasManagement.loadingStates,
-                fetchingCanvases: true,
-              },
+            uiState: {
+              ...state.uiState,
               errors: {
-                ...state.canvasManagement.errors,
-                fetchError: undefined,
+                ...state.uiState.errors,
+                [type === 'fetch' ? 'fetchError' : 'mutationError']: error,
               },
             },
           }));
-
-          try {
-            console.log('Loading workspace canvases via GraphQL API for workspace:', workspaceId);
-
-            // Build GraphQL query variables
-            const variables: WorkspaceCanvasesQueryVariables = {
-              workspaceId: workspaceId,
-              filter: filter ? {
-                isDefault: filter.isDefault,
-                searchQuery: filter.searchQuery,
-              } : undefined,
-              pagination: {
-                page: 1,
-                limit: 100, // Load all canvases for now
-                sortBy: 'position',
-                sortOrder: 'ASC',
-              },
-            };
-
-            // Execute GraphQL query
-            const result = await apolloClient.query<{ workspaceCanvases: CanvasesConnectionResponse }>({
-              query: GET_WORKSPACE_CANVASES,
-              variables,
-              fetchPolicy: 'cache-first',
-              errorPolicy: 'all',
-            });
-
-            if (result.errors && result.errors.length > 0) {
-              throw new Error(`GraphQL errors: ${result.errors.map(e => e.message).join(', ')}`);
-            }
-
-            const canvasesData = result.data?.workspaceCanvases;
-            if (!canvasesData) {
-              throw new Error('No canvas data returned from GraphQL query');
-            }
-
-
-            // Convert GraphQL responses to local Canvas types
-            const canvasMap = new Map<CanvasId, Canvas>();
-            let defaultCanvasId: CanvasId | undefined;
-            let defaultCanvas: Canvas | undefined;
-
-            canvasesData.items.forEach((graphqlCanvas) => {
-              const localCanvas = convertGraphQLCanvasToLocal(graphqlCanvas);
-              canvasMap.set(localCanvas.id, localCanvas);
-
-              if (localCanvas.settings.isDefault) {
-                if (defaultCanvasId) {
-                  // Multiple canvases marked as default - log warning
-                  console.warn('Multiple canvases marked as default, using first found:', {
-                    existing: defaultCanvasId,
-                    new: localCanvas.id,
-                  });
-                } else {
-                  defaultCanvasId = localCanvas.id;
-                  defaultCanvas = localCanvas;
-                }
-              }
-            });
-
-            // Determine which canvas to select on page load
-            let selectedCanvasId: CanvasId | undefined;
-            let selectedCanvasName: string | undefined;
-
-            if (defaultCanvasId && defaultCanvas) {
-              // Use the default canvas
-              selectedCanvasId = defaultCanvasId;
-              selectedCanvasName = defaultCanvas.name;
-            } else if (canvasMap.size > 0) {
-              // No default canvas found, use the first one
-              const firstCanvas = Array.from(canvasMap.values())[0];
-              selectedCanvasId = firstCanvas.id;
-              selectedCanvasName = firstCanvas.name;
-              console.info('No default canvas found, using first available:', firstCanvas.id);
-            }
-
-            // If no canvases exist, we might want to create a default one
-            // This depends on your backend behavior - some systems auto-create, others don't
-            let shouldCreateDefault = false;
-            if (canvasMap.size === 0) {
-              shouldCreateDefault = true;
-            }
-
-            // Update store with loaded canvases
-            set((state) => ({
-              canvasManagement: {
-                ...state.canvasManagement,
-                canvases: canvasMap,
-                defaultCanvasId,
-                loadingStates: {
-                  ...state.canvasManagement.loadingStates,
-                  fetchingCanvases: false,
-                },
-                errors: {
-                  ...state.canvasManagement.errors,
-                  fetchError: undefined,
-                },
-              },
-              context: {
-                ...state.context,
-                currentCanvasId: selectedCanvasId,
-                canvasName: selectedCanvasName,
-              },
-              isInitialized: true,
-            }));
-
-            console.log('Workspace canvases loaded successfully:', {
-              total: canvasMap.size,
-              defaultCanvasId,
-              selectedCanvasId,
-              shouldCreateDefault,
-            });
-
-            // TODO: Create default canvas if none exist (requires updating createCanvas to use GraphQL)
-            if (shouldCreateDefault) {
-              // For now, we'll just log this and leave canvas creation to the UI layer
-              // This will be re-enabled once createCanvas method is updated to use GraphQL
-            }
-          } catch (error) {
-            console.error('Failed to load workspace canvases:', error);
-            
-            set((state) => ({
-              canvasManagement: {
-                ...state.canvasManagement,
-                loadingStates: {
-                  ...state.canvasManagement.loadingStates,
-                  fetchingCanvases: false,
-                },
-                errors: {
-                  ...state.canvasManagement.errors,
-                  fetchError: `Failed to load canvases: ${error instanceof Error ? error.message : String(error)}`,
-                },
-              },
-            }));
-
-            // Don't throw the error - let the UI handle the error state gracefully
-          }
         },
 
-        refreshCanvases: async (): Promise<void> => {
-          const { context } = get();
-          if (context.currentWorkspaceId) {
-            await get().loadWorkspaceCanvases(context.currentWorkspaceId);
-          }
-        },
-
-        // Canvas settings
-        updateCanvasSettings: async (canvasId: CanvasId, settings: Partial<CanvasSettings>): Promise<boolean> => {
-          return get().updateCanvas({ id: canvasId, updates: { settings } });
-        },
-
-        saveCurrentViewport: async (position: CanvasPosition, zoom: number): Promise<void> => {
-          const { context } = get();
-          if (context.currentCanvasId) {
-            await get().updateCanvasSettings(context.currentCanvasId, {
-              position,
-              zoom,
-            });
-          }
-        },
-
-        // Utility methods
-        getCanvas: (canvasId: CanvasId): Canvas | undefined => {
-          return get().canvasManagement.canvases.get(canvasId);
-        },
-
-        getDefaultCanvas: (): Canvas | undefined => {
-          const { canvasManagement } = get();
-
-          // First check if we have a tracked default canvas ID
-          if (canvasManagement.defaultCanvasId) {
-            const defaultCanvas = canvasManagement.canvases.get(canvasManagement.defaultCanvasId);
-            if (defaultCanvas && defaultCanvas.settings.isDefault) {
-              return defaultCanvas;
-            }
-            // If tracked default doesn't exist or isn't marked as default, clear it
-            if (defaultCanvas && !defaultCanvas.settings.isDefault) {
-              console.warn('Tracked default canvas is no longer marked as default:', canvasManagement.defaultCanvasId);
-            }
-          }
-
-          // Search for first canvas marked as default
-          let foundDefault: Canvas | undefined;
-          for (const canvas of canvasManagement.canvases.values()) {
-            if (canvas.settings.isDefault) {
-              if (foundDefault) {
-                console.warn('Multiple canvases marked as default, using first found:', {
-                  first: foundDefault.id,
-                  duplicate: canvas.id,
-                });
-              } else {
-                foundDefault = canvas;
-                // Update the tracked default canvas ID if it differs
-                if (canvasManagement.defaultCanvasId !== canvas.id) {
-                  set((state) => ({
-                    canvasManagement: {
-                      ...state.canvasManagement,
-                      defaultCanvasId: canvas.id,
-                    },
-                  }));
-                }
-              }
-            }
-          }
-
-          return foundDefault;
-        },
-
-        getCurrentCanvas: (): Canvas | undefined => {
-          const { context } = get();
-          if (context.currentCanvasId) {
-            return get().getCanvas(context.currentCanvasId);
-          }
-          return undefined;
-        },
-
-        getCanvasesByFilter: (filter: CanvasFilter): Canvas[] => {
-          const { canvasManagement } = get();
-          const canvases = Array.from(canvasManagement.canvases.values());
-          
-          return canvases.filter((canvas) => {
-            if (filter.status && !filter.status.includes(canvas.status)) {
-              return false;
-            }
-            
-            if (filter.priority && !filter.priority.includes(canvas.priority)) {
-              return false;
-            }
-            
-            if (filter.tags && !filter.tags.some(tag => canvas.tags.includes(tag))) {
-              return false;
-            }
-            
-            if (filter.isDefault !== undefined && canvas.settings.isDefault !== filter.isDefault) {
-              return false;
-            }
-            
-            if (filter.searchQuery && !canvas.name.toLowerCase().includes(filter.searchQuery.toLowerCase())) {
-              return false;
-            }
-            
-            return true;
-          });
-        },
-
-        // Error handling
         clearErrors: () => {
           set((state) => ({
-            canvasManagement: {
-              ...state.canvasManagement,
+            uiState: {
+              ...state.uiState,
               errors: {
                 fetchError: undefined,
                 mutationError: undefined,
@@ -786,39 +147,18 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
             },
           }));
         },
-
-        setError: (type: 'fetch' | 'mutation', error: string) => {
-          set((state) => ({
-            canvasManagement: {
-              ...state.canvasManagement,
-              errors: {
-                ...state.canvasManagement.errors,
-                [type === 'fetch' ? 'fetchError' : 'mutationError']: error,
-              },
-            },
-          }));
-        },
       }),
       {
         name: 'workspace-store',
-        // Only persist context and canvas metadata, not loading states
+        // Only persist navigation context, not canvas data
         partialize: (state) => ({
           context: state.context,
-          canvasManagement: {
-            canvases: Array.from(state.canvasManagement.canvases.entries()),
-            defaultCanvasId: state.canvasManagement.defaultCanvasId,
-          },
           isInitialized: state.isInitialized,
         }),
-        // Custom merge function to handle Map serialization
+        // Simple merge function for context only
         merge: (persistedState: any, currentState) => ({
           ...currentState,
           context: persistedState?.context || DEFAULT_CONTEXT,
-          canvasManagement: {
-            ...currentState.canvasManagement,
-            canvases: new Map(persistedState?.canvasManagement?.canvases || []),
-            defaultCanvasId: persistedState?.canvasManagement?.defaultCanvasId,
-          },
           isInitialized: persistedState?.isInitialized || false,
         }),
       }
@@ -829,22 +169,4 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
   )
 );
 
-// Selectors for common use cases
-export const workspaceSelectors = {
-  getCurrentWorkspace: (state: WorkspaceStore) => ({
-    id: state.context.currentWorkspaceId,
-    name: state.context.workspaceName,
-  }),
-  getCurrentCanvas: (state: WorkspaceStore) => ({
-    id: state.context.currentCanvasId,
-    name: state.context.canvasName,
-    canvas: state.getCurrentCanvas(),
-  }),
-  getAllCanvases: (state: WorkspaceStore) => Array.from(state.canvasManagement.canvases.values()),
-  getCanvasCount: (state: WorkspaceStore) => state.canvasManagement.canvases.size,
-  isLoading: (state: WorkspaceStore) => Object.values(state.canvasManagement.loadingStates).some(Boolean),
-  hasErrors: (state: WorkspaceStore) => Boolean(
-    state.canvasManagement.errors.fetchError || state.canvasManagement.errors.mutationError
-  ),
-  getErrors: (state: WorkspaceStore) => state.canvasManagement.errors,
-};
+// Cleanup complete - Apollo hooks handle all data selection and memoization

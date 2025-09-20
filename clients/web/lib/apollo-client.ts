@@ -97,12 +97,15 @@ const errorLink = onError(({ graphQLErrors, networkError }) => {
 });
 
 /**
- * Cache configuration constants for permission queries
+ * Cache configuration constants
  */
-const PERMISSION_CACHE_CONFIG = {
-  // 5 minutes TTL as specified in NEX-186 requirements
-  TTL_MS: 5 * 60 * 1000,
-  
+const CACHE_CONFIG = {
+  // Permission cache TTL - 5 minutes as specified in NEX-186 requirements
+  PERMISSION_TTL_MS: 5 * 60 * 1000,
+
+  // Canvas data cache TTL - 10 minutes for canvas lists and data
+  CANVAS_TTL_MS: 10 * 60 * 1000,
+
   // Maximum cache size to prevent memory issues (approximately)
   MAX_CACHE_SIZE_KB: 10 * 1024, // 10MB
 };
@@ -130,31 +133,61 @@ export const apolloClient = new ApolloClient({
       Workspace: {
         fields: {
           canvases: {
-            // Merge strategy for canvas lists
+            // Merge strategy for canvas lists with deduplication
             merge(existing = [], incoming) {
-              return [...existing, ...incoming];
+              // Create a Map to deduplicate by canvas ID
+              const canvasMap = new Map();
+
+              // Add existing canvases first
+              existing.forEach((canvas: any) => {
+                if (canvas?.id) {
+                  canvasMap.set(canvas.id, canvas);
+                }
+              });
+
+              // Add incoming canvases, overwriting existing ones with same ID
+              incoming.forEach((canvas: any) => {
+                if (canvas?.id) {
+                  canvasMap.set(canvas.id, canvas);
+                }
+              });
+
+              return Array.from(canvasMap.values());
             },
           },
         },
       },
-      // Permission-specific caching policies for NEX-186
+      // Cache policies for queries
       Query: {
         fields: {
-          // Workspace-scoped permission caching
+          // Canvas data caching with TTL
+          workspaceCanvases: {
+            // Cache key includes workspaceId and filter for isolation
+            keyArgs: ['workspaceId', 'filter'],
+            merge: false, // Replace entirely for consistency
+          },
+
+          canvas: {
+            // Cache individual canvas by ID
+            keyArgs: ['id'],
+            merge: false,
+          },
+
+          // Permission-specific caching policies for NEX-186
           getUserWorkspacePermissions: {
             // Cache key includes userId and workspaceId for workspace isolation
             keyArgs: ['userId', 'workspaceId'],
             // Replace cached data completely to avoid merge issues
             merge: false,
           },
-          
+
           // Single permission check caching
           checkUserPermission: {
             // Cache key includes userId, workspaceId, and specific permission
             keyArgs: ['userId', 'workspaceId', 'permission'],
             merge: false,
           },
-          
+
           // Context permissions (all workspaces) caching
           getUserPermissionsForContext: {
             // Cache key includes only userId since this covers all workspaces
@@ -170,11 +203,11 @@ export const apolloClient = new ApolloClient({
   defaultOptions: {
     watchQuery: {
       errorPolicy: 'all', // Return partial data on error
-      fetchPolicy: 'cache-and-network', // Always check network for updates
+      fetchPolicy: 'cache-first', // Use cache first, then network
     },
     query: {
       errorPolicy: 'all',
-      fetchPolicy: 'cache-first',
+      fetchPolicy: 'cache-first', // Use cache first, then network
     },
     mutate: {
       errorPolicy: 'all',
@@ -205,7 +238,7 @@ export const permissionCacheUtils = {
    */
   isCacheSizeExceeded(): boolean {
     const currentSize = this.getCacheSize();
-    const maxSizeBytes = PERMISSION_CACHE_CONFIG.MAX_CACHE_SIZE_KB * 1024;
+    const maxSizeBytes = CACHE_CONFIG.MAX_CACHE_SIZE_KB * 1024;
     return currentSize > maxSizeBytes;
   },
 
@@ -229,7 +262,7 @@ export const permissionCacheUtils = {
           const entry = cacheData[key];
           if (entry && typeof entry === 'object' && 
               '__cacheTimestamp' in entry &&
-              (now - (entry.__cacheTimestamp as number)) > PERMISSION_CACHE_CONFIG.TTL_MS) {
+              (now - (entry.__cacheTimestamp as number)) > CACHE_CONFIG.PERMISSION_TTL_MS) {
             // Entry is expired, evict it
             const fieldName = key.split('.')[1];
             const args = this.parseArgsFromCacheKey(key);
@@ -387,7 +420,7 @@ if (typeof window !== 'undefined') {
   // Only run in browser environment
   setInterval(() => {
     permissionCacheUtils.performMaintenance();
-  }, PERMISSION_CACHE_CONFIG.TTL_MS); // Run maintenance at TTL interval
+  }, CACHE_CONFIG.PERMISSION_TTL_MS); // Run maintenance at TTL interval
 }
 
 /**

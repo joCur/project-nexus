@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { useWorkspaceStore, workspaceSelectors } from '@/stores/workspaceStore';
-import { useDeleteCanvas, useDuplicateCanvas } from '@/hooks/use-canvas';
+import { useWorkspaceStore } from '@/stores/workspaceStore';
+import { useCanvases, useCanvas, useDeleteCanvas, useDuplicateCanvas } from '@/hooks/use-canvas';
 import { cn } from '@/lib/utils';
 import type { CanvasId } from '@/types/workspace.types';
 import type { EntityId } from '@/types/common.types';
@@ -49,10 +49,11 @@ export const CanvasContextMenu: React.FC<CanvasContextMenuProps> = ({
   const [focusedIndex, setFocusedIndex] = useState(-1);
 
   const menuRef = useRef<HTMLDivElement>(null);
-  const canvas = useWorkspaceStore(state => state.getCanvas(canvasId));
-  const allCanvases = useWorkspaceStore(workspaceSelectors.getAllCanvases);
   const currentCanvasId = useWorkspaceStore(state => state.context.currentCanvasId);
 
+  // Use Apollo hooks for canvas data
+  const { canvas } = useCanvas(canvasId);
+  const { canvases: allCanvases } = useCanvases(workspaceId);
   const duplicateCanvas = useDuplicateCanvas();
   const deleteCanvas = useDeleteCanvas();
 

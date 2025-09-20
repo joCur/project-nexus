@@ -2,8 +2,8 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useWorkspaceStore, workspaceSelectors } from '@/stores/workspaceStore';
-import { useSetDefaultCanvas } from '@/hooks/use-canvas';
+import { useWorkspaceStore } from '@/stores/workspaceStore';
+import { useCanvases, useCanvas, useSetDefaultCanvas } from '@/hooks/use-canvas';
 import { CreateCanvasModal } from './CreateCanvasModal';
 import { DefaultCanvasBadge } from './DefaultCanvasBadge';
 import { CanvasContextMenu } from './CanvasContextMenu';
@@ -36,15 +36,16 @@ export const CanvasSwitcher: React.FC = () => {
   const router = useRouter();
   
   const context = useWorkspaceStore((state) => state.context);
-  const allCanvases = useWorkspaceStore(workspaceSelectors.getAllCanvases);
-  const currentCanvasData = useWorkspaceStore(workspaceSelectors.getCurrentCanvas);
-  const canvasCount = useWorkspaceStore(workspaceSelectors.getCanvasCount);
-  const isLoading = useWorkspaceStore(workspaceSelectors.isLoading);
+  const workspaceId = context.currentWorkspaceId;
+
+  // Use Apollo hooks for canvas data
+  const { canvases: allCanvases, loading: canvasesLoading } = useCanvases(workspaceId);
+  const { canvas: currentCanvas } = useCanvas(context.currentCanvasId);
   const setDefaultCanvas = useSetDefaultCanvas();
   const { showToast } = useToast();
 
-  const currentCanvas = currentCanvasData.canvas;
-  const workspaceId = context.currentWorkspaceId;
+  const canvasCount = allCanvases.length;
+  const isLoading = canvasesLoading;
 
   // Check for multiple default canvases and show warning
   useEffect(() => {

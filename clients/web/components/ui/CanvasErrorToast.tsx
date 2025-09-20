@@ -316,7 +316,7 @@ export const ToastContainer: React.FC<ToastContainerProps> = ({
 export const useToast = () => {
   const [notifications, setNotifications] = useState<ToastNotification[]>([]);
 
-  const showToast = (notification: Omit<ToastNotification, 'id'>) => {
+  const showToast = React.useCallback((notification: Omit<ToastNotification, 'id'>) => {
     const id = `toast_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const newNotification: ToastNotification = {
       id,
@@ -327,26 +327,26 @@ export const useToast = () => {
 
     setNotifications(prev => [...prev, newNotification]);
     return id;
-  };
+  }, []);
 
-  const dismissToast = (id: string) => {
+  const dismissToast = React.useCallback((id: string) => {
     setNotifications(prev => prev.filter(n => n.id !== id));
-  };
+  }, []);
 
-  const dismissAll = () => {
+  const dismissAll = React.useCallback(() => {
     setNotifications([]);
-  };
+  }, []);
 
   // Canvas-specific convenience methods
-  const showCanvasSuccess = (type: keyof typeof canvasToastMessages, ...args: any[]) => {
+  const showCanvasSuccess = React.useCallback((type: keyof typeof canvasToastMessages, ...args: any[]) => {
     const messageConfig = (canvasToastMessages[type] as any)(...args);
     return showToast(messageConfig);
-  };
+  }, [showToast]);
 
-  const showCanvasError = (type: keyof typeof canvasToastMessages, ...args: any[]) => {
+  const showCanvasError = React.useCallback((type: keyof typeof canvasToastMessages, ...args: any[]) => {
     const messageConfig = (canvasToastMessages[type] as any)(...args);
     return showToast(messageConfig);
-  };
+  }, [showToast]);
 
   return {
     notifications,
