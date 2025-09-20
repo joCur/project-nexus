@@ -183,19 +183,9 @@ export async function GET() {
       workspace: status.defaultWorkspace,
     };
 
-    const duration = Date.now() - startTime;
-    console.log(`[${requestId}] Request completed successfully in ${duration}ms`, responseData);
-
     return NextResponse.json(responseData);
 
   } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error(`[${requestId}] Error getting onboarding status after ${duration}ms:`, {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      requestId,
-    });
-
     // Handle specific error types
     if (error instanceof Error) {
       // Timeout errors
