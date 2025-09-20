@@ -51,7 +51,8 @@
       "mcp__linear-server__get_issue",
       "mcp__linear-server__create_comment",
       "Bash(lsof:*)",
-      "Bash(netstat:*)"
+      "Bash(netstat:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"

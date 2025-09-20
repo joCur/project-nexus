@@ -6,11 +6,12 @@
  */
 
 import { useCallback, useEffect, useMemo } from 'react';
-import { 
-  useQuery, 
-  useMutation, 
+import {
+  useQuery,
+  useMutation,
   useSubscription,
-  useApolloClient 
+  useApolloClient,
+  gql
 } from '@apollo/client';
 import {
   GET_WORKSPACE_CANVASES,
@@ -227,29 +228,48 @@ export const useCreateCanvas = (): UseCanvasMutationReturn => {
   const [createCanvasMutation, { loading, error, reset }] = useMutation(CREATE_CANVAS);
 
   const mutate = useCallback(async (params: CreateCanvasParams): Promise<CanvasId | null> => {
+    let optimisticCanvasId: CanvasId | null = null;
+
     try {
       // Optimistic update
-      const optimisticCanvasId = await workspaceStore.createCanvas(params);
-      
+      optimisticCanvasId = await workspaceStore.createCanvas(params);
+
       // Server mutation
       const input = transformCreateParamsToBackend(params);
       const { data } = await createCanvasMutation({ variables: { input } });
 
       if (data?.createCanvas) {
         const serverCanvas = transformBackendCanvasToFrontend(data.createCanvas);
-        
+
         // Replace optimistic canvas with server version
         if (optimisticCanvasId) {
           workspaceStore.canvasManagement.canvases.delete(optimisticCanvasId);
         }
-        workspaceStore.canvasManagement.canvases.set(serverCanvas.id, serverCanvas);
-        
+        workspaceStore.syncCanvasWithBackend(serverCanvas);
+
+        console.log('Canvas created successfully:', serverCanvas.id);
         return serverCanvas.id;
       }
 
-      return optimisticCanvasId;
+      // If mutation succeeded but no data returned, clean up optimistic update
+      if (optimisticCanvasId) {
+        workspaceStore.canvasManagement.canvases.delete(optimisticCanvasId);
+      }
+      return null;
     } catch (err) {
       console.error('Failed to create canvas:', err);
+
+      // Clean up optimistic update on error
+      if (optimisticCanvasId) {
+        workspaceStore.canvasManagement.canvases.delete(optimisticCanvasId);
+
+        // Reset default canvas if the optimistic canvas was set as default
+        if (workspaceStore.canvasManagement.defaultCanvasId === optimisticCanvasId) {
+          workspaceStore.canvasManagement.defaultCanvasId = workspaceStore.getDefaultCanvas()?.id;
+        }
+      }
+
+      workspaceStore.setError('mutation', `Failed to create canvas: ${err}`);
       return null;
     }
   }, [workspaceStore, createCanvasMutation]);
@@ -270,28 +290,41 @@ export const useUpdateCanvas = (): UseCanvasMutationReturn => {
   const [updateCanvasMutation, { loading, error, reset }] = useMutation(UPDATE_CANVAS);
 
   const mutate = useCallback(async (params: UpdateCanvasParams): Promise<boolean> => {
+    // Store previous state for rollback
+    const previousCanvas = workspaceStore.getCanvas(params.id);
+    if (!previousCanvas) {
+      console.error('Canvas not found for update:', params.id);
+      return false;
+    }
+
     try {
       // Optimistic update
       await workspaceStore.updateCanvas(params);
 
       // Server mutation
-      const { data } = await updateCanvasMutation({ 
-        variables: { 
-          id: params.id, 
+      const { data } = await updateCanvasMutation({
+        variables: {
+          id: params.id,
           input: params.updates,
-        } 
+        }
       });
 
       if (data?.updateCanvas) {
         const serverCanvas = transformBackendCanvasToFrontend(data.updateCanvas);
-        workspaceStore.canvasManagement.canvases.set(serverCanvas.id, serverCanvas);
+        workspaceStore.syncCanvasWithBackend(serverCanvas);
         return true;
       }
 
+      // If mutation succeeded but no data returned, revert optimistic update
+      workspaceStore.canvasManagement.canvases.set(params.id, previousCanvas);
       return false;
     } catch (err) {
       console.error('Failed to update canvas:', err);
-      // TODO: Revert optimistic update
+
+      // Revert optimistic update on error
+      workspaceStore.canvasManagement.canvases.set(params.id, previousCanvas);
+      workspaceStore.setError('mutation', `Failed to update canvas: ${err}`);
+
       return false;
     }
   }, [workspaceStore, updateCanvasMutation]);
@@ -312,10 +345,17 @@ export const useDeleteCanvas = (): UseCanvasMutationReturn => {
   const [deleteCanvasMutation, { loading, error, reset }] = useMutation(DELETE_CANVAS);
 
   const mutate = useCallback(async (canvasId: CanvasId): Promise<boolean> => {
+    // Store current canvas and context for potential rollback
+    const canvasToDelete = workspaceStore.getCanvas(canvasId);
+    const previousContext = { ...workspaceStore.context };
+    const previousDefaultCanvasId = workspaceStore.canvasManagement.defaultCanvasId;
+
+    if (!canvasToDelete) {
+      console.error('Canvas not found for deletion:', canvasId);
+      return false;
+    }
+
     try {
-      // Store current canvas for potential rollback
-      const canvasToDelete = workspaceStore.getCanvas(canvasId);
-      
       // Optimistic delete
       await workspaceStore.deleteCanvas(canvasId);
 
@@ -323,17 +363,41 @@ export const useDeleteCanvas = (): UseCanvasMutationReturn => {
       const { data } = await deleteCanvasMutation({ variables: { id: canvasId } });
 
       if (data?.deleteCanvas) {
+        console.log('Canvas deleted successfully:', canvasId);
         return true;
       } else {
-        // Rollback on failure
-        if (canvasToDelete) {
-          workspaceStore.canvasManagement.canvases.set(canvasId, canvasToDelete);
+        // Rollback on server failure
+        workspaceStore.canvasManagement.canvases.set(canvasId, canvasToDelete);
+
+        // Restore default canvas ID if this was the default
+        if (canvasToDelete.settings.isDefault) {
+          workspaceStore.canvasManagement.defaultCanvasId = previousDefaultCanvasId;
         }
+
+        // Restore context if this was the current canvas
+        if (previousContext.currentCanvasId === canvasId) {
+          workspaceStore.setCurrentCanvas(canvasId, canvasToDelete.name);
+        }
+
         return false;
       }
     } catch (err) {
       console.error('Failed to delete canvas:', err);
-      // TODO: Revert optimistic delete
+
+      // Revert optimistic delete on error
+      workspaceStore.canvasManagement.canvases.set(canvasId, canvasToDelete);
+
+      // Restore default canvas ID if this was the default
+      if (canvasToDelete.settings.isDefault) {
+        workspaceStore.canvasManagement.defaultCanvasId = previousDefaultCanvasId;
+      }
+
+      // Restore context if this was the current canvas
+      if (previousContext.currentCanvasId === canvasId) {
+        workspaceStore.setCurrentCanvas(canvasId, canvasToDelete.name);
+      }
+
+      workspaceStore.setError('mutation', `Failed to delete canvas: ${err}`);
       return false;
     }
   }, [workspaceStore, deleteCanvasMutation]);
@@ -355,71 +419,128 @@ export const useSetDefaultCanvas = (): UseCanvasMutationReturn => {
   const [setDefaultCanvasMutation, { loading, error, reset }] = useMutation(SET_DEFAULT_CANVAS);
 
   const mutate = useCallback(async (workspaceId: EntityId, canvasId: CanvasId): Promise<boolean> => {
+    // Store previous state for rollback
+    const previousCanvases = new Map(workspaceStore.canvasManagement.canvases);
+    const previousDefaultCanvasId = workspaceStore.canvasManagement.defaultCanvasId;
+
     try {
       // Optimistic update
       await workspaceStore.setDefaultCanvas(workspaceId, canvasId);
 
       // Server mutation
-      const { data } = await setDefaultCanvasMutation({ 
+      const { data } = await setDefaultCanvasMutation({
         variables: { id: canvasId },
         update: (cache, { data }) => {
           if (data?.setDefaultCanvas) {
-            // Update the Apollo cache to handle multiple canvases being default
-            const cacheData = cache.readQuery<{ workspaceCanvases: CanvasesConnectionResponse }>({
-              query: GET_WORKSPACE_CANVASES,
-              variables: { workspaceId },
-            });
+            try {
+              // Read all potential cache entries for workspace canvases
+              let cacheData: { workspaceCanvases: CanvasesConnectionResponse } | null = null;
+              try {
+                cacheData = cache.readQuery<{ workspaceCanvases: CanvasesConnectionResponse }>({
+                  query: GET_WORKSPACE_CANVASES,
+                  variables: { workspaceId },
+                });
+              } catch (error) {
+                // Query not in cache, skip cache update
+                console.debug('Workspace canvases query not in cache, skipping cache update');
+              }
 
-            if (cacheData?.workspaceCanvases?.items) {
-              // Update all canvases: set new default to true, others to false
-              const updatedItems = cacheData.workspaceCanvases.items.map(canvas => {
-                if (canvas.id === canvasId) {
-                  // This is the new default canvas
-                  return { ...canvas, isDefault: true };
-                } else if (canvas.isDefault) {
-                  // This was previously default, set to false
-                  return { ...canvas, isDefault: false };
-                }
-                return canvas;
-              });
+              if (cacheData?.workspaceCanvases?.items) {
+                // Update all canvases atomically: set new default to true, others to false
+                const updatedItems = cacheData.workspaceCanvases.items.map(canvas => ({
+                  ...canvas,
+                  isDefault: canvas.id === canvasId,
+                }));
 
-              // Write the updated data back to cache
-              cache.writeQuery({
-                query: GET_WORKSPACE_CANVASES,
-                variables: { workspaceId },
-                data: {
-                  workspaceCanvases: {
-                    ...cacheData.workspaceCanvases,
-                    items: updatedItems,
+                // Write the updated data back to cache
+                cache.writeQuery({
+                  query: GET_WORKSPACE_CANVASES,
+                  variables: { workspaceId },
+                  data: {
+                    workspaceCanvases: {
+                      ...cacheData.workspaceCanvases,
+                      items: updatedItems,
+                    },
                   },
+                });
+              }
+
+              // Also update individual canvas cache entries if they exist
+              const serverCanvas = data.setDefaultCanvas;
+              cache.writeFragment({
+                id: cache.identify({ __typename: 'Canvas', id: serverCanvas.id }),
+                fragment: gql`
+                  fragment UpdatedCanvasDefault on Canvas {
+                    isDefault
+                    updatedAt
+                  }
+                `,
+                data: {
+                  isDefault: true,
+                  updatedAt: serverCanvas.updatedAt,
                 },
               });
+
+              // Update other default canvases in cache to false
+              Array.from(previousCanvases.values()).forEach(canvas => {
+                if (canvas.id !== canvasId && canvas.settings.isDefault) {
+                  cache.writeFragment({
+                    id: cache.identify({ __typename: 'Canvas', id: canvas.id }),
+                    fragment: gql`
+                      fragment RemovedCanvasDefault on Canvas {
+                        isDefault
+                        updatedAt
+                      }
+                    `,
+                    data: {
+                      isDefault: false,
+                      updatedAt: new Date().toISOString(),
+                    },
+                  });
+                }
+              });
+            } catch (cacheError) {
+              console.warn('Failed to update Apollo cache for default canvas:', cacheError);
+              // Cache update failure should not fail the mutation
             }
           }
         }
       });
 
       if (data?.setDefaultCanvas) {
-        const updatedCanvas = transformBackendCanvasToFrontend(data.setDefaultCanvas);
-        
-        // Update workspace store - set new default and clear old ones
+        const serverCanvas = transformBackendCanvasToFrontend(data.setDefaultCanvas);
+
+        // Ensure workspace store is in sync with server response
+        // Set the server canvas as the canonical source
+        workspaceStore.canvasManagement.canvases.set(serverCanvas.id, serverCanvas);
+        workspaceStore.canvasManagement.defaultCanvasId = serverCanvas.id;
+
+        // Ensure all other canvases are marked as non-default
         workspaceStore.canvasManagement.canvases.forEach((canvas, id) => {
-          if (id === canvasId) {
-            // Set this as the new default
-            workspaceStore.canvasManagement.canvases.set(id, { ...canvas, settings: { ...canvas.settings, isDefault: true } });
-          } else if (canvas.settings.isDefault) {
-            // Remove default from other canvases
-            workspaceStore.canvasManagement.canvases.set(id, { ...canvas, settings: { ...canvas.settings, isDefault: false } });
+          if (id !== canvasId && canvas.settings.isDefault) {
+            workspaceStore.canvasManagement.canvases.set(id, {
+              ...canvas,
+              settings: { ...canvas.settings, isDefault: false },
+              updatedAt: new Date().toISOString(),
+              version: canvas.version + 1,
+            });
           }
         });
-        
+
         return true;
       }
 
+      // If mutation succeeded but no data returned, revert optimistic update
+      workspaceStore.canvasManagement.canvases = previousCanvases;
+      workspaceStore.canvasManagement.defaultCanvasId = previousDefaultCanvasId;
       return false;
     } catch (err) {
       console.error('Failed to set default canvas:', err);
-      // TODO: Revert optimistic update
+
+      // Revert optimistic update on error
+      workspaceStore.canvasManagement.canvases = previousCanvases;
+      workspaceStore.canvasManagement.defaultCanvasId = previousDefaultCanvasId;
+
       return false;
     }
   }, [workspaceStore, setDefaultCanvasMutation, apolloClient]);
@@ -440,9 +561,19 @@ export const useDuplicateCanvas = (): UseCanvasMutationReturn => {
   const [duplicateCanvasMutation, { loading, error, reset }] = useMutation(DUPLICATE_CANVAS);
 
   const mutate = useCallback(async (params: DuplicateCanvasParams): Promise<CanvasId | null> => {
+    // Verify source canvas exists
+    const sourceCanvas = workspaceStore.getCanvas(params.id);
+    if (!sourceCanvas) {
+      console.error('Source canvas not found for duplication:', params.id);
+      workspaceStore.setError('mutation', 'Source canvas not found for duplication');
+      return null;
+    }
+
+    let optimisticCanvasId: CanvasId | null = null;
+
     try {
       // Optimistic update
-      const optimisticCanvasId = await workspaceStore.duplicateCanvas(params);
+      optimisticCanvasId = await workspaceStore.duplicateCanvas(params);
 
       // Server mutation
       const input: DuplicateCanvasMutationVariables['input'] = {
@@ -451,26 +582,38 @@ export const useDuplicateCanvas = (): UseCanvasMutationReturn => {
         includeCards: params.includeCards,
         includeConnections: params.includeConnections,
       };
-      
-      const { data } = await duplicateCanvasMutation({ 
-        variables: { id: params.id, input } 
+
+      const { data } = await duplicateCanvasMutation({
+        variables: { id: params.id, input }
       });
 
       if (data?.duplicateCanvas) {
         const serverCanvas = transformBackendCanvasToFrontend(data.duplicateCanvas);
-        
+
         // Replace optimistic canvas with server version
         if (optimisticCanvasId) {
           workspaceStore.canvasManagement.canvases.delete(optimisticCanvasId);
         }
-        workspaceStore.canvasManagement.canvases.set(serverCanvas.id, serverCanvas);
-        
+        workspaceStore.syncCanvasWithBackend(serverCanvas);
+
+        console.log('Canvas duplicated successfully:', serverCanvas.id);
         return serverCanvas.id;
       }
 
-      return optimisticCanvasId;
+      // If mutation succeeded but no data returned, clean up optimistic update
+      if (optimisticCanvasId) {
+        workspaceStore.canvasManagement.canvases.delete(optimisticCanvasId);
+      }
+      return null;
     } catch (err) {
       console.error('Failed to duplicate canvas:', err);
+
+      // Clean up optimistic update on error
+      if (optimisticCanvasId) {
+        workspaceStore.canvasManagement.canvases.delete(optimisticCanvasId);
+      }
+
+      workspaceStore.setError('mutation', `Failed to duplicate canvas: ${err}`);
       return null;
     }
   }, [workspaceStore, duplicateCanvasMutation]);
@@ -498,8 +641,13 @@ export const useCanvasSubscriptions = (workspaceId: EntityId | undefined) => {
     onData: ({ data }) => {
       if (data?.data?.canvasCreated) {
         const canvas = transformBackendCanvasToFrontend(data.data.canvasCreated);
-        workspaceStore.canvasManagement.canvases.set(canvas.id, canvas);
+        workspaceStore.syncCanvasWithBackend(canvas);
+        console.log('Canvas created via subscription:', canvas.id);
       }
+    },
+    onError: (error) => {
+      console.error('Canvas created subscription error:', error);
+      workspaceStore.setError('fetch', `Canvas creation subscription failed: ${error.message}`);
     },
   });
 
@@ -510,8 +658,35 @@ export const useCanvasSubscriptions = (workspaceId: EntityId | undefined) => {
     onData: ({ data }) => {
       if (data?.data?.canvasUpdated) {
         const canvas = transformBackendCanvasToFrontend(data.data.canvasUpdated);
-        workspaceStore.canvasManagement.canvases.set(canvas.id, canvas);
+
+        // Use the sync method to properly handle store updates
+        workspaceStore.syncCanvasWithBackend(canvas);
+
+        // Handle default canvas changes
+        if (canvas.settings.isDefault) {
+          // This canvas became the default, ensure others are not default
+          workspaceStore.canvasManagement.canvases.forEach((existingCanvas, id) => {
+            if (id !== canvas.id && existingCanvas.settings.isDefault) {
+              const updatedCanvas = {
+                ...existingCanvas,
+                settings: { ...existingCanvas.settings, isDefault: false },
+                updatedAt: new Date().toISOString(),
+                version: existingCanvas.version + 1,
+              };
+              workspaceStore.canvasManagement.canvases.set(id, updatedCanvas);
+            }
+          });
+        }
+
+        console.log('Canvas updated via subscription:', canvas.id, {
+          isDefault: canvas.settings.isDefault,
+          name: canvas.name,
+        });
       }
+    },
+    onError: (error) => {
+      console.error('Canvas updated subscription error:', error);
+      workspaceStore.setError('fetch', `Canvas update subscription failed: ${error.message}`);
     },
   });
 
@@ -522,16 +697,35 @@ export const useCanvasSubscriptions = (workspaceId: EntityId | undefined) => {
     onData: ({ data }) => {
       if (data?.data?.canvasDeleted) {
         const canvasId = createCanvasId(data.data.canvasDeleted);
+        const deletedCanvas = workspaceStore.getCanvas(canvasId);
+
+        console.log('Canvas deleted via subscription:', canvasId);
+
+        // Remove from store
         workspaceStore.canvasManagement.canvases.delete(canvasId);
-        
-        // Clear current canvas if deleted
+
+        // Update default canvas ID if this was the default
+        if (workspaceStore.canvasManagement.defaultCanvasId === canvasId) {
+          const newDefault = workspaceStore.getDefaultCanvas();
+          workspaceStore.canvasManagement.defaultCanvasId = newDefault?.id;
+        }
+
+        // Clear current canvas if deleted and switch to default or first available
         if (workspaceStore.context.currentCanvasId === canvasId) {
-          workspaceStore.setCurrentCanvas(
-            workspaceStore.getDefaultCanvas()?.id || createCanvasId(''),
-            workspaceStore.getDefaultCanvas()?.name
-          );
+          const nextCanvas = workspaceStore.getDefaultCanvas() ||
+            Array.from(workspaceStore.canvasManagement.canvases.values())[0];
+
+          if (nextCanvas) {
+            workspaceStore.setCurrentCanvas(nextCanvas.id, nextCanvas.name);
+          } else {
+            workspaceStore.setCurrentCanvas(createCanvasId(''), undefined);
+          }
         }
       }
+    },
+    onError: (error) => {
+      console.error('Canvas deleted subscription error:', error);
+      workspaceStore.setError('fetch', `Canvas deletion subscription failed: ${error.message}`);
     },
   });
 
@@ -542,8 +736,44 @@ export const useCanvasSubscriptions = (workspaceId: EntityId | undefined) => {
     onData: ({ data }) => {
       if (data?.data?.defaultCanvasChanged && workspaceId) {
         const newDefaultId = createCanvasId(data.data.defaultCanvasChanged);
+
+        console.log('Default canvas changed via subscription:', newDefaultId);
+
+        // Update all canvas default states atomically
+        const currentTime = new Date().toISOString();
+        const updatedCanvases = new Map(workspaceStore.canvasManagement.canvases);
+
+        for (const [id, canvas] of updatedCanvases) {
+          const shouldBeDefault = id === newDefaultId;
+          const isCurrentlyDefault = canvas.settings.isDefault;
+
+          if (shouldBeDefault !== isCurrentlyDefault) {
+            updatedCanvases.set(id, {
+              ...canvas,
+              settings: { ...canvas.settings, isDefault: shouldBeDefault },
+              updatedAt: currentTime,
+              version: canvas.version + 1,
+            });
+          }
+        }
+
+        // Update store state
+        workspaceStore.canvasManagement.canvases = updatedCanvases;
         workspaceStore.canvasManagement.defaultCanvasId = newDefaultId;
+
+        // Update current canvas if this is the new default and no canvas is currently selected
+        const currentContext = workspaceStore.context;
+        if (!currentContext.currentCanvasId) {
+          const newDefaultCanvas = updatedCanvases.get(newDefaultId);
+          if (newDefaultCanvas) {
+            workspaceStore.setCurrentCanvas(newDefaultId, newDefaultCanvas.name);
+          }
+        }
       }
+    },
+    onError: (error) => {
+      console.error('Default canvas changed subscription error:', error);
+      workspaceStore.setError('fetch', `Default canvas subscription failed: ${error.message}`);
     },
   });
 };

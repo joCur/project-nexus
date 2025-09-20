@@ -441,31 +441,25 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
               throw new Error('Canvas not found');
             }
 
-            // Update the default canvas
+            // Optimistic update: atomically update default canvas state
             set((state) => {
               const newCanvases = new Map(state.canvasManagement.canvases);
-              
-              // Remove default from all canvases
+              const currentTime = new Date().toISOString();
+
+              // Atomically remove default from all canvases and set new default
               for (const [id, canvas] of newCanvases) {
-                if (canvas.settings.isDefault) {
+                const isNewDefault = id === canvasId;
+                const wasDefault = canvas.settings.isDefault;
+
+                // Only update if there's an actual change
+                if (isNewDefault !== wasDefault) {
                   newCanvases.set(id, {
                     ...canvas,
-                    settings: { ...canvas.settings, isDefault: false },
-                    updatedAt: new Date().toISOString(),
+                    settings: { ...canvas.settings, isDefault: isNewDefault },
+                    updatedAt: currentTime,
                     version: canvas.version + 1,
                   });
                 }
-              }
-              
-              // Set new default
-              const targetCanvas = newCanvases.get(canvasId);
-              if (targetCanvas) {
-                newCanvases.set(canvasId, {
-                  ...targetCanvas,
-                  settings: { ...targetCanvas.settings, isDefault: true },
-                  updatedAt: new Date().toISOString(),
-                  version: targetCanvas.version + 1,
-                });
               }
 
               return {
@@ -498,6 +492,27 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
             }));
             return false;
           }
+        },
+
+        // Sync canvas state with backend after mutation success
+        syncCanvasWithBackend: (canvas: Canvas): void => {
+          set((state) => {
+            const newCanvases = new Map(state.canvasManagement.canvases);
+            newCanvases.set(canvas.id, canvas);
+
+            // Update default canvas ID if this canvas is default
+            const newDefaultCanvasId = canvas.settings.isDefault
+              ? canvas.id
+              : state.canvasManagement.defaultCanvasId;
+
+            return {
+              canvasManagement: {
+                ...state.canvasManagement,
+                canvases: newCanvases,
+                defaultCanvasId: newDefaultCanvasId,
+              },
+            };
+          });
         },
 
         loadWorkspaceCanvases: async (workspaceId: EntityId, filter?: CanvasFilter): Promise<void> => {
@@ -554,15 +569,41 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
             // Convert GraphQL responses to local Canvas types
             const canvasMap = new Map<CanvasId, Canvas>();
             let defaultCanvasId: CanvasId | undefined;
+            let defaultCanvas: Canvas | undefined;
 
             canvasesData.items.forEach((graphqlCanvas) => {
               const localCanvas = convertGraphQLCanvasToLocal(graphqlCanvas);
               canvasMap.set(localCanvas.id, localCanvas);
-              
+
               if (localCanvas.settings.isDefault) {
-                defaultCanvasId = localCanvas.id;
+                if (defaultCanvasId) {
+                  // Multiple canvases marked as default - log warning
+                  console.warn('Multiple canvases marked as default, using first found:', {
+                    existing: defaultCanvasId,
+                    new: localCanvas.id,
+                  });
+                } else {
+                  defaultCanvasId = localCanvas.id;
+                  defaultCanvas = localCanvas;
+                }
               }
             });
+
+            // Determine which canvas to select on page load
+            let selectedCanvasId: CanvasId | undefined;
+            let selectedCanvasName: string | undefined;
+
+            if (defaultCanvasId && defaultCanvas) {
+              // Use the default canvas
+              selectedCanvasId = defaultCanvasId;
+              selectedCanvasName = defaultCanvas.name;
+            } else if (canvasMap.size > 0) {
+              // No default canvas found, use the first one
+              const firstCanvas = Array.from(canvasMap.values())[0];
+              selectedCanvasId = firstCanvas.id;
+              selectedCanvasName = firstCanvas.name;
+              console.info('No default canvas found, using first available:', firstCanvas.id);
+            }
 
             // If no canvases exist, we might want to create a default one
             // This depends on your backend behavior - some systems auto-create, others don't
@@ -588,11 +629,18 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
               },
               context: {
                 ...state.context,
-                currentCanvasId: defaultCanvasId || (canvasMap.size > 0 ? Array.from(canvasMap.keys())[0] : undefined),
-                canvasName: defaultCanvasId ? canvasMap.get(defaultCanvasId)?.name : (canvasMap.size > 0 ? Array.from(canvasMap.values())[0]?.name : undefined),
+                currentCanvasId: selectedCanvasId,
+                canvasName: selectedCanvasName,
               },
               isInitialized: true,
             }));
+
+            console.log('Workspace canvases loaded successfully:', {
+              total: canvasMap.size,
+              defaultCanvasId,
+              selectedCanvasId,
+              shouldCreateDefault,
+            });
 
             // TODO: Create default canvas if none exist (requires updating createCanvas to use GraphQL)
             if (shouldCreateDefault) {
@@ -649,18 +697,44 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 
         getDefaultCanvas: (): Canvas | undefined => {
           const { canvasManagement } = get();
+
+          // First check if we have a tracked default canvas ID
           if (canvasManagement.defaultCanvasId) {
-            return canvasManagement.canvases.get(canvasManagement.defaultCanvasId);
-          }
-          
-          // Find first canvas marked as default
-          for (const canvas of canvasManagement.canvases.values()) {
-            if (canvas.settings.isDefault) {
-              return canvas;
+            const defaultCanvas = canvasManagement.canvases.get(canvasManagement.defaultCanvasId);
+            if (defaultCanvas && defaultCanvas.settings.isDefault) {
+              return defaultCanvas;
+            }
+            // If tracked default doesn't exist or isn't marked as default, clear it
+            if (defaultCanvas && !defaultCanvas.settings.isDefault) {
+              console.warn('Tracked default canvas is no longer marked as default:', canvasManagement.defaultCanvasId);
             }
           }
-          
-          return undefined;
+
+          // Search for first canvas marked as default
+          let foundDefault: Canvas | undefined;
+          for (const canvas of canvasManagement.canvases.values()) {
+            if (canvas.settings.isDefault) {
+              if (foundDefault) {
+                console.warn('Multiple canvases marked as default, using first found:', {
+                  first: foundDefault.id,
+                  duplicate: canvas.id,
+                });
+              } else {
+                foundDefault = canvas;
+                // Update the tracked default canvas ID if it differs
+                if (canvasManagement.defaultCanvasId !== canvas.id) {
+                  set((state) => ({
+                    canvasManagement: {
+                      ...state.canvasManagement,
+                      defaultCanvasId: canvas.id,
+                    },
+                  }));
+                }
+              }
+            }
+          }
+
+          return foundDefault;
         },
 
         getCurrentCanvas: (): Canvas | undefined => {

@@ -217,6 +217,7 @@ export interface WorkspaceActions {
   
   // Canvas management
   setDefaultCanvas: (workspaceId: EntityId, canvasId: CanvasId) => Promise<boolean>;
+  syncCanvasWithBackend: (canvas: Canvas) => void;
   loadWorkspaceCanvases: (workspaceId: EntityId, filter?: CanvasFilter) => Promise<void>;
   refreshCanvases: () => Promise<void>;
   
