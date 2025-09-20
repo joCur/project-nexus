@@ -8,7 +8,7 @@
  */
 
 import { ExtendedUserProfile } from '@/types/auth';
-import { permissionLogger } from './permissionLogger';
+import { permissionLogger } from '../structured-logger';
 
 /**
  * Permission checking context interface
@@ -94,24 +94,50 @@ export function checkUserPermission(
     }
 
     // Log the permission check
-    permissionLogger.logPermissionCheck(permission, result, user.sub, targetWorkspaceId);
+    permissionLogger.debug(
+      `Permission check: ${permission} = ${result}`,
+      {
+        userId: user.sub,
+        workspaceId: targetWorkspaceId,
+        permission,
+        result,
+        source: 'permission-system'
+      },
+      ['permission-check']
+    );
     
   } catch (error) {
     // Secure by default on error
     result = false;
-    permissionLogger.logError('Permission check failed', {
-      permission,
-      userId: user.sub,
-      workspaceId: targetWorkspaceId
-    });
+    permissionLogger.error(
+      'Permission check failed',
+      error instanceof Error ? error : new Error(String(error)),
+      {
+        userId: user.sub,
+        workspaceId: targetWorkspaceId,
+        permission,
+        source: 'permission-system'
+      },
+      ['permission-error']
+    );
   }
 
   // Log performance metrics
   const duration = performance.now() - startTime;
-  permissionLogger.logPerformanceMetric('checkUserPermission', duration, user.sub, targetWorkspaceId, {
-    permission,
-    result,
-  });
+  permissionLogger.info(
+    `Permission check completed in ${duration.toFixed(2)}ms`,
+    {
+      userId: user.sub,
+      workspaceId: targetWorkspaceId,
+      permission,
+      result,
+      source: 'permission-system',
+      performance: {
+        duration
+      }
+    },
+    ['permission-performance']
+  );
 
   return result;
 }

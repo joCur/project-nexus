@@ -377,13 +377,13 @@ export class PermissionNotificationSystemImpl implements PermissionNotificationS
 
     // Check if critical events only
     if (this.preferences.criticalEventsOnly) {
-      const criticalEvents: PermissionEventType[] = [
+      const criticalEvents = [
         'permissionRevoked',
         'workspaceAccessRevoked',
         'permissionCheckFailed',
         'permissionQueryError',
-      ];
-      if (!criticalEvents.includes(event.type)) {
+      ] as const;
+      if (!criticalEvents.includes(event.type as any)) {
         return false;
       }
     }
