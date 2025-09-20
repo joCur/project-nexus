@@ -46,6 +46,7 @@ jest.mock('@/services/workspaceAuthorization', () => ({
 describe('Canvas Default Setting Integration Tests (NEX-187)', () => {
   let canvasService: CanvasService;
   let workspaceAuth: WorkspaceAuthorizationService;
+  let databaseTransactionSpy: jest.SpyInstance;
 
   const testUserId = 'test-user-123';
   const testWorkspaceId = 'test-workspace-456';
@@ -53,6 +54,10 @@ describe('Canvas Default Setting Integration Tests (NEX-187)', () => {
   beforeEach(() => {
     canvasService = new CanvasService();
     workspaceAuth = new WorkspaceAuthorizationService();
+
+    // Mock database.transaction globally to ensure it's available for all tests
+    databaseTransactionSpy = jest.spyOn(database, 'transaction').mockResolvedValue(null);
+
     jest.clearAllMocks();
     mockLogger.info.mockClear();
     mockLogger.error.mockClear();
@@ -85,7 +90,7 @@ describe('Canvas Default Setting Integration Tests (NEX-187)', () => {
       let setOperation: any = null;
       let validationQuery: any = null;
 
-      jest.spyOn(database, 'transaction').mockImplementation(async (callback) => {
+      databaseTransactionSpy.mockImplementation(async (callback) => {
         const mockTrx = jest.fn() as any;
 
         // Track the database operations within transaction
@@ -132,7 +137,7 @@ describe('Canvas Default Setting Integration Tests (NEX-187)', () => {
       const result = await canvasService.setDefaultCanvas(canvasId, testUserId);
 
       // Verify transaction was used
-      expect(database.transaction).toHaveBeenCalledTimes(1);
+      expect(databaseTransactionSpy).toHaveBeenCalledTimes(1);
 
       // Verify all transaction operations were called
       expect(clearOperation.where).toHaveBeenCalledWith('workspace_id', testWorkspaceId);
@@ -200,7 +205,7 @@ describe('Canvas Default Setting Integration Tests (NEX-187)', () => {
       const operationOrder: string[] = [];
 
       // Mock transaction to simulate proper serialization
-      jest.spyOn(database, 'transaction').mockImplementation(async (callback) => {
+      databaseTransactionSpy.mockImplementation(async (callback) => {
         const currentCall = transactionCallCount++;
         const canvasId = currentCall === 0 ? canvas1Id : currentCall === 1 ? canvas2Id : canvas3Id;
 
@@ -260,7 +265,7 @@ describe('Canvas Default Setting Integration Tests (NEX-187)', () => {
       });
 
       // Verify transactions were executed in isolation
-      expect(database.transaction).toHaveBeenCalledTimes(3);
+      expect(databaseTransactionSpy).toHaveBeenCalledTimes(3);
       expect(transactionResults).toHaveLength(3);
       expect(operationOrder).toHaveLength(6); // 3 starts + 3 completions
 
@@ -294,7 +299,7 @@ describe('Canvas Default Setting Integration Tests (NEX-187)', () => {
         updatedAt: new Date(),
       });
 
-      jest.spyOn(database, 'transaction').mockImplementation(async (callback) => {
+      databaseTransactionSpy.mockImplementation(async (callback) => {
         const mockTrx = jest.fn() as any;
 
         mockTrx
@@ -353,7 +358,7 @@ describe('Canvas Default Setting Integration Tests (NEX-187)', () => {
         updatedAt: new Date(),
       });
 
-      jest.spyOn(database, 'transaction').mockImplementation(async (callback) => {
+      databaseTransactionSpy.mockImplementation(async (callback) => {
         const mockTrx = jest.fn() as any;
 
         mockTrx
@@ -411,7 +416,7 @@ describe('Canvas Default Setting Integration Tests (NEX-187)', () => {
         updatedAt: new Date(),
       });
 
-      jest.spyOn(database, 'transaction').mockImplementation(async (callback) => {
+      databaseTransactionSpy.mockImplementation(async (callback) => {
         const mockTrx = jest.fn() as any;
 
         mockTrx
@@ -455,7 +460,7 @@ describe('Canvas Default Setting Integration Tests (NEX-187)', () => {
         .rejects.toThrow(NotFoundError);
 
       // Should not attempt transaction
-      expect(database.transaction).not.toHaveBeenCalled();
+      expect(databaseTransactionSpy).not.toHaveBeenCalled();
 
       // Verify error logging
       expect(mockLogger.error).toHaveBeenCalledWith(
@@ -482,8 +487,10 @@ describe('Canvas Default Setting Integration Tests (NEX-187)', () => {
         updatedAt: new Date(),
       });
 
-      // Mock permission denial
-      jest.spyOn(workspaceAuth, 'requirePermission').mockRejectedValue(
+      // Mock permission denial on the service's internal workspaceAuth instance
+      // Access the private property to mock it properly
+      const internalWorkspaceAuth = (canvasService as any).workspaceAuth;
+      jest.spyOn(internalWorkspaceAuth, 'requirePermission').mockRejectedValueOnce(
         new Error('Insufficient permissions to set default canvas')
       );
 
@@ -491,7 +498,7 @@ describe('Canvas Default Setting Integration Tests (NEX-187)', () => {
         .rejects.toThrow('Insufficient permissions to set default canvas');
 
       // Should not attempt transaction
-      expect(database.transaction).not.toHaveBeenCalled();
+      expect(databaseTransactionSpy).not.toHaveBeenCalled();
     });
 
     it('should return early when canvas is already default', async () => {
@@ -509,14 +516,12 @@ describe('Canvas Default Setting Integration Tests (NEX-187)', () => {
         updatedAt: new Date(),
       });
 
-      const transactionSpy = jest.spyOn(database, 'transaction');
-
       const result = await canvasService.setDefaultCanvas(alreadyDefaultCanvasId, testUserId);
 
       // Should return early without transaction
       expect(result.id).toBe(alreadyDefaultCanvasId);
       expect(result.isDefault).toBe(true);
-      expect(transactionSpy).not.toHaveBeenCalled();
+      expect(databaseTransactionSpy).not.toHaveBeenCalled();
 
       // Verify early return logging
       expect(mockLogger.info).toHaveBeenCalledWith(
@@ -544,7 +549,7 @@ describe('Canvas Default Setting Integration Tests (NEX-187)', () => {
         updatedAt: new Date(),
       });
 
-      jest.spyOn(database, 'transaction').mockImplementation(async (callback) => {
+      databaseTransactionSpy.mockImplementation(async (callback) => {
         const mockTrx = jest.fn() as any;
 
         mockTrx
@@ -582,7 +587,7 @@ describe('Canvas Default Setting Integration Tests (NEX-187)', () => {
         updatedAt: new Date(),
       });
 
-      jest.spyOn(database, 'transaction').mockImplementation(async (callback) => {
+      databaseTransactionSpy.mockImplementation(async (callback) => {
         const mockTrx = jest.fn() as any;
 
         mockTrx
@@ -645,7 +650,7 @@ describe('Canvas Default Setting Integration Tests (NEX-187)', () => {
         updatedAt: new Date(),
       });
 
-      jest.spyOn(database, 'transaction').mockImplementation(async () => {
+      databaseTransactionSpy.mockImplementation(async () => {
         await new Promise(resolve => setTimeout(resolve, 50));
         throw new Error('Transaction failed');
       });
