@@ -579,9 +579,9 @@ export const canvasResolvers = {
     },
 
     /**
-     * Resolve creator (createdBy) for Canvas type
+     * Resolve owner (createdBy) for Canvas type
      */
-    createdByUser: async (canvas: Canvas, _: any, context: GraphQLContext) => {
+    owner: async (canvas: Canvas, _: any, context: GraphQLContext) => {
       const userService = context.dataSources.userService;
       return await userService.findById(canvas.createdBy);
     },
