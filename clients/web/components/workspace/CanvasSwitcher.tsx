@@ -83,7 +83,7 @@ export const CanvasSwitcher: React.FC = () => {
 
   const handleCanvasSelect = (canvasId: string) => {
     if (workspaceId && canvasId !== context.currentCanvasId) {
-      router.push(`/workspace/${workspaceId}/canvas/${canvasId}` as any);
+      router.push(`/workspace/${workspaceId}/canvas/${canvasId}`);
     }
     setIsOpen(false);
   };

@@ -5,6 +5,12 @@ import Link from 'next/link';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
 import { useCanvas } from '@/hooks/use-canvas';
 
+interface Breadcrumb {
+  name: string;
+  href: string;
+  current: boolean;
+}
+
 /**
  * Breadcrumb navigation component for workspace views
  * 
@@ -39,7 +45,7 @@ export const WorkspaceBreadcrumbs: React.FC = () => {
     return null;
   }
 
-  const breadcrumbs = [
+  const breadcrumbs: Breadcrumb[] = [
     {
       name: 'Dashboard',
       href: '/',
@@ -47,7 +53,7 @@ export const WorkspaceBreadcrumbs: React.FC = () => {
     },
     {
       name: workspaceName,
-      href: `/workspace/${workspaceId}` as any,
+      href: `/workspace/${workspaceId}`,
       current: !canvasId, // Current if we're on workspace root
     },
   ];
@@ -56,7 +62,7 @@ export const WorkspaceBreadcrumbs: React.FC = () => {
   if (canvasId) {
     breadcrumbs.push({
       name: canvasName,
-      href: `/workspace/${workspaceId}/canvas/${canvasId}` as any,
+      href: `/workspace/${workspaceId}/canvas/${canvasId}`,
       current: true,
     });
   }
@@ -90,7 +96,7 @@ export const WorkspaceBreadcrumbs: React.FC = () => {
               </span>
             ) : (
               <Link
-                href={breadcrumb.href}
+                href={breadcrumb.href as any}
                 className="text-gray-500 hover:text-gray-700 focus:text-gray-700 focus:outline-none focus:underline transition-colors"
                 aria-label={`Navigate to ${breadcrumb.name}`}
               >

@@ -214,8 +214,7 @@ describe('CanvasSwitcher', () => {
       dismissToast: jest.fn(),
       dismissAll: jest.fn(),
       notifications: [],
-      showCanvasSuccess: jest.fn(),
-      showCanvasError: jest.fn(),
+      showCanvasToast: jest.fn(),
     });
   });
 

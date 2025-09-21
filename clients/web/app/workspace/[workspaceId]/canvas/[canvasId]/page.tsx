@@ -60,7 +60,7 @@ export default function CanvasPage() {
       setIsCanvasReady(true);
     } else if (canvasId && !isLoading && !currentCanvas && canvases.length > 0) {
       // Canvas doesn't exist - redirect to workspace root
-      router.replace(`/workspace/${workspaceId}` as any);
+      router.replace(`/workspace/${workspaceId}`);
       return;
     }
   }, [canvasId, isLoading, currentCanvas, canvases.length, context.currentCanvasId, router, workspaceId]); // Using ref to avoid infinite re-renders

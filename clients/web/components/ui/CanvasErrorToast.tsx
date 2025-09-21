@@ -337,14 +337,11 @@ export const useToast = () => {
     setNotifications([]);
   }, []);
 
-  // Canvas-specific convenience methods
-  const showCanvasSuccess = React.useCallback((type: keyof typeof canvasToastMessages, ...args: any[]) => {
-    const messageConfig = (canvasToastMessages[type] as any)(...args);
-    return showToast(messageConfig);
-  }, [showToast]);
-
-  const showCanvasError = React.useCallback((type: keyof typeof canvasToastMessages, ...args: any[]) => {
-    const messageConfig = (canvasToastMessages[type] as any)(...args);
+  // Canvas-specific convenience methods (properly typed for each message type)
+  const showCanvasToast = React.useCallback((type: keyof typeof canvasToastMessages, ...args: unknown[]) => {
+    // Access message function and call with spread args
+    const messageFunction = canvasToastMessages[type] as (...args: unknown[]) => ToastNotification;
+    const messageConfig = messageFunction(...args);
     return showToast(messageConfig);
   }, [showToast]);
 
@@ -353,8 +350,7 @@ export const useToast = () => {
     showToast,
     dismissToast,
     dismissAll,
-    showCanvasSuccess,
-    showCanvasError,
+    showCanvasToast,
   };
 };
 
