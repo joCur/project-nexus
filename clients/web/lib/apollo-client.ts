@@ -379,15 +379,36 @@ export const permissionCacheUtils = {
 };
 
 /**
+ * Cache maintenance interval management
+ */
+let cacheMaintenanceInterval: NodeJS.Timeout | null = null;
+
+/**
  * Start periodic cache maintenance
  * Runs every 5 minutes to clean up expired entries
  */
-if (typeof window !== 'undefined') {
-  // Only run in browser environment
-  setInterval(() => {
-    permissionCacheUtils.performMaintenance();
-  }, CACHE_CONFIG.PERMISSION_TTL_MS); // Run maintenance at TTL interval
-}
+export const startCacheMaintenance = (): void => {
+  if (typeof window !== 'undefined' && !cacheMaintenanceInterval) {
+    // Only run in browser environment and if not already started
+    cacheMaintenanceInterval = setInterval(() => {
+      permissionCacheUtils.performMaintenance();
+    }, CACHE_CONFIG.PERMISSION_TTL_MS);
+  }
+};
+
+/**
+ * Stop periodic cache maintenance
+ * Call this during cleanup to prevent memory leaks
+ */
+export const stopCacheMaintenance = (): void => {
+  if (cacheMaintenanceInterval) {
+    clearInterval(cacheMaintenanceInterval);
+    cacheMaintenanceInterval = null;
+  }
+};
+
+// Auto-start maintenance when module loads
+startCacheMaintenance();
 
 /**
  * Type-safe Apollo Client instance
