@@ -241,20 +241,12 @@ export const useCardOperations = (workspaceId: EntityId) => {
   /**
    * Subscribe to real-time card events and sync with store
    *
-   * ⚠️ TEMPORARILY DISABLED - TODO: Re-enable real-time card subscriptions
+   * ⚠️ TEMPORARILY DISABLED
    *
-   * Reason: Backend subscriptions return null for non-nullable fields
-   * Likely cause: Authentication/permission issues in subscription resolvers
-   *
-   * @see Notion documentation: "GraphQL Subscriptions Status" for detailed re-enabling steps
-   * @see TodoWrite: "Re-enable card subscriptions in useCardOperations hook"
+   * Reason: Backend subscriptions return null for non-nullable fields due to authentication/permission issues
+   * Documentation: See "GraphQL Subscriptions Status" in Notion for complete details and resolution plan
+   * TODO: Re-enable when backend auth issues are resolved
    */
-
-  // 🚨 CARD SUBSCRIPTIONS DISABLED - See "GraphQL Subscriptions Status" in Notion for details
-  // 🚨 Card subscriptions disabled - authentication/permission issues in backend
-  // Related documentation: "GraphQL Subscriptions Status" in Notion
-
-  // TODO: Re-enable these card subscriptions when backend auth issues are resolved:
   /*
   useSubscription(CARD_CREATED_SUBSCRIPTION, {
     variables: { workspaceId },

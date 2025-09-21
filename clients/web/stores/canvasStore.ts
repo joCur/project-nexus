@@ -11,37 +11,16 @@ import { devtools, persist } from 'zustand/middleware';
 import type { CanvasStore, ViewportState, CanvasConfig, CanvasInteraction, CanvasPosition, ZoomLevel } from '@/types/canvas.types';
 import type { CanvasId } from '@/types/workspace.types';
 import type { EntityId } from '@/types/common.types';
+import { DEFAULT_CANVAS_CONFIG, DEFAULT_VIEWPORT_POSITION, DEFAULT_ZOOM_LEVEL } from '@/lib/canvas-defaults';
 
 /**
  * Default viewport state
  */
 const DEFAULT_VIEWPORT: ViewportState = {
-  position: { x: 0, y: 0 },
-  zoom: 1.0,
+  position: DEFAULT_VIEWPORT_POSITION,
+  zoom: DEFAULT_ZOOM_LEVEL,
   bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
   isDirty: false,
-};
-
-/**
- * Default canvas configuration
- */
-const DEFAULT_CONFIG: CanvasConfig = {
-  grid: {
-    enabled: true,
-    size: 20,
-    color: '#e5e7eb',
-    opacity: 0.3,
-  },
-  zoom: {
-    min: 0.25,
-    max: 4.0,
-    step: 0.1,
-  },
-  performance: {
-    enableCulling: true,
-    enableVirtualization: true,
-    maxVisibleCards: 1000,
-  },
 };
 
 /**
@@ -82,7 +61,7 @@ export const useCanvasStore = create<CanvasStoreExtended>()(
       (set, get) => ({
         // State
         viewport: DEFAULT_VIEWPORT,
-        config: DEFAULT_CONFIG,
+        config: DEFAULT_CANVAS_CONFIG,
         interaction: DEFAULT_INTERACTION,
         isInitialized: false,
         
@@ -305,7 +284,7 @@ export const useCanvasStore = create<CanvasStoreExtended>()(
         reset: () => {
           set({
             viewport: DEFAULT_VIEWPORT,
-            config: DEFAULT_CONFIG,
+            config: DEFAULT_CANVAS_CONFIG,
             interaction: DEFAULT_INTERACTION,
             isInitialized: false,
             currentCanvasId: undefined,
@@ -330,7 +309,7 @@ export const useCanvasStore = create<CanvasStoreExtended>()(
         merge: (persistedState: any, currentState) => ({
           ...currentState,
           viewport: persistedState?.viewport || DEFAULT_VIEWPORT,
-          config: persistedState?.config || DEFAULT_CONFIG,
+          config: persistedState?.config || DEFAULT_CANVAS_CONFIG,
           currentCanvasId: persistedState?.currentCanvasId,
           canvasViewports: new Map(persistedState?.canvasViewports || []),
         }),

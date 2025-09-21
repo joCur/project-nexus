@@ -50,6 +50,7 @@ import type {
 import { createCanvasId } from '@/types/workspace.types';
 import type { EntityId } from '@/types/common.types';
 import type { CanvasPosition } from '@/types/canvas.types';
+import { DEFAULT_CANVAS_SETTINGS } from '@/lib/canvas-defaults';
 
 /**
  * Transform backend GraphQL response to frontend Canvas type
@@ -63,19 +64,7 @@ const transformBackendCanvasToFrontend = (backendCanvas: CanvasResponse): Canvas
     description: backendCanvas.description,
     settings: {
       isDefault: backendCanvas.isDefault,
-      position: { x: 0, y: 0, z: 0 }, // Default position since backend doesn't store viewport
-      zoom: 1.0, // Default zoom
-      grid: {
-        enabled: true,
-        size: 20,
-        color: '#e5e7eb',
-        opacity: 0.3,
-      },
-      background: {
-        type: 'COLOR' as const,
-        color: '#ffffff',
-        opacity: 1.0,
-      },
+      ...DEFAULT_CANVAS_SETTINGS,
     },
     status: 'active', // Default from backend
     priority: 'normal', // Default from backend
@@ -561,21 +550,13 @@ export const useDuplicateCanvas = (): UseCanvasMutationReturn => {
 /**
  * Hook for real-time canvas subscriptions
  *
- * ⚠️ TEMPORARILY DISABLED - TODO: Re-enable real-time subscriptions
+ * ⚠️ TEMPORARILY DISABLED
  *
- * Reason: Backend subscriptions return null for non-nullable fields
- * Likely cause: Authentication/permission issues in subscription resolvers
- *
- * @see Notion documentation: "GraphQL Subscriptions Status" for detailed re-enabling steps
- * @see TodoWrite: "Re-enable canvas subscriptions in useCanvasSubscriptions hook"
+ * Reason: Backend subscriptions return null for non-nullable fields due to authentication/permission issues
+ * Documentation: See "GraphQL Subscriptions Status" in Notion for complete details and resolution plan
+ * TODO: Re-enable when backend auth issues are resolved
  */
 export const useCanvasSubscriptions = (workspaceId: EntityId | undefined) => {
-  // 🚨 SUBSCRIPTIONS DISABLED - See "GraphQL Subscriptions Status" in Notion for details
-
-  // 🚨 Canvas subscriptions disabled - authentication/permission issues in backend
-  // Related documentation: "GraphQL Subscriptions Status" in Notion
-
-  // TODO: Re-enable these subscriptions when backend auth issues are resolved:
   /*
   useSubscription(CANVAS_CREATED_SUBSCRIPTION, {
     variables: { workspaceId },
