@@ -374,7 +374,7 @@ export const useDeleteCanvas = (): UseCanvasMutationReturn => {
 
       // Clear current canvas if we're deleting it
       if (storeRef.current?.context?.currentCanvasId === canvasId) {
-        storeRef.current?.setCurrentCanvas?.(createCanvasId(''), undefined);
+        storeRef.current?.clearCurrentCanvas?.();
       }
 
       // Server mutation - Apollo cache will handle removal

@@ -608,14 +608,14 @@ describe('Canvas Apollo Hooks', () => {
     });
 
     it('should clear current canvas if deleting current one', async () => {
-      const mockSetCurrentCanvas = jest.fn();
+      const mockClearCurrentCanvas = jest.fn();
 
       mockUseWorkspaceStore.mockImplementation((selector?: any) => {
         const mockStore = {
           context: {
             currentCanvasId: testCanvasId1,
           },
-          setCurrentCanvas: mockSetCurrentCanvas,
+          clearCurrentCanvas: mockClearCurrentCanvas,
           setCanvasLoading: jest.fn(),
           setError: jest.fn(),
           clearErrors: jest.fn(),
@@ -644,7 +644,7 @@ describe('Canvas Apollo Hooks', () => {
         await result.current.mutate(testCanvasId1);
       });
 
-      expect(mockSetCurrentCanvas).toHaveBeenCalledWith(createCanvasId(''), undefined);
+      expect(mockClearCurrentCanvas).toHaveBeenCalled();
     });
   });
 

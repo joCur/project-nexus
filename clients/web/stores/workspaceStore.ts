@@ -54,6 +54,7 @@ interface SimplifiedWorkspaceStore {
   // Context management
   setCurrentWorkspace: (workspaceId: EntityId, workspaceName?: string) => void;
   setCurrentCanvas: (canvasId: CanvasId, canvasName?: string) => void;
+  clearCurrentCanvas: () => void;
   switchCanvas: (canvasId: CanvasId) => Promise<void>;
   clearContext: () => void;
 
@@ -93,6 +94,16 @@ export const useWorkspaceStore = create<SimplifiedWorkspaceStore>()(
               ...state.context,
               currentCanvasId: canvasId,
               canvasName: canvasName || `Canvas ${canvasId}`,
+            },
+          }));
+        },
+
+        clearCurrentCanvas: () => {
+          set((state) => ({
+            context: {
+              ...state.context,
+              currentCanvasId: undefined,
+              canvasName: undefined,
             },
           }));
         },
