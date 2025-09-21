@@ -33,26 +33,19 @@ const authLink = setContext(async (_, { headers }) => {
     if (response.ok) {
       const data = await response.json();
       token = data.accessToken;
-      // Apollo authLink: Access token retrieved successfully
     } else if (response.status === 401) {
       // User is not authenticated - redirect to login
-      // Apollo authLink: User not authenticated, redirecting to login
       window.location.href = '/api/auth/login';
       return { headers };
-    } else {
-      // Apollo authLink: Failed to get auth token
     }
 
     const requestHeaders = {
       ...headers,
       ...(token && { authorization: `Bearer ${token}` }),
     };
-    
-    // Apollo authLink: Request headers logged
 
     return { headers: requestHeaders };
   } catch (error) {
-    // Apollo authLink: Failed to get auth token for GraphQL request
     return { headers };
   }
 });
@@ -63,22 +56,16 @@ const authLink = setContext(async (_, { headers }) => {
 const errorLink = onError(({ graphQLErrors, networkError }) => {
   if (graphQLErrors) {
     graphQLErrors.forEach(({ message, locations, path, extensions }) => {
-      // GraphQL error logged
-      
       // Handle authentication errors
       if (extensions?.code === 'UNAUTHENTICATED') {
-        // Redirect to login or refresh token
         window.location.href = '/api/auth/login';
       }
     });
   }
 
   if (networkError) {
-    // Apollo Client Network error and details logged
-    
     // Handle specific network errors
     if ('statusCode' in networkError && networkError.statusCode === 401) {
-      // Unauthorized - redirect to login
       window.location.href = '/api/auth/login';
     }
   }
@@ -216,7 +203,6 @@ export const permissionCacheUtils = {
       const cacheData = apolloClient.cache.extract();
       return JSON.stringify(cacheData).length;
     } catch (error) {
-      // Failed to calculate cache size
       return 0;
     }
   },
@@ -266,10 +252,8 @@ export const permissionCacheUtils = {
       
       // Run garbage collection to clean up evicted entries
       cache.gc();
-      
-      // Expired permission cache entries cleared
     } catch (error) {
-      // Failed to clear expired permission cache
+      // Silently handle cache clearing errors
     }
   },
 
@@ -305,16 +289,15 @@ export const permissionCacheUtils = {
         variables: { userId, workspaceId },
         fetchPolicy: 'cache-first',
         errorPolicy: 'ignore', // Don't fail the entire warming process
-      }).catch(error => {
-        // Failed to warm cache for workspace
+      }).catch(() => {
+        // Silently handle individual warming failures
       })
     );
 
     try {
       await Promise.allSettled(warmingPromises);
-      // Permission cache warmed for workspaces
     } catch (error) {
-      // Permission cache warming failed
+      // Silently handle cache warming errors
     }
   },
 
@@ -345,9 +328,8 @@ export const permissionCacheUtils = {
       });
       
       cache.gc();
-      // All permission cache invalidated for user
     } catch (error) {
-      // Failed to invalidate user permissions
+      // Silently handle cache invalidation errors
     }
   },
 
@@ -373,9 +355,8 @@ export const permissionCacheUtils = {
       });
       
       cache.gc();
-      // Workspace permission cache invalidated for user
     } catch (error) {
-      // Failed to invalidate workspace permissions
+      // Silently handle cache invalidation errors
     }
   },
 
@@ -389,13 +370,10 @@ export const permissionCacheUtils = {
       
       // Check cache size and warn if exceeded
       if (this.isCacheSizeExceeded()) {
-        // Permission cache size exceeded limit, consider clearing cache
         // Could implement automatic cache clearing here if needed
       }
-      
-      // Permission cache maintenance completed
     } catch (error) {
-      // Permission cache maintenance failed
+      // Silently handle maintenance errors
     }
   },
 };
