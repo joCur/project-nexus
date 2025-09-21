@@ -5,7 +5,7 @@
  * real-time synchronization, optimistic updates, and server persistence.
  */
 
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   useQuery,
   useMutation,
@@ -557,24 +557,130 @@ export const useDuplicateCanvas = (): UseCanvasMutationReturn => {
  * TODO: Re-enable when backend auth issues are resolved
  */
 export const useCanvasSubscriptions = (workspaceId: EntityId | undefined) => {
+  // Error boundary state for subscription failures
+  const [subscriptionErrors, setSubscriptionErrors] = useState<{
+    canvasCreated: string | null;
+    canvasUpdated: string | null;
+    canvasDeleted: string | null;
+    defaultCanvasChanged: string | null;
+  }>({
+    canvasCreated: null,
+    canvasUpdated: null,
+    canvasDeleted: null,
+    defaultCanvasChanged: null,
+  });
+
+  // Error recovery mechanism
+  const handleSubscriptionError = useCallback((type: keyof typeof subscriptionErrors, error: any) => {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.warn(`Canvas subscription error (${type}):`, errorMessage);
+
+    // Update error state
+    setSubscriptionErrors(prev => ({
+      ...prev,
+      [type]: errorMessage
+    }));
+
+    // Optional: Report to error tracking service
+    // errorTracking.captureException(error, { context: `canvas-subscription-${type}` });
+
+    // Graceful degradation - subscription failure shouldn't break the app
+    return null;
+  }, []);
+
+  // Reset errors when workspaceId changes
+  useEffect(() => {
+    setSubscriptionErrors({
+      canvasCreated: null,
+      canvasUpdated: null,
+      canvasDeleted: null,
+      defaultCanvasChanged: null,
+    });
+  }, [workspaceId]);
   /*
+  // When re-enabling, use the error boundary for safe subscription handling:
   useSubscription(CANVAS_CREATED_SUBSCRIPTION, {
     variables: { workspaceId },
     skip: !workspaceId,
     onData: ({ data }) => {
-      if (data?.data?.canvasCreated) {
-        // Canvas created via subscription
+      try {
+        if (data?.data?.canvasCreated) {
+          // Canvas created via subscription - add to store
+          const canvas = transformBackendCanvasToFrontend(data.data.canvasCreated);
+          // TODO: Add canvas to store when re-enabling
+        }
+      } catch (error) {
+        handleSubscriptionError('canvasCreated', error);
       }
     },
     onError: (error) => {
-      // Canvas created subscription error
+      handleSubscriptionError('canvasCreated', error);
     },
   });
 
-  useSubscription(CANVAS_UPDATED_SUBSCRIPTION, { ... });
-  useSubscription(CANVAS_DELETED_SUBSCRIPTION, { ... });
-  useSubscription(DEFAULT_CANVAS_CHANGED_SUBSCRIPTION, { ... });
+  useSubscription(CANVAS_UPDATED_SUBSCRIPTION, {
+    variables: { workspaceId },
+    skip: !workspaceId,
+    onData: ({ data }) => {
+      try {
+        if (data?.data?.canvasUpdated) {
+          // Canvas updated via subscription
+          const canvas = transformBackendCanvasToFrontend(data.data.canvasUpdated);
+          // TODO: Update canvas in store when re-enabling
+        }
+      } catch (error) {
+        handleSubscriptionError('canvasUpdated', error);
+      }
+    },
+    onError: (error) => {
+      handleSubscriptionError('canvasUpdated', error);
+    },
+  });
+
+  useSubscription(CANVAS_DELETED_SUBSCRIPTION, {
+    variables: { workspaceId },
+    skip: !workspaceId,
+    onData: ({ data }) => {
+      try {
+        if (data?.data?.canvasDeleted) {
+          // Canvas deleted via subscription
+          const canvasId = data.data.canvasDeleted;
+          // TODO: Remove canvas from store when re-enabling
+        }
+      } catch (error) {
+        handleSubscriptionError('canvasDeleted', error);
+      }
+    },
+    onError: (error) => {
+      handleSubscriptionError('canvasDeleted', error);
+    },
+  });
+
+  useSubscription(DEFAULT_CANVAS_CHANGED_SUBSCRIPTION, {
+    variables: { workspaceId },
+    skip: !workspaceId,
+    onData: ({ data }) => {
+      try {
+        if (data?.data?.defaultCanvasChanged) {
+          // Default canvas changed via subscription
+          const canvasId = data.data.defaultCanvasChanged;
+          // TODO: Update default canvas in store when re-enabling
+        }
+      } catch (error) {
+        handleSubscriptionError('defaultCanvasChanged', error);
+      }
+    },
+    onError: (error) => {
+      handleSubscriptionError('defaultCanvasChanged', error);
+    },
+  });
   */
+
+  // Return subscription errors for debugging when re-enabling
+  return {
+    subscriptionErrors,
+    hasErrors: Object.values(subscriptionErrors).some(error => error !== null),
+  };
 };
 
 // Note: Canvas settings sync hooks will be added when backend supports them

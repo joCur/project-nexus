@@ -587,6 +587,14 @@ export const canvasResolvers = {
     },
 
     /**
+     * Resolve createdByUser (alias for createdBy) for Canvas type
+     */
+    createdByUser: async (canvas: Canvas, _: any, context: GraphQLContext) => {
+      const userService = context.dataSources.userService;
+      return await userService.findById(canvas.createdBy);
+    },
+
+    /**
      * Resolve card count for Canvas type
      */
     cardCount: async (canvas: Canvas, _: any, context: GraphQLContext): Promise<number> => {

@@ -5,7 +5,7 @@
  * real-time synchronization and server persistence for card operations.
  */
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   useQuery,
   useMutation,
@@ -247,19 +247,97 @@ export const useCardOperations = (workspaceId: EntityId) => {
    * Documentation: See "GraphQL Subscriptions Status" in Notion for complete details and resolution plan
    * TODO: Re-enable when backend auth issues are resolved
    */
+
+  // Error boundary state for subscription failures
+  const [cardSubscriptionErrors, setCardSubscriptionErrors] = useState<{
+    cardCreated: string | null;
+    cardUpdated: string | null;
+    cardDeleted: string | null;
+  }>({
+    cardCreated: null,
+    cardUpdated: null,
+    cardDeleted: null,
+  });
+
+  // Error recovery mechanism for card subscriptions
+  const handleCardSubscriptionError = useCallback((type: keyof typeof cardSubscriptionErrors, error: any) => {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.warn(`Card subscription error (${type}):`, errorMessage);
+
+    // Update error state
+    setCardSubscriptionErrors(prev => ({
+      ...prev,
+      [type]: errorMessage
+    }));
+
+    // Graceful degradation - subscription failure shouldn't break the app
+    return null;
+  }, []);
+
+  // Reset card subscription errors when workspaceId changes
+  useEffect(() => {
+    setCardSubscriptionErrors({
+      cardCreated: null,
+      cardUpdated: null,
+      cardDeleted: null,
+    });
+  }, [workspaceId]);
+
   /*
+  // When re-enabling, use the error boundary for safe subscription handling:
   useSubscription(CARD_CREATED_SUBSCRIPTION, {
     variables: { workspaceId },
+    skip: !workspaceId,
     onData: ({ data }) => {
-      if (data?.data?.cardCreated) {
-        const card = transformBackendCardToFrontend(data.data.cardCreated);
-        store.createCard({ ... });
+      try {
+        if (data?.data?.cardCreated) {
+          const card = transformBackendCardToFrontend(data.data.cardCreated);
+          store.createCard(card);
+        }
+      } catch (error) {
+        handleCardSubscriptionError('cardCreated', error);
       }
+    },
+    onError: (error) => {
+      handleCardSubscriptionError('cardCreated', error);
     },
   });
 
-  useSubscription(CARD_UPDATED_SUBSCRIPTION, { ... });
-  useSubscription(CARD_DELETED_SUBSCRIPTION, { ... });
+  useSubscription(CARD_UPDATED_SUBSCRIPTION, {
+    variables: { workspaceId },
+    skip: !workspaceId,
+    onData: ({ data }) => {
+      try {
+        if (data?.data?.cardUpdated) {
+          const card = transformBackendCardToFrontend(data.data.cardUpdated);
+          store.updateCard(card);
+        }
+      } catch (error) {
+        handleCardSubscriptionError('cardUpdated', error);
+      }
+    },
+    onError: (error) => {
+      handleCardSubscriptionError('cardUpdated', error);
+    },
+  });
+
+  useSubscription(CARD_DELETED_SUBSCRIPTION, {
+    variables: { workspaceId },
+    skip: !workspaceId,
+    onData: ({ data }) => {
+      try {
+        if (data?.data?.cardDeleted) {
+          const cardId = data.data.cardDeleted;
+          store.deleteCard(cardId);
+        }
+      } catch (error) {
+        handleCardSubscriptionError('cardDeleted', error);
+      }
+    },
+    onError: (error) => {
+      handleCardSubscriptionError('cardDeleted', error);
+    },
+  });
   */
 
   // ============================================================================
@@ -379,13 +457,17 @@ export const useCardOperations = (workspaceId: EntityId) => {
     createCard,
     updateCard,
     deleteCard,
-    
+
     // Sync operations
     syncCardsFromServer,
     refetchCards,
 
     // Direct store access for local operations
     store,
+
+    // Subscription error boundary (for debugging when re-enabling)
+    cardSubscriptionErrors,
+    hasCardSubscriptionErrors: Object.values(cardSubscriptionErrors).some(error => error !== null),
   };
 };
 
