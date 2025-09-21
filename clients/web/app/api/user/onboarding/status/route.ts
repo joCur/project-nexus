@@ -1,5 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getSession, getAccessToken } from '@auth0/nextjs-auth0';
+import {
+  classifyError,
+  AuthenticationError,
+  BackendError,
+  Auth0TokenError,
+  ErrorCode
+} from '@/lib/errors/api-errors';
 
 /**
  * Get user's onboarding status from backend
@@ -13,41 +20,40 @@ import { getSession, getAccessToken } from '@auth0/nextjs-auth0';
  */
 export async function GET() {
   const requestId = Math.random().toString(36).substring(2, 9);
-  const startTime = Date.now();
-  
-  console.log(`[${requestId}] Onboarding status request started`);
-  
+
   try {
-    // Check session with detailed logging
-    console.log(`[${requestId}] Checking Auth0 session...`);
+    // Check session
     const session = await getSession();
-    
+
     if (!session?.user) {
-      console.log(`[${requestId}] No session found, returning 401`);
-      return NextResponse.json(
-        { 
-          error: 'Authentication required',
-          code: 'NO_SESSION',
-          requestId 
-        },
-        { status: 401 }
+      const authError = new AuthenticationError(
+        ErrorCode.NO_SESSION,
+        'Authentication required',
+        { requestId }
+      );
+      return NextResponse.json(authError.toJSON(), { status: authError.statusCode });
+    }
+
+    // Get access token - this is required for proper authentication
+    let accessToken: string;
+    try {
+      const tokenResult = await getAccessToken();
+      if (!tokenResult.accessToken) {
+        throw new Error('No access token returned from Auth0');
+      }
+      accessToken = tokenResult.accessToken;
+    } catch (error) {
+      // Auth0 token errors are internal service failures, not authentication failures
+      throw new Auth0TokenError(
+        'Auth0 token service temporarily unavailable',
+        {
+          cause: error instanceof Error ? error : new Error('Auth0 token retrieval failed'),
+          requestId
+        }
       );
     }
 
-    console.log(`[${requestId}] Session found for user: ${session.user.sub}`);
-
-    // Get access token with graceful fallback for development
-    let accessToken: string | undefined;
-    try {
-      const tokenResult = await getAccessToken();
-      accessToken = tokenResult.accessToken;
-      console.log(`[${requestId}] Access token obtained successfully`);
-    } catch (error) {
-      console.warn(`[${requestId}] Failed to get access token, using development mode:`, error);
-    }
-
     // Call backend GraphQL API to get onboarding status
-    console.log(`[${requestId}] Calling backend GraphQL API...`);
     const graphqlQuery = `
       query GetMyOnboardingStatus {
         myOnboardingStatus {
@@ -74,12 +80,10 @@ export async function GET() {
     `;
 
     const backendUrl = process.env.API_BASE_URL || 'http://backend:3000';
-    console.log(`[${requestId}] Backend URL: ${backendUrl}/graphql`);
 
     // Create AbortController for request timeout
     const controller = new AbortController();
     const timeout = setTimeout(() => {
-      console.warn(`[${requestId}] Request timeout after 10 seconds`);
       controller.abort();
     }, 10000); // 10 second timeout
 
@@ -104,64 +108,48 @@ export async function GET() {
       clearTimeout(timeout);
     }
 
-    console.log(`[${requestId}] Backend response status: ${backendResponse.status}`);
-
     if (!backendResponse.ok) {
       const errorText = await backendResponse.text().catch(() => 'Unknown error');
-      console.error(`[${requestId}] Backend API error:`, {
-        status: backendResponse.status,
-        statusText: backendResponse.statusText,
-        body: errorText,
-      });
 
-      // Return specific error codes instead of defaulting to incomplete
       if (backendResponse.status === 404) {
-        return NextResponse.json(
-          { 
-            error: 'User not found in backend system',
-            code: 'USER_NOT_FOUND',
-            requestId 
-          },
-          { status: 404 }
+        const backendError = new BackendError(
+          ErrorCode.USER_NOT_FOUND,
+          'User not found in backend system',
+          404,
+          { requestId }
         );
+        return NextResponse.json(backendError.toJSON(), { status: backendError.statusCode });
       }
 
       if (backendResponse.status >= 500) {
-        return NextResponse.json(
-          { 
-            error: 'Backend service temporarily unavailable',
-            code: 'BACKEND_ERROR',
-            requestId,
-            retryAfter: 30 // suggest retry after 30 seconds
-          },
-          { status: 503 }
+        const backendError = new BackendError(
+          ErrorCode.BACKEND_ERROR,
+          'Backend service temporarily unavailable',
+          503,
+          { requestId, retryAfter: 30 }
         );
+        return NextResponse.json(backendError.toJSON(), { status: backendError.statusCode });
       }
 
       throw new Error(`Backend API error: ${backendResponse.status} - ${errorText}`);
     }
 
     const result = await backendResponse.json();
-    console.log(`[${requestId}] GraphQL response received`);
 
     if (result.errors) {
-      console.error(`[${requestId}] GraphQL errors:`, result.errors);
-      
       // Check for specific GraphQL error types
-      const hasAuthError = result.errors.some((error: { extensions?: { code?: string }; message?: string }) => 
+      const hasAuthError = result.errors.some((error: { extensions?: { code?: string }; message?: string }) =>
         error.extensions?.code === 'UNAUTHENTICATED' ||
         error.message?.includes('Authentication')
       );
 
       if (hasAuthError) {
-        return NextResponse.json(
-          { 
-            error: 'Authentication failed with backend',
-            code: 'BACKEND_AUTH_ERROR',
-            requestId 
-          },
-          { status: 401 }
+        const authError = new AuthenticationError(
+          ErrorCode.BACKEND_AUTH_ERROR,
+          'Authentication failed with backend',
+          { requestId }
         );
+        return NextResponse.json(authError.toJSON(), { status: authError.statusCode });
       }
 
       throw new Error(`GraphQL query failed: ${result.errors[0]?.message || 'Unknown GraphQL error'}`);
@@ -169,7 +157,6 @@ export async function GET() {
 
     const status = result.data?.myOnboardingStatus;
     if (!status) {
-      console.error(`[${requestId}] No onboarding status data in response`);
       throw new Error('Invalid response format: missing onboarding status data');
     }
 
@@ -186,45 +173,8 @@ export async function GET() {
     return NextResponse.json(responseData);
 
   } catch (error) {
-    // Handle specific error types
-    if (error instanceof Error) {
-      // Timeout errors
-      if (error.name === 'AbortError') {
-        return NextResponse.json(
-          { 
-            error: 'Request timeout - backend service is slow to respond',
-            code: 'REQUEST_TIMEOUT',
-            requestId,
-            retryAfter: 10
-          },
-          { status: 408 }
-        );
-      }
-
-      // Network errors (connection refused, etc.)
-      if (error.message.includes('fetch failed') || error.message.includes('ECONNREFUSED')) {
-        return NextResponse.json(
-          { 
-            error: 'Cannot connect to backend service',
-            code: 'BACKEND_UNREACHABLE',
-            requestId,
-            retryAfter: 30
-          },
-          { status: 503 }
-        );
-      }
-    }
-    
-    // For any other unexpected errors, return 500 but don't default to "incomplete" status
-    // The client hook will preserve existing cached status on 500 errors
-    return NextResponse.json(
-      { 
-        error: 'Internal server error occurred while fetching onboarding status',
-        code: 'INTERNAL_ERROR',
-        requestId,
-        message: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    );
+    // Use the error classification system to handle errors properly
+    const apiError = classifyError(error, requestId);
+    return NextResponse.json(apiError.toJSON(), { status: apiError.statusCode });
   }
 }

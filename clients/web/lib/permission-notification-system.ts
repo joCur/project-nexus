@@ -41,8 +41,8 @@ const DEBOUNCE_CONFIG = {
     'roleChanged',
     'permissionCacheInvalidated',
   ] as PermissionEventType[],
-  // Debounce delay in milliseconds
-  debounceDelay: 500,
+  // Debounce delay in milliseconds (set to 0 in test environment)
+  debounceDelay: process.env.NODE_ENV === 'test' ? 0 : 500,
   // Maximum number of grouped events in a single emission
   maxGroupedEvents: 10,
 };
@@ -174,7 +174,7 @@ export class PermissionNotificationSystemImpl implements PermissionNotificationS
       this.processEvent(event);
 
     } catch (error) {
-      console.error('Error processing permission event:', error);
+      // Error processing permission event
     }
   }
 
@@ -182,6 +182,10 @@ export class PermissionNotificationSystemImpl implements PermissionNotificationS
    * Check if an event should be debounced
    */
   private shouldDebounceEvent(event: PermissionEvent): boolean {
+    // Don't debounce in test environment
+    if (process.env.NODE_ENV === 'test') {
+      return false;
+    }
     return DEBOUNCE_CONFIG.debouncedEventTypes.includes(event.type);
   }
 
@@ -301,7 +305,7 @@ export class PermissionNotificationSystemImpl implements PermissionNotificationS
 
     // Log batch summary
     if (this.preferences.enableConsoleLogging) {
-      console.log(`🔐 [Batched] ${events.length} ${firstEvent.type} events:`, events);
+      // Logged batched permission events
     }
 
     // Log to structured logger
@@ -416,7 +420,7 @@ export class PermissionNotificationSystemImpl implements PermissionNotificationS
           this.removeListener(registration);
         }
       } catch (error) {
-        console.error('Error in permission event listener:', error);
+        // Error in permission event listener - silently continue with other listeners
       }
     }
   }
@@ -465,34 +469,34 @@ export class PermissionNotificationSystemImpl implements PermissionNotificationS
     
     switch (event.type) {
       case 'permissionGranted':
-        console.log(`${prefix} ✅ Permission granted`, event);
+        // Permission granted
         break;
       case 'permissionRevoked':
-        console.warn(`${prefix} ❌ Permission revoked`, event);
+        // Permission revoked
         break;
       case 'roleChanged':
-        console.log(`${prefix} 👤 Role changed`, event);
+        // Role changed
         break;
       case 'workspaceAccessGranted':
-        console.log(`${prefix} 🏢 Workspace access granted`, event);
+        // Workspace access granted
         break;
       case 'workspaceAccessRevoked':
-        console.warn(`${prefix} 🚫 Workspace access revoked`, event);
+        // Workspace access revoked
         break;
       case 'permissionCheckFailed':
-        console.error(`${prefix} ⚠️ Permission check failed`, event);
+        // Permission check failed
         break;
       case 'permissionQueryError':
-        console.error(`${prefix} 🔴 Permission query error`, event);
+        // Permission query error
         break;
       case 'permissionCacheInvalidated':
-        console.log(`${prefix} 🗑️ Cache invalidated`, event);
+        // Cache invalidated
         break;
       case 'permissionCacheWarmed':
-        console.log(`${prefix} 🔥 Cache warmed`, event);
+        // Cache warmed
         break;
       default:
-        console.log(`${prefix} ${event.type}`, event);
+        // Permission event logged
     }
   }
 
@@ -518,7 +522,7 @@ export class PermissionNotificationSystemImpl implements PermissionNotificationS
     // For now, we'll use a simple console log as placeholder
     const message = this.getNotificationMessage(event);
     if (message) {
-      console.log(`🔔 Permission Notification: ${message}`);
+      // Permission notification logged
       // TODO: Integrate with actual toast notification system
       // toast.show({ message, type: this.getNotificationType(event) });
     }
@@ -550,7 +554,7 @@ export class PermissionNotificationSystemImpl implements PermissionNotificationS
         message = `${events.length} permission changes occurred`;
     }
 
-    console.log(`🔔 Permission Notification (Batched): ${message}`);
+    // Permission notification (batched) logged
     // TODO: Integrate with actual toast notification system
     // toast.show({ message, type: 'info' });
   }

@@ -1,10 +1,11 @@
 'use client';
 
 import { useParams, useRouter, notFound } from 'next/navigation';
-import { useWorkspaceStore, workspaceSelectors } from '@/stores/workspaceStore';
-import { useEffect, useState } from 'react';
+import { useWorkspaceStore } from '@/stores/workspaceStore';
+import { useEffect, useState, useRef } from 'react';
 import { InfiniteCanvas } from '@/components/canvas/InfiniteCanvas';
 import { useOnboardingStatus } from '@/hooks/use-onboarding-status';
+import { useCanvases, useCanvas } from '@/hooks/use-canvas';
 import { createCanvasId } from '@/types/workspace.types';
 
 /**
@@ -18,19 +19,18 @@ export default function CanvasPage() {
   const canvasId = createCanvasId(params.canvasId as string);
   
   const [isCanvasReady, setIsCanvasReady] = useState(false);
-  
-  const {
-    setCurrentWorkspace,
-    setCurrentCanvas,
-    loadWorkspaceCanvases,
-    switchCanvas,
-    getCanvas,
-    isInitialized,
-  } = useWorkspaceStore();
-  
-  const context = useWorkspaceStore((state) => state.context);
-  const isLoading = useWorkspaceStore(workspaceSelectors.isLoading);
+
+  const workspaceStore = useWorkspaceStore();
+  const storeRef = useRef(workspaceStore);
+  storeRef.current = workspaceStore;
+  const context = workspaceStore.context;
+
+  // Use Apollo hooks for canvas data
+  const { canvases, loading: canvasesLoading } = useCanvases(workspaceId);
+  const { canvas: currentCanvas, loading: currentCanvasLoading } = useCanvas(canvasId);
   const { status: onboardingStatus, isLoading: onboardingLoading } = useOnboardingStatus();
+
+  const isLoading = canvasesLoading || currentCanvasLoading;
 
   // Check onboarding status and redirect if needed
   useEffect(() => {
@@ -42,37 +42,28 @@ export default function CanvasPage() {
   // Set workspace context if needed
   useEffect(() => {
     if (workspaceId && context.currentWorkspaceId !== workspaceId) {
-      setCurrentWorkspace(workspaceId, `Workspace ${workspaceId}`);
+      storeRef.current?.setCurrentWorkspace?.(workspaceId, `Workspace ${workspaceId}`);
     }
-  }, [workspaceId, context.currentWorkspaceId, setCurrentWorkspace]);
+  }, [workspaceId, context.currentWorkspaceId]); // Using ref to avoid infinite re-renders
 
-  // Load workspace canvases if not initialized
-  useEffect(() => {
-    if (workspaceId && !isInitialized && !isLoading) {
-      loadWorkspaceCanvases(workspaceId);
-    }
-  }, [workspaceId, isInitialized, isLoading, loadWorkspaceCanvases]);
+  // Canvas data is automatically loaded by Apollo hooks
+  // No need to manually load canvases anymore
 
   // Set current canvas and validate it exists
   useEffect(() => {
-    if (canvasId && isInitialized) {
-      const canvas = getCanvas(canvasId);
-      
-      if (!canvas) {
-        // Canvas doesn't exist - redirect to workspace root
-        router.replace(`/workspace/${workspaceId}` as any);
-        return;
-      }
-      
+    if (canvasId && !isLoading && currentCanvas) {
       // Set current canvas if different
       if (context.currentCanvasId !== canvasId) {
-        setCurrentCanvas(canvasId, canvas.name);
-        switchCanvas(canvasId);
+        storeRef.current?.setCurrentCanvas?.(canvasId, currentCanvas.name);
       }
-      
+
       setIsCanvasReady(true);
+    } else if (canvasId && !isLoading && !currentCanvas && canvases.length > 0) {
+      // Canvas doesn't exist - redirect to workspace root
+      router.replace(`/workspace/${workspaceId}`);
+      return;
     }
-  }, [canvasId, isInitialized, context.currentCanvasId, getCanvas, setCurrentCanvas, switchCanvas, router, workspaceId]);
+  }, [canvasId, isLoading, currentCanvas, canvases.length, context.currentCanvasId, router, workspaceId]); // Using ref to avoid infinite re-renders
 
   // Show loading while checking onboarding status
   if (onboardingLoading) {
@@ -89,7 +80,7 @@ export default function CanvasPage() {
   }
 
   // Show loading while workspace/canvas data is loading
-  if (!isInitialized || isLoading || !isCanvasReady) {
+  if (isLoading || !isCanvasReady) {
     return (
       <div className="flex-1 flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -100,7 +91,6 @@ export default function CanvasPage() {
     );
   }
 
-  const currentCanvas = getCanvas(canvasId);
   if (!currentCanvas) {
     notFound();
   }

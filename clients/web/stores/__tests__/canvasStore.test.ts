@@ -20,7 +20,7 @@ describe('Canvas Store', () => {
       const { result } = renderHook(() => useCanvasStore());
       
       expect(result.current.viewport).toEqual({
-        position: { x: 0, y: 0 },
+        position: { x: 0, y: 0, z: 0 },
         zoom: 1.0,
         bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
         isDirty: false,
@@ -312,7 +312,7 @@ describe('Canvas Store', () => {
 
       // Verify reset to defaults
       expect(result.current.viewport.zoom).toBe(1.0);
-      expect(result.current.viewport.position).toEqual({ x: 0, y: 0 });
+      expect(result.current.viewport.position).toEqual({ x: 0, y: 0, z: 0 });
       expect(result.current.config.grid.enabled).toBe(true);
       expect(result.current.interaction.mode).toBe('select');
       expect(result.current.interaction.selection.selectedIds).toEqual(new Set());

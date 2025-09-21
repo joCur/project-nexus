@@ -408,7 +408,8 @@ export const canvasResolvers = {
         const canvasService = new CanvasService();
         const updatedCanvas = await canvasService.setDefaultCanvas(id, context.user!.id);
 
-        // Publish real-time event
+        // Always publish real-time event, even if canvas was already default
+        // This ensures frontend state stays synchronized
         await pubSub.publish(CANVAS_EVENTS.CANVAS_UPDATED, {
           canvasUpdated: updatedCanvas,
           workspaceId: updatedCanvas.workspaceId,
@@ -418,16 +419,30 @@ export const canvasResolvers = {
           canvasId: id,
           workspaceId: updatedCanvas.workspaceId,
           userId: context.user!.id,
+          isDefault: updatedCanvas.isDefault,
         });
 
         return updatedCanvas;
 
       } catch (error) {
+        // Enhanced error logging for debugging canvas default issues
         logger.error('Failed to set default canvas via GraphQL', {
           canvasId: id,
           userId: context.user!.id,
           error: error instanceof Error ? error.message : 'Unknown error',
+          errorType: error?.constructor?.name,
+          errorStack: error instanceof Error ? error.stack : undefined,
         });
+
+        // Re-throw specific errors as appropriate GraphQL errors
+        if (error instanceof NotFoundError) {
+          throw error;
+        }
+
+        if (error instanceof ValidationError) {
+          throw error;
+        }
+
         throw error;
       }
     },
@@ -564,7 +579,15 @@ export const canvasResolvers = {
     },
 
     /**
-     * Resolve creator (createdBy) for Canvas type
+     * Resolve owner (createdBy) for Canvas type
+     */
+    owner: async (canvas: Canvas, _: any, context: GraphQLContext) => {
+      const userService = context.dataSources.userService;
+      return await userService.findById(canvas.createdBy);
+    },
+
+    /**
+     * Resolve createdByUser (alias for createdBy) for Canvas type
      */
     createdByUser: async (canvas: Canvas, _: any, context: GraphQLContext) => {
       const userService = context.dataSources.userService;

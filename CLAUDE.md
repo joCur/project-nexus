@@ -173,10 +173,69 @@ gh pr merge 19 --squash --delete-branch
 - **Linear Workflow**: Always update ticket state and properties throughout development process
 - **Agent Usage**: Try to always use the correct sub agent, when working on a process e.g. using the senior backend agent when working on the backend
 - never implement development versions of features that mock the real implementation, unless otherwise stated.
+- **Documentation**: All documentation is now stored in Notion. Create new documentation in Notion and link to specific documentation in code comments when relevant.
 
-## Documentation References
+## Documentation in Notion
 
-- [Elevator Pitch](./README.md)
-- [Design Guidelines](./docs/design-documentation/)
-- [Product Manager Documentation](./docs/project-documentation/product-manager-output.md)
-- [Technical Architecture](./docs/project-documentation/technical-architecture.md)
+**All project documentation has been migrated to Notion and should be accessed via the Notion MCP server.**
+
+### Using Notion MCP for Documentation Lookup
+
+When you need to find or reference documentation:
+
+```typescript
+// Use notion-search to find relevant documentation
+mcp__notion__notion-search with query: "canvas default fix"
+mcp__notion__notion-search with query: "apollo testing guide"
+mcp__notion__notion-search with query: "design system buttons"
+
+// Use notion-fetch to get full content of specific documents
+mcp__notion__notion-fetch with id: "[page-id-from-search]"
+```
+
+### Linking Code to Documentation
+
+**IMPORTANT**: When working with code that has related documentation, include Notion links or page names in comments:
+
+```typescript
+// Related documentation: "GraphQL Subscriptions Status" in Notion
+// This feature is currently disabled - see Notion doc for re-enabling steps
+const subscriptionsDisabled = true;
+
+// Canvas default setting implementation
+// See: "Canvas Default Fix Documentation" in Notion for transaction safety details
+function setCanvasDefault(canvasId: string) {
+  // implementation
+}
+
+// Button component implementation
+// Design specs: "Button Components" in Notion Design System
+export const Button = ({ variant, size, ...props }) => {
+  // implementation
+}
+```
+
+### Documentation Structure in Notion
+
+**Main Documentation Sections:**
+- **Project Nexus** (Main page) - Project overview and elevator pitch
+- **📋 Technical Documentation** - Development guides, fixes, and technical specs
+- **🎨 Design Documentation** - Complete design system, features, and guidelines
+- **📊 Project Documentation** - Product requirements and technical architecture
+
+### Key Documentation Pages in Notion
+
+- **Project Overview**: "Project Nexus" main page
+- **Technical Guides**:
+  - "Apollo GraphQL Testing Guide"
+  - "Canvas Default Fix Documentation"
+  - "GraphQL Subscriptions Status"
+- **Design System**:
+  - "Complete Style Guide"
+  - "Button Components"
+  - "Knowledge Card Components"
+  - "Color System"
+  - "Typography System"
+- **Product Specifications**:
+  - "Product Manager Output"
+  - "Technical Architecture"

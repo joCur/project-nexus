@@ -5,12 +5,13 @@
  * real-time synchronization, optimistic updates, and server persistence.
  */
 
-import { useCallback, useEffect, useMemo } from 'react';
-import { 
-  useQuery, 
-  useMutation, 
-  useSubscription,
-  useApolloClient 
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useQuery,
+  useMutation,
+  // useSubscription, // 🚨 TODO: Uncomment when subscriptions are re-enabled - See "GraphQL Subscriptions Status" in Notion
+  useApolloClient,
+  gql
 } from '@apollo/client';
 import {
   GET_WORKSPACE_CANVASES,
@@ -49,6 +50,7 @@ import type {
 import { createCanvasId } from '@/types/workspace.types';
 import type { EntityId } from '@/types/common.types';
 import type { CanvasPosition } from '@/types/canvas.types';
+import { DEFAULT_CANVAS_SETTINGS } from '@/lib/canvas-defaults';
 
 /**
  * Transform backend GraphQL response to frontend Canvas type
@@ -62,19 +64,7 @@ const transformBackendCanvasToFrontend = (backendCanvas: CanvasResponse): Canvas
     description: backendCanvas.description,
     settings: {
       isDefault: backendCanvas.isDefault,
-      position: { x: 0, y: 0, z: 0 }, // Default position since backend doesn't store viewport
-      zoom: 1.0, // Default zoom
-      grid: {
-        enabled: true,
-        size: 20,
-        color: '#e5e7eb',
-        opacity: 0.3,
-      },
-      background: {
-        type: 'COLOR' as const,
-        color: '#ffffff',
-        opacity: 1.0,
-      },
+      ...DEFAULT_CANVAS_SETTINGS,
     },
     status: 'active', // Default from backend
     priority: 'normal', // Default from backend
@@ -107,6 +97,8 @@ export const useCanvases = (
   filter?: CanvasFilter
 ): UseCanvasesReturn => {
   const workspaceStore = useWorkspaceStore();
+  const storeRef = useRef(workspaceStore);
+  storeRef.current = workspaceStore;
 
   // Build GraphQL variables
   const variables: WorkspaceCanvasesQueryVariables | undefined = workspaceId ? {
@@ -128,27 +120,46 @@ export const useCanvases = (
   } = useQuery<{ workspaceCanvases: CanvasesConnectionResponse }>(GET_WORKSPACE_CANVASES, {
     variables,
     skip: !workspaceId,
-    fetchPolicy: 'cache-and-network',
-    onCompleted: (data) => {
-      // Sync to workspace store
-      if (data.workspaceCanvases?.items) {
-        data.workspaceCanvases.items.forEach(canvasResponse => {
-          const canvas = transformBackendCanvasToFrontend(canvasResponse);
-          const existingCanvas = workspaceStore.getCanvas(canvas.id);
-          
-          if (!existingCanvas || existingCanvas.version < canvas.version) {
-            workspaceStore.canvasManagement.canvases.set(canvas.id, canvas);
-          }
-        });
-      }
+    fetchPolicy: 'cache-and-network', // Always check server for updates
+    onCompleted: () => {
+      // Update UI loading state
+      storeRef.current?.setCanvasLoading?.('fetchingCanvases', false);
+    },
+    onError: (error) => {
+      storeRef.current?.setError?.('fetch', error.message);
+      storeRef.current?.setCanvasLoading?.('fetchingCanvases', false);
     },
   });
 
+  // Set loading state when query starts
+  useEffect(() => {
+    if (loading) {
+      storeRef.current?.setCanvasLoading?.('fetchingCanvases', true);
+    }
+  }, [loading]); // Using ref to avoid infinite re-renders
+
+  // Auto-refetch on window focus for fresh data
+  useEffect(() => {
+    const handleFocus = () => {
+      if (workspaceId && !loading) {
+        apolloRefetch().catch(() => {});
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [workspaceId, loading]); // Remove apolloRefetch from deps - it's captured in closure
+
   const refetch = useCallback(async () => {
     if (workspaceId) {
-      await apolloRefetch();
+      storeRef.current?.setCanvasLoading?.('fetchingCanvases', true);
+      try {
+        await apolloRefetch();
+      } catch (error) {
+        storeRef.current?.setError?.('fetch', error instanceof Error ? error.message : 'Failed to refetch canvases');
+      }
     }
-  }, [apolloRefetch, workspaceId]);
+  }, [apolloRefetch, workspaceId]); // Using ref to avoid infinite re-renders
 
   const loadMore = useCallback(async () => {
     if (data?.workspaceCanvases?.hasNextPage && fetchMore) {
@@ -164,12 +175,10 @@ export const useCanvases = (
     }
   }, [data, fetchMore, variables]);
 
+  // Transform data directly from Apollo cache - no store duplication
   const canvases = useMemo(() => {
-    // Prefer store data for real-time updates
-    return workspaceStore.canvasManagement.canvases.size > 0
-      ? Array.from(workspaceStore.canvasManagement.canvases.values())
-      : (data?.workspaceCanvases?.items || []).map(transformBackendCanvasToFrontend);
-  }, [workspaceStore.canvasManagement.canvases, data]);
+    return (data?.workspaceCanvases?.items || []).map(transformBackendCanvasToFrontend);
+  }, [data]);
 
   return {
     canvases,
@@ -185,29 +194,15 @@ export const useCanvases = (
  * Hook for fetching a single canvas
  */
 export const useCanvas = (canvasId: CanvasId | undefined): UseCanvasReturn => {
-  const workspaceStore = useWorkspaceStore();
-
   const { data, loading, error, refetch } = useQuery<{ canvas: CanvasResponse }>(GET_CANVAS, {
     variables: { id: canvasId },
     skip: !canvasId,
     fetchPolicy: 'cache-and-network',
-    onCompleted: (data) => {
-      if (data.canvas) {
-        const canvas = transformBackendCanvasToFrontend(data.canvas);
-        workspaceStore.canvasManagement.canvases.set(canvas.id, canvas);
-      }
-    },
   });
 
   const canvas = useMemo(() => {
-    if (!canvasId) return undefined;
-    
-    // Prefer store data for real-time updates
-    const storeCanvas = workspaceStore.getCanvas(canvasId);
-    if (storeCanvas) return storeCanvas;
-    
     return data?.canvas ? transformBackendCanvasToFrontend(data.canvas) : undefined;
-  }, [canvasId, workspaceStore, data]);
+  }, [data]);
 
   return {
     canvas,
@@ -224,35 +219,74 @@ export const useCanvas = (canvasId: CanvasId | undefined): UseCanvasReturn => {
  */
 export const useCreateCanvas = (): UseCanvasMutationReturn => {
   const workspaceStore = useWorkspaceStore();
+  const storeRef = useRef(workspaceStore);
+  storeRef.current = workspaceStore;
   const [createCanvasMutation, { loading, error, reset }] = useMutation(CREATE_CANVAS);
+
+  // Update UI loading state
+  useEffect(() => {
+    storeRef.current?.setCanvasLoading?.('creatingCanvas', loading);
+  }, [loading]); // Using ref to avoid infinite re-renders
 
   const mutate = useCallback(async (params: CreateCanvasParams): Promise<CanvasId | null> => {
     try {
-      // Optimistic update
-      const optimisticCanvasId = await workspaceStore.createCanvas(params);
-      
-      // Server mutation
+      storeRef.current?.clearErrors?.();
+
+      // Server mutation with proper cache update
       const input = transformCreateParamsToBackend(params);
-      const { data } = await createCanvasMutation({ variables: { input } });
+      const { data } = await createCanvasMutation({
+        variables: { input },
+        update: (cache, { data }) => {
+          if (data?.createCanvas) {
+            try {
+              // Read current workspace canvases cache
+              const existingData = cache.readQuery<{ workspaceCanvases: CanvasesConnectionResponse }>({
+                query: GET_WORKSPACE_CANVASES,
+                variables: { workspaceId: params.workspaceId },
+              });
+
+              if (existingData?.workspaceCanvases?.items) {
+                // Check if canvas already exists in cache (prevent duplicate)
+                const canvasExists = existingData.workspaceCanvases.items.some(
+                  canvas => canvas.id === data.createCanvas.id
+                );
+
+                if (!canvasExists) {
+                  // Add new canvas to cache
+                  const updatedItems = [...existingData.workspaceCanvases.items, data.createCanvas];
+
+                  cache.writeQuery({
+                    query: GET_WORKSPACE_CANVASES,
+                    variables: { workspaceId: params.workspaceId },
+                    data: {
+                      workspaceCanvases: {
+                        ...existingData.workspaceCanvases,
+                        items: updatedItems,
+                        totalCount: existingData.workspaceCanvases.totalCount + 1,
+                      },
+                    },
+                  });
+                }
+              }
+            } catch (cacheError) {
+              // Cache update failed silently
+            }
+          }
+        }
+      });
 
       if (data?.createCanvas) {
-        const serverCanvas = transformBackendCanvasToFrontend(data.createCanvas);
-        
-        // Replace optimistic canvas with server version
-        if (optimisticCanvasId) {
-          workspaceStore.canvasManagement.canvases.delete(optimisticCanvasId);
-        }
-        workspaceStore.canvasManagement.canvases.set(serverCanvas.id, serverCanvas);
-        
-        return serverCanvas.id;
+        // Canvas created successfully
+        return createCanvasId(data.createCanvas.id);
       }
 
-      return optimisticCanvasId;
+      return null;
     } catch (err) {
-      console.error('Failed to create canvas:', err);
+      // Canvas creation failed
+      storeRef.current?.setError?.('mutation', `Failed to create canvas: ${err instanceof Error ? err.message : String(err)}`);
       return null;
     }
-  }, [workspaceStore, createCanvasMutation]);
+  }, [createCanvasMutation]); // Using ref to avoid infinite re-renders
 
   return {
     mutate,
@@ -267,34 +301,39 @@ export const useCreateCanvas = (): UseCanvasMutationReturn => {
  */
 export const useUpdateCanvas = (): UseCanvasMutationReturn => {
   const workspaceStore = useWorkspaceStore();
+  const storeRef = useRef(workspaceStore);
+  storeRef.current = workspaceStore;
   const [updateCanvasMutation, { loading, error, reset }] = useMutation(UPDATE_CANVAS);
+
+  // Update UI loading state
+  useEffect(() => {
+    storeRef.current?.setCanvasLoading?.('updatingCanvas', loading);
+  }, [loading]); // Using ref to avoid infinite re-renders
 
   const mutate = useCallback(async (params: UpdateCanvasParams): Promise<boolean> => {
     try {
-      // Optimistic update
-      await workspaceStore.updateCanvas(params);
+      storeRef.current?.clearErrors?.();
 
-      // Server mutation
-      const { data } = await updateCanvasMutation({ 
-        variables: { 
-          id: params.id, 
+      // Server mutation - Apollo cache will handle updates
+      const { data } = await updateCanvasMutation({
+        variables: {
+          id: params.id,
           input: params.updates,
-        } 
+        }
       });
 
       if (data?.updateCanvas) {
-        const serverCanvas = transformBackendCanvasToFrontend(data.updateCanvas);
-        workspaceStore.canvasManagement.canvases.set(serverCanvas.id, serverCanvas);
+        // Canvas updated successfully
         return true;
       }
 
       return false;
     } catch (err) {
-      console.error('Failed to update canvas:', err);
-      // TODO: Revert optimistic update
+      // Canvas update failed
+      storeRef.current?.setError?.('mutation', `Failed to update canvas: ${err instanceof Error ? err.message : String(err)}`);
       return false;
     }
-  }, [workspaceStore, updateCanvasMutation]);
+  }, [updateCanvasMutation]); // Using ref to avoid infinite re-renders
 
   return {
     mutate,
@@ -309,34 +348,46 @@ export const useUpdateCanvas = (): UseCanvasMutationReturn => {
  */
 export const useDeleteCanvas = (): UseCanvasMutationReturn => {
   const workspaceStore = useWorkspaceStore();
+  const storeRef = useRef(workspaceStore);
+  storeRef.current = workspaceStore;
   const [deleteCanvasMutation, { loading, error, reset }] = useMutation(DELETE_CANVAS);
+
+  // Update UI loading state
+  useEffect(() => {
+    storeRef.current?.setCanvasLoading?.('deletingCanvas', loading);
+  }, [loading]); // Using ref to avoid infinite re-renders
 
   const mutate = useCallback(async (canvasId: CanvasId): Promise<boolean> => {
     try {
-      // Store current canvas for potential rollback
-      const canvasToDelete = workspaceStore.getCanvas(canvasId);
-      
-      // Optimistic delete
-      await workspaceStore.deleteCanvas(canvasId);
+      storeRef.current?.clearErrors?.();
 
-      // Server mutation
-      const { data } = await deleteCanvasMutation({ variables: { id: canvasId } });
+      // Clear current canvas if we're deleting it
+      if (storeRef.current?.context?.currentCanvasId === canvasId) {
+        storeRef.current?.clearCurrentCanvas?.();
+      }
+
+      // Server mutation - Apollo cache will handle removal
+      const { data } = await deleteCanvasMutation({
+        variables: { id: canvasId },
+        update: (cache) => {
+          // Evict the deleted canvas from cache
+          cache.evict({ id: cache.identify({ __typename: 'Canvas', id: canvasId }) });
+          cache.gc();
+        }
+      });
 
       if (data?.deleteCanvas) {
+        // Canvas deleted successfully
         return true;
-      } else {
-        // Rollback on failure
-        if (canvasToDelete) {
-          workspaceStore.canvasManagement.canvases.set(canvasId, canvasToDelete);
-        }
-        return false;
       }
+
+      return false;
     } catch (err) {
-      console.error('Failed to delete canvas:', err);
-      // TODO: Revert optimistic delete
+      // Canvas deletion failed
+      storeRef.current?.setError?.('mutation', `Failed to delete canvas: ${err instanceof Error ? err.message : String(err)}`);
       return false;
     }
-  }, [workspaceStore, deleteCanvasMutation]);
+  }, [deleteCanvasMutation]); // Using ref to avoid infinite re-renders
 
   return {
     mutate,
@@ -351,78 +402,89 @@ export const useDeleteCanvas = (): UseCanvasMutationReturn => {
  */
 export const useSetDefaultCanvas = (): UseCanvasMutationReturn => {
   const workspaceStore = useWorkspaceStore();
-  const apolloClient = useApolloClient();
+  const storeRef = useRef(workspaceStore);
+  storeRef.current = workspaceStore;
   const [setDefaultCanvasMutation, { loading, error, reset }] = useMutation(SET_DEFAULT_CANVAS);
+
+  // Update UI loading state
+  useEffect(() => {
+    storeRef.current?.setCanvasLoading?.('settingDefault', loading);
+  }, [loading]); // Using ref to avoid infinite re-renders
 
   const mutate = useCallback(async (workspaceId: EntityId, canvasId: CanvasId): Promise<boolean> => {
     try {
-      // Optimistic update
-      await workspaceStore.setDefaultCanvas(workspaceId, canvasId);
+      storeRef.current?.clearErrors?.();
 
-      // Server mutation
-      const { data } = await setDefaultCanvasMutation({ 
+      // Server mutation with Apollo cache update
+      const { data } = await setDefaultCanvasMutation({
         variables: { id: canvasId },
         update: (cache, { data }) => {
           if (data?.setDefaultCanvas) {
-            // Update the Apollo cache to handle multiple canvases being default
-            const cacheData = cache.readQuery<{ workspaceCanvases: CanvasesConnectionResponse }>({
-              query: GET_WORKSPACE_CANVASES,
-              variables: { workspaceId },
-            });
+            try {
+              // Read workspace canvases cache
+              let cacheData: { workspaceCanvases: CanvasesConnectionResponse } | null = null;
+              try {
+                cacheData = cache.readQuery<{ workspaceCanvases: CanvasesConnectionResponse }>({
+                  query: GET_WORKSPACE_CANVASES,
+                  variables: { workspaceId },
+                });
+              } catch (error) {
+                // Workspace canvases query not in cache, skipping cache update
+              }
 
-            if (cacheData?.workspaceCanvases?.items) {
-              // Update all canvases: set new default to true, others to false
-              const updatedItems = cacheData.workspaceCanvases.items.map(canvas => {
-                if (canvas.id === canvasId) {
-                  // This is the new default canvas
-                  return { ...canvas, isDefault: true };
-                } else if (canvas.isDefault) {
-                  // This was previously default, set to false
-                  return { ...canvas, isDefault: false };
-                }
-                return canvas;
-              });
+              if (cacheData?.workspaceCanvases?.items) {
+                // Update all canvases: set new default to true, others to false
+                const updatedItems = cacheData.workspaceCanvases.items.map(canvas => ({
+                  ...canvas,
+                  isDefault: canvas.id === canvasId,
+                }));
 
-              // Write the updated data back to cache
-              cache.writeQuery({
-                query: GET_WORKSPACE_CANVASES,
-                variables: { workspaceId },
-                data: {
-                  workspaceCanvases: {
-                    ...cacheData.workspaceCanvases,
-                    items: updatedItems,
+                cache.writeQuery({
+                  query: GET_WORKSPACE_CANVASES,
+                  variables: { workspaceId },
+                  data: {
+                    workspaceCanvases: {
+                      ...cacheData.workspaceCanvases,
+                      items: updatedItems,
+                    },
                   },
+                });
+              }
+
+              // Update individual canvas cache entries
+              const serverCanvas = data.setDefaultCanvas;
+              cache.writeFragment({
+                id: cache.identify({ __typename: 'Canvas', id: serverCanvas.id }),
+                fragment: gql`
+                  fragment UpdatedCanvasDefault on Canvas {
+                    isDefault
+                    updatedAt
+                  }
+                `,
+                data: {
+                  isDefault: true,
+                  updatedAt: serverCanvas.updatedAt,
                 },
               });
+            } catch (cacheError) {
+              // Failed to update Apollo cache for default canvas
             }
           }
         }
       });
 
       if (data?.setDefaultCanvas) {
-        const updatedCanvas = transformBackendCanvasToFrontend(data.setDefaultCanvas);
-        
-        // Update workspace store - set new default and clear old ones
-        workspaceStore.canvasManagement.canvases.forEach((canvas, id) => {
-          if (id === canvasId) {
-            // Set this as the new default
-            workspaceStore.canvasManagement.canvases.set(id, { ...canvas, settings: { ...canvas.settings, isDefault: true } });
-          } else if (canvas.settings.isDefault) {
-            // Remove default from other canvases
-            workspaceStore.canvasManagement.canvases.set(id, { ...canvas, settings: { ...canvas.settings, isDefault: false } });
-          }
-        });
-        
+        // Default canvas set successfully
         return true;
       }
 
       return false;
     } catch (err) {
-      console.error('Failed to set default canvas:', err);
-      // TODO: Revert optimistic update
+      // Failed to set default canvas
+      storeRef.current?.setError?.('mutation', `Failed to set default canvas: ${err instanceof Error ? err.message : String(err)}`);
       return false;
     }
-  }, [workspaceStore, setDefaultCanvasMutation, apolloClient]);
+  }, [setDefaultCanvasMutation]); // Using ref to avoid infinite re-renders
 
   return {
     mutate,
@@ -437,12 +499,18 @@ export const useSetDefaultCanvas = (): UseCanvasMutationReturn => {
  */
 export const useDuplicateCanvas = (): UseCanvasMutationReturn => {
   const workspaceStore = useWorkspaceStore();
+  const storeRef = useRef(workspaceStore);
+  storeRef.current = workspaceStore;
   const [duplicateCanvasMutation, { loading, error, reset }] = useMutation(DUPLICATE_CANVAS);
+
+  // Update UI loading state
+  useEffect(() => {
+    storeRef.current?.setCanvasLoading?.('duplicatingCanvas', loading);
+  }, [loading]); // Using ref to avoid infinite re-renders
 
   const mutate = useCallback(async (params: DuplicateCanvasParams): Promise<CanvasId | null> => {
     try {
-      // Optimistic update
-      const optimisticCanvasId = await workspaceStore.duplicateCanvas(params);
+      storeRef.current?.clearErrors?.();
 
       // Server mutation
       const input: DuplicateCanvasMutationVariables['input'] = {
@@ -451,29 +519,23 @@ export const useDuplicateCanvas = (): UseCanvasMutationReturn => {
         includeCards: params.includeCards,
         includeConnections: params.includeConnections,
       };
-      
-      const { data } = await duplicateCanvasMutation({ 
-        variables: { id: params.id, input } 
+
+      const { data } = await duplicateCanvasMutation({
+        variables: { id: params.id, input }
       });
 
       if (data?.duplicateCanvas) {
-        const serverCanvas = transformBackendCanvasToFrontend(data.duplicateCanvas);
-        
-        // Replace optimistic canvas with server version
-        if (optimisticCanvasId) {
-          workspaceStore.canvasManagement.canvases.delete(optimisticCanvasId);
-        }
-        workspaceStore.canvasManagement.canvases.set(serverCanvas.id, serverCanvas);
-        
-        return serverCanvas.id;
+        // Canvas duplicated successfully
+        return createCanvasId(data.duplicateCanvas.id);
       }
 
-      return optimisticCanvasId;
+      return null;
     } catch (err) {
-      console.error('Failed to duplicate canvas:', err);
+      // Failed to duplicate canvas
+      storeRef.current?.setError?.('mutation', `Failed to duplicate canvas: ${err instanceof Error ? err.message : String(err)}`);
       return null;
     }
-  }, [workspaceStore, duplicateCanvasMutation]);
+  }, [duplicateCanvasMutation]); // Using ref to avoid infinite re-renders
 
   return {
     mutate,
@@ -487,65 +549,138 @@ export const useDuplicateCanvas = (): UseCanvasMutationReturn => {
 
 /**
  * Hook for real-time canvas subscriptions
+ *
+ * ⚠️ TEMPORARILY DISABLED
+ *
+ * Reason: Backend subscriptions return null for non-nullable fields due to authentication/permission issues
+ * Documentation: See "GraphQL Subscriptions Status" in Notion for complete details and resolution plan
+ * TODO: Re-enable when backend auth issues are resolved
  */
 export const useCanvasSubscriptions = (workspaceId: EntityId | undefined) => {
-  const workspaceStore = useWorkspaceStore();
+  // Error boundary state for subscription failures
+  const [subscriptionErrors, setSubscriptionErrors] = useState<{
+    canvasCreated: string | null;
+    canvasUpdated: string | null;
+    canvasDeleted: string | null;
+    defaultCanvasChanged: string | null;
+  }>({
+    canvasCreated: null,
+    canvasUpdated: null,
+    canvasDeleted: null,
+    defaultCanvasChanged: null,
+  });
 
-  // Subscribe to canvas created events
+  // Error recovery mechanism
+  const handleSubscriptionError = useCallback((type: keyof typeof subscriptionErrors, error: any) => {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.warn(`Canvas subscription error (${type}):`, errorMessage);
+
+    // Update error state
+    setSubscriptionErrors(prev => ({
+      ...prev,
+      [type]: errorMessage
+    }));
+
+    // Optional: Report to error tracking service
+    // errorTracking.captureException(error, { context: `canvas-subscription-${type}` });
+
+    // Graceful degradation - subscription failure shouldn't break the app
+    return null;
+  }, []);
+
+  // Reset errors when workspaceId changes
+  useEffect(() => {
+    setSubscriptionErrors({
+      canvasCreated: null,
+      canvasUpdated: null,
+      canvasDeleted: null,
+      defaultCanvasChanged: null,
+    });
+  }, [workspaceId]);
+  /*
+  // When re-enabling, use the error boundary for safe subscription handling:
   useSubscription(CANVAS_CREATED_SUBSCRIPTION, {
     variables: { workspaceId },
     skip: !workspaceId,
     onData: ({ data }) => {
-      if (data?.data?.canvasCreated) {
-        const canvas = transformBackendCanvasToFrontend(data.data.canvasCreated);
-        workspaceStore.canvasManagement.canvases.set(canvas.id, canvas);
+      try {
+        if (data?.data?.canvasCreated) {
+          // Canvas created via subscription - add to store
+          const canvas = transformBackendCanvasToFrontend(data.data.canvasCreated);
+          // TODO: Add canvas to store when re-enabling
+        }
+      } catch (error) {
+        handleSubscriptionError('canvasCreated', error);
       }
+    },
+    onError: (error) => {
+      handleSubscriptionError('canvasCreated', error);
     },
   });
 
-  // Subscribe to canvas updated events
   useSubscription(CANVAS_UPDATED_SUBSCRIPTION, {
     variables: { workspaceId },
     skip: !workspaceId,
     onData: ({ data }) => {
-      if (data?.data?.canvasUpdated) {
-        const canvas = transformBackendCanvasToFrontend(data.data.canvasUpdated);
-        workspaceStore.canvasManagement.canvases.set(canvas.id, canvas);
+      try {
+        if (data?.data?.canvasUpdated) {
+          // Canvas updated via subscription
+          const canvas = transformBackendCanvasToFrontend(data.data.canvasUpdated);
+          // TODO: Update canvas in store when re-enabling
+        }
+      } catch (error) {
+        handleSubscriptionError('canvasUpdated', error);
       }
+    },
+    onError: (error) => {
+      handleSubscriptionError('canvasUpdated', error);
     },
   });
 
-  // Subscribe to canvas deleted events
   useSubscription(CANVAS_DELETED_SUBSCRIPTION, {
     variables: { workspaceId },
     skip: !workspaceId,
     onData: ({ data }) => {
-      if (data?.data?.canvasDeleted) {
-        const canvasId = createCanvasId(data.data.canvasDeleted);
-        workspaceStore.canvasManagement.canvases.delete(canvasId);
-        
-        // Clear current canvas if deleted
-        if (workspaceStore.context.currentCanvasId === canvasId) {
-          workspaceStore.setCurrentCanvas(
-            workspaceStore.getDefaultCanvas()?.id || createCanvasId(''),
-            workspaceStore.getDefaultCanvas()?.name
-          );
+      try {
+        if (data?.data?.canvasDeleted) {
+          // Canvas deleted via subscription
+          const canvasId = data.data.canvasDeleted;
+          // TODO: Remove canvas from store when re-enabling
         }
+      } catch (error) {
+        handleSubscriptionError('canvasDeleted', error);
       }
+    },
+    onError: (error) => {
+      handleSubscriptionError('canvasDeleted', error);
     },
   });
 
-  // Subscribe to default canvas changes
   useSubscription(DEFAULT_CANVAS_CHANGED_SUBSCRIPTION, {
     variables: { workspaceId },
     skip: !workspaceId,
     onData: ({ data }) => {
-      if (data?.data?.defaultCanvasChanged && workspaceId) {
-        const newDefaultId = createCanvasId(data.data.defaultCanvasChanged);
-        workspaceStore.canvasManagement.defaultCanvasId = newDefaultId;
+      try {
+        if (data?.data?.defaultCanvasChanged) {
+          // Default canvas changed via subscription
+          const canvasId = data.data.defaultCanvasChanged;
+          // TODO: Update default canvas in store when re-enabling
+        }
+      } catch (error) {
+        handleSubscriptionError('defaultCanvasChanged', error);
       }
     },
+    onError: (error) => {
+      handleSubscriptionError('defaultCanvasChanged', error);
+    },
   });
+  */
+
+  // Return subscription errors for debugging when re-enabling
+  return {
+    subscriptionErrors,
+    hasErrors: Object.values(subscriptionErrors).some(error => error !== null),
+  };
 };
 
 // Note: Canvas settings sync hooks will be added when backend supports them

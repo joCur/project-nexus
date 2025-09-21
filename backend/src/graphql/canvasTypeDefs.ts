@@ -33,6 +33,7 @@ export const canvasTypeDefs = gql`
     
     # Computed/resolved fields
     workspace: Workspace!
+    owner: User!
     createdByUser: User!
     cardCount: Int!
     connectionCount: Int!
