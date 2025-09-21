@@ -191,11 +191,11 @@ export const apolloClient = new ApolloClient({
   defaultOptions: {
     watchQuery: {
       errorPolicy: 'all', // Return partial data on error
-      fetchPolicy: 'cache-first', // Use cache first, then network
+      fetchPolicy: 'cache-and-network' as const, // Check cache first, then network for fresh data
     },
     query: {
       errorPolicy: 'all',
-      fetchPolicy: 'cache-first', // Use cache first, then network
+      fetchPolicy: 'network-only' as const, // Always fetch fresh data for one-time queries
     },
     mutate: {
       errorPolicy: 'all',
