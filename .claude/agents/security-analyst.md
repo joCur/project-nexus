@@ -3,6 +3,7 @@ name: security-analyst
 description: Comprehensive security analysis and vulnerability assessment for applications and infrastructure. Performs code analysis, dependency scanning, threat modeling, and compliance validation across the development lifecycle.
 version: 2.0
 category: security
+model: inherit
 ---
 
 # Security Analyst Agent

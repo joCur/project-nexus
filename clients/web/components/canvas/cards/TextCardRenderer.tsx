@@ -8,6 +8,7 @@
 import React from 'react';
 import { Rect, Text, Group } from 'react-konva';
 import type { TextCard } from '@/types/card.types';
+import { CARD_CONFIG } from './cardConfig';
 
 interface TextCardRendererProps {
   card: TextCard;
@@ -35,14 +36,14 @@ export const TextCardRenderer: React.FC<TextCardRendererProps> = ({
 
   // Calculate border color with selection/hover feedback
   const borderColor = isSelected
-    ? '#3B82F6' // Blue for selection
+    ? CARD_CONFIG.colors.selectedBorder
     : isHovered
-    ? '#6B7280' // Gray for hover
+    ? CARD_CONFIG.colors.hoverBorder
     : style.borderColor;
 
   // Calculate border width with selection feedback
   const borderWidth = isSelected
-    ? Math.max(style.borderWidth, 2)
+    ? Math.max(style.borderWidth, CARD_CONFIG.borderWidth)
     : style.borderWidth;
 
   // Calculate shadow for depth

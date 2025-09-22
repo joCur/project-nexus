@@ -8,13 +8,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Rect, Text, Group, Image as KonvaImage } from 'react-konva';
 import type { ImageCard } from '@/types/card.types';
-
-interface ImageCardRendererProps {
-  card: ImageCard;
-  isSelected: boolean;
-  isDragged: boolean;
-  isHovered: boolean;
-}
+import { CARD_CONFIG, ImageCache } from './cardConfig';
 
 /**
  * ImageCardRenderer component
@@ -31,33 +25,42 @@ export const ImageCardRenderer: React.FC<ImageCardRendererProps> = ({
   const [imageError, setImageError] = useState(false);
   const imageRef = useRef<HTMLImageElement>();
 
-  // Load image
+  // Load image with caching
   useEffect(() => {
+    let isMounted = true;
+
     if (content.url) {
-      const img = new window.Image();
-      img.crossOrigin = 'anonymous';
+      const imageSrc = content.thumbnail || content.url;
 
-      img.onload = () => {
-        setImage(img);
-        setImageLoaded(true);
-        setImageError(false);
-      };
-
-      img.onerror = () => {
-        setImageError(true);
-        setImageLoaded(false);
-        setImage(null);
-      };
-
-      // Use thumbnail if available, otherwise use main URL
-      img.src = content.thumbnail || content.url;
-      imageRef.current = img;
+      ImageCache.getImage(imageSrc)
+        .then((img) => {
+          if (isMounted) {
+            setImage(img);
+            setImageLoaded(true);
+            setImageError(false);
+            imageRef.current = img;
+          }
+        })
+        .catch((error) => {
+          if (isMounted) {
+            console.warn('Image loading failed:', error);
+            setImageError(true);
+            setImageLoaded(false);
+            setImage(null);
+          }
+        });
     }
 
+    // Cleanup function with better memory management
     return () => {
+      isMounted = false;
       if (imageRef.current) {
+        // Clear event handlers
         imageRef.current.onload = null;
         imageRef.current.onerror = null;
+        // Help with garbage collection
+        imageRef.current.src = '';
+        imageRef.current = undefined;
       }
     };
   }, [content.url, content.thumbnail]);
@@ -70,14 +73,14 @@ export const ImageCardRenderer: React.FC<ImageCardRendererProps> = ({
 
   // Calculate border color with selection/hover feedback
   const borderColor = isSelected
-    ? '#3B82F6' // Blue for selection
+    ? CARD_CONFIG.colors.selectedBorder
     : isHovered
-    ? '#6B7280' // Gray for hover
+    ? CARD_CONFIG.colors.hoverBorder
     : style.borderColor;
 
   // Calculate border width with selection feedback
   const borderWidth = isSelected
-    ? Math.max(style.borderWidth, 2)
+    ? Math.max(style.borderWidth, CARD_CONFIG.borderWidth)
     : style.borderWidth;
 
   // Calculate shadow for depth
@@ -97,7 +100,7 @@ export const ImageCardRenderer: React.FC<ImageCardRendererProps> = ({
   } : shadowConfig;
 
   // Calculate image dimensions and positioning
-  const padding = 8;
+  const padding = CARD_CONFIG.padding / 2; // Half padding for image area
   const captionHeight = content.caption ? 30 : 0;
   const imageArea = {
     x: padding,

@@ -61,16 +61,16 @@ export const CardRenderer = React.memo<CardRendererProps>(({
     setHoveredCard,
   } = useCardStore();
 
-  // Determine card state
-  const isSelected = selection.selectedIds.has(card.id);
-  const isDragged = dragState.draggedIds.has(card.id);
-  const isHovered = hoverState.hoveredId === card.id;
+  // Determine card state with safe checks
+  const isSelected = card?.id && selection?.selectedIds?.has(card.id) || false;
+  const isDragged = card?.id && dragState?.draggedIds?.has(card.id) || false;
+  const isHovered = card?.id && hoverState?.hoveredId === card.id || false;
 
   // Suppress unused vars warning for now - these will be used for resize handles later
   void resizeState;
 
-  // Don't render hidden cards
-  if (card.isHidden) {
+  // Don't render if card is invalid or hidden
+  if (!card || !card.id || card.isHidden) {
     return null;
   }
 
@@ -89,15 +89,15 @@ export const CardRenderer = React.memo<CardRendererProps>(({
 
   // Handle drag start
   const handleDragStart = (e: KonvaEventObject<DragEvent>) => {
-    if (card.isLocked) return;
+    if (card?.isLocked) return;
 
-    const selectedIds = selection.selectedIds.has(card.id)
+    const selectedIds = selection?.selectedIds?.has(card.id)
       ? Array.from(selection.selectedIds)
       : [card.id];
 
     startDrag(selectedIds, {
-      x: e.target.x(),
-      y: e.target.y(),
+      x: e.target?.x() || 0,
+      y: e.target?.y() || 0,
     });
 
     onCardDragStart?.(card, e);
@@ -105,11 +105,11 @@ export const CardRenderer = React.memo<CardRendererProps>(({
 
   // Handle drag move
   const handleDragMove = (e: KonvaEventObject<DragEvent>) => {
-    if (card.isLocked || !dragState.isDragging) return;
+    if (card?.isLocked || !dragState?.isDragging) return;
 
     const currentOffset = {
-      x: e.target.x() - dragState.startPosition.x,
-      y: e.target.y() - dragState.startPosition.y,
+      x: (e.target?.x() || 0) - (dragState?.startPosition?.x || 0),
+      y: (e.target?.y() || 0) - (dragState?.startPosition?.y || 0),
     };
 
     updateDrag(currentOffset);
@@ -118,11 +118,11 @@ export const CardRenderer = React.memo<CardRendererProps>(({
 
   // Handle drag end
   const handleDragEnd = (e: KonvaEventObject<DragEvent>) => {
-    if (card.isLocked) return;
+    if (card?.isLocked) return;
 
     endDrag({
-      x: e.target.x(),
-      y: e.target.y(),
+      x: e.target?.x() || 0,
+      y: e.target?.y() || 0,
     });
 
     onCardDragEnd?.(card, e);

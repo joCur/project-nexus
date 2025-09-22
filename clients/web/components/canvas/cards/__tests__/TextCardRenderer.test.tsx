@@ -444,7 +444,7 @@ describe('TextCardRenderer', () => {
 
       // Background rect should have selection border
       const backgroundRect = rects[0];
-      expect(backgroundRect).toHaveAttribute('data-stroke', '#3B82F6'); // Blue selection
+      expect(backgroundRect).toHaveAttribute('data-stroke', '#3b82f6'); // Blue selection
       expect(backgroundRect).toHaveAttribute('data-stroke-width', '2'); // Enhanced border
 
       // Should have selection highlight overlay
@@ -463,7 +463,7 @@ describe('TextCardRenderer', () => {
 
       // Background rect should have hover border
       const backgroundRect = rects[0];
-      expect(backgroundRect).toHaveAttribute('data-stroke', '#6B7280'); // Gray hover
+      expect(backgroundRect).toHaveAttribute('data-stroke', '#93c5fd'); // Light blue hover
 
       // Should have hover highlight overlay
       const highlightRect = rects.find(rect =>
@@ -481,7 +481,7 @@ describe('TextCardRenderer', () => {
 
       // Should use selection color, not hover
       const backgroundRect = rects[0];
-      expect(backgroundRect).toHaveAttribute('data-stroke', '#3B82F6'); // Selection blue
+      expect(backgroundRect).toHaveAttribute('data-stroke', '#3b82f6'); // Selection blue
 
       // Should have selection highlight, not hover
       const highlightRect = rects.find(rect =>
