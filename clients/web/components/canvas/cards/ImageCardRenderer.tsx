@@ -10,6 +10,13 @@ import { Rect, Text, Group, Image as KonvaImage } from 'react-konva';
 import type { ImageCard } from '@/types/card.types';
 import { CARD_CONFIG, ImageCache } from './cardConfig';
 
+interface ImageCardRendererProps {
+  card: ImageCard;
+  isSelected: boolean;
+  isDragged: boolean;
+  isHovered: boolean;
+}
+
 /**
  * ImageCardRenderer component
  */
