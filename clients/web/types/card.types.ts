@@ -596,25 +596,25 @@ export interface CardStore extends CardState, CardActions {}
  * Type guard for text card
  */
 export const isTextCard = (card: Card): card is TextCard =>
-  card.content.type === 'text';
+  card.content?.type === 'text';
 
 /**
  * Type guard for image card
  */
 export const isImageCard = (card: Card): card is ImageCard =>
-  card.content.type === 'image';
+  card.content?.type === 'image';
 
 /**
  * Type guard for link card
  */
 export const isLinkCard = (card: Card): card is LinkCard =>
-  card.content.type === 'link';
+  card.content?.type === 'link';
 
 /**
  * Type guard for code card
  */
 export const isCodeCard = (card: Card): card is CodeCard =>
-  card.content.type === 'code';
+  card.content?.type === 'code';
 
 // ============================================================================
 // DEFAULT CONFIGURATIONS

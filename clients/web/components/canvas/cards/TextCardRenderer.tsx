@@ -77,9 +77,9 @@ export const TextCardRenderer: React.FC<TextCardRendererProps> = ({
 
   // Text truncation for large content
   const maxLines = Math.floor(textHeight / lineHeight);
-  const displayText = content.markdown
-    ? content.content // For now, display as plain text - markdown parsing can be added later
-    : content.content;
+  const displayText = content?.markdown
+    ? (content?.content ?? '') // For now, display as plain text - markdown parsing can be added later
+    : (content?.content ?? '');
 
   // Simple text truncation
   const words = displayText.split(' ');
@@ -147,7 +147,7 @@ export const TextCardRenderer: React.FC<TextCardRendererProps> = ({
       />
 
       {/* Markdown indicator (if markdown is enabled) */}
-      {content.markdown && (
+      {content?.markdown && (
         <Group>
           <Rect
             x={dimensions.width - 24}
@@ -171,11 +171,11 @@ export const TextCardRenderer: React.FC<TextCardRendererProps> = ({
       )}
 
       {/* Word count indicator for large content */}
-      {content.wordCount > 100 && (
+      {(content?.wordCount ?? 0) > 100 && (
         <Text
           x={dimensions.width - 60}
           y={dimensions.height - 20}
-          text={`${content.wordCount} words`}
+          text={`${content?.wordCount ?? 0} words`}
           fontSize={10}
           fontFamily="Inter, sans-serif"
           fill="#9CA3AF"
