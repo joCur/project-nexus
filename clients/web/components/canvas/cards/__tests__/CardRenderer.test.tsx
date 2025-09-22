@@ -1,0 +1,688 @@
+import React from 'react';
+import { render, screen, fireEvent } from '@testing-library/react';
+import '@testing-library/jest-dom';
+import { CardRenderer } from '../CardRenderer';
+import type { Card, TextCard, ImageCard, LinkCard, CodeCard } from '@/types/card.types';
+import type { KonvaEventObject } from 'konva/lib/Node';
+
+// Mock Konva components
+jest.mock('react-konva', () => ({
+  Group: ({ children, x, y, draggable, onClick, onDblClick, onDragStart, onDragMove, onDragEnd, onMouseEnter, onMouseLeave, opacity, listening, ...props }: {
+    children?: React.ReactNode;
+    x?: number;
+    y?: number;
+    draggable?: boolean;
+    onClick?: (e: any) => void;
+    onDblClick?: (e: any) => void;
+    onDragStart?: (e: any) => void;
+    onDragMove?: (e: any) => void;
+    onDragEnd?: (e: any) => void;
+    onMouseEnter?: (e: any) => void;
+    onMouseLeave?: (e: any) => void;
+    opacity?: number;
+    listening?: boolean;
+    [key: string]: unknown;
+  }) => (
+    <div
+      data-testid="konva-group"
+      data-x={x}
+      data-y={y}
+      data-draggable={draggable}
+      data-opacity={opacity}
+      data-listening={listening}
+      onClick={onClick}
+      onDoubleClick={onDblClick}
+      onMouseDown={onDragStart}
+      onMouseMove={onDragMove}
+      onMouseUp={onDragEnd}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      {...props}
+    >
+      {children}
+    </div>
+  ),
+}));
+
+// Mock specific card renderers
+jest.mock('../TextCardRenderer', () => ({
+  TextCardRenderer: ({ card, isSelected, isDragged, isHovered }: {
+    card: TextCard;
+    isSelected: boolean;
+    isDragged: boolean;
+    isHovered: boolean;
+  }) => (
+    <div
+      data-testid="text-card-renderer"
+      data-card-id={card.id}
+      data-selected={isSelected}
+      data-dragged={isDragged}
+      data-hovered={isHovered}
+    >
+      Text Card: {card.content.text}
+    </div>
+  ),
+}));
+
+jest.mock('../ImageCardRenderer', () => ({
+  ImageCardRenderer: ({ card, isSelected, isDragged, isHovered }: {
+    card: ImageCard;
+    isSelected: boolean;
+    isDragged: boolean;
+    isHovered: boolean;
+  }) => (
+    <div
+      data-testid="image-card-renderer"
+      data-card-id={card.id}
+      data-selected={isSelected}
+      data-dragged={isDragged}
+      data-hovered={isHovered}
+    >
+      Image Card: {card.content.url}
+    </div>
+  ),
+}));
+
+jest.mock('../LinkCardRenderer', () => ({
+  LinkCardRenderer: ({ card, isSelected, isDragged, isHovered }: {
+    card: LinkCard;
+    isSelected: boolean;
+    isDragged: boolean;
+    isHovered: boolean;
+  }) => (
+    <div
+      data-testid="link-card-renderer"
+      data-card-id={card.id}
+      data-selected={isSelected}
+      data-dragged={isDragged}
+      data-hovered={isHovered}
+    >
+      Link Card: {card.content.url}
+    </div>
+  ),
+}));
+
+jest.mock('../CodeCardRenderer', () => ({
+  CodeCardRenderer: ({ card, isSelected, isDragged, isHovered }: {
+    card: CodeCard;
+    isSelected: boolean;
+    isDragged: boolean;
+    isHovered: boolean;
+  }) => (
+    <div
+      data-testid="code-card-renderer"
+      data-card-id={card.id}
+      data-selected={isSelected}
+      data-dragged={isDragged}
+      data-hovered={isHovered}
+    >
+      Code Card: {card.content.language}
+    </div>
+  ),
+}));
+
+// Mock card store
+const mockCardStore = {
+  selection: {
+    selectedIds: new Set<string>(),
+  },
+  dragState: {
+    isDragging: false,
+    draggedIds: new Set<string>(),
+    startPosition: { x: 0, y: 0 },
+  },
+  resizeState: {
+    isResizing: false,
+    resizedId: undefined,
+  },
+  hoverState: {
+    hoveredId: undefined,
+  },
+  selectCard: jest.fn(),
+  startDrag: jest.fn(),
+  updateDrag: jest.fn(),
+  endDrag: jest.fn(),
+  setHoveredCard: jest.fn(),
+};
+
+jest.mock('@/stores/cardStore', () => ({
+  useCardStore: () => mockCardStore,
+}));
+
+describe('CardRenderer', () => {
+  // Helper to create test cards
+  const createTestCard = (
+    id: string,
+    type: 'text' | 'image' | 'link' | 'code',
+    x: number = 0,
+    y: number = 0,
+    isLocked: boolean = false,
+    isHidden: boolean = false
+  ): Card => {
+    const baseCard = {
+      id,
+      type,
+      position: { x, y, z: 0 },
+      dimensions: { width: 200, height: 100 },
+      style: { opacity: 1 },
+      isHidden,
+      isLocked,
+      metadata: {
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    };
+
+    switch (type) {
+      case 'text':
+        return {
+          ...baseCard,
+          type: 'text',
+          content: {
+            text: 'Test text content',
+            isMarkdown: false,
+            wordCount: 3,
+          },
+        } as TextCard;
+      case 'image':
+        return {
+          ...baseCard,
+          type: 'image',
+          content: {
+            url: 'https://example.com/image.jpg',
+            caption: 'Test image',
+            fileSize: 1024,
+            mimeType: 'image/jpeg',
+          },
+        } as ImageCard;
+      case 'link':
+        return {
+          ...baseCard,
+          type: 'link',
+          content: {
+            url: 'https://example.com',
+            title: 'Example Site',
+            description: 'A test site',
+            domain: 'example.com',
+            favicon: 'https://example.com/favicon.ico',
+          },
+        } as LinkCard;
+      case 'code':
+        return {
+          ...baseCard,
+          type: 'code',
+          content: {
+            code: 'console.log("test");',
+            language: 'javascript',
+            lineCount: 1,
+            executionState: 'idle',
+          },
+        } as CodeCard;
+      default:
+        throw new Error(`Unknown card type: ${type}`);
+    }
+  };
+
+  const createMockKonvaEvent = (
+    eventType: string,
+    target?: any,
+    evt?: Partial<MouseEvent | DragEvent>
+  ): KonvaEventObject<any> => ({
+    type: eventType,
+    target: {
+      x: () => 100,
+      y: () => 200,
+      ...target,
+    },
+    evt: {
+      ctrlKey: false,
+      metaKey: false,
+      ...evt,
+    },
+    cancelBubble: false,
+    currentTarget: null,
+  } as any);
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCardStore.selection.selectedIds.clear();
+    mockCardStore.dragState.draggedIds.clear();
+    mockCardStore.dragState.isDragging = false;
+    mockCardStore.hoverState.hoveredId = undefined;
+  });
+
+  describe('Card Type Determination', () => {
+    it('renders TextCardRenderer for text cards', () => {
+      const textCard = createTestCard('text-card', 'text');
+      render(<CardRenderer card={textCard} />);
+
+      expect(screen.getByTestId('text-card-renderer')).toBeInTheDocument();
+      expect(screen.getByText('Text Card: Test text content')).toBeInTheDocument();
+    });
+
+    it('renders ImageCardRenderer for image cards', () => {
+      const imageCard = createTestCard('image-card', 'image');
+      render(<CardRenderer card={imageCard} />);
+
+      expect(screen.getByTestId('image-card-renderer')).toBeInTheDocument();
+      expect(screen.getByText('Image Card: https://example.com/image.jpg')).toBeInTheDocument();
+    });
+
+    it('renders LinkCardRenderer for link cards', () => {
+      const linkCard = createTestCard('link-card', 'link');
+      render(<CardRenderer card={linkCard} />);
+
+      expect(screen.getByTestId('link-card-renderer')).toBeInTheDocument();
+      expect(screen.getByText('Link Card: https://example.com')).toBeInTheDocument();
+    });
+
+    it('renders CodeCardRenderer for code cards', () => {
+      const codeCard = createTestCard('code-card', 'code');
+      render(<CardRenderer card={codeCard} />);
+
+      expect(screen.getByTestId('code-card-renderer')).toBeInTheDocument();
+      expect(screen.getByText('Code Card: javascript')).toBeInTheDocument();
+    });
+
+    it('falls back to TextCardRenderer for unknown card types', () => {
+      const unknownCard = {
+        ...createTestCard('unknown-card', 'text'),
+        type: 'unknown' as any,
+      };
+
+      render(<CardRenderer card={unknownCard} />);
+
+      expect(screen.getByTestId('text-card-renderer')).toBeInTheDocument();
+    });
+  });
+
+  describe('Selection State Handling', () => {
+    it('passes correct selection state to child renderers', () => {
+      const card = createTestCard('selected-card', 'text');
+      mockCardStore.selection.selectedIds.add('selected-card');
+
+      render(<CardRenderer card={card} />);
+
+      const renderer = screen.getByTestId('text-card-renderer');
+      expect(renderer).toHaveAttribute('data-selected', 'true');
+    });
+
+    it('passes false selection state when card is not selected', () => {
+      const card = createTestCard('unselected-card', 'text');
+
+      render(<CardRenderer card={card} />);
+
+      const renderer = screen.getByTestId('text-card-renderer');
+      expect(renderer).toHaveAttribute('data-selected', 'false');
+    });
+  });
+
+  describe('Hover State Handling', () => {
+    it('passes correct hover state to child renderers', () => {
+      const card = createTestCard('hovered-card', 'text');
+      mockCardStore.hoverState.hoveredId = 'hovered-card';
+
+      render(<CardRenderer card={card} />);
+
+      const renderer = screen.getByTestId('text-card-renderer');
+      expect(renderer).toHaveAttribute('data-hovered', 'true');
+    });
+
+    it('passes false hover state when card is not hovered', () => {
+      const card = createTestCard('unhovered-card', 'text');
+
+      render(<CardRenderer card={card} />);
+
+      const renderer = screen.getByTestId('text-card-renderer');
+      expect(renderer).toHaveAttribute('data-hovered', 'false');
+    });
+  });
+
+  describe('Drag State Handling', () => {
+    it('passes correct drag state to child renderers', () => {
+      const card = createTestCard('dragged-card', 'text');
+      mockCardStore.dragState.draggedIds.add('dragged-card');
+
+      render(<CardRenderer card={card} />);
+
+      const renderer = screen.getByTestId('text-card-renderer');
+      expect(renderer).toHaveAttribute('data-dragged', 'true');
+    });
+
+    it('passes false drag state when card is not being dragged', () => {
+      const card = createTestCard('not-dragged-card', 'text');
+
+      render(<CardRenderer card={card} />);
+
+      const renderer = screen.getByTestId('text-card-renderer');
+      expect(renderer).toHaveAttribute('data-dragged', 'false');
+    });
+  });
+
+  describe('Group Properties', () => {
+    it('sets correct position from card data', () => {
+      const card = createTestCard('positioned-card', 'text', 150, 250);
+      render(<CardRenderer card={card} />);
+
+      const group = screen.getByTestId('konva-group');
+      expect(group).toHaveAttribute('data-x', '150');
+      expect(group).toHaveAttribute('data-y', '250');
+    });
+
+    it('sets correct opacity from card style', () => {
+      const card = createTestCard('transparent-card', 'text');
+      card.style.opacity = 0.5;
+
+      render(<CardRenderer card={card} />);
+
+      const group = screen.getByTestId('konva-group');
+      expect(group).toHaveAttribute('data-opacity', '0.5');
+    });
+
+    it('sets draggable based on locked state', () => {
+      const normalCard = createTestCard('normal-card', 'text');
+      const lockedCard = createTestCard('locked-card', 'text', 0, 0, true);
+
+      const { rerender } = render(<CardRenderer card={normalCard} />);
+      expect(screen.getByTestId('konva-group')).toHaveAttribute('data-draggable', 'true');
+
+      rerender(<CardRenderer card={lockedCard} />);
+      expect(screen.getByTestId('konva-group')).toHaveAttribute('data-draggable', 'false');
+    });
+
+    it('sets listening based on locked state', () => {
+      const normalCard = createTestCard('normal-card', 'text');
+      const lockedCard = createTestCard('locked-card', 'text', 0, 0, true);
+
+      const { rerender } = render(<CardRenderer card={normalCard} />);
+      expect(screen.getByTestId('konva-group')).toHaveAttribute('data-listening', 'true');
+
+      rerender(<CardRenderer card={lockedCard} />);
+      expect(screen.getByTestId('konva-group')).toHaveAttribute('data-listening', 'false');
+    });
+  });
+
+  describe('Event Handlers', () => {
+    describe('Click Events', () => {
+      it('handles click events and calls selectCard', () => {
+        const card = createTestCard('clickable-card', 'text');
+        const onCardClick = jest.fn();
+
+        render(<CardRenderer card={card} onCardClick={onCardClick} />);
+
+        const group = screen.getByTestId('konva-group');
+        fireEvent.click(group);
+
+        expect(mockCardStore.selectCard).toHaveBeenCalledWith('clickable-card', false);
+        expect(onCardClick).toHaveBeenCalledWith(card, expect.any(Object));
+      });
+
+      it('handles click with ctrl key for multi-selection', () => {
+        const card = createTestCard('multi-select-card', 'text');
+
+        render(<CardRenderer card={card} />);
+
+        const group = screen.getByTestId('konva-group');
+        fireEvent.click(group, { ctrlKey: true });
+
+        expect(mockCardStore.selectCard).toHaveBeenCalledWith('multi-select-card', true);
+      });
+
+      it('handles click with meta key for multi-selection', () => {
+        const card = createTestCard('meta-select-card', 'text');
+
+        render(<CardRenderer card={card} />);
+
+        const group = screen.getByTestId('konva-group');
+        fireEvent.click(group, { metaKey: true });
+
+        expect(mockCardStore.selectCard).toHaveBeenCalledWith('meta-select-card', true);
+      });
+    });
+
+    describe('Double Click Events', () => {
+      it('handles double click events', () => {
+        const card = createTestCard('double-clickable-card', 'text');
+        const onCardDoubleClick = jest.fn();
+
+        render(<CardRenderer card={card} onCardDoubleClick={onCardDoubleClick} />);
+
+        const group = screen.getByTestId('konva-group');
+        fireEvent.doubleClick(group);
+
+        expect(onCardDoubleClick).toHaveBeenCalledWith(card, expect.any(Object));
+      });
+    });
+
+    describe('Drag Events', () => {
+      it('handles drag start for unlocked cards', () => {
+        const card = createTestCard('draggable-card', 'text');
+        const onCardDragStart = jest.fn();
+
+        render(<CardRenderer card={card} onCardDragStart={onCardDragStart} />);
+
+        const group = screen.getByTestId('konva-group');
+        fireEvent.mouseDown(group);
+
+        expect(mockCardStore.startDrag).toHaveBeenCalledWith(['draggable-card'], {
+          x: 100,
+          y: 200,
+        });
+        expect(onCardDragStart).toHaveBeenCalledWith(card, expect.any(Object));
+      });
+
+      it('ignores drag events for locked cards', () => {
+        const card = createTestCard('locked-card', 'text', 0, 0, true);
+
+        render(<CardRenderer card={card} />);
+
+        const group = screen.getByTestId('konva-group');
+        fireEvent.mouseDown(group);
+
+        expect(mockCardStore.startDrag).not.toHaveBeenCalled();
+      });
+
+      it('handles drag with selected cards', () => {
+        const card = createTestCard('selected-drag-card', 'text');
+        mockCardStore.selection.selectedIds.add('selected-drag-card');
+        mockCardStore.selection.selectedIds.add('other-selected-card');
+
+        render(<CardRenderer card={card} />);
+
+        const group = screen.getByTestId('konva-group');
+        fireEvent.mouseDown(group);
+
+        expect(mockCardStore.startDrag).toHaveBeenCalledWith(
+          ['selected-drag-card', 'other-selected-card'],
+          { x: 100, y: 200 }
+        );
+      });
+
+      it('handles drag move events', () => {
+        const card = createTestCard('drag-move-card', 'text');
+        const onCardDragMove = jest.fn();
+        mockCardStore.dragState.isDragging = true;
+        mockCardStore.dragState.startPosition = { x: 50, y: 75 };
+
+        render(<CardRenderer card={card} onCardDragMove={onCardDragMove} />);
+
+        const group = screen.getByTestId('konva-group');
+        fireEvent.mouseMove(group);
+
+        expect(mockCardStore.updateDrag).toHaveBeenCalledWith({
+          x: 50, // 100 - 50
+          y: 125, // 200 - 75
+        });
+        expect(onCardDragMove).toHaveBeenCalledWith(card, expect.any(Object));
+      });
+
+      it('ignores drag move for locked cards', () => {
+        const card = createTestCard('locked-move-card', 'text', 0, 0, true);
+        mockCardStore.dragState.isDragging = true;
+
+        render(<CardRenderer card={card} />);
+
+        const group = screen.getByTestId('konva-group');
+        fireEvent.mouseMove(group);
+
+        expect(mockCardStore.updateDrag).not.toHaveBeenCalled();
+      });
+
+      it('handles drag end events', () => {
+        const card = createTestCard('drag-end-card', 'text');
+        const onCardDragEnd = jest.fn();
+
+        render(<CardRenderer card={card} onCardDragEnd={onCardDragEnd} />);
+
+        const group = screen.getByTestId('konva-group');
+        fireEvent.mouseUp(group);
+
+        expect(mockCardStore.endDrag).toHaveBeenCalledWith({
+          x: 100,
+          y: 200,
+        });
+        expect(onCardDragEnd).toHaveBeenCalledWith(card, expect.any(Object));
+      });
+
+      it('ignores drag end for locked cards', () => {
+        const card = createTestCard('locked-end-card', 'text', 0, 0, true);
+
+        render(<CardRenderer card={card} />);
+
+        const group = screen.getByTestId('konva-group');
+        fireEvent.mouseUp(group);
+
+        expect(mockCardStore.endDrag).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('Hover Events', () => {
+      it('handles mouse enter events', () => {
+        const card = createTestCard('hoverable-card', 'text');
+        const onCardHover = jest.fn();
+
+        render(<CardRenderer card={card} onCardHover={onCardHover} />);
+
+        const group = screen.getByTestId('konva-group');
+        fireEvent.mouseEnter(group);
+
+        expect(mockCardStore.setHoveredCard).toHaveBeenCalledWith('hoverable-card');
+        expect(onCardHover).toHaveBeenCalledWith(card, expect.any(Object));
+      });
+
+      it('handles mouse leave events', () => {
+        const card = createTestCard('unhover-card', 'text');
+        const onCardUnhover = jest.fn();
+
+        render(<CardRenderer card={card} onCardUnhover={onCardUnhover} />);
+
+        const group = screen.getByTestId('konva-group');
+        fireEvent.mouseLeave(group);
+
+        expect(mockCardStore.setHoveredCard).toHaveBeenCalledWith(undefined);
+        expect(onCardUnhover).toHaveBeenCalledWith(card, expect.any(Object));
+      });
+    });
+  });
+
+  describe('Hidden Cards', () => {
+    it('does not render hidden cards', () => {
+      const hiddenCard = createTestCard('hidden-card', 'text', 0, 0, false, true);
+
+      const { container } = render(<CardRenderer card={hiddenCard} />);
+
+      expect(container.firstChild).toBeNull();
+    });
+
+    it('renders visible cards normally', () => {
+      const visibleCard = createTestCard('visible-card', 'text', 0, 0, false, false);
+
+      render(<CardRenderer card={visibleCard} />);
+
+      expect(screen.getByTestId('konva-group')).toBeInTheDocument();
+    });
+  });
+
+  describe('Memoization', () => {
+    it('memoizes the component properly', () => {
+      const card = createTestCard('memo-card', 'text');
+
+      const { rerender } = render(<CardRenderer card={card} />);
+      const firstRender = screen.getByTestId('text-card-renderer');
+
+      // Rerender with same props
+      rerender(<CardRenderer card={card} />);
+      const secondRender = screen.getByTestId('text-card-renderer');
+
+      // Should be memoized and not re-render
+      expect(firstRender).toBe(secondRender);
+    });
+
+    it('re-renders when card changes', () => {
+      const card1 = createTestCard('memo-card-1', 'text');
+      const card2 = createTestCard('memo-card-2', 'text');
+
+      const { rerender } = render(<CardRenderer card={card1} />);
+      expect(screen.getByTestId('text-card-renderer')).toHaveAttribute('data-card-id', 'memo-card-1');
+
+      rerender(<CardRenderer card={card2} />);
+      expect(screen.getByTestId('text-card-renderer')).toHaveAttribute('data-card-id', 'memo-card-2');
+    });
+
+    it('re-renders when store state changes', () => {
+      const card = createTestCard('state-card', 'text');
+
+      const { rerender } = render(<CardRenderer card={card} />);
+      expect(screen.getByTestId('text-card-renderer')).toHaveAttribute('data-selected', 'false');
+
+      mockCardStore.selection.selectedIds.add('state-card');
+      rerender(<CardRenderer card={card} />);
+      expect(screen.getByTestId('text-card-renderer')).toHaveAttribute('data-selected', 'true');
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('handles cards with missing content gracefully', () => {
+      const incompleteCard = {
+        ...createTestCard('incomplete-card', 'text'),
+        content: undefined,
+      } as any;
+
+      // Should not throw an error, fallback to text renderer
+      expect(() => render(<CardRenderer card={incompleteCard} />)).not.toThrow();
+    });
+
+    it('handles cards with invalid position gracefully', () => {
+      const invalidCard = {
+        ...createTestCard('invalid-position-card', 'text'),
+        position: undefined,
+      } as any;
+
+      // Should not throw an error
+      expect(() => render(<CardRenderer card={invalidCard} />)).not.toThrow();
+    });
+  });
+
+  describe('Performance', () => {
+    it('has correct display name for debugging', () => {
+      expect(CardRenderer.displayName).toBe('CardRenderer');
+    });
+
+    it('prevents excessive re-renders with stable event handlers', () => {
+      const card = createTestCard('stable-card', 'text');
+      const onCardClick = jest.fn();
+
+      const { rerender } = render(<CardRenderer card={card} onCardClick={onCardClick} />);
+
+      // Multiple rerenders should not create new event handlers
+      rerender(<CardRenderer card={card} onCardClick={onCardClick} />);
+      rerender(<CardRenderer card={card} onCardClick={onCardClick} />);
+
+      // Event handler should remain stable
+      const group = screen.getByTestId('konva-group');
+      fireEvent.click(group);
+
+      expect(onCardClick).toHaveBeenCalledTimes(1);
+    });
+  });
+});
