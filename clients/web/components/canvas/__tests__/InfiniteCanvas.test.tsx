@@ -82,14 +82,16 @@ describe('InfiniteCanvas', () => {
 
   it('shows grid by default', () => {
     render(<InfiniteCanvas />);
-    const layer = screen.getByTestId('konva-layer');
-    expect(layer).toBeInTheDocument();
+    // Check that at least one layer exists (grid layer)
+    const layers = screen.getAllByTestId('konva-layer');
+    expect(layers.length).toBeGreaterThan(0);
   });
 
   it('hides grid when showGrid is false', () => {
     render(<InfiniteCanvas showGrid={false} />);
-    const layer = screen.getByTestId('konva-layer');
-    expect(layer).toBeInTheDocument();
+    // Should still have at least one layer (card layer) even without grid
+    const layers = screen.getAllByTestId('konva-layer');
+    expect(layers.length).toBeGreaterThan(0);
   });
 
 

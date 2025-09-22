@@ -192,7 +192,9 @@ describe('ImageCardRenderer', () => {
       const card = createImageCard();
       render(<ImageCardRenderer card={card} isSelected={false} isDragged={false} isHovered={false} />);
 
-      expect(screen.getByTestId('konva-group')).toBeInTheDocument();
+      // There can be multiple groups due to nested structure
+      const groups = screen.getAllByTestId('konva-group');
+      expect(groups.length).toBeGreaterThan(0);
 
       // Should have background rect
       const rects = screen.getAllByTestId('konva-rect');

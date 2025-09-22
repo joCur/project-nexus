@@ -60,11 +60,11 @@ jest.mock('react-konva', () => ({
         onDblClick(konvaEvent);
       }
     }}
-      onMouseDown={onDragStart}
-      onMouseMove={onDragMove}
-      onMouseUp={onDragEnd}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
+      onMouseDown={(e) => { if (onDragStart) { const konvaEvent = { target: { x: () => 100, y: () => 200, getStage: () => ({ getPointerPosition: () => ({ x: e.clientX || 0, y: e.clientY || 0 }) }) }, evt: e, cancelBubble: false }; onDragStart(konvaEvent); } }}
+      onMouseMove={(e) => { if (onDragMove) { const konvaEvent = { target: { x: () => 100, y: () => 200, getStage: () => ({ getPointerPosition: () => ({ x: e.clientX || 0, y: e.clientY || 0 }) }) }, evt: e, cancelBubble: false }; onDragMove(konvaEvent); } }}
+      onMouseUp={(e) => { if (onDragEnd) { const konvaEvent = { target: { x: () => 100, y: () => 200, getStage: () => ({ getPointerPosition: () => ({ x: e.clientX || 0, y: e.clientY || 0 }) }) }, evt: e, cancelBubble: false }; onDragEnd(konvaEvent); } }}
+      onMouseEnter={(e) => { if (onMouseEnter) { const konvaEvent = { target: { x: () => 100, y: () => 200, getStage: () => ({ getPointerPosition: () => ({ x: e.clientX || 0, y: e.clientY || 0 }) }) }, evt: e, cancelBubble: false }; onMouseEnter(konvaEvent); } }}
+      onMouseLeave={(e) => { if (onMouseLeave) { const konvaEvent = { target: { x: () => 100, y: () => 200, getStage: () => ({ getPointerPosition: () => ({ x: e.clientX || 0, y: e.clientY || 0 }) }) }, evt: e, cancelBubble: false }; onMouseLeave(konvaEvent); } }}
       {...props}
     >
       {children}
@@ -149,8 +149,8 @@ jest.mock('../CodeCardRenderer', () => ({
   ),
 }));
 
-// Mock card store
-const mockCardStore = {
+// Mock card store with reactive behavior
+let mockStoreState = {
   selection: {
     selectedIds: new Set<string>(),
   },
@@ -173,11 +173,45 @@ const mockCardStore = {
   setHoveredCard: jest.fn(),
 };
 
+const getMockCardStore = () => ({
+  selection: {
+    selectedIds: mockStoreState.selection.selectedIds,
+  },
+  dragState: {
+    isDragging: mockStoreState.dragState.isDragging,
+    draggedIds: mockStoreState.dragState.draggedIds,
+    startPosition: mockStoreState.dragState.startPosition,
+  },
+  resizeState: {
+    isResizing: mockStoreState.resizeState.isResizing,
+    resizedId: mockStoreState.resizeState.resizedId,
+  },
+  hoverState: {
+    hoveredId: mockStoreState.hoverState.hoveredId,
+  },
+  selectCard: mockStoreState.selectCard,
+  startDrag: mockStoreState.startDrag,
+  updateDrag: mockStoreState.updateDrag,
+  endDrag: mockStoreState.endDrag,
+  setHoveredCard: mockStoreState.setHoveredCard,
+});
+
 jest.mock('@/stores/cardStore', () => ({
-  useCardStore: () => mockCardStore,
+  useCardStore: () => getMockCardStore(),
 }));
 
 describe('CardRenderer', () => {
+  beforeEach(() => {
+    // Reset mock state before each test
+    mockStoreState.selection.selectedIds.clear();
+    mockStoreState.dragState.isDragging = false;
+    mockStoreState.dragState.draggedIds.clear();
+    mockStoreState.resizeState.isResizing = false;
+    mockStoreState.resizeState.resizedId = undefined;
+    mockStoreState.hoverState.hoveredId = undefined;
+    jest.clearAllMocks();
+  });
+
   // Helper to create test cards
   const createTestCard = (
     id: string,
@@ -274,13 +308,6 @@ describe('CardRenderer', () => {
 
   // Mock Konva event creation removed - not used
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockCardStore.selection.selectedIds.clear();
-    mockCardStore.dragState.draggedIds.clear();
-    mockCardStore.dragState.isDragging = false;
-    mockCardStore.hoverState.hoveredId = undefined;
-  });
 
   describe('Card Type Determination', () => {
     it('renders TextCardRenderer for text cards', () => {
@@ -330,7 +357,7 @@ describe('CardRenderer', () => {
   describe('Selection State Handling', () => {
     it('passes correct selection state to child renderers', () => {
       const card = createTestCard('selected-card', 'text');
-      mockCardStore.selection.selectedIds.add('selected-card');
+      mockStoreState.selection.selectedIds.add('selected-card');
 
       render(<CardRenderer card={card} />);
 
@@ -351,7 +378,7 @@ describe('CardRenderer', () => {
   describe('Hover State Handling', () => {
     it('passes correct hover state to child renderers', () => {
       const card = createTestCard('hovered-card', 'text');
-      mockCardStore.hoverState.hoveredId = 'hovered-card' as any;
+      mockStoreState.hoverState.hoveredId = 'hovered-card' as any;
 
       render(<CardRenderer card={card} />);
 
@@ -372,7 +399,7 @@ describe('CardRenderer', () => {
   describe('Drag State Handling', () => {
     it('passes correct drag state to child renderers', () => {
       const card = createTestCard('dragged-card', 'text');
-      mockCardStore.dragState.draggedIds.add('dragged-card');
+      mockStoreState.dragState.draggedIds.add('dragged-card');
 
       render(<CardRenderer card={card} />);
 
@@ -444,7 +471,7 @@ describe('CardRenderer', () => {
         const group = screen.getByTestId('konva-group');
         fireEvent.click(group);
 
-        expect(mockCardStore.selectCard).toHaveBeenCalledWith('clickable-card', false);
+        expect(mockStoreState.selectCard).toHaveBeenCalledWith('clickable-card', false);
         expect(onCardClick).toHaveBeenCalledWith(card, expect.any(Object));
       });
 
@@ -456,7 +483,7 @@ describe('CardRenderer', () => {
         const group = screen.getByTestId('konva-group');
         fireEvent.click(group, { ctrlKey: true });
 
-        expect(mockCardStore.selectCard).toHaveBeenCalledWith('multi-select-card', true);
+        expect(mockStoreState.selectCard).toHaveBeenCalledWith('multi-select-card', true);
       });
 
       it('handles click with meta key for multi-selection', () => {
@@ -467,7 +494,7 @@ describe('CardRenderer', () => {
         const group = screen.getByTestId('konva-group');
         fireEvent.click(group, { metaKey: true });
 
-        expect(mockCardStore.selectCard).toHaveBeenCalledWith('meta-select-card', true);
+        expect(mockStoreState.selectCard).toHaveBeenCalledWith('meta-select-card', true);
       });
     });
 
@@ -495,7 +522,7 @@ describe('CardRenderer', () => {
         const group = screen.getByTestId('konva-group');
         fireEvent.mouseDown(group);
 
-        expect(mockCardStore.startDrag).toHaveBeenCalledWith(['draggable-card'], {
+        expect(mockStoreState.startDrag).toHaveBeenCalledWith(['draggable-card'], {
           x: 100,
           y: 200,
         });
@@ -510,20 +537,20 @@ describe('CardRenderer', () => {
         const group = screen.getByTestId('konva-group');
         fireEvent.mouseDown(group);
 
-        expect(mockCardStore.startDrag).not.toHaveBeenCalled();
+        expect(mockStoreState.startDrag).not.toHaveBeenCalled();
       });
 
       it('handles drag with selected cards', () => {
         const card = createTestCard('selected-drag-card', 'text');
-        mockCardStore.selection.selectedIds.add('selected-drag-card');
-        mockCardStore.selection.selectedIds.add('other-selected-card');
+        mockStoreState.selection.selectedIds.add('selected-drag-card');
+        mockStoreState.selection.selectedIds.add('other-selected-card');
 
         render(<CardRenderer card={card} />);
 
         const group = screen.getByTestId('konva-group');
         fireEvent.mouseDown(group);
 
-        expect(mockCardStore.startDrag).toHaveBeenCalledWith(
+        expect(mockStoreState.startDrag).toHaveBeenCalledWith(
           ['selected-drag-card', 'other-selected-card'],
           { x: 100, y: 200 }
         );
@@ -532,15 +559,15 @@ describe('CardRenderer', () => {
       it('handles drag move events', () => {
         const card = createTestCard('drag-move-card', 'text');
         const onCardDragMove = jest.fn();
-        mockCardStore.dragState.isDragging = true;
-        mockCardStore.dragState.startPosition = { x: 50, y: 75 };
+        mockStoreState.dragState.isDragging = true;
+        mockStoreState.dragState.startPosition = { x: 50, y: 75 };
 
         render(<CardRenderer card={card} onCardDragMove={onCardDragMove} />);
 
         const group = screen.getByTestId('konva-group');
         fireEvent.mouseMove(group);
 
-        expect(mockCardStore.updateDrag).toHaveBeenCalledWith({
+        expect(mockStoreState.updateDrag).toHaveBeenCalledWith({
           x: 50, // 100 - 50
           y: 125, // 200 - 75
         });
@@ -549,14 +576,14 @@ describe('CardRenderer', () => {
 
       it('ignores drag move for locked cards', () => {
         const card = createTestCard('locked-move-card', 'text', 0, 0, true);
-        mockCardStore.dragState.isDragging = true;
+        mockStoreState.dragState.isDragging = true;
 
         render(<CardRenderer card={card} />);
 
         const group = screen.getByTestId('konva-group');
         fireEvent.mouseMove(group);
 
-        expect(mockCardStore.updateDrag).not.toHaveBeenCalled();
+        expect(mockStoreState.updateDrag).not.toHaveBeenCalled();
       });
 
       it('handles drag end events', () => {
@@ -568,7 +595,7 @@ describe('CardRenderer', () => {
         const group = screen.getByTestId('konva-group');
         fireEvent.mouseUp(group);
 
-        expect(mockCardStore.endDrag).toHaveBeenCalledWith({
+        expect(mockStoreState.endDrag).toHaveBeenCalledWith({
           x: 100,
           y: 200,
         });
@@ -583,7 +610,7 @@ describe('CardRenderer', () => {
         const group = screen.getByTestId('konva-group');
         fireEvent.mouseUp(group);
 
-        expect(mockCardStore.endDrag).not.toHaveBeenCalled();
+        expect(mockStoreState.endDrag).not.toHaveBeenCalled();
       });
     });
 
@@ -597,7 +624,7 @@ describe('CardRenderer', () => {
         const group = screen.getByTestId('konva-group');
         fireEvent.mouseEnter(group);
 
-        expect(mockCardStore.setHoveredCard).toHaveBeenCalledWith('hoverable-card');
+        expect(mockStoreState.setHoveredCard).toHaveBeenCalledWith('hoverable-card');
         expect(onCardHover).toHaveBeenCalledWith(card, expect.any(Object));
       });
 
@@ -610,7 +637,7 @@ describe('CardRenderer', () => {
         const group = screen.getByTestId('konva-group');
         fireEvent.mouseLeave(group);
 
-        expect(mockCardStore.setHoveredCard).toHaveBeenCalledWith(undefined);
+        expect(mockStoreState.setHoveredCard).toHaveBeenCalledWith(undefined);
         expect(onCardUnhover).toHaveBeenCalledWith(card, expect.any(Object));
       });
     });
@@ -663,11 +690,14 @@ describe('CardRenderer', () => {
     it('re-renders when store state changes', () => {
       const card = createTestCard('state-card', 'text');
 
-      const { rerender } = render(<CardRenderer card={card} />);
+      // First render with card not selected
+      const { unmount } = render(<CardRenderer card={card} />);
       expect(screen.getByTestId('text-card-renderer')).toHaveAttribute('data-selected', 'false');
+      unmount();
 
-      mockCardStore.selection.selectedIds.add('state-card');
-      rerender(<CardRenderer card={card} />);
+      // Update the mock state and render again
+      mockStoreState.selection.selectedIds.add('state-card');
+      render(<CardRenderer card={card} />);
       expect(screen.getByTestId('text-card-renderer')).toHaveAttribute('data-selected', 'true');
     });
   });

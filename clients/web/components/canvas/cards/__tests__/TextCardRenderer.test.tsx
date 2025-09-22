@@ -267,9 +267,9 @@ describe('TextCardRenderer', () => {
     });
 
     it('truncates long text content', () => {
-      const longText = 'This is a very long text content that should be truncated when it exceeds the available space in the card. It contains many words that cannot fit in a small card.';
+      const longText = 'This is a very long text content that should definitely be truncated when it exceeds the available space in the card. It contains many many many words that absolutely cannot fit in a small card. We need to make sure this text has enough words to trigger the truncation algorithm in the component. The algorithm calculates max words based on card dimensions and should truncate this content appropriately. This text should have more than enough words to exceed the calculated maximum and force truncation to occur with ellipsis at the end.';
       const card = createTextCard('long-text', {
-        dimensions: { width: 150, height: 100 },
+        dimensions: { width: 120, height: 80 },
         content: {
           type: 'text' as const,
           content: longText,

@@ -142,6 +142,24 @@ export const CardRenderer = React.memo<CardRendererProps>(({
 
   // Render specific card type
   const renderCardContent = () => {
+    // Handle missing content gracefully - fallback to text renderer
+    if (!card.content) {
+      // Create a safe fallback card with text content
+      const fallbackCard: TextCard = {
+        ...card,
+        content: { type: 'text' as const, content: '', markdown: false, wordCount: 0 }
+      } as TextCard;
+
+      return (
+        <TextCardRenderer
+          card={fallbackCard}
+          isSelected={isSelected}
+          isDragged={isDragged}
+          isHovered={isHovered}
+        />
+      );
+    }
+
     if (isTextCard(card)) {
       return (
         <TextCardRenderer
@@ -199,8 +217,8 @@ export const CardRenderer = React.memo<CardRendererProps>(({
 
   return (
     <Group
-      x={card.position.x}
-      y={card.position.y}
+      x={card.position?.x ?? 0}
+      y={card.position?.y ?? 0}
       draggable={!card.isLocked}
       onClick={handleClick}
       onDblClick={handleDoubleClick}
@@ -209,7 +227,7 @@ export const CardRenderer = React.memo<CardRendererProps>(({
       onDragEnd={handleDragEnd}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      opacity={card.style.opacity}
+      opacity={card.style?.opacity ?? 1}
       listening={!card.isLocked}
     >
       {renderCardContent()}
