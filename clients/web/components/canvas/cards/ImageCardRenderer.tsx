@@ -9,6 +9,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Rect, Text, Group, Image as KonvaImage } from 'react-konva';
 import type { ImageCard } from '@/types/card.types';
 import { CARD_CONFIG, ImageCache } from './cardConfig';
+import { sanitizeImageUrl, cleanupImage } from './imageSecurityUtils';
 
 interface ImageCardRendererProps {
   card: ImageCard;
@@ -32,14 +33,24 @@ export const ImageCardRenderer: React.FC<ImageCardRendererProps> = ({
   const [imageError, setImageError] = useState(false);
   const imageRef = useRef<HTMLImageElement>();
 
-  // Load image with caching
+  // Load image with caching and security validation
   useEffect(() => {
     let isMounted = true;
 
     if (content.url) {
       const imageSrc = content.thumbnail || content.url;
 
-      ImageCache.getImage(imageSrc)
+      // Validate URL before attempting to load
+      const sanitizedUrl = sanitizeImageUrl(imageSrc);
+      if (!sanitizedUrl) {
+        console.warn('Invalid or unsafe image URL:', imageSrc);
+        setImageError(true);
+        setImageLoaded(false);
+        setImage(null);
+        return;
+      }
+
+      ImageCache.getImage(sanitizedUrl)
         .then((img) => {
           if (isMounted) {
             setImage(img);
@@ -58,17 +69,11 @@ export const ImageCardRenderer: React.FC<ImageCardRendererProps> = ({
         });
     }
 
-    // Cleanup function with better memory management
+    // Cleanup function with improved security
     return () => {
       isMounted = false;
-      if (imageRef.current) {
-        // Clear event handlers
-        imageRef.current.onload = null;
-        imageRef.current.onerror = null;
-        // Help with garbage collection
-        imageRef.current.src = '';
-        imageRef.current = undefined;
-      }
+      cleanupImage(imageRef.current);
+      imageRef.current = undefined;
     };
   }, [content.url, content.thumbnail]);
 

@@ -2,6 +2,8 @@
  * Configuration constants for card rendering
  */
 
+import { loadImageSecurely, cleanupImage } from './imageSecurityUtils';
+
 export const CARD_CONFIG = {
   // Padding and spacing
   padding: 16,
@@ -58,7 +60,7 @@ export const CARD_CONFIG = {
   },
 } as const;
 
-// Image cache for performance optimization
+// Image cache for performance optimization with security
 export class ImageCache {
   private static cache = new Map<string, HTMLImageElement>();
   private static loadingPromises = new Map<string, Promise<HTMLImageElement>>();
@@ -74,35 +76,34 @@ export class ImageCache {
       return this.loadingPromises.get(src)!;
     }
 
-    // Create new loading promise
-    const loadingPromise = new Promise<HTMLImageElement>((resolve, reject) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-
-      img.onload = () => {
+    // Create new loading promise with security validation
+    const loadingPromise = loadImageSecurely(src, CARD_CONFIG.image.loadTimeout)
+      .then((img) => {
         this.cache.set(src, img);
         this.loadingPromises.delete(src);
-        resolve(img);
-      };
-
-      img.onerror = () => {
+        return img;
+      })
+      .catch((error) => {
         this.loadingPromises.delete(src);
-        reject(new Error(`Failed to load image: ${src}`));
-      };
-
-      img.src = src;
-    });
+        throw error;
+      });
 
     this.loadingPromises.set(src, loadingPromise);
     return loadingPromise;
   }
 
   static clear() {
+    // Clean up all cached images properly
+    this.cache.forEach((img) => cleanupImage(img));
     this.cache.clear();
     this.loadingPromises.clear();
   }
 
   static remove(src: string) {
+    const img = this.cache.get(src);
+    if (img) {
+      cleanupImage(img);
+    }
     this.cache.delete(src);
     this.loadingPromises.delete(src);
   }

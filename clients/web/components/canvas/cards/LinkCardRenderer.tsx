@@ -8,6 +8,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Rect, Text, Group, Image as KonvaImage } from 'react-konva';
 import type { LinkCard } from '@/types/card.types';
+import { sanitizeImageUrl, createSecureImage, cleanupImage } from './imageSecurityUtils';
 
 interface LinkCardRendererProps {
   card: LinkCard;
@@ -17,7 +18,7 @@ interface LinkCardRendererProps {
 }
 
 /**
- * Custom hook for loading images with cleanup
+ * Custom hook for loading images with security validation and cleanup
  */
 const useImageLoader = (url: string | undefined) => {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
@@ -31,8 +32,16 @@ const useImageLoader = (url: string | undefined) => {
       return;
     }
 
-    const img = new window.Image();
-    img.crossOrigin = 'anonymous';
+    // Validate URL before loading
+    const sanitizedUrl = sanitizeImageUrl(url);
+    if (!sanitizedUrl) {
+      console.warn('Invalid or unsafe image URL:', url);
+      setLoaded(false);
+      setImage(null);
+      return;
+    }
+
+    const img = createSecureImage();
 
     img.onload = () => {
       setImage(img);
@@ -44,16 +53,13 @@ const useImageLoader = (url: string | undefined) => {
       setImage(null);
     };
 
-    img.src = url;
+    img.src = sanitizedUrl;
     imageRef.current = img;
 
-    // Cleanup
+    // Cleanup with security utility
     return () => {
-      if (imageRef.current) {
-        imageRef.current.onload = null;
-        imageRef.current.onerror = null;
-        imageRef.current = undefined;
-      }
+      cleanupImage(imageRef.current);
+      imageRef.current = undefined;
     };
   }, [url]);
 
