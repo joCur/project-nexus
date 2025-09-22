@@ -17,6 +17,50 @@ interface LinkCardRendererProps {
 }
 
 /**
+ * Custom hook for loading images with cleanup
+ */
+const useImageLoader = (url: string | undefined) => {
+  const [image, setImage] = useState<HTMLImageElement | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const imageRef = useRef<HTMLImageElement>();
+
+  useEffect(() => {
+    if (!url) {
+      setImage(null);
+      setLoaded(false);
+      return;
+    }
+
+    const img = new window.Image();
+    img.crossOrigin = 'anonymous';
+
+    img.onload = () => {
+      setImage(img);
+      setLoaded(true);
+    };
+
+    img.onerror = () => {
+      setLoaded(false);
+      setImage(null);
+    };
+
+    img.src = url;
+    imageRef.current = img;
+
+    // Cleanup
+    return () => {
+      if (imageRef.current) {
+        imageRef.current.onload = null;
+        imageRef.current.onerror = null;
+        imageRef.current = undefined;
+      }
+    };
+  }, [url]);
+
+  return { image, loaded };
+};
+
+/**
  * LinkCardRenderer component
  */
 export const LinkCardRenderer: React.FC<LinkCardRendererProps> = ({
@@ -26,68 +70,10 @@ export const LinkCardRenderer: React.FC<LinkCardRendererProps> = ({
   isHovered,
 }) => {
   const { content, dimensions, style } = card;
-  const [favicon, setFavicon] = useState<HTMLImageElement | null>(null);
-  const [previewImage, setPreviewImage] = useState<HTMLImageElement | null>(null);
-  const [faviconLoaded, setFaviconLoaded] = useState(false);
-  const [previewLoaded, setPreviewLoaded] = useState(false);
-  const faviconRef = useRef<HTMLImageElement>();
-  const previewRef = useRef<HTMLImageElement>();
 
-  // Load favicon
-  useEffect(() => {
-    if (content.favicon) {
-      const img = new window.Image();
-      img.crossOrigin = 'anonymous';
-
-      img.onload = () => {
-        setFavicon(img);
-        setFaviconLoaded(true);
-      };
-
-      img.onerror = () => {
-        setFaviconLoaded(false);
-        setFavicon(null);
-      };
-
-      img.src = content.favicon;
-      faviconRef.current = img;
-    }
-
-    return () => {
-      if (faviconRef.current) {
-        faviconRef.current.onload = null;
-        faviconRef.current.onerror = null;
-      }
-    };
-  }, [content.favicon]);
-
-  // Load preview image
-  useEffect(() => {
-    if (content.previewImage) {
-      const img = new window.Image();
-      img.crossOrigin = 'anonymous';
-
-      img.onload = () => {
-        setPreviewImage(img);
-        setPreviewLoaded(true);
-      };
-
-      img.onerror = () => {
-        setPreviewLoaded(false);
-        setPreviewImage(null);
-      };
-
-      img.src = content.previewImage;
-      previewRef.current = img;
-    }
-
-    return () => {
-      if (previewRef.current) {
-        previewRef.current.onload = null;
-        previewRef.current.onerror = null;
-      }
-    };
-  }, [content.previewImage]);
+  // Use custom hook for loading images
+  const { image: favicon, loaded: faviconLoaded } = useImageLoader(content.favicon);
+  const { image: previewImage, loaded: previewLoaded } = useImageLoader(content.previewImage);
 
   // Calculate visual state modifiers
   const isHighlighted = isSelected || isHovered;

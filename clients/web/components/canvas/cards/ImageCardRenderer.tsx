@@ -5,7 +5,7 @@
  * optional captions and metadata. Includes proper aspect ratio handling.
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Rect, Text, Group, Image as KonvaImage } from 'react-konva';
 import type { ImageCard } from '@/types/card.types';
 import { CARD_CONFIG, ImageCache } from './cardConfig';
@@ -144,6 +144,22 @@ export const ImageCardRenderer: React.FC<ImageCardRendererProps> = ({
 
   const imageDims = getImageDimensions();
 
+  // Memoize the clip function to avoid recreating on every render
+  const clipFunction = useMemo(() => {
+    return (ctx: CanvasRenderingContext2D) => {
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(
+        imageArea.x,
+        imageArea.y,
+        imageArea.width,
+        imageArea.height,
+        Math.max(0, style.borderRadius - padding)
+      );
+      ctx.clip();
+    };
+  }, [imageArea.x, imageArea.y, imageArea.width, imageArea.height, style.borderRadius, padding]);
+
   return (
     <Group>
       {/* Drop shadow (if enabled) */}
@@ -194,18 +210,7 @@ export const ImageCardRenderer: React.FC<ImageCardRendererProps> = ({
             width={imageArea.width}
             height={imageArea.height}
             cornerRadius={Math.max(0, style.borderRadius - padding)}
-            clipFunc={(ctx: CanvasRenderingContext2D) => {
-              ctx.save();
-              ctx.beginPath();
-              ctx.roundRect(
-                imageArea.x,
-                imageArea.y,
-                imageArea.width,
-                imageArea.height,
-                Math.max(0, style.borderRadius - padding)
-              );
-              ctx.clip();
-            }}
+            clipFunc={clipFunction}
           />
 
           {/* Actual image */}
