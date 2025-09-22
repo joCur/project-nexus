@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { CardRenderer } from '../CardRenderer';
-import type { Card, TextCard, ImageCard, LinkCard, CodeCard } from '@/types/card.types';
+import type { Card, TextCard, ImageCard, LinkCard, CodeCard, CardId, CardStatus, CardPriority, CardStyle } from '@/types/card.types';
 import type { KonvaEventObject } from 'konva/lib/Node';
 
 // Mock Konva components
@@ -30,8 +30,36 @@ jest.mock('react-konva', () => ({
       data-draggable={draggable}
       data-opacity={opacity}
       data-listening={listening}
-      onClick={onClick}
-      onDoubleClick={onDblClick}
+      onClick={(e) => {
+      if (onClick) {
+        const konvaEvent = {
+          evt: {
+            ctrlKey: e.ctrlKey || false,
+            metaKey: e.metaKey || false,
+            shiftKey: e.shiftKey || false,
+            altKey: e.altKey || false,
+            button: e.button || 0,
+          },
+          cancelBubble: false,
+        };
+        onClick(konvaEvent);
+      }
+    }}
+      onDoubleClick={(e) => {
+      if (onDblClick) {
+        const konvaEvent = {
+          evt: {
+            ctrlKey: e.ctrlKey || false,
+            metaKey: e.metaKey || false,
+            shiftKey: e.shiftKey || false,
+            altKey: e.altKey || false,
+            button: e.button || 0,
+          },
+          cancelBubble: false,
+        };
+        onDblClick(konvaEvent);
+      }
+    }}
       onMouseDown={onDragStart}
       onMouseMove={onDragMove}
       onMouseUp={onDragEnd}
@@ -59,7 +87,7 @@ jest.mock('../TextCardRenderer', () => ({
       data-dragged={isDragged}
       data-hovered={isHovered}
     >
-      Text Card: {card.content.text}
+      Text Card: {card.content.content}
     </div>
   ),
 }));
@@ -160,62 +188,83 @@ describe('CardRenderer', () => {
     isHidden: boolean = false
   ): Card => {
     const baseCard = {
-      id,
-      type,
+      id: id as CardId,
       position: { x, y, z: 0 },
       dimensions: { width: 200, height: 100 },
-      style: { opacity: 1 },
+      style: {
+        backgroundColor: '#ffffff',
+        borderColor: '#cccccc',
+        textColor: '#000000',
+        borderWidth: 1,
+        borderRadius: 4,
+        opacity: 1,
+        shadow: false,
+      } as CardStyle,
       isHidden,
       isLocked,
-      metadata: {
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+      isSelected: false,
+      isMinimized: false,
+      status: 'active' as CardStatus,
+      priority: 'medium' as CardPriority,
+      tags: [] as string[],
+      linkedCardIds: [] as CardId[],
+      permissions: {
+        canEdit: true,
+        canDelete: true,
+        canShare: true,
+        canComment: true,
       },
+      animation: {
+        isAnimating: false,
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      metadata: {},
     };
 
     switch (type) {
       case 'text':
         return {
           ...baseCard,
-          type: 'text',
           content: {
-            text: 'Test text content',
-            isMarkdown: false,
+            type: 'text' as const,
+            content: 'Test text content',
+            markdown: false,
             wordCount: 3,
           },
         } as TextCard;
       case 'image':
         return {
           ...baseCard,
-          type: 'image',
           content: {
+            type: 'image' as const,
             url: 'https://example.com/image.jpg',
+            alt: 'Test image',
             caption: 'Test image',
             fileSize: 1024,
-            mimeType: 'image/jpeg',
           },
         } as ImageCard;
       case 'link':
         return {
           ...baseCard,
-          type: 'link',
           content: {
+            type: 'link' as const,
             url: 'https://example.com',
             title: 'Example Site',
             description: 'A test site',
             domain: 'example.com',
             favicon: 'https://example.com/favicon.ico',
+            isAccessible: true,
           },
         } as LinkCard;
       case 'code':
         return {
           ...baseCard,
-          type: 'code',
           content: {
-            code: 'console.log("test");',
+            type: 'code' as const,
+            content: 'console.log("test");',
             language: 'javascript',
             lineCount: 1,
-            executionState: 'idle',
           },
         } as CodeCard;
       default:
@@ -223,25 +272,7 @@ describe('CardRenderer', () => {
     }
   };
 
-  const createMockKonvaEvent = (
-    eventType: string,
-    target?: any,
-    evt?: Partial<MouseEvent | DragEvent>
-  ): KonvaEventObject<any> => ({
-    type: eventType,
-    target: {
-      x: () => 100,
-      y: () => 200,
-      ...target,
-    },
-    evt: {
-      ctrlKey: false,
-      metaKey: false,
-      ...evt,
-    },
-    cancelBubble: false,
-    currentTarget: null,
-  } as any);
+  // Mock Konva event creation removed - not used
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -320,7 +351,7 @@ describe('CardRenderer', () => {
   describe('Hover State Handling', () => {
     it('passes correct hover state to child renderers', () => {
       const card = createTestCard('hovered-card', 'text');
-      mockCardStore.hoverState.hoveredId = 'hovered-card';
+      mockCardStore.hoverState.hoveredId = 'hovered-card' as any;
 
       render(<CardRenderer card={card} />);
 

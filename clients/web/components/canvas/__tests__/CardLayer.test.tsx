@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { CardLayer } from '../CardLayer';
-import type { Card, TextCard, ImageCard, LinkCard, CodeCard } from '@/types/card.types';
+import type { Card, TextCard, ImageCard, LinkCard, CodeCard, CardId, CardStatus, CardPriority } from '@/types/card.types';
 import type { CanvasBounds } from '@/types/canvas.types';
 
 // Mock Konva components
@@ -31,7 +31,7 @@ jest.mock('../cards/CardRenderer', () => ({
   CardRenderer: ({ card }: { card: Card }) => (
     <div
       data-testid={`card-renderer-${card.id}`}
-      data-card-type={card.type}
+      data-card-type={card.content.type}
       data-card-x={card.position.x}
       data-card-y={card.position.y}
       data-card-z={card.position.z}
@@ -85,62 +85,83 @@ describe('CardLayer', () => {
     z: number = 0
   ): Card => {
     const baseCard = {
-      id,
-      type,
+      id: id as CardId,
       position: { x, y, z },
       dimensions: { width: 200, height: 100 },
-      style: { opacity: 1 },
+      style: {
+        backgroundColor: '#ffffff',
+        borderColor: '#cccccc',
+        textColor: '#000000',
+        borderWidth: 1,
+        borderRadius: 4,
+        opacity: 1,
+        shadow: false,
+      },
       isHidden: false,
       isLocked: false,
-      metadata: {
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+      isSelected: false,
+      isMinimized: false,
+      status: 'active' as CardStatus,
+      priority: 'medium' as CardPriority,
+      tags: [] as string[],
+      linkedCardIds: [] as CardId[],
+      permissions: {
+        canEdit: true,
+        canDelete: true,
+        canShare: true,
+        canComment: true,
       },
+      animation: {
+        isAnimating: false,
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      metadata: {},
     };
 
     switch (type) {
       case 'text':
         return {
           ...baseCard,
-          type: 'text',
           content: {
-            text: 'Test text content',
-            isMarkdown: false,
+            type: 'text' as const,
+            content: 'Test text content',
+            markdown: false,
             wordCount: 3,
           },
         } as TextCard;
       case 'image':
         return {
           ...baseCard,
-          type: 'image',
           content: {
+            type: 'image' as const,
             url: 'https://example.com/image.jpg',
+            alt: 'Test image',
             caption: 'Test image',
             fileSize: 1024,
-            mimeType: 'image/jpeg',
           },
         } as ImageCard;
       case 'link':
         return {
           ...baseCard,
-          type: 'link',
           content: {
+            type: 'link' as const,
             url: 'https://example.com',
             title: 'Example Site',
             description: 'A test site',
             domain: 'example.com',
             favicon: 'https://example.com/favicon.ico',
+            isAccessible: true,
           },
         } as LinkCard;
       case 'code':
         return {
           ...baseCard,
-          type: 'code',
           content: {
-            code: 'console.log("test");',
+            type: 'code' as const,
+            content: 'console.log("test");',
             language: 'javascript',
             lineCount: 1,
-            executionState: 'idle',
           },
         } as CodeCard;
       default:

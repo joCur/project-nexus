@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { CodeCardRenderer } from '../CodeCardRenderer';
-import type { CodeCard } from '@/types/card.types';
+import type { CodeCard, CardId } from '@/types/card.types';
 
 // Mock Konva components
 jest.mock('react-konva', () => ({
@@ -85,8 +85,7 @@ describe('CodeCardRenderer', () => {
     id: string = 'test-code-card',
     overrides: Partial<CodeCard> = {}
   ): CodeCard => ({
-    id,
-    type: 'code',
+    id: id as CardId,
     position: { x: 0, y: 0, z: 0 },
     dimensions: { width: 400, height: 300 },
     style: {
@@ -106,20 +105,29 @@ describe('CodeCardRenderer', () => {
       },
     },
     content: {
+      type: 'code' as const,
       content: 'console.log("Hello, World!");\nconst x = 42;\nreturn x;',
-      code: 'console.log("Hello, World!");\nconst x = 42;\nreturn x;',
       language: 'javascript',
       lineCount: 3,
       filename: 'example.js',
       hasExecuted: false,
-      executionState: 'idle',
       executionResults: undefined,
     },
     isHidden: false,
     isLocked: false,
+    isSelected: false,
+    isMinimized: false,
+    status: 'active' as const,
+    priority: 'normal' as const,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    tags: [],
     metadata: {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+    },
+    animation: {
+      isAnimating: false,
     },
     ...overrides,
   });
@@ -564,9 +572,8 @@ describe('CodeCardRenderer', () => {
           ...createCodeCard().content,
           executionResults: {
             output: 'Hello, World!',
-            error: null,
+            error: undefined,
             timestamp: '2024-01-15T10:30:00Z',
-            executionTime: 25,
           },
         },
       });
@@ -588,10 +595,9 @@ describe('CodeCardRenderer', () => {
         content: {
           ...createCodeCard().content,
           executionResults: {
-            output: null,
+            output: undefined,
             error: 'ReferenceError: x is not defined',
             timestamp: '2024-01-15T10:30:00Z',
-            executionTime: 5,
           },
         },
       });
@@ -614,9 +620,8 @@ describe('CodeCardRenderer', () => {
           ...createCodeCard().content,
           executionResults: {
             output: 'Result',
-            error: null,
+            error: undefined,
             timestamp: '2024-01-15T10:30:00Z',
-            executionTime: 15,
           },
         },
       });

@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { LinkCardRenderer } from '../LinkCardRenderer';
-import type { LinkCard } from '@/types/card.types';
+import type { LinkCard, CardId } from '@/types/card.types';
 
 // Mock Konva components
 jest.mock('react-konva', () => ({
@@ -134,8 +134,7 @@ describe('LinkCardRenderer', () => {
     id: string = 'test-link-card',
     overrides: Partial<LinkCard> = {}
   ): LinkCard => ({
-    id,
-    type: 'link',
+    id: id as CardId,
     position: { x: 0, y: 0, z: 0 },
     dimensions: { width: 300, height: 200 },
     style: {
@@ -155,6 +154,7 @@ describe('LinkCardRenderer', () => {
       },
     },
     content: {
+      type: 'link' as const,
       url: 'https://example.com/article',
       title: 'Example Article Title',
       description: 'This is a description of the example article with useful information.',
@@ -163,16 +163,22 @@ describe('LinkCardRenderer', () => {
       previewImage: 'https://example.com/preview.jpg',
       isAccessible: true,
       lastChecked: '2024-01-15T10:30:00Z',
-      metadata: {
-        author: 'John Doe',
-        publishedAt: '2024-01-01T00:00:00Z',
-      },
     },
     isHidden: false,
     isLocked: false,
+    isSelected: false,
+    isMinimized: false,
+    status: 'active' as const,
+    priority: 'normal' as const,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    tags: [],
     metadata: {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+    },
+    animation: {
+      isAnimating: false,
     },
     ...overrides,
   });

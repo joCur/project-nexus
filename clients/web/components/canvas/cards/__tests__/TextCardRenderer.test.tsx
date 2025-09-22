@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { TextCardRenderer } from '../TextCardRenderer';
-import type { TextCard } from '@/types/card.types';
+import type { TextCard, CardId } from '@/types/card.types';
 
 // Mock Konva components
 jest.mock('react-konva', () => ({
@@ -85,8 +85,7 @@ describe('TextCardRenderer', () => {
     id: string = 'test-card',
     overrides: Partial<TextCard> = {}
   ): TextCard => ({
-    id,
-    type: 'text',
+    id: id as CardId,
     position: { x: 0, y: 0, z: 0 },
     dimensions: { width: 200, height: 150 },
     style: {
@@ -106,17 +105,26 @@ describe('TextCardRenderer', () => {
       },
     },
     content: {
+      type: 'text' as const,
       content: 'Test text content',
-      text: 'Test text content',
       markdown: false,
-      isMarkdown: false,
       wordCount: 3,
     },
     isHidden: false,
     isLocked: false,
+    isSelected: false,
+    isMinimized: false,
+    status: 'active' as const,
+    priority: 'normal' as const,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    tags: [],
     metadata: {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+    },
+    animation: {
+      isAnimating: false,
     },
     ...overrides,
   });
@@ -185,10 +193,9 @@ describe('TextCardRenderer', () => {
     it('renders text content with proper formatting', () => {
       const card = createTextCard('text-card', {
         content: {
+          type: 'text' as const,
           content: 'Hello, World!',
-          text: 'Hello, World!',
           markdown: false,
-          isMarkdown: false,
           wordCount: 2,
         },
       });
@@ -264,10 +271,9 @@ describe('TextCardRenderer', () => {
       const card = createTextCard('long-text', {
         dimensions: { width: 150, height: 100 },
         content: {
+          type: 'text' as const,
           content: longText,
-          text: longText,
           markdown: false,
-          isMarkdown: false,
           wordCount: longText.split(' ').length,
         },
       });
@@ -286,10 +292,9 @@ describe('TextCardRenderer', () => {
     it('displays markdown indicator when markdown is enabled', () => {
       const card = createTextCard('markdown-card', {
         content: {
+          type: 'text' as const,
           content: '# Markdown Title\nSome **bold** text.',
-          text: '# Markdown Title\nSome **bold** text.',
           markdown: true,
-          isMarkdown: true,
           wordCount: 4,
         },
       });
@@ -318,10 +323,9 @@ describe('TextCardRenderer', () => {
     it('does not display markdown indicator for plain text', () => {
       const card = createTextCard('plain-text', {
         content: {
+          type: 'text' as const,
           content: 'Plain text content',
-          text: 'Plain text content',
           markdown: false,
-          isMarkdown: false,
           wordCount: 3,
         },
       });
@@ -339,10 +343,9 @@ describe('TextCardRenderer', () => {
       const card = createTextCard('positioned-markdown', {
         dimensions: { width: 300, height: 200 },
         content: {
+          type: 'text' as const,
           content: 'Markdown content',
-          text: 'Markdown content',
           markdown: true,
-          isMarkdown: true,
           wordCount: 2,
         },
       });
@@ -369,10 +372,9 @@ describe('TextCardRenderer', () => {
     it('displays word count for long content', () => {
       const card = createTextCard('long-content', {
         content: {
+          type: 'text' as const,
           content: 'This is a very long text with many words that exceeds one hundred words in total length.',
-          text: 'This is a very long text with many words that exceeds one hundred words in total length.',
           markdown: false,
-          isMarkdown: false,
           wordCount: 150, // Over 100 words
         },
       });
@@ -393,10 +395,9 @@ describe('TextCardRenderer', () => {
     it('does not display word count for short content', () => {
       const card = createTextCard('short-content', {
         content: {
+          type: 'text' as const,
           content: 'Short text',
-          text: 'Short text',
           markdown: false,
-          isMarkdown: false,
           wordCount: 2, // Under 100 words
         },
       });
@@ -415,10 +416,9 @@ describe('TextCardRenderer', () => {
       const card = createTextCard('positioned-word-count', {
         dimensions: { width: 300, height: 200 },
         content: {
+          type: 'text' as const,
           content: 'Long content',
-          text: 'Long content',
           markdown: false,
-          isMarkdown: false,
           wordCount: 120,
         },
       });
@@ -657,10 +657,9 @@ describe('TextCardRenderer', () => {
       const card = {
         ...createTextCard(),
         content: {
+          type: 'text' as const,
           content: '',
-          text: '',
           markdown: false,
-          isMarkdown: false,
           wordCount: 0,
         },
       };

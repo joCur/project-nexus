@@ -363,7 +363,8 @@ export class CanvasErrorBoundary extends Component<CanvasErrorBoundaryProps, Can
   private reportError(error: Error, errorInfo: ErrorInfo) {
     // This would integrate with your error reporting service
     // e.g., Sentry, LogRocket, Bugsnag, etc.
-    const errorReport = {
+    // Prepare error report for logging service
+    /* const errorReport = {
       error: {
         name: error.name,
         message: error.message,
@@ -380,7 +381,7 @@ export class CanvasErrorBoundary extends Component<CanvasErrorBoundaryProps, Can
         recoverable: error.recoverable,
         context: error.context,
       } : null,
-    };
+    }; */
 
     // Error report logged
     // TODO: Send to error reporting service

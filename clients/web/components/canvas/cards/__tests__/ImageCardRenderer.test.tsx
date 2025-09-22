@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { ImageCardRenderer } from '../ImageCardRenderer';
-import type { ImageCard } from '@/types/card.types';
+import type { ImageCard, CardId } from '@/types/card.types';
 
 // Mock Konva components
 jest.mock('react-konva', () => ({
@@ -132,8 +132,7 @@ describe('ImageCardRenderer', () => {
     id: string = 'test-image-card',
     overrides: Partial<ImageCard> = {}
   ): ImageCard => ({
-    id,
-    type: 'image',
+    id: id as CardId,
     position: { x: 0, y: 0, z: 0 },
     dimensions: { width: 300, height: 200 },
     style: {
@@ -153,22 +152,33 @@ describe('ImageCardRenderer', () => {
       },
     },
     content: {
+      type: 'image' as const,
       url: 'https://example.com/test-image.jpg',
-      thumbnail: 'https://example.com/test-image-thumb.jpg',
-      caption: 'Test image caption',
       alt: 'Test image alt text',
+      caption: 'Test image caption',
+      thumbnail: 'https://example.com/test-image-thumb.jpg',
+      originalFilename: undefined,
       fileSize: 1024 * 512, // 512KB
-      mimeType: 'image/jpeg',
-      metadata: {
+      dimensions: {
         width: 400,
         height: 300,
       },
     },
     isHidden: false,
     isLocked: false,
+    isSelected: false,
+    isMinimized: false,
+    status: 'active' as const,
+    priority: 'normal' as const,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    tags: [],
     metadata: {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+    },
+    animation: {
+      isAnimating: false,
     },
     ...overrides,
   });
@@ -476,7 +486,7 @@ describe('ImageCardRenderer', () => {
       const card = createImageCard('no-alt', {
         content: {
           ...createImageCard().content,
-          alt: undefined,
+          alt: '',
         },
       });
 
