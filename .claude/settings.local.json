@@ -54,7 +54,8 @@
       "Bash(netstat:*)",
       "Bash(npx tsc:*)",
       "mcp__notion__notion-search",
-      "mcp__notion__notion-create-pages"
+      "mcp__notion__notion-create-pages",
+      "Bash(npm run test:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"
