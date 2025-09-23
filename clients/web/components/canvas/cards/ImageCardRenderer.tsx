@@ -5,7 +5,7 @@
  * optional captions and metadata. Includes proper aspect ratio handling.
  */
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Rect, Text, Group, Image as KonvaImage } from 'react-konva';
 import type { ImageCard } from '@/types/card.types';
 import { CARD_CONFIG, ImageCache } from './cardConfig';
@@ -149,20 +149,18 @@ export const ImageCardRenderer: React.FC<ImageCardRendererProps> = ({
 
   const imageDims = getImageDimensions();
 
-  // Memoize the clip function to avoid recreating on every render
-  const clipFunction = useMemo(() => {
-    return (ctx: CanvasRenderingContext2D) => {
-      ctx.save();
-      ctx.beginPath();
-      ctx.roundRect(
-        imageArea.x,
-        imageArea.y,
-        imageArea.width,
-        imageArea.height,
-        Math.max(0, style.borderRadius - padding)
-      );
-      ctx.clip();
-    };
+  // Optimize clip function with useCallback to reduce recreations
+  const clipFunction = useCallback((ctx: CanvasRenderingContext2D) => {
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(
+      imageArea.x,
+      imageArea.y,
+      imageArea.width,
+      imageArea.height,
+      Math.max(0, style.borderRadius - padding)
+    );
+    ctx.clip();
   }, [imageArea.x, imageArea.y, imageArea.width, imageArea.height, style.borderRadius, padding]);
 
   return (
@@ -199,7 +197,7 @@ export const ImageCardRenderer: React.FC<ImageCardRendererProps> = ({
           y={0}
           width={dimensions.width}
           height={dimensions.height}
-          fill={isSelected ? '#3B82F6' : '#6B7280'}
+          fill={isSelected ? CARD_CONFIG.colors.selectedBorder : CARD_CONFIG.colors.secondaryText}
           opacity={highlightAlpha}
           cornerRadius={style.borderRadius}
         />

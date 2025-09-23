@@ -82,13 +82,53 @@ export const TextCardRenderer: React.FC<TextCardRendererProps> = ({
     ? (content?.content ?? '') // For now, display as plain text - markdown parsing can be added later
     : (content?.content ?? '');
 
-  // Simple text truncation
-  const words = displayText.split(' ');
-  const wordsPerLine = Math.max(1, Math.floor(textWidth / (fontSize * 0.6)));
-  const maxWords = maxLines * wordsPerLine;
-  const truncatedText = words.length > maxWords
-    ? words.slice(0, maxWords).join(' ') + '...'
-    : displayText;
+  // Improved text truncation with better word wrapping
+  const truncateText = (text: string, maxWidth: number, maxHeight: number): string => {
+    const words = text.split(' ');
+    const lines: string[] = [];
+    let currentLine = '';
+
+    for (const word of words) {
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
+      const testWidth = testLine.length * fontSize * 0.6; // Rough character width estimation
+
+      if (testWidth <= maxWidth) {
+        currentLine = testLine;
+      } else {
+        if (currentLine) {
+          lines.push(currentLine);
+          currentLine = word;
+        } else {
+          // Single word is too long, truncate it
+          const maxChars = Math.floor(maxWidth / (fontSize * 0.6));
+          lines.push(word.substring(0, maxChars - 3) + '...');
+          break;
+        }
+      }
+
+      // Check if we've exceeded max lines
+      if ((lines.length + (currentLine ? 1 : 0)) * lineHeight > maxHeight) {
+        if (lines.length === 0) {
+          // If we can't fit even one line, add ellipsis to first line
+          lines.push(currentLine + '...');
+        } else {
+          // Replace last line with truncated version
+          const lastLine = lines[lines.length - 1];
+          const truncationIndex = Math.max(0, lastLine.length - 3);
+          lines[lines.length - 1] = lastLine.substring(0, truncationIndex) + '...';
+        }
+        break;
+      }
+    }
+
+    if (currentLine && lines.length * lineHeight + lineHeight <= maxHeight) {
+      lines.push(currentLine);
+    }
+
+    return lines.join('\n');
+  };
+
+  const truncatedText = truncateText(displayText, textWidth, textHeight);
 
   return (
     <Group>

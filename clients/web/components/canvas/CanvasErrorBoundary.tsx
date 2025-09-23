@@ -361,30 +361,54 @@ export class CanvasErrorBoundary extends Component<CanvasErrorBoundaryProps, Can
   }
 
   private reportError(error: Error, errorInfo: ErrorInfo) {
-    // This would integrate with your error reporting service
-    // e.g., Sentry, LogRocket, Bugsnag, etc.
-    // Prepare error report for logging service
-    /* const errorReport = {
-      error: {
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
-      },
-      errorInfo,
-      userAgent: navigator.userAgent,
-      url: window.location.href,
-      timestamp: new Date().toISOString(),
-      canvasContext: error instanceof CanvasError ? {
-        type: error.type,
-        canvasId: error.canvasId,
-        workspaceId: error.workspaceId,
-        recoverable: error.recoverable,
-        context: error.context,
-      } : null,
-    }; */
+    // Import the structured logger for error reporting
+    const { logger } = require('@/lib/structured-logger');
 
-    // Error report logged
-    // TODO: Send to error reporting service
+    // Prepare canvas-specific context
+    const canvasContext = error instanceof CanvasError ? {
+      type: error.type,
+      canvasId: error.canvasId,
+      workspaceId: error.workspaceId,
+      recoverable: error.recoverable,
+      context: error.context,
+    } : null;
+
+    // Create comprehensive error context
+    const errorContext = {
+      component: 'CanvasErrorBoundary',
+      feature: 'canvas',
+      action: 'error_boundary_triggered',
+      componentStack: errorInfo.componentStack,
+      canvasContext,
+      retryCount: this.state.retryCount,
+      errorId: this.generateErrorId(),
+      metadata: {
+        errorInfo,
+        environment: process.env.NODE_ENV,
+        timestamp: new Date().toISOString(),
+      },
+    };
+
+    // Log error using structured logger with appropriate severity
+    if (error instanceof CanvasError && error.recoverable) {
+      logger.error(
+        `Recoverable canvas error: ${error.message}`,
+        error,
+        errorContext,
+        ['canvas', 'recoverable', 'error-boundary']
+      );
+    } else {
+      logger.fatal(
+        `Critical canvas error: ${error.message}`,
+        error,
+        errorContext,
+        ['canvas', 'critical', 'error-boundary']
+      );
+    }
+  }
+
+  private generateErrorId(): string {
+    return `canvas_error_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
   private attemptAutoRetry(error: Error) {

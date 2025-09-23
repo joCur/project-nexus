@@ -36,9 +36,9 @@ export const CodeCardRenderer: React.FC<CodeCardRendererProps> = ({
 
   // Calculate border color with selection/hover feedback
   const borderColor = isSelected
-    ? '#3B82F6' // Blue for selection
+    ? CARD_CONFIG.colors.selectedBorder
     : isHovered
-    ? '#6B7280' // Gray for hover
+    ? CARD_CONFIG.colors.hoverBorder
     : style.borderColor;
 
   // Calculate border width with selection feedback
