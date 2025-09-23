@@ -68,11 +68,6 @@ export const CardRenderer = React.memo<CardRendererProps>(({
   const isDragged = card?.id && dragState?.draggedIds?.has(card.id) || false;
   const isHovered = card?.id && hoverState?.hoveredId === card.id || false;
 
-  // Don't render if card is invalid or hidden
-  if (!card || !card.id || card.isHidden) {
-    return null;
-  }
-
   // Handle click events
   const handleClick = useCallback((e: KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true;
@@ -138,6 +133,11 @@ export const CardRenderer = React.memo<CardRendererProps>(({
     setHoveredCard(undefined);
     onCardUnhover?.(card, e);
   }, [setHoveredCard, onCardUnhover]);
+
+  // Don't render if card is invalid or hidden
+  if (!card || !card.id || card.isHidden) {
+    return null;
+  }
 
   // Render specific card type
   const renderCardContent = () => {
