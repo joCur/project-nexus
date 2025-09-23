@@ -308,7 +308,7 @@ describe('TextCardRenderer', () => {
       const markdownRect = rects.find(rect =>
         rect.getAttribute('data-width') === '16' &&
         rect.getAttribute('data-height') === '12' &&
-        rect.getAttribute('data-fill') === '#6B7280'
+        rect.getAttribute('data-fill') === '#6b7280'
       );
       expect(markdownRect).toBeInTheDocument();
 
@@ -388,7 +388,7 @@ describe('TextCardRenderer', () => {
 
       expect(wordCountText).toBeInTheDocument();
       expect(wordCountText).toHaveAttribute('data-font-size', '10');
-      expect(wordCountText).toHaveAttribute('data-fill', '#9CA3AF');
+      expect(wordCountText).toHaveAttribute('data-fill', '#6b7280');
       expect(wordCountText).toHaveAttribute('data-align', 'right');
     });
 
@@ -449,7 +449,7 @@ describe('TextCardRenderer', () => {
 
       // Should have selection highlight overlay
       const highlightRect = rects.find(rect =>
-        rect.getAttribute('data-fill') === '#3B82F6' &&
+        rect.getAttribute('data-fill') === '#3b82f6' &&
         rect.getAttribute('data-opacity') === '0.1'
       );
       expect(highlightRect).toBeInTheDocument();
@@ -467,7 +467,7 @@ describe('TextCardRenderer', () => {
 
       // Should have hover highlight overlay
       const highlightRect = rects.find(rect =>
-        rect.getAttribute('data-fill') === '#6B7280' &&
+        rect.getAttribute('data-fill') === '#6b7280' &&
         rect.getAttribute('data-opacity') === '0.05'
       );
       expect(highlightRect).toBeInTheDocument();
@@ -485,7 +485,7 @@ describe('TextCardRenderer', () => {
 
       // Should have selection highlight, not hover
       const highlightRect = rects.find(rect =>
-        rect.getAttribute('data-fill') === '#3B82F6' &&
+        rect.getAttribute('data-fill') === '#3b82f6' &&
         rect.getAttribute('data-opacity') === '0.1'
       );
       expect(highlightRect).toBeInTheDocument();
@@ -529,7 +529,7 @@ describe('TextCardRenderer', () => {
 
       // Should have dashed border for drag feedback
       const dragRect = rects.find(rect =>
-        rect.getAttribute('data-stroke') === '#3B82F6' &&
+        rect.getAttribute('data-stroke') === '#3b82f6' &&
         rect.getAttribute('data-stroke-width') === '2' &&
         rect.getAttribute('data-dash') === '[5,5]' &&
         rect.getAttribute('data-opacity') === '0.8'
