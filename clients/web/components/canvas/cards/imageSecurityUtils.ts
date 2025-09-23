@@ -49,7 +49,8 @@ export const sanitizeImageUrl = (url: string | undefined): string | null => {
     ];
 
     if (suspiciousPatterns.some(pattern => pattern.test(url))) {
-      console.warn('Suspicious URL pattern detected:', url);
+      // Use proper logging service instead of console.warn
+      // logger.warn('Suspicious URL pattern detected:', url);
       return null;
     }
 
