@@ -89,12 +89,12 @@ export const LinkCardRenderer: React.FC<LinkCardRendererProps> = ({
 
   // Calculate border color with selection/hover feedback
   const borderColor = isSelected
-    ? '#3B82F6' // Blue for selection
+    ? CARD_CONFIG.colors.selectedBorder
     : isHovered
-    ? '#6B7280' // Gray for hover
+    ? CARD_CONFIG.colors.hoverBorder
     : content.isAccessible
     ? style.borderColor
-    : '#EF4444'; // Red for inaccessible links
+    : CARD_CONFIG.colors.warningColor;
 
   // Calculate border width with selection feedback
   const borderWidth = isSelected

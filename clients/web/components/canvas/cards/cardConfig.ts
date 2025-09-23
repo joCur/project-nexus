@@ -22,6 +22,7 @@ export const CARD_CONFIG = {
     code: 11,
     caption: 11,
     indicator: 10,
+    scaleFactor: 20, // Divisor for width-based font size calculation
   },
   lineHeight: 1.5,
   codeLineHeight: 1.4,

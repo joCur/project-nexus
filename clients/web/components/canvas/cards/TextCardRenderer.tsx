@@ -69,7 +69,7 @@ export const TextCardRenderer: React.FC<TextCardRendererProps> = ({
 
   // Determine font size based on card size
   const fontSize = Math.min(
-    Math.max(CARD_CONFIG.fontSize.min, Math.floor(dimensions.width / 20)),
+    Math.max(CARD_CONFIG.fontSize.min, Math.floor(dimensions.width / CARD_CONFIG.fontSize.scaleFactor)),
     CARD_CONFIG.fontSize.max
   );
 
