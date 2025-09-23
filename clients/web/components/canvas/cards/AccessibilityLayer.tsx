@@ -20,7 +20,7 @@ export const AccessibilityLayer: React.FC<AccessibilityLayerProps> = ({
   onCardFocus,
   onCardActivate,
 }) => {
-  const { selectedCards, selectCard, deselectCard, setSelectedCards } = useCardStore();
+  const { selection, selectCard, clearSelection, selectCards, getSelectedCards } = useCardStore();
   const focusedIndexRef = useRef<number>(-1);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -41,8 +41,11 @@ export const AccessibilityLayer: React.FC<AccessibilityLayerProps> = ({
           onCardActivate?.(card);
 
           // Toggle selection
-          if (selectedCards.has(card.id)) {
-            deselectCard(card.id);
+          if (selection.selectedIds.has(card.id)) {
+            // Deselect by clearing and re-selecting others
+            const currentSelected = getSelectedCards();
+            const newSelection = currentSelected.filter(c => c.id !== card.id).map(c => c.id);
+            selectCards(newSelection);
           } else {
             selectCard(card.id, e.ctrlKey || e.metaKey);
           }
@@ -61,20 +64,20 @@ export const AccessibilityLayer: React.FC<AccessibilityLayerProps> = ({
         if (e.ctrlKey || e.metaKey) {
           e.preventDefault();
           // Select all cards
-          setSelectedCards(new Set(cards.map(c => c.id)));
+          selectCards(cards.map(c => c.id));
         }
         break;
 
       case 'Escape':
         e.preventDefault();
         // Deselect all
-        setSelectedCards(new Set());
+        clearSelection();
         break;
 
       default:
         break;
     }
-  }, [cards, selectedCards, selectCard, deselectCard, setSelectedCards, onCardActivate]);
+  }, [cards, selection, selectCard, clearSelection, selectCards, getSelectedCards, onCardActivate]);
 
   // Navigate between cards with arrow keys
   const navigateCards = useCallback((direction: string) => {
@@ -127,12 +130,12 @@ export const AccessibilityLayer: React.FC<AccessibilityLayerProps> = ({
 
   // Get accessible label for card
   const getCardLabel = (card: Card): string => {
-    const type = card.type;
-    const selected = selectedCards.has(card.id) ? 'selected' : '';
+    const type = card.content.type;
+    const selected = selection.selectedIds.has(card.id) ? 'selected' : '';
     const locked = card.isLocked ? 'locked' : '';
 
     let content = '';
-    switch (card.type) {
+    switch (card.content.type) {
       case 'text':
         content = (card.content as any).content?.substring(0, 50) || 'Empty text';
         break;
@@ -163,7 +166,7 @@ export const AccessibilityLayer: React.FC<AccessibilityLayerProps> = ({
           key={card.id}
           role="button"
           aria-label={getCardLabel(card)}
-          aria-selected={selectedCards.has(card.id)}
+          aria-selected={selection.selectedIds.has(card.id)}
           aria-disabled={card.isLocked}
           tabIndex={index === 0 ? 0 : -1}
           onFocus={() => {

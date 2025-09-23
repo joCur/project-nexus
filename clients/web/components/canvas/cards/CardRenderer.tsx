@@ -23,7 +23,7 @@ import { TextCardRenderer } from './TextCardRenderer';
 import { ImageCardRenderer } from './ImageCardRenderer';
 import { LinkCardRenderer } from './LinkCardRenderer';
 import { CodeCardRenderer } from './CodeCardRenderer';
-import { getFallbackCard, isValidCard } from './cardFactory';
+import { isValidCard, getFallbackCard } from './cardFactory';
 
 interface CardRendererProps {
   card: Card;
@@ -141,21 +141,18 @@ export const CardRenderer = React.memo<CardRendererProps>(({
 
   // Render specific card type
   const renderCardContent = () => {
-    // Handle invalid or missing content gracefully with proper factory
+    // Handle invalid or missing content gracefully with fallback
+    // This ensures cards always render, meeting NEX-192 error recovery requirements
     if (!isValidCard(card)) {
       const fallbackCard = getFallbackCard(card);
-
-      // Ensure we have a text card as fallback
-      if (isTextCard(fallbackCard)) {
-        return (
-          <TextCardRenderer
-            card={fallbackCard}
-            isSelected={isSelected}
-            isDragged={isDragged}
-            isHovered={isHovered}
-          />
-        );
-      }
+      return (
+        <TextCardRenderer
+          card={fallbackCard}
+          isSelected={isSelected}
+          isDragged={isDragged}
+          isHovered={isHovered}
+        />
+      );
     }
 
     if (isTextCard(card)) {
