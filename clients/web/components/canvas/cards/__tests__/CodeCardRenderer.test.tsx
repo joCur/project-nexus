@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { CodeCardRenderer } from '../CodeCardRenderer';
+import { CARD_CONFIG } from '../cardConfig';
 import type { CodeCard, CardId } from '@/types/card.types';
 
 // Mock Konva components
@@ -169,7 +170,7 @@ describe('CodeCardRenderer', () => {
       render(<CodeCardRenderer card={card} isSelected={false} isDragged={false} isHovered={false} />);
 
       const backgroundRect = screen.getAllByTestId('konva-rect')[0];
-      expect(backgroundRect).toHaveAttribute('data-fill', '#1E1E1E');
+      expect(backgroundRect).toHaveAttribute('data-fill', CARD_CONFIG.colors.codeBackground);
     });
   });
 

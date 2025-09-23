@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { LinkCardRenderer } from '../LinkCardRenderer';
+import { CARD_CONFIG } from '../cardConfig';
 import type { LinkCard, CardId } from '@/types/card.types';
 
 // Mock Konva components
@@ -603,7 +604,7 @@ describe('LinkCardRenderer', () => {
       render(<LinkCardRenderer card={card} isSelected={false} isDragged={false} isHovered={false} />);
 
       const backgroundRect = screen.getAllByTestId('konva-rect')[0];
-      expect(backgroundRect).toHaveAttribute('data-stroke', '#EF4444');
+      expect(backgroundRect).toHaveAttribute('data-stroke', CARD_CONFIG.colors.warningColor);
     });
 
     it('uses normal border for accessible links', () => {
@@ -740,7 +741,7 @@ describe('LinkCardRenderer', () => {
 
       // Background should have selection border
       const backgroundRect = rects[0];
-      expect(backgroundRect).toHaveAttribute('data-stroke', '#3B82F6');
+      expect(backgroundRect).toHaveAttribute('data-stroke', CARD_CONFIG.colors.selectedBorder);
       expect(backgroundRect).toHaveAttribute('data-stroke-width', '2');
 
       // Should have selection highlight
@@ -759,7 +760,7 @@ describe('LinkCardRenderer', () => {
 
       // Background should have hover border
       const backgroundRect = rects[0];
-      expect(backgroundRect).toHaveAttribute('data-stroke', '#6B7280');
+      expect(backgroundRect).toHaveAttribute('data-stroke', CARD_CONFIG.colors.hoverBorder);
 
       // Should have hover highlight
       const highlightRect = rects.find(rect =>
@@ -780,7 +781,7 @@ describe('LinkCardRenderer', () => {
       render(<LinkCardRenderer card={card} isSelected={true} isDragged={false} isHovered={true} />);
 
       const backgroundRect = screen.getAllByTestId('konva-rect')[0];
-      expect(backgroundRect).toHaveAttribute('data-stroke', '#3B82F6'); // Selection wins
+      expect(backgroundRect).toHaveAttribute('data-stroke', CARD_CONFIG.colors.selectedBorder); // Selection wins
     });
   });
 
