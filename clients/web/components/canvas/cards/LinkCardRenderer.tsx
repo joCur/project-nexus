@@ -156,6 +156,8 @@ export const LinkCardRenderer: React.FC<LinkCardRendererProps> = ({
 
   // Truncate text helper
   const truncateText = (text: string, maxLength: number) => {
+    if (!text || typeof text !== 'string') return '';
+    if (maxLength <= 0) return '';
     return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
   };
 

@@ -131,7 +131,7 @@ export const CodeCardRenderer: React.FC<CodeCardRendererProps> = ({
   // Truncate code for display
   const maxLines = Math.floor(codeArea.height / 14); // Assuming 14px line height
   const displayLines = lines.slice(0, maxLines);
-  const truncatedCode = displayLines.join('\n');
+  const truncatedCode = displayLines.join('\n') || '';
   const isTruncated = lines.length > maxLines;
 
   return (
