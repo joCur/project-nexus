@@ -8,6 +8,7 @@
 import React from 'react';
 import { Rect, Text, Group } from 'react-konva';
 import type { CodeCard } from '@/types/card.types';
+import { CARD_CONFIG } from './cardConfig';
 
 interface CodeCardRendererProps {
   card: CodeCard;

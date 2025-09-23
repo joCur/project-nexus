@@ -9,6 +9,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Rect, Text, Group, Image as KonvaImage } from 'react-konva';
 import type { LinkCard } from '@/types/card.types';
 import { sanitizeImageUrl, createSecureImage, cleanupImage } from './imageSecurityUtils';
+import { CARD_CONFIG } from './cardConfig';
 
 interface LinkCardRendererProps {
   card: LinkCard;

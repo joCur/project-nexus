@@ -61,9 +61,7 @@
   },
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
-    "playwright",
     "context7",
-    "semgrep",
     "linear-server",
     "notion"
   ]
