@@ -119,8 +119,8 @@ export const CardLayer: React.FC<CardLayerProps> = ({
     previousCardsRef.current = sortedCards;
 
     // Only recreate renderers if cards actually changed
-    if (!cardsChanged && previousCardsRef.current.length > 0) {
-      return previousCardsRef.current.map((card) => (
+    if (!cardsChanged && sortedCards.length > 0) {
+      return sortedCards.map((card) => (
         <React.Suspense
           key={card.id}
           fallback={null}

@@ -73,7 +73,7 @@ export const CardRenderer = React.memo<CardRendererProps>(({
     e.cancelBubble = true;
     selectCard(card.id, e.evt.ctrlKey || e.evt.metaKey);
     onCardClick?.(card, e);
-  }, [card.id, selectCard, onCardClick]);
+  }, [card, selectCard, onCardClick]);
 
   // Handle double click events
   const handleDoubleClick = useCallback((e: KonvaEventObject<MouseEvent>) => {
@@ -95,20 +95,20 @@ export const CardRenderer = React.memo<CardRendererProps>(({
     });
 
     onCardDragStart?.(card, e);
-  }, [card?.isLocked, card.id, selection?.selectedIds, startDrag, onCardDragStart]);
+  }, [card, selection?.selectedIds, startDrag, onCardDragStart]);
 
   // Handle drag move
   const handleDragMove = useCallback((e: KonvaEventObject<DragEvent>) => {
-    if (card?.isLocked || !dragState?.isDragging) return;
+    if (card?.isLocked || !dragState?.isDragging || !dragState?.startPosition) return;
 
     const currentOffset = {
-      x: (e.target?.x() || 0) - (dragState?.startPosition?.x || 0),
-      y: (e.target?.y() || 0) - (dragState?.startPosition?.y || 0),
+      x: (e.target?.x() || 0) - dragState.startPosition.x,
+      y: (e.target?.y() || 0) - dragState.startPosition.y,
     };
 
     updateDrag(currentOffset);
     onCardDragMove?.(card, e);
-  }, [card?.isLocked, dragState?.isDragging, dragState?.startPosition?.x, dragState?.startPosition?.y, updateDrag, onCardDragMove]);
+  }, [card, dragState?.isDragging, dragState?.startPosition, updateDrag, onCardDragMove]);
 
   // Handle drag end
   const handleDragEnd = useCallback((e: KonvaEventObject<DragEvent>) => {
@@ -120,19 +120,19 @@ export const CardRenderer = React.memo<CardRendererProps>(({
     });
 
     onCardDragEnd?.(card, e);
-  }, [card?.isLocked, endDrag, onCardDragEnd]);
+  }, [card, endDrag, onCardDragEnd]);
 
   // Handle mouse enter
   const handleMouseEnter = useCallback((e: KonvaEventObject<MouseEvent>) => {
     setHoveredCard(card.id);
     onCardHover?.(card, e);
-  }, [card.id, setHoveredCard, onCardHover]);
+  }, [card, setHoveredCard, onCardHover]);
 
   // Handle mouse leave
   const handleMouseLeave = useCallback((e: KonvaEventObject<MouseEvent>) => {
     setHoveredCard(undefined);
     onCardUnhover?.(card, e);
-  }, [setHoveredCard, onCardUnhover]);
+  }, [card, setHoveredCard, onCardUnhover]);
 
   // Don't render if card is invalid or hidden
   if (!card || !card.id || card.isHidden) {
