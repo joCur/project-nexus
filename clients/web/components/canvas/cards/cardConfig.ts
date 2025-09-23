@@ -81,6 +81,20 @@ export const CARD_CONFIG = {
   // Performance
   viewport: {
     cullingPadding: 100, // pixels outside viewport to still render
+    extraPadding: 500, // Extra pixels around viewport to render for CardLayer
+  },
+
+  // Code card specific
+  code: {
+    padding: 12,
+    headerHeight: 28,
+    footerHeight: 24,
+    lineNumberWidth: 32,
+  },
+
+  // Text rendering
+  text: {
+    characterWidthEstimate: 0.6, // Rough character width as fraction of font size
   },
 } as const;
 

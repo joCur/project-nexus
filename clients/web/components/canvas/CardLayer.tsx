@@ -7,6 +7,7 @@ import { useCanvasStore } from '@/stores/canvasStore';
 import { useViewportDimensions } from '@/utils/viewport';
 import type { Card } from '@/types/card.types';
 import type { CanvasBounds } from '@/types/canvas.types';
+import { CARD_CONFIG } from './cards/cardConfig';
 
 // Import the CardRenderer from the cards directory
 const CardRenderer = React.lazy(() =>
@@ -41,7 +42,7 @@ interface CardLayerProps {
 export const CardLayer: React.FC<CardLayerProps> = ({
   viewportBounds,
   enableViewportCulling = true,
-  viewportPadding = 500, // Extra pixels around viewport to render
+  viewportPadding = CARD_CONFIG.viewport.extraPadding, // Extra pixels around viewport to render
 }) => {
   const { cards, getCardsInBounds } = useCardStore();
   const { viewport } = useCanvasStore();

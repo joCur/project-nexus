@@ -63,10 +63,10 @@ export const CodeCardRenderer: React.FC<CodeCardRendererProps> = ({
   } : shadowConfig;
 
   // Layout calculations
-  const padding = 12;
-  const headerHeight = 28;
-  const footerHeight = content.executionResults ? 24 : 0;
-  const lineNumberWidth = 32;
+  const padding = CARD_CONFIG.code.padding;
+  const headerHeight = CARD_CONFIG.code.headerHeight;
+  const footerHeight = content.executionResults ? CARD_CONFIG.code.footerHeight : 0;
+  const lineNumberWidth = CARD_CONFIG.code.lineNumberWidth;
 
   // Content areas
   const headerArea = {

@@ -82,15 +82,22 @@ export const TextCardRenderer: React.FC<TextCardRendererProps> = ({
     ? (content?.content ?? '') // For now, display as plain text - markdown parsing can be added later
     : (content?.content ?? '');
 
+  // Text measurement utilities for accurate text wrapping
+  const measureTextWidth = (text: string): number => {
+    // Use the more accurate character width estimation from CARD_CONFIG
+    return text.length * fontSize * CARD_CONFIG.text.characterWidthEstimate;
+  };
+
   // Improved text truncation with better word wrapping
   const truncateText = (text: string, maxWidth: number, maxHeight: number): string => {
     const words = text.split(' ');
     const lines: string[] = [];
     let currentLine = '';
+    const maxLinesCount = Math.floor(maxHeight / lineHeight);
 
     for (const word of words) {
       const testLine = currentLine ? `${currentLine} ${word}` : word;
-      const testWidth = testLine.length * fontSize * 0.6; // Rough character width estimation
+      const testWidth = measureTextWidth(testLine);
 
       if (testWidth <= maxWidth) {
         currentLine = testLine;
@@ -98,30 +105,38 @@ export const TextCardRenderer: React.FC<TextCardRendererProps> = ({
         if (currentLine) {
           lines.push(currentLine);
           currentLine = word;
+
+          // Check if adding this word would exceed max lines
+          if (lines.length >= maxLinesCount) {
+            // Truncate the last line to fit ellipsis
+            const lastLine = lines[lines.length - 1];
+            const ellipsisWidth = measureTextWidth('...');
+            let truncatedLine = lastLine;
+
+            while (measureTextWidth(truncatedLine + '...') > maxWidth && truncatedLine.length > 0) {
+              truncatedLine = truncatedLine.slice(0, -1);
+            }
+
+            lines[lines.length - 1] = truncatedLine + '...';
+            break;
+          }
         } else {
           // Single word is too long, truncate it
-          const maxChars = Math.floor(maxWidth / (fontSize * 0.6));
-          lines.push(word.substring(0, maxChars - 3) + '...');
+          let truncatedWord = word;
+          const ellipsisWidth = measureTextWidth('...');
+
+          while (measureTextWidth(truncatedWord + '...') > maxWidth && truncatedWord.length > 0) {
+            truncatedWord = truncatedWord.slice(0, -1);
+          }
+
+          lines.push(truncatedWord + '...');
           break;
         }
       }
-
-      // Check if we've exceeded max lines
-      if ((lines.length + (currentLine ? 1 : 0)) * lineHeight > maxHeight) {
-        if (lines.length === 0) {
-          // If we can't fit even one line, add ellipsis to first line
-          lines.push(currentLine + '...');
-        } else {
-          // Replace last line with truncated version
-          const lastLine = lines[lines.length - 1];
-          const truncationIndex = Math.max(0, lastLine.length - 3);
-          lines[lines.length - 1] = lastLine.substring(0, truncationIndex) + '...';
-        }
-        break;
-      }
     }
 
-    if (currentLine && lines.length * lineHeight + lineHeight <= maxHeight) {
+    // Add remaining current line if it fits
+    if (currentLine && lines.length < maxLinesCount) {
       lines.push(currentLine);
     }
 
