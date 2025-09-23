@@ -168,7 +168,7 @@ export const CodeCardRenderer: React.FC<CodeCardRendererProps> = ({
           y={0}
           width={dimensions.width}
           height={dimensions.height}
-          fill={isSelected ? '#3B82F6' : '#6B7280'}
+          fill={isSelected ? CARD_CONFIG.colors.selectedBorder : CARD_CONFIG.colors.hoverBorder}
           opacity={highlightAlpha}
           cornerRadius={style.borderRadius}
         />

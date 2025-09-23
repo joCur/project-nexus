@@ -640,7 +640,7 @@ describe('ImageCardRenderer', () => {
 
       // Should have selection highlight
       const highlightRect = rects.find(rect =>
-        rect.getAttribute('data-fill') === '#3B82F6' &&
+        rect.getAttribute('data-fill') === '#3b82f6' &&
         rect.getAttribute('data-opacity') === '0.1'
       );
       expect(highlightRect).toBeInTheDocument();
@@ -658,7 +658,7 @@ describe('ImageCardRenderer', () => {
 
       // Should have hover highlight
       const highlightRect = rects.find(rect =>
-        rect.getAttribute('data-fill') === '#6B7280' &&
+        rect.getAttribute('data-fill') === '#6b7280' &&
         rect.getAttribute('data-opacity') === '0.05'
       );
       expect(highlightRect).toBeInTheDocument();
@@ -675,7 +675,7 @@ describe('ImageCardRenderer', () => {
       expect(backgroundRect).toHaveAttribute('data-stroke', '#3b82f6');
 
       const highlightRect = rects.find(rect =>
-        rect.getAttribute('data-fill') === '#3B82F6'
+        rect.getAttribute('data-fill') === '#3b82f6'
       );
       expect(highlightRect).toBeInTheDocument();
     });

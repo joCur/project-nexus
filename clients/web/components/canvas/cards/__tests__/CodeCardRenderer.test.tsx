@@ -707,12 +707,12 @@ describe('CodeCardRenderer', () => {
 
       // Background should have selection border
       const backgroundRect = rects[0];
-      expect(backgroundRect).toHaveAttribute('data-stroke', '#3B82F6');
+      expect(backgroundRect).toHaveAttribute('data-stroke', '#3b82f6');
       expect(backgroundRect).toHaveAttribute('data-stroke-width', '2');
 
       // Should have selection highlight
       const highlightRect = rects.find(rect =>
-        rect.getAttribute('data-fill') === '#3B82F6' &&
+        rect.getAttribute('data-fill') === '#3b82f6' &&
         rect.getAttribute('data-opacity') === '0.1'
       );
       expect(highlightRect).toBeInTheDocument();
@@ -726,11 +726,11 @@ describe('CodeCardRenderer', () => {
 
       // Background should have hover border
       const backgroundRect = rects[0];
-      expect(backgroundRect).toHaveAttribute('data-stroke', '#6B7280');
+      expect(backgroundRect).toHaveAttribute('data-stroke', '#93c5fd');
 
       // Should have hover highlight
       const highlightRect = rects.find(rect =>
-        rect.getAttribute('data-fill') === '#6B7280' &&
+        rect.getAttribute('data-fill') === '#93c5fd' &&
         rect.getAttribute('data-opacity') === '0.05'
       );
       expect(highlightRect).toBeInTheDocument();
@@ -744,7 +744,7 @@ describe('CodeCardRenderer', () => {
 
       // Should use selection styling
       const backgroundRect = rects[0];
-      expect(backgroundRect).toHaveAttribute('data-stroke', '#3B82F6');
+      expect(backgroundRect).toHaveAttribute('data-stroke', '#3b82f6');
     });
   });
 
