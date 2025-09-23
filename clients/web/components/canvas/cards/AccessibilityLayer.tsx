@@ -8,6 +8,7 @@
 import React, { useEffect, useCallback, useRef } from 'react';
 import { useCardStore } from '@/stores/cardStore';
 import type { Card } from '@/types/card.types';
+import { isTextCard, isImageCard, isLinkCard, isCodeCard } from '@/types/card.types';
 
 interface AccessibilityLayerProps {
   cards: Card[];
@@ -135,19 +136,16 @@ export const AccessibilityLayer: React.FC<AccessibilityLayerProps> = ({
     const locked = card.isLocked ? 'locked' : '';
 
     let content = '';
-    switch (card.content.type) {
-      case 'text':
-        content = (card.content as any).content?.substring(0, 50) || 'Empty text';
-        break;
-      case 'image':
-        content = (card.content as any).alt || 'Image';
-        break;
-      case 'link':
-        content = (card.content as any).title || 'Link';
-        break;
-      case 'code':
-        content = `Code in ${(card.content as any).language || 'unknown language'}`;
-        break;
+    if (isTextCard(card)) {
+      content = card.content.content?.substring(0, 50) || 'Empty text';
+    } else if (isImageCard(card)) {
+      content = card.content.alt || 'Image';
+    } else if (isLinkCard(card)) {
+      content = card.content.title || 'Link';
+    } else if (isCodeCard(card)) {
+      content = `Code in ${card.content.language || 'unknown language'}`;
+    } else {
+      content = 'Unknown card type';
     }
 
     return `${type} card: ${content} ${selected} ${locked}`.trim();

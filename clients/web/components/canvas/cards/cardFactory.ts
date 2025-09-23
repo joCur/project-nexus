@@ -6,9 +6,8 @@
  * This is critical for error resilience as per NEX-192 requirements.
  */
 
-import type { Card, TextCard, ImageCard, LinkCard, CodeCard } from '@/types/card.types';
+import type { Card, TextCard, TextCardContent, ImageCardContent, LinkCardContent, CodeCardContent } from '@/types/card.types';
 import { createCardId } from '@/types/card.types';
-import { isTextCard, isImageCard, isLinkCard, isCodeCard } from '@/types/card.types';
 
 /**
  * Creates a fallback text card for error cases
@@ -54,6 +53,62 @@ export const createFallbackTextCard = (baseCard: Partial<Card>): TextCard => {
 };
 
 /**
+ * Type guard for text card content
+ */
+export const isTextCardContent = (content: unknown): content is TextCardContent => {
+  return (
+    typeof content === 'object' &&
+    content !== null &&
+    'type' in content &&
+    content.type === 'text' &&
+    'content' in content &&
+    typeof (content as Record<string, unknown>).content === 'string'
+  );
+};
+
+/**
+ * Type guard for image card content
+ */
+export const isImageCardContent = (content: unknown): content is ImageCardContent => {
+  return (
+    typeof content === 'object' &&
+    content !== null &&
+    'type' in content &&
+    content.type === 'image' &&
+    'url' in content &&
+    typeof (content as Record<string, unknown>).url === 'string'
+  );
+};
+
+/**
+ * Type guard for link card content
+ */
+export const isLinkCardContent = (content: unknown): content is LinkCardContent => {
+  return (
+    typeof content === 'object' &&
+    content !== null &&
+    'type' in content &&
+    content.type === 'link' &&
+    'url' in content &&
+    typeof (content as Record<string, unknown>).url === 'string'
+  );
+};
+
+/**
+ * Type guard for code card content
+ */
+export const isCodeCardContent = (content: unknown): content is CodeCardContent => {
+  return (
+    typeof content === 'object' &&
+    content !== null &&
+    'type' in content &&
+    content.type === 'code' &&
+    'language' in content &&
+    typeof (content as Record<string, unknown>).language === 'string'
+  );
+};
+
+/**
  * Validates if a card has valid content
  * Checks that required fields are present
  */
@@ -61,22 +116,14 @@ export const isValidCard = (card: Card | null | undefined): boolean => {
   if (!card || !card.content) return false;
 
   switch (card.content.type) {
-    case 'text': {
-      const content = card.content as any;
-      return typeof content.content === 'string';
-    }
-    case 'image': {
-      const content = card.content as any;
-      return typeof content.url === 'string';
-    }
-    case 'link': {
-      const content = card.content as any;
-      return typeof content.url === 'string';
-    }
-    case 'code': {
-      const content = card.content as any;
-      return typeof content.language === 'string';
-    }
+    case 'text':
+      return isTextCardContent(card.content);
+    case 'image':
+      return isImageCardContent(card.content);
+    case 'link':
+      return isLinkCardContent(card.content);
+    case 'code':
+      return isCodeCardContent(card.content);
     default:
       return false;
   }
