@@ -14,6 +14,10 @@ const CanvasBackground = dynamic(() => import('./CanvasBackground').then(mod => 
   ssr: false
 });
 
+const CardLayer = dynamic(() => import('./CardLayer').then(mod => ({ default: mod.default })), {
+  ssr: false
+});
+
 interface InfiniteCanvasProps {
   className?: string;
   showGrid?: boolean;
@@ -86,7 +90,11 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
           zoom={zoom}
           position={position}
         />
-        {/* Future: Card and connection layers will be added here */}
+        <CardLayer
+          enableViewportCulling={true}
+          viewportPadding={500}
+        />
+        {/* Future: Connection layers will be added here */}
       </CanvasStage>
     </div>
   );
