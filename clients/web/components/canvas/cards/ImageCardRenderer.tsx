@@ -79,8 +79,8 @@ export const ImageCardRenderer: React.FC<ImageCardRendererProps> = ({
 
   // Calculate visual state modifiers
   const isHighlighted = isSelected || isHovered;
-  const selectionAlpha = isSelected ? 0.1 : 0;
-  const hoverAlpha = isHovered && !isSelected ? 0.05 : 0;
+  const selectionAlpha = isSelected ? CARD_CONFIG.opacity.selection : 0;
+  const hoverAlpha = isHovered && !isSelected ? CARD_CONFIG.opacity.hover : 0;
   const highlightAlpha = Math.max(selectionAlpha, hoverAlpha);
 
   // Calculate border color with selection/hover feedback

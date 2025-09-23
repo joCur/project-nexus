@@ -23,6 +23,7 @@ import { TextCardRenderer } from './TextCardRenderer';
 import { ImageCardRenderer } from './ImageCardRenderer';
 import { LinkCardRenderer } from './LinkCardRenderer';
 import { CodeCardRenderer } from './CodeCardRenderer';
+import { getFallbackCard, isValidCard } from './cardFactory';
 
 interface CardRendererProps {
   card: Card;
@@ -52,8 +53,9 @@ export const CardRenderer = React.memo<CardRendererProps>(({
   const {
     selection,
     dragState,
-    resizeState,
     hoverState,
+    // Note: resizeState will be used in future for resize handles implementation
+    // resizeState,
     selectCard,
     startDrag,
     updateDrag,
@@ -65,9 +67,6 @@ export const CardRenderer = React.memo<CardRendererProps>(({
   const isSelected = card?.id && selection?.selectedIds?.has(card.id) || false;
   const isDragged = card?.id && dragState?.draggedIds?.has(card.id) || false;
   const isHovered = card?.id && hoverState?.hoveredId === card.id || false;
-
-  // Suppress unused vars warning for now - these will be used for resize handles later
-  void resizeState;
 
   // Don't render if card is invalid or hidden
   if (!card || !card.id || card.isHidden) {
@@ -142,22 +141,21 @@ export const CardRenderer = React.memo<CardRendererProps>(({
 
   // Render specific card type
   const renderCardContent = () => {
-    // Handle missing content gracefully - fallback to text renderer
-    if (!card.content) {
-      // Create a safe fallback card with text content
-      const fallbackCard: TextCard = {
-        ...card,
-        content: { type: 'text' as const, content: '', markdown: false, wordCount: 0 }
-      } as TextCard;
+    // Handle invalid or missing content gracefully with proper factory
+    if (!isValidCard(card)) {
+      const fallbackCard = getFallbackCard(card);
 
-      return (
-        <TextCardRenderer
-          card={fallbackCard}
-          isSelected={isSelected}
-          isDragged={isDragged}
-          isHovered={isHovered}
-        />
-      );
+      // Ensure we have a text card as fallback
+      if (isTextCard(fallbackCard)) {
+        return (
+          <TextCardRenderer
+            card={fallbackCard}
+            isSelected={isSelected}
+            isDragged={isDragged}
+            isHovered={isHovered}
+          />
+        );
+      }
     }
 
     if (isTextCard(card)) {

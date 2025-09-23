@@ -17,9 +17,24 @@ export const CARD_CONFIG = {
     base: 14,
     title: 16,
     heading: 20,
+    min: 12,
+    max: 18,
+    code: 11,
+    caption: 11,
+    indicator: 10,
   },
   lineHeight: 1.5,
+  codeLineHeight: 1.4,
   fontFamily: 'Arial',
+  codeFontFamily: 'Consolas, Monaco, monospace',
+
+  // Opacity values
+  opacity: {
+    selection: 0.1,
+    hover: 0.05,
+    dragIndicator: 0.8,
+    altIndicator: 0.8,
+  },
 
   // Colors
   colors: {
@@ -31,8 +46,16 @@ export const CARD_CONFIG = {
     text: '#1f2937',
     secondaryText: '#6b7280',
     errorBackground: '#fee2e2',
+    errorBorder: '#fecaca',
     errorText: '#991b1b',
     loadingBackground: '#f3f4f6',
+    loadingBorder: '#e5e7eb',
+    codeBackground: '#1f2937',
+    codeBorder: '#374151',
+    codeText: '#e5e7eb',
+    successColor: '#10b981',
+    warningColor: '#ef4444',
+    infoColor: '#059669',
   },
 
   // Image handling

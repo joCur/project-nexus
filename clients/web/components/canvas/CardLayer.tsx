@@ -4,6 +4,7 @@ import React, { useMemo } from 'react';
 import { Layer } from 'react-konva';
 import { useCardStore } from '@/stores/cardStore';
 import { useCanvasStore } from '@/stores/canvasStore';
+import { useViewportDimensions } from '@/utils/viewport';
 import type { Card } from '@/types/card.types';
 import type { CanvasBounds } from '@/types/canvas.types';
 
@@ -45,6 +46,7 @@ export const CardLayer: React.FC<CardLayerProps> = ({
   const { cards, getCardsInBounds } = useCardStore();
   const { viewport } = useCanvasStore();
   const { zoom, position } = viewport;
+  const viewportDimensions = useViewportDimensions();
 
   // Calculate current viewport bounds if not provided
   const currentViewportBounds = useMemo((): CanvasBounds => {
@@ -54,8 +56,7 @@ export const CardLayer: React.FC<CardLayerProps> = ({
 
     // Calculate viewport bounds based on canvas state
     // We need to reverse the transform to get world coordinates
-    const viewportWidth = window.innerWidth || 1920;
-    const viewportHeight = window.innerHeight || 1080;
+    const { width: viewportWidth, height: viewportHeight } = viewportDimensions;
 
     // Convert screen space to world space coordinates
     const worldMinX = (-position.x) / zoom - viewportPadding;
@@ -69,7 +70,7 @@ export const CardLayer: React.FC<CardLayerProps> = ({
       maxX: worldMaxX,
       maxY: worldMaxY,
     };
-  }, [viewportBounds, position.x, position.y, zoom, viewportPadding]);
+  }, [viewportBounds, position.x, position.y, zoom, viewportPadding, viewportDimensions]);
 
   // Get visible cards with performance optimization
   const visibleCards = useMemo((): Card[] => {
@@ -96,7 +97,13 @@ export const CardLayer: React.FC<CardLayerProps> = ({
     });
   }, [visibleCards]);
 
-  // Memoized card renderers
+  // Generate stable keys for card rendering based on card IDs
+  // This improves React's reconciliation and prevents unnecessary re-renders
+  const cardKeys = useMemo(() => {
+    return sortedCards.map(card => card.id).join(',');
+  }, [sortedCards]);
+
+  // Memoized card renderers with stable key generation
   const cardRenderers = useMemo(() => {
     return sortedCards.map((card) => (
       <React.Suspense
@@ -108,7 +115,7 @@ export const CardLayer: React.FC<CardLayerProps> = ({
         />
       </React.Suspense>
     ));
-  }, [sortedCards]);
+  }, [cardKeys, sortedCards]); // Use cardKeys for more stable memoization
 
   return (
     <Layer

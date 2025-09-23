@@ -30,8 +30,8 @@ export const TextCardRenderer: React.FC<TextCardRendererProps> = ({
 
   // Calculate visual state modifiers
   const isHighlighted = isSelected || isHovered;
-  const selectionAlpha = isSelected ? 0.1 : 0;
-  const hoverAlpha = isHovered && !isSelected ? 0.05 : 0;
+  const selectionAlpha = isSelected ? CARD_CONFIG.opacity.selection : 0;
+  const hoverAlpha = isHovered && !isSelected ? CARD_CONFIG.opacity.hover : 0;
   const highlightAlpha = Math.max(selectionAlpha, hoverAlpha);
 
   // Calculate border color with selection/hover feedback
@@ -63,18 +63,18 @@ export const TextCardRenderer: React.FC<TextCardRendererProps> = ({
   } : shadowConfig;
 
   // Calculate text metrics and positioning
-  const padding = 16;
+  const padding = CARD_CONFIG.padding;
   const textWidth = dimensions.width - (padding * 2);
   const textHeight = dimensions.height - (padding * 2);
 
   // Determine font size based on card size
   const fontSize = Math.min(
-    Math.max(12, Math.floor(dimensions.width / 20)),
-    18
+    Math.max(CARD_CONFIG.fontSize.min, Math.floor(dimensions.width / 20)),
+    CARD_CONFIG.fontSize.max
   );
 
   // Line height calculation
-  const lineHeight = fontSize * 1.4;
+  const lineHeight = fontSize * CARD_CONFIG.codeLineHeight;
 
   // Text truncation for large content
   const maxLines = Math.floor(textHeight / lineHeight);
@@ -124,7 +124,7 @@ export const TextCardRenderer: React.FC<TextCardRendererProps> = ({
           y={0}
           width={dimensions.width}
           height={dimensions.height}
-          fill={isSelected ? '#3B82F6' : '#6B7280'}
+          fill={isSelected ? CARD_CONFIG.colors.selectedBorder : CARD_CONFIG.colors.secondaryText}
           opacity={highlightAlpha}
           cornerRadius={style.borderRadius}
         />
@@ -155,9 +155,9 @@ export const TextCardRenderer: React.FC<TextCardRendererProps> = ({
             y={8}
             width={16}
             height={12}
-            fill="#6B7280"
+            fill={CARD_CONFIG.colors.secondaryText}
             cornerRadius={2}
-            opacity={0.7}
+            opacity={CARD_CONFIG.opacity.altIndicator}
           />
           <Text
             x={dimensions.width - 22}
@@ -177,9 +177,9 @@ export const TextCardRenderer: React.FC<TextCardRendererProps> = ({
           x={dimensions.width - 60}
           y={dimensions.height - 20}
           text={`${content?.wordCount ?? 0} words`}
-          fontSize={10}
+          fontSize={CARD_CONFIG.fontSize.indicator}
           fontFamily="Inter, sans-serif"
-          fill="#9CA3AF"
+          fill={CARD_CONFIG.colors.secondaryText}
           align="right"
         />
       )}
@@ -191,11 +191,11 @@ export const TextCardRenderer: React.FC<TextCardRendererProps> = ({
           y={0}
           width={dimensions.width}
           height={dimensions.height}
-          stroke="#3B82F6"
+          stroke={CARD_CONFIG.colors.selectedBorder}
           strokeWidth={2}
           dash={[5, 5]}
           cornerRadius={style.borderRadius}
-          opacity={0.8}
+          opacity={CARD_CONFIG.opacity.dragIndicator}
         />
       )}
     </Group>
