@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { Layer } from 'react-konva';
 import { useCardStore } from '@/stores/cardStore';
 import { useCanvasStore } from '@/stores/canvasStore';
@@ -98,25 +98,51 @@ export const CardLayer: React.FC<CardLayerProps> = ({
     });
   }, [visibleCards]);
 
-  // Generate stable keys for card rendering based on card IDs
-  // This improves React's reconciliation and prevents unnecessary re-renders
-  const cardKeys = useMemo(() => {
-    return sortedCards.map(card => card.id).join(',');
-  }, [sortedCards]);
+  // Use ref to track card count for more efficient memoization
+  const cardCountRef = useRef(sortedCards.length);
+  const previousCardsRef = useRef<Card[]>([]);
 
-  // Memoized card renderers with stable key generation
+  // Memoized card renderers with ref-based optimization
   const cardRenderers = useMemo(() => {
+    const currentCount = sortedCards.length;
+    const countChanged = cardCountRef.current !== currentCount;
+
+    // Check if cards actually changed (not just reordered)
+    const cardsChanged = countChanged ||
+      sortedCards.some((card, index) => {
+        const prevCard = previousCardsRef.current[index];
+        return !prevCard || prevCard.id !== card.id;
+      });
+
+    // Update refs
+    cardCountRef.current = currentCount;
+    previousCardsRef.current = sortedCards;
+
+    // Only recreate renderers if cards actually changed
+    if (!cardsChanged && previousCardsRef.current.length > 0) {
+      return previousCardsRef.current.map((card) => (
+        <React.Suspense
+          key={card.id}
+          fallback={null}
+        >
+          <CardRenderer
+            card={card}
+          />
+        </React.Suspense>
+      ));
+    }
+
     return sortedCards.map((card) => (
       <React.Suspense
         key={card.id}
-        fallback={null} // No fallback for better performance
+        fallback={null}
       >
         <CardRenderer
           card={card}
         />
       </React.Suspense>
     ));
-  }, [cardKeys, sortedCards]); // Use cardKeys for more stable memoization
+  }, [sortedCards]);
 
   return (
     <Layer
