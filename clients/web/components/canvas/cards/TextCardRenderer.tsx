@@ -74,7 +74,7 @@ export const TextCardRenderer: React.FC<TextCardRendererProps> = ({
   );
 
   // Line height calculation
-  const lineHeight = fontSize * CARD_CONFIG.codeLineHeight;
+  const lineHeight = fontSize * CARD_CONFIG.lineHeight;
 
   // Text truncation for large content
   const maxLines = Math.floor(textHeight / lineHeight);

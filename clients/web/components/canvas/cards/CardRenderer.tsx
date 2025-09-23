@@ -5,7 +5,7 @@
  * handles selection states, drag operations, and resize handles.
  */
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Group } from 'react-konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type {
@@ -74,20 +74,20 @@ export const CardRenderer = React.memo<CardRendererProps>(({
   }
 
   // Handle click events
-  const handleClick = (e: KonvaEventObject<MouseEvent>) => {
+  const handleClick = useCallback((e: KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true;
     selectCard(card.id, e.evt.ctrlKey || e.evt.metaKey);
     onCardClick?.(card, e);
-  };
+  }, [card.id, selectCard, onCardClick]);
 
   // Handle double click events
-  const handleDoubleClick = (e: KonvaEventObject<MouseEvent>) => {
+  const handleDoubleClick = useCallback((e: KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true;
     onCardDoubleClick?.(card, e);
-  };
+  }, [card, onCardDoubleClick]);
 
   // Handle drag start
-  const handleDragStart = (e: KonvaEventObject<DragEvent>) => {
+  const handleDragStart = useCallback((e: KonvaEventObject<DragEvent>) => {
     if (card?.isLocked) return;
 
     const selectedIds = selection?.selectedIds?.has(card.id)
@@ -100,10 +100,10 @@ export const CardRenderer = React.memo<CardRendererProps>(({
     });
 
     onCardDragStart?.(card, e);
-  };
+  }, [card?.isLocked, card.id, selection?.selectedIds, startDrag, onCardDragStart]);
 
   // Handle drag move
-  const handleDragMove = (e: KonvaEventObject<DragEvent>) => {
+  const handleDragMove = useCallback((e: KonvaEventObject<DragEvent>) => {
     if (card?.isLocked || !dragState?.isDragging) return;
 
     const currentOffset = {
@@ -113,10 +113,10 @@ export const CardRenderer = React.memo<CardRendererProps>(({
 
     updateDrag(currentOffset);
     onCardDragMove?.(card, e);
-  };
+  }, [card?.isLocked, dragState?.isDragging, dragState?.startPosition?.x, dragState?.startPosition?.y, updateDrag, onCardDragMove]);
 
   // Handle drag end
-  const handleDragEnd = (e: KonvaEventObject<DragEvent>) => {
+  const handleDragEnd = useCallback((e: KonvaEventObject<DragEvent>) => {
     if (card?.isLocked) return;
 
     endDrag({
@@ -125,19 +125,19 @@ export const CardRenderer = React.memo<CardRendererProps>(({
     });
 
     onCardDragEnd?.(card, e);
-  };
+  }, [card?.isLocked, endDrag, onCardDragEnd]);
 
   // Handle mouse enter
-  const handleMouseEnter = (e: KonvaEventObject<MouseEvent>) => {
+  const handleMouseEnter = useCallback((e: KonvaEventObject<MouseEvent>) => {
     setHoveredCard(card.id);
     onCardHover?.(card, e);
-  };
+  }, [card.id, setHoveredCard, onCardHover]);
 
   // Handle mouse leave
-  const handleMouseLeave = (e: KonvaEventObject<MouseEvent>) => {
+  const handleMouseLeave = useCallback((e: KonvaEventObject<MouseEvent>) => {
     setHoveredCard(undefined);
     onCardUnhover?.(card, e);
-  };
+  }, [setHoveredCard, onCardUnhover]);
 
   // Render specific card type
   const renderCardContent = () => {
@@ -200,6 +200,7 @@ export const CardRenderer = React.memo<CardRendererProps>(({
     }
 
     // Fallback to text renderer for unknown types
+    // This cast is safe as TextCardRenderer can handle any card type with content
     return (
       <TextCardRenderer
         card={card as TextCard}
