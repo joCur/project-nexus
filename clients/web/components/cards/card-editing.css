@@ -1,0 +1,171 @@
+/**
+ * Card Editing Animations
+ * CSS animations for the inline card editing system
+ */
+
+/* Edit overlay entrance animation */
+.edit-overlay-enter {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+.edit-overlay-enter-active {
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity 200ms ease-out, transform 200ms ease-out;
+}
+
+.edit-overlay-enter-done {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Edit overlay exit animation */
+.edit-overlay-exit-active {
+  opacity: 0;
+  transform: scale(0.95);
+  transition: opacity 150ms ease-in, transform 150ms ease-in;
+}
+
+/* Focus styles for editing controls */
+.edit-overlay button:focus,
+.edit-overlay input:focus,
+.edit-overlay textarea:focus,
+.edit-overlay select:focus,
+.edit-overlay [contenteditable]:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Custom scrollbar for code editor and text areas */
+.edit-overlay .scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: #9ca3af #f3f4f6;
+}
+
+.edit-overlay .scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.edit-overlay .scrollbar-thin::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 3px;
+}
+
+.edit-overlay .scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #9ca3af;
+  border-radius: 3px;
+}
+
+.edit-overlay .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* Animation for loading spinner in link editor */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Visual feedback for URL validation */
+.url-valid {
+  background-color: rgb(240 253 244);
+  border-color: rgb(34 197 94);
+}
+
+.url-invalid {
+  background-color: rgb(254 242 242);
+  border-color: rgb(239 68 68);
+}
+
+/* Markdown indicator styling */
+.markdown-indicator {
+  background: linear-gradient(135deg, #3b82f6, #1e40af);
+  color: white;
+  font-weight: 500;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Code editor line numbers */
+.line-numbers {
+  user-select: none;
+  color: #9ca3af;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: right;
+  padding-right: 8px;
+  background: #f9fafb;
+  border-right: 1px solid #e5e7eb;
+}
+
+/* Syntax highlighting placeholder classes */
+.language-javascript,
+.language-typescript {
+  color: #1e40af;
+}
+
+.language-html {
+  color: #dc2626;
+}
+
+.language-css {
+  color: #059669;
+}
+
+.language-json {
+  color: #7c3aed;
+}
+
+/* Text selection in editors */
+.edit-overlay *::selection {
+  background: #3b82f6;
+  color: white;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .edit-overlay {
+    min-width: 280px;
+  }
+
+  .edit-overlay input,
+  .edit-overlay textarea {
+    font-size: 16px; /* Prevent zoom on iOS */
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .edit-overlay {
+    border-width: 3px;
+  }
+
+  .edit-overlay button,
+  .edit-overlay input,
+  .edit-overlay textarea,
+  .edit-overlay select {
+    border-width: 2px;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .edit-overlay-enter-active,
+  .edit-overlay-exit-active {
+    transition: none;
+  }
+
+  .animate-spin {
+    animation: none;
+  }
+}
