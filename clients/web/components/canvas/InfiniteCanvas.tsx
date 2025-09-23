@@ -18,11 +18,17 @@ const CardLayer = dynamic(() => import('./CardLayer').then(mod => ({ default: mo
   ssr: false
 });
 
+const CardEditingManager = dynamic(() => import('./CardEditingManager').then(mod => ({ default: mod.default })), {
+  ssr: false
+});
+
 interface InfiniteCanvasProps {
   className?: string;
   showGrid?: boolean;
   ariaLabel?: string;
   ariaDescription?: string;
+  /** Whether to enable inline card editing */
+  enableCardEditing?: boolean;
 }
 
 /**
@@ -48,6 +54,7 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
   showGrid = true,
   ariaLabel = 'Interactive infinite canvas workspace',
   ariaDescription = 'Use arrow keys to pan, plus and minus keys to zoom, space to reset view',
+  enableCardEditing = true,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const { width, height } = useCanvasSize(containerRef);
@@ -96,6 +103,14 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
         />
         {/* Future: Connection layers will be added here */}
       </CanvasStage>
+
+      {/* Card Editing Overlay Manager */}
+      {enableCardEditing && (
+        <CardEditingManager
+          canvasContainer={containerRef.current}
+          enableEditing={enableCardEditing}
+        />
+      )}
     </div>
   );
 };

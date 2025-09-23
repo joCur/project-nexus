@@ -75,9 +75,20 @@ export const CardRenderer = React.memo<CardRendererProps>(({
     onCardClick?.(card, e);
   }, [card, selectCard, onCardClick]);
 
-  // Handle double click events
+  // Handle double click events - integrate with editing system
   const handleDoubleClick = useCallback((e: KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true;
+
+    // Try to start editing if the editing manager is available
+    if (typeof window !== 'undefined' && !card.isLocked) {
+      const editingManager = (window as any).__cardEditingManager;
+      if (editingManager && !editingManager.isEditing) {
+        editingManager.startEditing(card.id);
+        return; // Don't call the original callback if we started editing
+      }
+    }
+
+    // Fallback to original double-click behavior
     onCardDoubleClick?.(card, e);
   }, [card, onCardDoubleClick]);
 
