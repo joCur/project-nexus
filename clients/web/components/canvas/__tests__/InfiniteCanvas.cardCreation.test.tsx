@@ -598,7 +598,9 @@ describe('InfiniteCanvas - Card Creation Integration', () => {
       const user = userEvent.setup();
 
       // Mock card creation to fail
-      mockCardStore.createCard.mockRejectedValue(new Error('Network error'));
+      mockCardStore.createCard.mockImplementation(() => {
+        throw new Error('Network error');
+      });
 
       renderInfiniteCanvas();
 

@@ -319,7 +319,7 @@ export const CardCreationMenu: React.FC<CardCreationMenuProps> = ({
 
         const focusableIndex = focusableItems.findIndex(focusableItem => focusableItem === item);
         const isFocused = focusedIndex === focusableIndex;
-        const isDisabled = item.type !== 'more' && item.type !== 'separator' && (item as CardCreationMenuOption).disabled;
+        const isDisabled = item.type !== 'more' && 'disabled' in item && (item as CardCreationMenuOption).disabled;
 
         return (
           <button

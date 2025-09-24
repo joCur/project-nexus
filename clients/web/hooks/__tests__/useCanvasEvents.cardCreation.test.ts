@@ -73,7 +73,6 @@ describe('useCanvasEvents - Card Creation Integration', () => {
     // Create mock element with all required methods including context menu setup
     mockElement = {
       tabIndex: 0,
-      contains: jest.fn(),
       addEventListener: jest.fn((eventType: string, handler: EventListener) => {
         if (!eventListeners[eventType]) {
           eventListeners[eventType] = [];
