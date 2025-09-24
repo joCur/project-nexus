@@ -109,7 +109,7 @@ export const setupKonvaMocks = () => {
   // Mock individual Konva modules
   jest.mock('konva/lib/shapes/Rect', () => ({}));
   jest.mock('konva/lib/shapes/Text', () => ({}));
-  jest.mock('konva/lib/shapes/Group', () => ({}));
+  jest.mock('konva/lib/Group', () => ({}));
   jest.mock('konva/lib/Stage', () => ({}));
   jest.mock('konva/lib/Layer', () => ({}));
 

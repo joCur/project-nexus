@@ -67,12 +67,27 @@ describe('useCanvasEvents - Card Creation Integration', () => {
     const { useCanvasStore } = require('@/stores/canvasStore');
     (useCanvasStore as jest.Mock).mockReturnValue(mockCanvasStore);
 
-    // Create mock element with all required methods
+    // Store event listeners for manual triggering
+    const eventListeners: { [key: string]: EventListener[] } = {};
+
+    // Create mock element with all required methods including context menu setup
     mockElement = {
       tabIndex: 0,
       contains: jest.fn(),
-      addEventListener: jest.fn(),
-      removeEventListener: jest.fn(),
+      addEventListener: jest.fn((eventType: string, handler: EventListener) => {
+        if (!eventListeners[eventType]) {
+          eventListeners[eventType] = [];
+        }
+        eventListeners[eventType].push(handler);
+      }),
+      removeEventListener: jest.fn((eventType: string, handler: EventListener) => {
+        if (eventListeners[eventType]) {
+          const index = eventListeners[eventType].indexOf(handler);
+          if (index > -1) {
+            eventListeners[eventType].splice(index, 1);
+          }
+        }
+      }),
       querySelector: jest.fn().mockReturnValue(null),
       setAttribute: jest.fn(),
       getBoundingClientRect: jest.fn().mockReturnValue({
@@ -84,6 +99,27 @@ describe('useCanvasEvents - Card Creation Integration', () => {
         bottom: 768,
       }),
       focus: jest.fn(),
+      dispatchEvent: jest.fn((event: Event) => {
+        const listeners = eventListeners[event.type];
+        if (listeners) {
+          listeners.forEach(listener => listener(event));
+        }
+        return true;
+      }),
+      // Add context menu support - mock element as infinite canvas
+      closest: jest.fn((selector: string) => {
+        if (selector === '[data-testid="infinite-canvas"]') {
+          return mockElement; // This element IS the infinite canvas
+        }
+        if (selector === '[data-card-id]') {
+          return null; // This element is NOT a card
+        }
+        return null;
+      }),
+      // Ensure contains works for context menu events
+      contains: jest.fn((node: Node) => {
+        return node === mockElement; // Contains itself and its "children"
+      }),
     } as unknown as HTMLDivElement;
 
     // Create ref
@@ -222,6 +258,13 @@ describe('useCanvasEvents - Card Creation Integration', () => {
       // Mock active element as contentEditable div
       const mockDiv = document.createElement('div');
       mockDiv.contentEditable = 'true';
+
+      // Ensure isContentEditable is true in Jest environment
+      Object.defineProperty(mockDiv, 'isContentEditable', {
+        value: true,
+        writable: false,
+      });
+
       Object.defineProperty(document, 'activeElement', {
         writable: true,
         value: mockDiv,
@@ -235,9 +278,21 @@ describe('useCanvasEvents - Card Creation Integration', () => {
   });
 
   describe('Card Creation Shortcuts', () => {
+    let hookResult: any;
+    let currentHookCleanup: (() => void) | null = null;
+
     beforeEach(() => {
-      renderHook(() => useCanvasEvents(containerRef, getCardCreationHandlers()));
+      hookResult = renderHook(() => useCanvasEvents(containerRef, getCardCreationHandlers()));
+      currentHookCleanup = hookResult.unmount;
       mockElement.contains = jest.fn().mockReturnValue(true);
+    });
+
+    afterEach(() => {
+      // Clean up hook to remove event listeners
+      if (currentHookCleanup) {
+        currentHookCleanup();
+        currentHookCleanup = null;
+      }
     });
 
     it('should create text card with N key', () => {
@@ -339,25 +394,36 @@ describe('useCanvasEvents - Card Creation Integration', () => {
     });
 
     it('should not trigger when handlers are not provided', () => {
-      // Re-render without handlers
-      renderHook(() => useCanvasEvents(containerRef));
+      // Clean up the existing hook first
+      if (currentHookCleanup) {
+        currentHookCleanup();
+        currentHookCleanup = null;
+      }
+
+      // Clear all mocks after cleanup
+      jest.clearAllMocks();
+
+      // Render hook without handlers - completely fresh instance
+      const { unmount } = renderHook(() => useCanvasEvents(containerRef));
+      mockElement.contains = jest.fn().mockReturnValue(true);
 
       const keyEvent = new KeyboardEvent('keydown', { key: 't' });
       fireEvent(document, keyEvent);
 
       expect(mockOnCreateCard).not.toHaveBeenCalled();
+
+      // Clean up the no-handler hook
+      unmount();
     });
   });
 
   describe('Position Calculations', () => {
-    beforeEach(() => {
+    it('should calculate center position with viewport offset', () => {
+      // Set viewport with offset BEFORE rendering hook
+      mockCanvasStore.viewport.position = { x: -100, y: -50 };
+
       renderHook(() => useCanvasEvents(containerRef, getCardCreationHandlers()));
       mockElement.contains = jest.fn().mockReturnValue(true);
-    });
-
-    it('should calculate center position with viewport offset', () => {
-      // Set viewport with offset
-      mockCanvasStore.viewport.position = { x: -100, y: -50 };
 
       const keyEvent = new KeyboardEvent('keydown', { key: 't' });
       fireEvent(document, keyEvent);
@@ -369,8 +435,11 @@ describe('useCanvasEvents - Card Creation Integration', () => {
     });
 
     it('should calculate center position with zoom', () => {
-      // Set viewport with zoom
+      // Set viewport with zoom BEFORE rendering hook
       mockCanvasStore.viewport.zoom = 2;
+
+      renderHook(() => useCanvasEvents(containerRef, getCardCreationHandlers()));
+      mockElement.contains = jest.fn().mockReturnValue(true);
 
       const keyEvent = new KeyboardEvent('keydown', { key: 'i' });
       fireEvent(document, keyEvent);
@@ -382,9 +451,12 @@ describe('useCanvasEvents - Card Creation Integration', () => {
     });
 
     it('should calculate center position with both offset and zoom', () => {
-      // Set viewport with both offset and zoom
+      // Set viewport with both offset and zoom BEFORE rendering hook
       mockCanvasStore.viewport.position = { x: -200, y: -100 };
       mockCanvasStore.viewport.zoom = 1.5;
+
+      renderHook(() => useCanvasEvents(containerRef, getCardCreationHandlers()));
+      mockElement.contains = jest.fn().mockReturnValue(true);
 
       const keyEvent = new KeyboardEvent('keydown', { key: 'c' });
       fireEvent(document, keyEvent);
@@ -397,18 +469,55 @@ describe('useCanvasEvents - Card Creation Integration', () => {
   });
 
   describe('Right-click Context Menu', () => {
+    let contextMenuHookCleanup: (() => void) | null = null;
+
     beforeEach(() => {
-      renderHook(() => useCanvasEvents(containerRef, getCardCreationHandlers()));
+      // Ensure contains returns true for context menu events and can handle Node objects
+      mockElement.contains = jest.fn().mockImplementation((node: any) => {
+        // Return true for all nodes to simulate the element contains check
+        return true;
+      });
+      const hookResult = renderHook(() => useCanvasEvents(containerRef, getCardCreationHandlers()));
+      contextMenuHookCleanup = hookResult.unmount;
+    });
+
+    afterEach(() => {
+      // Clean up hook to remove event listeners
+      if (contextMenuHookCleanup) {
+        contextMenuHookCleanup();
+        contextMenuHookCleanup = null;
+      }
     });
 
     it('should trigger context menu on right-click', () => {
+      // Create a proper target element that will pass the context menu checks
+      const targetElement = {
+        closest: jest.fn((selector: string) => {
+          if (selector === '[data-testid="infinite-canvas"]') {
+            return mockElement; // Element is within infinite canvas
+          }
+          if (selector === '[data-card-id]') {
+            return null; // Element is NOT a card
+          }
+          return null;
+        }),
+      };
+
       const contextMenuEvent = new MouseEvent('contextmenu', {
         clientX: 300,
         clientY: 400,
         bubbles: true,
       });
 
-      fireEvent(mockElement, contextMenuEvent);
+      // Mock the event target to be the target element
+      Object.defineProperty(contextMenuEvent, 'target', {
+        value: targetElement,
+        enumerable: true,
+      });
+
+      // Directly trigger the event on the element using dispatchEvent
+      // which should trigger the addEventListener handlers
+      mockElement.dispatchEvent(contextMenuEvent);
 
       expect(mockOnOpenContextMenu).toHaveBeenCalledWith({
         x: 300,
@@ -417,6 +526,19 @@ describe('useCanvasEvents - Card Creation Integration', () => {
     });
 
     it('should prevent default context menu behavior', () => {
+      // Create a proper target element that will pass the context menu checks
+      const targetElement = {
+        closest: jest.fn((selector: string) => {
+          if (selector === '[data-testid="infinite-canvas"]') {
+            return mockElement; // Element is within infinite canvas
+          }
+          if (selector === '[data-card-id]') {
+            return null; // Element is NOT a card
+          }
+          return null;
+        }),
+      };
+
       const contextMenuEvent = new MouseEvent('contextmenu', {
         clientX: 300,
         clientY: 400,
@@ -425,14 +547,43 @@ describe('useCanvasEvents - Card Creation Integration', () => {
 
       const preventDefaultSpy = jest.spyOn(contextMenuEvent, 'preventDefault');
 
-      fireEvent(mockElement, contextMenuEvent);
+      // Mock the event target to be the target element
+      Object.defineProperty(contextMenuEvent, 'target', {
+        value: targetElement,
+        enumerable: true,
+      });
+
+      // Directly trigger the event on the element using dispatchEvent
+      mockElement.dispatchEvent(contextMenuEvent);
 
       expect(preventDefaultSpy).toHaveBeenCalled();
     });
 
     it('should not trigger context menu when handler not provided', () => {
-      // Re-render without handlers
-      renderHook(() => useCanvasEvents(containerRef));
+      // Clean up the existing hook first
+      if (contextMenuHookCleanup) {
+        contextMenuHookCleanup();
+        contextMenuHookCleanup = null;
+      }
+
+      // Clear all mocks after cleanup
+      jest.clearAllMocks();
+
+      // Re-render without handlers - completely fresh instance
+      const { unmount } = renderHook(() => useCanvasEvents(containerRef));
+
+      // Create a proper target element that will pass the context menu checks
+      const targetElement = {
+        closest: jest.fn((selector: string) => {
+          if (selector === '[data-testid="infinite-canvas"]') {
+            return mockElement; // Element is within infinite canvas
+          }
+          if (selector === '[data-card-id]') {
+            return null; // Element is NOT a card
+          }
+          return null;
+        }),
+      };
 
       const contextMenuEvent = new MouseEvent('contextmenu', {
         clientX: 300,
@@ -440,9 +591,18 @@ describe('useCanvasEvents - Card Creation Integration', () => {
         bubbles: true,
       });
 
-      fireEvent(mockElement, contextMenuEvent);
+      // Mock the event target to be the target element
+      Object.defineProperty(contextMenuEvent, 'target', {
+        value: targetElement,
+        enumerable: true,
+      });
+
+      mockElement.dispatchEvent(contextMenuEvent);
 
       expect(mockOnOpenContextMenu).not.toHaveBeenCalled();
+
+      // Clean up the no-handler hook
+      unmount();
     });
   });
 
@@ -481,8 +641,11 @@ describe('useCanvasEvents - Card Creation Integration', () => {
         y: 0,
       });
 
-      // Update store position to simulate navigation
+      // Update store position to simulate navigation and re-render hook
       mockCanvasStore.viewport.position = { x: -20, y: 0 };
+
+      // Re-render hook to pick up the new position
+      renderHook(() => useCanvasEvents(containerRef, getCardCreationHandlers()));
 
       // Then create card
       const createCardEvent = new KeyboardEvent('keydown', { key: 't' });

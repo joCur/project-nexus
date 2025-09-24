@@ -5,9 +5,9 @@ import dynamic from 'next/dynamic';
 import { useCanvasSize } from '@/hooks/useCanvasSize';
 import { useCanvasEvents } from '@/hooks/useCanvasEvents';
 import { useCanvasStore } from '@/stores/canvasStore';
-import { useCardCreation } from '@/hooks/useCardCreation';
-import { CardCreationMenu } from './CardCreationMenu';
-import { CreateCardModal } from './CreateCardModal';
+import useCardCreation from '@/hooks/useCardCreation';
+import CardCreationMenu from './CardCreationMenu';
+import CreateCardModal from './CreateCardModal';
 import type { CardType } from '@/types/card.types';
 import type { EntityId } from '@/types/common.types';
 
@@ -153,7 +153,15 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
         <CardCreationMenu
           position={cardCreation.state.contextMenuPosition}
           onClose={cardCreation.closeContextMenu}
-          onCreateCard={(type) => cardCreationHandlers.onCreateCard(type)}
+          onCreateCard={async (type) => {
+            // Use the stored creation position (canvas coordinates) from context menu click
+            if (cardCreation.state.creationPosition) {
+              await cardCreation.createCardAtPosition(type, cardCreation.state.creationPosition);
+            } else {
+              // Fallback to default position if no position stored
+              await cardCreationHandlers.onCreateCard(type);
+            }
+          }}
           onMoreOptions={() => {
             cardCreation.closeContextMenu();
             cardCreation.openModal();

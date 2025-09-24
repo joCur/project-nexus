@@ -124,14 +124,15 @@ export const CardCreationMenu: React.FC<CardCreationMenuProps> = ({
   const [menuPosition, setMenuPosition] = useState(position);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Filter out disabled options
-  const availableOptions = CARD_CREATION_OPTIONS.filter(
-    option => !disabledTypes.includes(option.type)
-  );
+  // Mark options as disabled but don't filter them out
+  const optionsWithDisabled = CARD_CREATION_OPTIONS.map(option => ({
+    ...option,
+    disabled: disabledTypes.includes(option.type)
+  }));
 
   // All menu items including separator and more options
   const allMenuItems: MenuItemType[] = [
-    ...availableOptions,
+    ...optionsWithDisabled,
     { type: 'separator' as const, separator: true },
     {
       type: 'more' as const,
@@ -146,14 +147,21 @@ export const CardCreationMenu: React.FC<CardCreationMenuProps> = ({
     },
   ];
 
-  // Get focusable items (exclude separator)
-  const focusableItems = allMenuItems.filter(item => !('separator' in item));
+  // Get focusable items (exclude separator and disabled items)
+  const focusableItems = allMenuItems.filter(item => {
+    if ('separator' in item) return false;
+    if (item.type === 'more') return true;
+    return !(item as CardCreationMenuOption).disabled;
+  });
 
   /**
    * Handle menu item click
    */
   const handleItemClick = (item: MenuItemType) => {
     if ('separator' in item) return;
+
+    // Don't handle clicks on disabled items
+    if (item.type !== 'more' && (item as CardCreationMenuOption).disabled) return;
 
     if (item.type === 'more') {
       onMoreOptions();
@@ -242,28 +250,28 @@ export const CardCreationMenu: React.FC<CardCreationMenuProps> = ({
         // Handle keyboard shortcuts
         case 't':
         case 'T':
-          if (!event.ctrlKey && !event.metaKey && !event.altKey) {
+          if (!event.ctrlKey && !event.metaKey && !event.altKey && !disabledTypes.includes('text')) {
             event.preventDefault();
             onCreateCard('text');
           }
           break;
         case 'i':
         case 'I':
-          if (!event.ctrlKey && !event.metaKey && !event.altKey) {
+          if (!event.ctrlKey && !event.metaKey && !event.altKey && !disabledTypes.includes('image')) {
             event.preventDefault();
             onCreateCard('image');
           }
           break;
         case 'l':
         case 'L':
-          if (!event.ctrlKey && !event.metaKey && !event.altKey) {
+          if (!event.ctrlKey && !event.metaKey && !event.altKey && !disabledTypes.includes('link')) {
             event.preventDefault();
             onCreateCard('link');
           }
           break;
         case 'c':
         case 'C':
-          if (!event.ctrlKey && !event.metaKey && !event.altKey) {
+          if (!event.ctrlKey && !event.metaKey && !event.altKey && !disabledTypes.includes('code')) {
             event.preventDefault();
             onCreateCard('code');
           }
@@ -311,7 +319,7 @@ export const CardCreationMenu: React.FC<CardCreationMenuProps> = ({
 
         const focusableIndex = focusableItems.findIndex(focusableItem => focusableItem === item);
         const isFocused = focusedIndex === focusableIndex;
-        const isDisabled = item.type !== 'more' && disabledTypes.includes(item.type as CardType);
+        const isDisabled = item.type !== 'more' && item.type !== 'separator' && (item as CardCreationMenuOption).disabled;
 
         return (
           <button

@@ -16,7 +16,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
-import { CardCreationMenu } from '../CardCreationMenu';
+import CardCreationMenu from '../CardCreationMenu';
 import type { CardType } from '@/types/card.types';
 import type { Position } from '@/types/common.types';
 import {

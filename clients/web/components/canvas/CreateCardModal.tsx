@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Fragment } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
-import { Fragment } from 'react';
 import { cn } from '@/lib/utils';
-import { CardTypeSelector } from './CardTypeSelector';
+import CardTypeSelector from './CardTypeSelector';
 import type { CardType, CreateCardParams } from '@/types/card.types';
 import type { CanvasPosition } from '@/types/canvas.types';
 
@@ -116,6 +115,7 @@ export const CreateCardModal: React.FC<CreateCardModalProps> = ({
     getDefaultFormData(initialType)
   );
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   // Reset form when modal opens/closes or type changes
   useEffect(() => {
@@ -178,9 +178,9 @@ export const CreateCardModal: React.FC<CreateCardModalProps> = ({
         if (!formData.url?.trim()) {
           errors.url = 'Image URL is required';
         } else {
-          try {
-            new URL(formData.url);
-          } catch {
+          // Simple URL validation with regex
+          const urlRegex = /^https?:\/\/.+/i;
+          if (!urlRegex.test(formData.url)) {
             errors.url = 'Please enter a valid URL';
           }
         }
@@ -192,9 +192,9 @@ export const CreateCardModal: React.FC<CreateCardModalProps> = ({
         if (!formData.url?.trim()) {
           errors.url = 'URL is required';
         } else {
-          try {
-            new URL(formData.url);
-          } catch {
+          // Simple URL validation with regex
+          const urlRegex = /^https?:\/\/.+/i;
+          if (!urlRegex.test(formData.url)) {
             errors.url = 'Please enter a valid URL';
           }
         }
@@ -206,6 +206,7 @@ export const CreateCardModal: React.FC<CreateCardModalProps> = ({
         break;
     }
 
+
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -216,9 +217,17 @@ export const CreateCardModal: React.FC<CreateCardModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validateForm() || isCreating) {
+    if (isCreating || isSubmitting) {
       return;
     }
+
+    // Always run validation and wait for state update
+    const isValid = validateForm();
+    if (!isValid) {
+      return;
+    }
+
+    setIsSubmitting(true);
 
     // Create card content based on type
     let content: any;
@@ -255,7 +264,6 @@ export const CreateCardModal: React.FC<CreateCardModalProps> = ({
           type: 'code',
           language: formData.language || 'javascript',
           content: formData.content || '',
-          filename: formData.filename || undefined,
           lineCount: (formData.content || '').split('\n').length,
         };
         break;
@@ -265,6 +273,20 @@ export const CreateCardModal: React.FC<CreateCardModalProps> = ({
       type: formData.type,
       position: position || { x: 0, y: 0, z: Date.now() },
       content,
+      dimensions: {
+        width: formData.type === 'text' ? 250 : formData.type === 'image' ? 300 : 250,
+        height: formData.type === 'text' ? 150 : formData.type === 'image' ? 200 : 150,
+      },
+      ...(formData.type === 'text' && formData.title && {
+        metadata: {
+          title: formData.title,
+        },
+      }),
+      ...(formData.type === 'code' && formData.filename && {
+        metadata: {
+          filename: formData.filename,
+        },
+      }),
     };
 
     try {
@@ -272,6 +294,8 @@ export const CreateCardModal: React.FC<CreateCardModalProps> = ({
       onClose();
     } catch (error) {
       // Error handling is done by parent component
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -295,6 +319,7 @@ export const CreateCardModal: React.FC<CreateCardModalProps> = ({
                 value={formData.title || ''}
                 onChange={(e) => handleFieldChange('title', e.target.value)}
                 placeholder={placeholders.title}
+                disabled={isCreating || isSubmitting}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
@@ -308,6 +333,7 @@ export const CreateCardModal: React.FC<CreateCardModalProps> = ({
                 value={formData.content || ''}
                 onChange={(e) => handleFieldChange('content', e.target.value)}
                 placeholder={placeholders.content}
+                disabled={isCreating || isSubmitting}
                 className={cn(
                   'w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500',
                   validationErrors.content ? 'border-red-500' : 'border-gray-300'
@@ -333,6 +359,7 @@ export const CreateCardModal: React.FC<CreateCardModalProps> = ({
                 value={formData.url || ''}
                 onChange={(e) => handleFieldChange('url', e.target.value)}
                 placeholder={placeholders.url}
+                disabled={isCreating || isSubmitting}
                 className={cn(
                   'w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500',
                   validationErrors.url ? 'border-red-500' : 'border-gray-300'
@@ -352,6 +379,7 @@ export const CreateCardModal: React.FC<CreateCardModalProps> = ({
                 value={formData.alt || ''}
                 onChange={(e) => handleFieldChange('alt', e.target.value)}
                 placeholder={placeholders.alt}
+                disabled={isCreating || isSubmitting}
                 className={cn(
                   'w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500',
                   validationErrors.alt ? 'border-red-500' : 'border-gray-300'
@@ -371,6 +399,7 @@ export const CreateCardModal: React.FC<CreateCardModalProps> = ({
                 value={formData.caption || ''}
                 onChange={(e) => handleFieldChange('caption', e.target.value)}
                 placeholder={placeholders.caption}
+                disabled={isCreating || isSubmitting}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
@@ -390,6 +419,7 @@ export const CreateCardModal: React.FC<CreateCardModalProps> = ({
                 value={formData.url || ''}
                 onChange={(e) => handleFieldChange('url', e.target.value)}
                 placeholder={placeholders.url}
+                disabled={isCreating || isSubmitting}
                 className={cn(
                   'w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500',
                   validationErrors.url ? 'border-red-500' : 'border-gray-300'
@@ -409,6 +439,7 @@ export const CreateCardModal: React.FC<CreateCardModalProps> = ({
                 value={formData.title || ''}
                 onChange={(e) => handleFieldChange('title', e.target.value)}
                 placeholder={placeholders.title}
+                disabled={isCreating || isSubmitting}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               />
               <p className="text-gray-500 text-sm mt-1">
@@ -429,6 +460,7 @@ export const CreateCardModal: React.FC<CreateCardModalProps> = ({
                 id="language"
                 value={formData.language || 'javascript'}
                 onChange={(e) => handleFieldChange('language', e.target.value)}
+                disabled={isCreating || isSubmitting}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="javascript">JavaScript</option>
@@ -458,6 +490,7 @@ export const CreateCardModal: React.FC<CreateCardModalProps> = ({
                 value={formData.filename || ''}
                 onChange={(e) => handleFieldChange('filename', e.target.value)}
                 placeholder={placeholders.filename}
+                disabled={isCreating || isSubmitting}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
@@ -471,6 +504,7 @@ export const CreateCardModal: React.FC<CreateCardModalProps> = ({
                 value={formData.content || ''}
                 onChange={(e) => handleFieldChange('content', e.target.value)}
                 placeholder={placeholders.content}
+                disabled={isCreating || isSubmitting}
                 className={cn(
                   'w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 font-mono text-sm',
                   validationErrors.content ? 'border-red-500' : 'border-gray-300'
@@ -528,7 +562,7 @@ export const CreateCardModal: React.FC<CreateCardModalProps> = ({
                     <label className="block text-sm font-medium text-gray-700 mb-3">
                       Card Type
                     </label>
-                    <CardTypeSelector
+<CardTypeSelector
                       selectedType={formData.type}
                       onTypeSelect={handleTypeSelect}
                       variant="grid"
@@ -563,17 +597,17 @@ export const CreateCardModal: React.FC<CreateCardModalProps> = ({
                     <button
                       type="button"
                       onClick={onClose}
-                      disabled={isCreating}
+                      disabled={isCreating || isSubmitting}
                       className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
-                      disabled={isCreating}
+                      disabled={isCreating || isSubmitting}
                       className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 flex items-center"
                     >
-                      {isCreating && (
+                      {(isCreating || isSubmitting) && (
                         <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                           <path className="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />

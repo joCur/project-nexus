@@ -16,7 +16,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
-import { CardTypeSelector } from '../CardTypeSelector';
+import CardTypeSelector from '../CardTypeSelector';
 import type { CardType } from '@/types/card.types';
 import {
   mockMatchMedia,
@@ -151,7 +151,7 @@ describe('CardTypeSelector', () => {
     it('should mark selected type as checked', () => {
       render(<CardTypeSelector {...defaultProps} selectedType="text" />);
 
-      const textCardButton = screen.getByLabelText(/Text Card/);
+      const textCardButton = screen.getByRole('radio', { name: /Text Card/ });
       expect(textCardButton).toHaveAttribute('aria-checked', 'true');
 
       const otherButtons = screen.getAllByRole('radio').filter(button => button !== textCardButton);
@@ -164,14 +164,14 @@ describe('CardTypeSelector', () => {
       render(<CardTypeSelector {...defaultProps} selectedType="image" />);
 
       // Check for visual selection indicator (checkmark icon)
-      const imageButton = screen.getByLabelText(/Image Card/);
+      const imageButton = screen.getByRole('radio', { name: /Image Card/ });
       expect(imageButton).toHaveClass('ring-2', 'ring-offset-2', 'ring-current');
     });
 
     it('should apply correct color styling to selected type', () => {
       render(<CardTypeSelector {...defaultProps} selectedType="link" />);
 
-      const linkButton = screen.getByLabelText(/Link Card/);
+      const linkButton = screen.getByRole('radio', { name: /Link Card/ });
       expect(linkButton).toHaveClass('text-purple-600', 'bg-purple-50', 'border-purple-200');
     });
   });
@@ -181,7 +181,7 @@ describe('CardTypeSelector', () => {
       const user = userEvent.setup();
       render(<CardTypeSelector {...defaultProps} />);
 
-      const textCardButton = screen.getByLabelText(/Text Card/);
+      const textCardButton = screen.getByRole('radio', { name: /Text Card/ });
       await user.click(textCardButton);
 
       expect(mockOnTypeSelect).toHaveBeenCalledWith('text');
@@ -191,7 +191,7 @@ describe('CardTypeSelector', () => {
       const user = userEvent.setup();
       render(<CardTypeSelector {...defaultProps} />);
 
-      const imageCardButton = screen.getByLabelText(/Image Card/);
+      const imageCardButton = screen.getByRole('radio', { name: /Image Card/ });
       imageCardButton.focus();
       await user.keyboard('{Enter}');
 
@@ -202,7 +202,7 @@ describe('CardTypeSelector', () => {
       const user = userEvent.setup();
       render(<CardTypeSelector {...defaultProps} />);
 
-      const linkCardButton = screen.getByLabelText(/Link Card/);
+      const linkCardButton = screen.getByRole('radio', { name: /Link Card/ });
       linkCardButton.focus();
       await user.keyboard(' ');
 
@@ -213,7 +213,7 @@ describe('CardTypeSelector', () => {
       const user = userEvent.setup();
       render(<CardTypeSelector {...defaultProps} />);
 
-      const codeCardButton = screen.getByLabelText(/Code Card/);
+      const codeCardButton = screen.getByRole('radio', { name: /Code Card/ });
       codeCardButton.focus();
 
       const enterEvent = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
@@ -234,10 +234,10 @@ describe('CardTypeSelector', () => {
     it('should disable specified card types', () => {
       render(<CardTypeSelector {...defaultProps} disabledTypes={['text', 'image']} />);
 
-      const textCardButton = screen.getByLabelText(/Text Card/);
-      const imageCardButton = screen.getByLabelText(/Image Card/);
-      const linkCardButton = screen.getByLabelText(/Link Card/);
-      const codeCardButton = screen.getByLabelText(/Code Card/);
+      const textCardButton = screen.getByRole('radio', { name: /Text Card/ });
+      const imageCardButton = screen.getByRole('radio', { name: /Image Card/ });
+      const linkCardButton = screen.getByRole('radio', { name: /Link Card/ });
+      const codeCardButton = screen.getByRole('radio', { name: /Code Card/ });
 
       expect(textCardButton).toBeDisabled();
       expect(textCardButton).toHaveAttribute('aria-disabled', 'true');
@@ -255,7 +255,7 @@ describe('CardTypeSelector', () => {
     it('should apply disabled styling to disabled types', () => {
       render(<CardTypeSelector {...defaultProps} disabledTypes={['code']} />);
 
-      const codeCardButton = screen.getByLabelText(/Code Card/);
+      const codeCardButton = screen.getByRole('radio', { name: /Code Card/ });
       expect(codeCardButton).toHaveClass('opacity-50', 'cursor-not-allowed');
     });
 
@@ -263,7 +263,7 @@ describe('CardTypeSelector', () => {
       const user = userEvent.setup();
       render(<CardTypeSelector {...defaultProps} disabledTypes={['text']} />);
 
-      const textCardButton = screen.getByLabelText(/Text Card/);
+      const textCardButton = screen.getByRole('radio', { name: /Text Card/ });
       await user.click(textCardButton);
 
       expect(mockOnTypeSelect).not.toHaveBeenCalled();
@@ -273,7 +273,7 @@ describe('CardTypeSelector', () => {
       const user = userEvent.setup();
       render(<CardTypeSelector {...defaultProps} disabledTypes={['link']} />);
 
-      const linkCardButton = screen.getByLabelText(/Link Card/);
+      const linkCardButton = screen.getByRole('radio', { name: /Link Card/ });
       linkCardButton.focus();
       await user.keyboard('{Enter}');
       await user.keyboard(' ');
@@ -344,10 +344,10 @@ describe('CardTypeSelector', () => {
     it('should associate descriptions with buttons using aria-describedby', () => {
       render(<CardTypeSelector {...defaultProps} />);
 
-      const textButton = screen.getByLabelText(/Text Card/);
+      const textButton = screen.getByRole('radio', { name: /Text Card/ });
       expect(textButton).toHaveAttribute('aria-describedby', 'text-description');
 
-      const imageButton = screen.getByLabelText(/Image Card/);
+      const imageButton = screen.getByRole('radio', { name: /Image Card/ });
       expect(imageButton).toHaveAttribute('aria-describedby', 'image-description');
     });
 
@@ -365,7 +365,7 @@ describe('CardTypeSelector', () => {
       const { rerender } = render(<CardTypeSelector {...defaultProps} />);
 
       // Initial state
-      const textButton = screen.getByLabelText(/Text Card/);
+      const textButton = screen.getByRole('radio', { name: /Text Card/ });
       expect(textButton).toHaveAttribute('aria-checked', 'false');
 
       // Update selection
@@ -418,7 +418,7 @@ describe('CardTypeSelector', () => {
       const user = userEvent.setup();
       render(<CardTypeSelector {...defaultProps} />);
 
-      const textButton = screen.getByLabelText(/Text Card/);
+      const textButton = screen.getByRole('radio', { name: /Text Card/ });
 
       // Click rapidly multiple times
       await user.click(textButton);

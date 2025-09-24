@@ -12,7 +12,7 @@
  */
 
 import { renderHook, act } from '@testing-library/react';
-import { useCardCreation } from '../useCardCreation';
+import useCardCreation from '../useCardCreation';
 import { createMockCardStore, createMockCanvasStore } from '../../__tests__/utils';
 import type { CardType, CreateCardParams } from '@/types/card.types';
 import { createCardId } from '@/types/card.types';
