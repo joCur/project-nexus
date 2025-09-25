@@ -229,7 +229,13 @@ export const useCanvasEvents = (
 
     if (isCanvasBackground && cardCreationHandlers?.onOpenContextMenu) {
       e.preventDefault();
-      cardCreationHandlers.onOpenContextMenu({ x: e.clientX, y: e.clientY });
+
+      // Get position relative to the canvas container
+      const containerRect = container.getBoundingClientRect();
+      const relativeX = e.clientX - containerRect.left;
+      const relativeY = e.clientY - containerRect.top;
+
+      cardCreationHandlers.onOpenContextMenu({ x: relativeX, y: relativeY });
     }
   }, [containerRef, cardCreationHandlers]);
 
