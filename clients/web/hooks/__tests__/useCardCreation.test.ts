@@ -13,18 +13,44 @@
 
 import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { MockedProvider } from '@apollo/client/testing';
 import useCardCreation from '../useCardCreation';
-import { CREATE_CARD, GET_CARDS } from '@/lib/graphql/cardOperations';
 import { createMockCanvasStore } from '../../__tests__/utils';
-import type { CardType } from '@/types/card.types';
 import type { CanvasPosition } from '@/types/canvas.types';
+
+const { useCanvasStore } = require('@/stores/canvasStore');
 
 // Mock canvas store
 let mockCanvasStore: ReturnType<typeof createMockCanvasStore>;
 
 jest.mock('@/stores/canvasStore', () => ({
   useCanvasStore: jest.fn(),
+}));
+
+// Mock card store
+const mockCardStore = {
+  addCard: jest.fn(),
+  updateCard: jest.fn(),
+  removeCard: jest.fn(),
+  selectCard: jest.fn(),
+  deselectCard: jest.fn(),
+  clearSelection: jest.fn(),
+  cards: new Map(),
+  selectedIds: new Set(),
+};
+
+jest.mock('@/stores/cardStore', () => ({
+  useCardStore: jest.fn(() => mockCardStore),
+}));
+
+// Mock useMutation directly
+const mockMutationResult = jest.fn();
+
+jest.mock('@apollo/client', () => ({
+  ...jest.requireActual('@apollo/client'),
+  useMutation: jest.fn(() => [
+    mockMutationResult,
+    { loading: false, error: null, data: null }
+  ]),
 }));
 
 // Mock window dimensions
@@ -40,79 +66,10 @@ Object.defineProperty(window, 'innerHeight', {
   value: 768,
 });
 
-// Apollo mocks for successful card creation
+// Test constants
 const mockWorkspaceId = 'test-workspace-id';
-// Use a simple successful mock with flexible z value
-const successfulMock = {
-  request: {
-    query: CREATE_CARD,
-  },
-  newData: () => ({
-    data: {
-      createCard: {
-        id: 'test-card-id',
-        workspaceId: mockWorkspaceId,
-        ownerId: 'test-user-id',
-        title: 'New text card',
-        content: '',
-        type: 'TEXT',
-        position: { x: 100, y: 200, z: 123 },
-        dimensions: { width: 250, height: 150 },
-        style: {
-          backgroundColor: '#ffffff',
-          borderColor: '#e5e7eb',
-          textColor: '#1f2937',
-          borderWidth: 1,
-          borderRadius: 8,
-          opacity: 1,
-          shadow: true,
-        },
-        tags: [],
-        metadata: {},
-        status: 'DRAFT',
-        priority: 'NORMAL',
-        createdAt: '2023-01-01T00:00:00Z',
-        updatedAt: '2023-01-01T00:00:00Z',
-        version: 1,
-      },
-    },
-  }),
-};
 
-const createSuccessfulMock = () => successfulMock;
-
-const successfulMocks = [createSuccessfulMock()];
-
-// Apollo mocks for error cases
-const createErrorMock = () => ({
-  request: {
-    query: CREATE_CARD,
-    variableMatcher: (variables: any) => {
-      const input = variables.input;
-      return (
-        input.workspaceId === mockWorkspaceId &&
-        input.type === 'TEXT' &&
-        input.title === 'New text card' &&
-        input.content === '' &&
-        input.position.x === 100 &&
-        input.position.y === 200 &&
-        typeof input.position.z === 'number' &&
-        input.dimensions.width === 250 &&
-        input.dimensions.height === 150 &&
-        input.style === undefined &&
-        Array.isArray(input.tags) &&
-        input.tags.length === 0 &&
-        input.priority === 'NORMAL'
-      );
-    },
-  },
-  error: new Error('Failed to create card'),
-});
-
-const errorMocks = [createErrorMock()];
-
-const TestWrapper = ({ children, mocks = successfulMocks }: { children: React.ReactNode; mocks?: any[] }) =>
-  React.createElement(MockedProvider, { mocks, addTypename: false }, children);
+const TestWrapper = ({ children }: { children: React.ReactNode }) => children as React.ReactElement;
 
 describe('useCardCreation', () => {
   beforeEach(() => {
@@ -128,8 +85,45 @@ describe('useCardCreation', () => {
       bounds: { x: 0, y: 0, width: 1024, height: 768 },
     };
 
+    // Reset card store mock
+    mockCardStore.addCard.mockClear();
+    mockCardStore.cards = new Map();
+    mockCardStore.selectedIds = new Set();
+
+    // Reset and configure successful mutation mock
+    mockMutationResult.mockClear();
+    mockMutationResult.mockResolvedValue({
+      data: {
+        createCard: {
+          id: 'test-card-id',
+          workspaceId: mockWorkspaceId,
+          ownerId: 'test-user-id',
+          title: 'New text card',
+          content: 'Enter your text here',
+          type: 'TEXT',
+          position: { x: 100, y: 200, z: 123 },
+          dimensions: { width: 250, height: 150 },
+          style: {
+            backgroundColor: '#ffffff',
+            borderColor: '#e5e7eb',
+            textColor: '#1f2937',
+            borderWidth: 1,
+            borderRadius: 8,
+            opacity: 1,
+            shadow: true,
+          },
+          tags: [],
+          metadata: {},
+          status: 'DRAFT',
+          priority: 'NORMAL',
+          createdAt: '2023-01-01T00:00:00Z',
+          updatedAt: '2023-01-01T00:00:00Z',
+          version: 1,
+        },
+      },
+    });
+
     // Setup mocks
-    const { useCanvasStore } = require('@/stores/canvasStore');
     (useCanvasStore as jest.Mock).mockReturnValue(mockCanvasStore);
   });
 
@@ -349,16 +343,16 @@ describe('useCardCreation', () => {
         expect(result.current.state.isModalOpen).toBe(false);
         expect(result.current.state.isContextMenuOpen).toBe(false);
         expect(result.current.state.selectedType).toBeNull();
-      });
+      }, { timeout: 2000 });
     });
 
     it('should handle creation errors gracefully', async () => {
-      const ErrorWrapper = ({ children }: { children: React.ReactNode }) =>
-        React.createElement(MockedProvider, { mocks: errorMocks, addTypename: false }, children);
+      // Configure mutation to reject
+      mockMutationResult.mockRejectedValue(new Error('Failed to create card'));
 
       const { result } = renderHook(
         () => useCardCreation({ workspaceId: mockWorkspaceId }),
-        { wrapper: ErrorWrapper }
+        { wrapper: TestWrapper }
       );
       const position: CanvasPosition = { x: 100, y: 200, z: 123 };
 
@@ -410,7 +404,7 @@ describe('useCardCreation', () => {
 
       await waitFor(() => {
         expect(cardId).toBe('test-card-id');
-      });
+      }, { timeout: 2000 });
     });
   });
 

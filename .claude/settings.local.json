@@ -55,7 +55,8 @@
       "Bash(npx tsc:*)",
       "mcp__notion__notion-search",
       "mcp__notion__notion-create-pages",
-      "Bash(npm run test:*)"
+      "Bash(npm run test:*)",
+      "Bash(npm run test:frontend:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"

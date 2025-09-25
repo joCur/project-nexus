@@ -7,23 +7,17 @@
 
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import type { 
-  CardStore, 
-  Card, 
-  CardType, 
-  CardContent, 
+import type {
+  CardStore,
+  Card,
+  CardType,
   CardStyle,
-  CardSelection,
-  CardDragState,
-  CardHistory,
+  CardStatus,
+  CardPriority,
   CardId,
-  CreateCardParams,
-  UpdateCardParams,
-  CardResizeState,
-  CardHoverState
-} from '@/types/card.types';
+  UpdateCardParams} from '@/types/card.types';
 import { createCardId } from '@/types/card.types';
-import type { Position, Dimensions, Bounds, EntityId } from '@/types/common.types';
+import type { Position, Dimensions } from '@/types/common.types';
 import type { CanvasPosition, CanvasBounds } from '@/types/canvas.types';
 
 /**
@@ -254,21 +248,23 @@ export const useCardStore = create<CardStore>()(
         moveCards: (ids: CardId[], offset: Position) => {
           set((state) => {
             const newCards = new Map(state.cards);
-            
+
             ids.forEach((id) => {
               const card = newCards.get(id);
               if (card) {
+                const newPosition = {
+                  x: card.position.x + offset.x,
+                  y: card.position.y + offset.y,
+                  z: card.position.z,
+                };
                 newCards.set(id, {
                   ...card,
-                  position: {
-                    x: card.position.x + offset.x,
-                    y: card.position.y + offset.y,
-                  },
+                  position: newPosition,
                   updatedAt: new Date().toISOString(),
                 });
               }
             });
-            
+
             return {
               cards: newCards,
               history: state.history, // Simplified - not tracking history for now
@@ -348,7 +344,7 @@ export const useCardStore = create<CardStore>()(
 
         endDrag: (finalPosition?: CanvasPosition) => {
           const { draggedIds, startPosition } = get().dragState;
-          
+
           if (finalPosition && draggedIds.size > 0) {
             const offset = {
               x: finalPosition.x - startPosition.x,
@@ -356,7 +352,7 @@ export const useCardStore = create<CardStore>()(
             };
             get().moveCards(Array.from(draggedIds), offset);
           }
-          
+
           set({
             dragState: {
               isDragging: false,
@@ -381,7 +377,7 @@ export const useCardStore = create<CardStore>()(
           get().deleteCards(ids);
         },
 
-        pasteCards: (position: CanvasPosition = { x: 100, y: 100 }) => {
+        pasteCards: () => {
           console.warn('pasteCards: Card creation should be done via GraphQL mutations');
           return [];
         },
@@ -389,19 +385,17 @@ export const useCardStore = create<CardStore>()(
         // History operations - simplified implementation
         undo: () => {
           // Stub implementation - history tracking disabled for now
-          console.log('Undo not implemented');
         },
 
         redo: () => {
           // Stub implementation - history tracking disabled for now
-          console.log('Redo not implemented');
         },
 
         canUndo: () => get().history.past.length > 0,
         canRedo: () => get().history.future.length > 0,
 
         // Missing CRUD operations
-        createCardFromTemplate: (templateId: string, position: CanvasPosition) => {
+        createCardFromTemplate: () => {
           console.warn('createCardFromTemplate: Card creation should be done via GraphQL mutations');
           return createCardId('');
         },
@@ -429,15 +423,15 @@ export const useCardStore = create<CardStore>()(
         },
         
         // Missing card manipulation
-        updateCardStatus: (id: CardId, status: any) => {
+        updateCardStatus: (id: CardId, status: CardStatus) => {
           get().updateCard({ id, updates: { status } });
         },
-        
-        updateCardPriority: (id: CardId, priority: any) => {
+
+        updateCardPriority: (id: CardId, priority: CardPriority) => {
           get().updateCard({ id, updates: { priority } });
         },
         
-        arrangeCards: (ids: CardId[], arrangement: 'front' | 'back' | 'forward' | 'backward') => {
+        arrangeCards: () => {
           // Stub implementation
         },
         
@@ -486,11 +480,11 @@ export const useCardStore = create<CardStore>()(
         },
         
         // Missing resize operations
-        startResize: (id: CardId, handle: any) => {
+        startResize: () => {
           // Stub implementation
         },
-        
-        updateResize: (dimensions: Dimensions) => {
+
+        updateResize: () => {
           // Stub implementation
         },
         
@@ -525,17 +519,17 @@ export const useCardStore = create<CardStore>()(
         },
         
         // Missing template operations
-        saveAsTemplate: (id: CardId, name: string, description: string) => {
+        saveAsTemplate: () => {
           // Stub implementation
           return `template_${Date.now()}`;
         },
-        
-        deleteTemplate: (templateId: string) => {
+
+        deleteTemplate: () => {
           // Stub implementation
         },
         
         // Missing filtering and search
-        setFilter: (filter: any) => {
+        setFilter: (filter: Record<string, unknown>) => {
           set({ activeFilter: filter });
         },
         
@@ -543,7 +537,7 @@ export const useCardStore = create<CardStore>()(
           set({ activeFilter: {} });
         },
         
-        searchCards: (query: string) => {
+        searchCards: () => {
           // Stub implementation
           set({ searchResults: [] });
         },
@@ -566,7 +560,7 @@ export const useCardStore = create<CardStore>()(
           return Array.from(get().cards.values()).filter(card => card.content.type === type);
         },
         
-        getCardsByStatus: (status: any) => {
+        getCardsByStatus: (status: CardStatus) => {
           return Array.from(get().cards.values()).filter(card => card.status === status);
         },
         
@@ -638,9 +632,9 @@ export const useCardStore = create<CardStore>()(
           cards: Array.from(state.cards.entries()),
         }),
         // Custom merge function to handle Map serialization
-        merge: (persistedState: any, currentState) => ({
+        merge: (persistedState: unknown, currentState: CardStore): CardStore => ({
           ...currentState,
-          cards: new Map(persistedState?.cards || []),
+          cards: new Map((persistedState as { cards?: [CardId, Card][] })?.cards || []),
         }),
       }
     ),

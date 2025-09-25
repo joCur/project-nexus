@@ -85,21 +85,29 @@ export const CardRenderer = React.memo<CardRendererProps>(({
   const handleDragStart = useCallback((e: KonvaEventObject<DragEvent>) => {
     if (card?.isLocked) return;
 
+    // Prevent Stage drag when dragging cards
+    e.cancelBubble = true;
+
     const selectedIds = selection?.selectedIds?.has(card.id)
       ? Array.from(selection.selectedIds)
       : [card.id];
 
-    startDrag(selectedIds, {
-      x: e.target?.x() || 0,
-      y: e.target?.y() || 0,
-    });
+    const startPosition = {
+      x: card.position.x,
+      y: card.position.y,
+      z: card.position.z || 0,
+    };
 
+    startDrag(selectedIds, startPosition);
     onCardDragStart?.(card, e);
   }, [card, selection?.selectedIds, startDrag, onCardDragStart]);
 
   // Handle drag move
   const handleDragMove = useCallback((e: KonvaEventObject<DragEvent>) => {
     if (card?.isLocked || !dragState?.isDragging || !dragState?.startPosition) return;
+
+    // Prevent Stage drag during card drag
+    e.cancelBubble = true;
 
     const currentOffset = {
       x: (e.target?.x() || 0) - dragState.startPosition.x,
@@ -114,11 +122,17 @@ export const CardRenderer = React.memo<CardRendererProps>(({
   const handleDragEnd = useCallback((e: KonvaEventObject<DragEvent>) => {
     if (card?.isLocked) return;
 
-    endDrag({
+    // Prevent Stage drag during card drag
+    e.cancelBubble = true;
+
+    // Get final position from Konva
+    const finalPosition = {
       x: e.target?.x() || 0,
       y: e.target?.y() || 0,
-    });
+      z: card.position.z || 0,
+    };
 
+    endDrag(finalPosition);
     onCardDragEnd?.(card, e);
   }, [card, endDrag, onCardDragEnd]);
 
