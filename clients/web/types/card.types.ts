@@ -178,6 +178,8 @@ export interface CardAnimation {
 interface BaseCard {
   /** Unique card identifier */
   id: CardId;
+  /** Owner ID (user who created/owns the card) */
+  ownerId: EntityId;
   /** Card content with discriminated union */
   content: CardContent;
   /** Canvas position (z component is used for layering) */
@@ -494,8 +496,9 @@ export interface UpdateCardParams {
  */
 export interface CardActions {
   // CRUD operations
-  createCard: (params: CreateCardParams) => CardId;
-  createCardFromTemplate: (templateId: string, position: CanvasPosition) => CardId;
+  // Cards are now created via GraphQL mutations only
+  addCard: (card: Card) => void; // Add card from server response
+  createCardFromTemplate: (templateId: string, position: CanvasPosition) => CardId; // Deprecated
   updateCard: (params: UpdateCardParams) => void;
   updateCards: (updates: UpdateCardParams[]) => void;
   deleteCard: (id: CardId) => void;

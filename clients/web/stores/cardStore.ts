@@ -27,124 +27,10 @@ import type { Position, Dimensions, Bounds, EntityId } from '@/types/common.type
 import type { CanvasPosition, CanvasBounds } from '@/types/canvas.types';
 
 /**
- * Generate a unique card ID
+ * Generate a unique card ID (used for client-side operations like duplicateCard)
  */
 const generateCardId = (): CardId => {
   return createCardId(`card_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
-};
-
-/**
- * Default card style
- */
-const DEFAULT_STYLE: CardStyle = {
-  backgroundColor: '#ffffff',
-  borderColor: '#e5e7eb',
-  textColor: '#1f2937',
-  borderWidth: 1,
-  borderRadius: 8,
-  opacity: 1,
-  shadow: true,
-};
-
-/**
- * Default card dimensions by type
- */
-const DEFAULT_DIMENSIONS: Record<CardType, Dimensions> = {
-  text: { width: 300, height: 200 },
-  image: { width: 400, height: 300 },
-  link: { width: 350, height: 150 },
-  code: { width: 500, height: 300 },
-};
-
-/**
- * Create a new card with defaults
- */
-const createNewCard = (params: CreateCardParams): Card => {
-  const now = new Date().toISOString();
-  
-  // Create proper content based on type with all required fields
-  let content: CardContent;
-  const inputContent = params.content as any;
-  
-  switch (params.type) {
-    case 'text':
-      content = {
-        type: 'text',
-        content: inputContent?.content || '',
-        markdown: inputContent?.markdown || false,
-        wordCount: inputContent?.wordCount || 0,
-        lastEditedAt: inputContent?.lastEditedAt || now,
-      };
-      break;
-    case 'image':
-      content = {
-        type: 'image',
-        url: inputContent?.url || '',
-        alt: inputContent?.alt || '',
-        caption: inputContent?.caption,
-        originalFilename: inputContent?.originalFilename,
-        fileSize: inputContent?.fileSize,
-        dimensions: inputContent?.dimensions,
-        thumbnail: inputContent?.thumbnail,
-      };
-      break;
-    case 'link':
-      content = {
-        type: 'link',
-        url: inputContent?.url || '',
-        title: inputContent?.title || '',
-        description: inputContent?.description,
-        favicon: inputContent?.favicon,
-        previewImage: inputContent?.previewImage,
-        domain: inputContent?.domain || '',
-        lastChecked: inputContent?.lastChecked,
-        isAccessible: inputContent?.isAccessible ?? true,
-      };
-      break;
-    case 'code':
-      content = {
-        type: 'code',
-        language: inputContent?.language || 'javascript',
-        content: inputContent?.content || '',
-        filename: inputContent?.filename,
-        lineCount: inputContent?.lineCount || 0,
-        hasExecuted: inputContent?.hasExecuted,
-        executionResults: inputContent?.executionResults,
-      };
-      break;
-    default:
-      content = {
-        type: 'text',
-        content: '',
-        markdown: false,
-        wordCount: 0,
-        lastEditedAt: now,
-      };
-  }
-  
-  return {
-    id: generateCardId(),
-    content,
-    position: {
-      ...params.position,
-      z: params.position.z ?? Date.now(), // Use position.z for layering
-    },
-    dimensions: params.dimensions || DEFAULT_DIMENSIONS[params.type],
-    style: { ...DEFAULT_STYLE, ...params.style },
-    isSelected: false,
-    isLocked: false,
-    isHidden: false,
-    isMinimized: false,
-    status: 'draft',
-    priority: 'normal',
-    createdAt: now,
-    updatedAt: now,
-    tags: [],
-    metadata: {},
-    animation: {
-      isAnimating: false,
-    },
-  } as Card;
 };
 
 /**
@@ -196,21 +82,19 @@ export const useCardStore = create<CardStore>()(
         activeFilter: {},
         searchResults: [],
 
-        // CRUD operations
-        createCard: (params: CreateCardParams) => {
-          const newCard = createNewCard(params);
-          
+        // CRUD operations - Cards are now created via GraphQL mutations only
+
+        // Add card from server response (for Apollo cache updates)
+        addCard: (card: Card) => {
           set((state) => {
             const newCards = new Map(state.cards);
-            newCards.set(newCard.id, newCard);
-            
+            newCards.set(card.id, card);
+
             return {
               cards: newCards,
-              history: state.history, // Simplified - not tracking history for now
+              history: state.history,
             };
           });
-          
-          return newCard.id;
         },
 
         updateCard: (params: UpdateCardParams) => {
@@ -498,27 +382,8 @@ export const useCardStore = create<CardStore>()(
         },
 
         pasteCards: (position: CanvasPosition = { x: 100, y: 100 }) => {
-          const { clipboard } = get();
-          if (clipboard.length === 0) return [];
-          
-          const pastedIds: CardId[] = [];
-          const baseOffset = { x: 20, y: 20 };
-          
-          clipboard.forEach((card, index) => {
-            const newId = get().createCard({
-              type: card.content.type,
-              position: {
-                x: position.x + baseOffset.x * index,
-                y: position.y + baseOffset.y * index,
-              },
-              content: card.content,
-              dimensions: card.dimensions,
-              style: card.style,
-            });
-            pastedIds.push(newId);
-          });
-          
-          return pastedIds;
+          console.warn('pasteCards: Card creation should be done via GraphQL mutations');
+          return [];
         },
 
         // History operations - simplified implementation
@@ -537,8 +402,8 @@ export const useCardStore = create<CardStore>()(
 
         // Missing CRUD operations
         createCardFromTemplate: (templateId: string, position: CanvasPosition) => {
-          // Stub implementation
-          return get().createCard({ type: 'text', position });
+          console.warn('createCardFromTemplate: Card creation should be done via GraphQL mutations');
+          return createCardId('');
         },
         
         updateCards: (updates: UpdateCardParams[]) => {

@@ -791,7 +791,7 @@ export const cardResolvers = {
      */
     owner: async (card: Card, _: any, context: GraphQLContext) => {
       const userService = context.dataSources.userService;
-      return await userService.findById(card.createdBy);
+      return await userService.findById(card.ownerId);
     },
   },
 };

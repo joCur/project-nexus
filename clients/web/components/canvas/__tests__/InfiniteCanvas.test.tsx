@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
+import { MockedProvider } from '@apollo/client/testing';
 import { InfiniteCanvas } from '../InfiniteCanvas';
 import { useCanvasStore } from '@/stores/canvasStore';
 
@@ -28,6 +29,13 @@ jest.mock('react-konva', () => ({
   Rect: ({ ...props }: { [key: string]: unknown }) => <div data-testid="konva-rect" {...props} />,
   Line: ({ ...props }: { [key: string]: unknown }) => <div data-testid="konva-line" {...props} />,
 }));
+
+// Apollo test wrapper
+const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <MockedProvider mocks={[]} addTypename={false}>
+    {children}
+  </MockedProvider>
+);
 
 describe('InfiniteCanvas', () => {
   const mockStore = {
@@ -60,20 +68,32 @@ describe('InfiniteCanvas', () => {
   });
 
   it('renders the canvas container', () => {
-    render(<InfiniteCanvas />);
+    render(
+      <TestWrapper>
+        <InfiniteCanvas workspaceId="test-workspace" />
+      </TestWrapper>
+    );
     const canvas = screen.getByTestId('infinite-canvas');
     expect(canvas).toBeInTheDocument();
     expect(canvas).toHaveClass('relative', 'w-full', 'h-full', 'overflow-hidden');
   });
 
   it('renders with custom className', () => {
-    render(<InfiniteCanvas className="custom-class" />);
+    render(
+      <TestWrapper>
+        <InfiniteCanvas workspaceId="test-workspace" className="custom-class" />
+      </TestWrapper>
+    );
     const canvas = screen.getByTestId('infinite-canvas');
     expect(canvas).toHaveClass('custom-class');
   });
 
   it('renders the canvas stage with correct dimensions', () => {
-    render(<InfiniteCanvas />);
+    render(
+      <TestWrapper>
+        <InfiniteCanvas workspaceId="test-workspace" />
+      </TestWrapper>
+    );
     const stage = screen.getByTestId('konva-stage');
     expect(stage).toBeInTheDocument();
     expect(stage).toHaveAttribute('width', '800');
@@ -81,14 +101,22 @@ describe('InfiniteCanvas', () => {
   });
 
   it('shows grid by default', () => {
-    render(<InfiniteCanvas />);
+    render(
+      <TestWrapper>
+        <InfiniteCanvas workspaceId="test-workspace" />
+      </TestWrapper>
+    );
     // Check that at least one layer exists (grid layer)
     const layers = screen.getAllByTestId('konva-layer');
     expect(layers.length).toBeGreaterThan(0);
   });
 
   it('hides grid when showGrid is false', () => {
-    render(<InfiniteCanvas showGrid={false} />);
+    render(
+      <TestWrapper>
+        <InfiniteCanvas workspaceId="test-workspace" showGrid={false} />
+      </TestWrapper>
+    );
     // Should still have at least one layer (card layer) even without grid
     const layers = screen.getAllByTestId('konva-layer');
     expect(layers.length).toBeGreaterThan(0);
@@ -96,7 +124,11 @@ describe('InfiniteCanvas', () => {
 
 
   it('renders canvas with proper dimensions', async () => {
-    render(<InfiniteCanvas />);
+    render(
+      <TestWrapper>
+        <InfiniteCanvas workspaceId="test-workspace" />
+      </TestWrapper>
+    );
     
     const stage = screen.getByTestId('konva-stage');
     expect(stage).toHaveAttribute('width', '800');
@@ -104,7 +136,11 @@ describe('InfiniteCanvas', () => {
   });
 
   it('updates when viewport changes', () => {
-    const { rerender } = render(<InfiniteCanvas />);
+    const { rerender } = render(
+      <TestWrapper>
+        <InfiniteCanvas workspaceId="test-workspace" />
+      </TestWrapper>
+    );
     
     // Update the mock store
     const updatedStore = {
@@ -118,7 +154,11 @@ describe('InfiniteCanvas', () => {
     
     (useCanvasStore as unknown as jest.Mock).mockReturnValue(updatedStore);
     
-    rerender(<InfiniteCanvas />);
+    rerender(
+      <TestWrapper>
+        <InfiniteCanvas workspaceId="test-workspace" />
+      </TestWrapper>
+    );
     
     // Component should re-render with updated viewport
     const canvas = screen.getByTestId('infinite-canvas');
@@ -128,7 +168,11 @@ describe('InfiniteCanvas', () => {
   // Accessibility Tests
   describe('Accessibility', () => {
     it('has proper ARIA attributes', () => {
-      render(<InfiniteCanvas />);
+      render(
+        <TestWrapper>
+          <InfiniteCanvas workspaceId="test-workspace" />
+        </TestWrapper>
+      );
       const canvas = screen.getByTestId('infinite-canvas');
       
       expect(canvas).toHaveAttribute('role', 'application');
@@ -140,10 +184,13 @@ describe('InfiniteCanvas', () => {
 
     it('has custom ARIA label and description', () => {
       render(
-        <InfiniteCanvas 
-          ariaLabel="Custom canvas label" 
-          ariaDescription="Custom canvas description" 
-        />
+        <TestWrapper>
+          <InfiniteCanvas
+            workspaceId="test-workspace"
+            ariaLabel="Custom canvas label"
+            ariaDescription="Custom canvas description"
+          />
+        </TestWrapper>
       );
       const canvas = screen.getByTestId('infinite-canvas');
       
@@ -151,7 +198,11 @@ describe('InfiniteCanvas', () => {
     });
 
     it('renders screen reader instructions', () => {
-      render(<InfiniteCanvas />);
+      render(
+        <TestWrapper>
+          <InfiniteCanvas workspaceId="test-workspace" />
+        </TestWrapper>
+      );
       
       const instructionsContainer = document.querySelector('#canvas-instructions');
       expect(instructionsContainer).toBeInTheDocument();
@@ -163,14 +214,22 @@ describe('InfiniteCanvas', () => {
 
 
     it('displays current zoom level in instructions', () => {
-      render(<InfiniteCanvas />);
+      render(
+        <TestWrapper>
+          <InfiniteCanvas workspaceId="test-workspace" />
+        </TestWrapper>
+      );
       
       expect(screen.getByText(/Current zoom level: 100 percent/)).toBeInTheDocument();
       expect(screen.getByText(/Zoom range: 25% to 400%/)).toBeInTheDocument();
     });
 
     it('updates zoom level announcement when zoom changes', async () => {
-      const { rerender } = render(<InfiniteCanvas />);
+      const { rerender } = render(
+        <TestWrapper>
+          <InfiniteCanvas workspaceId="test-workspace" />
+        </TestWrapper>
+      );
       
       // Update zoom level
       const updatedStore = {
@@ -182,7 +241,11 @@ describe('InfiniteCanvas', () => {
       };
       
       (useCanvasStore as unknown as jest.Mock).mockReturnValue(updatedStore);
-      rerender(<InfiniteCanvas />);
+      rerender(
+      <TestWrapper>
+        <InfiniteCanvas workspaceId="test-workspace" />
+      </TestWrapper>
+    );
       
       await waitFor(() => {
         expect(screen.getByText(/Current zoom level: 150 percent/)).toBeInTheDocument();
@@ -190,7 +253,11 @@ describe('InfiniteCanvas', () => {
     });
 
     it('has proper focus styles applied via Tailwind classes', () => {
-      render(<InfiniteCanvas />);
+      render(
+        <TestWrapper>
+          <InfiniteCanvas workspaceId="test-workspace" />
+        </TestWrapper>
+      );
       const canvas = screen.getByTestId('infinite-canvas');
       
       expect(canvas).toHaveClass('focus:outline-none', 'focus:ring-2', 'focus:ring-border-focus', 'focus:ring-offset-2');
@@ -200,7 +267,11 @@ describe('InfiniteCanvas', () => {
   // Design System Integration Tests
   describe('Design System Integration', () => {
     it('uses design system color tokens', () => {
-      render(<InfiniteCanvas />);
+      render(
+        <TestWrapper>
+          <InfiniteCanvas workspaceId="test-workspace" />
+        </TestWrapper>
+      );
       const canvas = screen.getByTestId('infinite-canvas');
       
       // Uses bg-canvas-base from design tokens

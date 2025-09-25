@@ -360,12 +360,13 @@ export interface CardsInBoundsQueryVariables {
 export interface CreateCardMutationVariables {
   input: {
     workspaceId: string;
-    type: 'TEXT' | 'IMAGE' | 'LINK' | 'CODE';
+    type: 'text' | 'image' | 'link' | 'code' | 'file' | 'drawing';
     title?: string;
     content?: string;
     position: {
       x: number;
       y: number;
+      z: number;
     };
     dimensions?: {
       width: number;
@@ -382,7 +383,7 @@ export interface CreateCardMutationVariables {
     };
     tags?: string[];
     metadata?: Record<string, any>;
-    priority?: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
+    priority?: 'low' | 'normal' | 'high' | 'urgent';
   };
 }
 
@@ -394,6 +395,7 @@ export interface UpdateCardMutationVariables {
     position?: {
       x: number;
       y: number;
+      z: number;
     };
     dimensions?: {
       width: number;

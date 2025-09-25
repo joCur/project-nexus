@@ -28,8 +28,8 @@ interface InfiniteCanvasProps {
   showGrid?: boolean;
   ariaLabel?: string;
   ariaDescription?: string;
-  /** Workspace ID for card operations */
-  workspaceId?: EntityId;
+  /** Workspace ID for card operations - required for card creation */
+  workspaceId: EntityId;
 }
 
 /**
@@ -72,6 +72,7 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
 
   // Initialize card creation hook
   const cardCreation = useCardCreation({
+    workspaceId,
     defaultType: 'text',
     autoEnterEditMode: true, // TODO: Will be implemented in NEX-193
   });
@@ -154,9 +155,15 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
           position={cardCreation.state.contextMenuPosition}
           onClose={cardCreation.closeContextMenu}
           onCreateCard={async (type) => {
-            // Use the stored creation position (canvas coordinates) from context menu click
-            if (cardCreation.state.creationPosition) {
-              await cardCreation.createCardAtPosition(type, cardCreation.state.creationPosition);
+            // Store the creation position before closing context menu
+            const position = cardCreation.state.creationPosition;
+
+            // Close context menu first
+            cardCreation.closeContextMenu();
+
+            if (position) {
+              // Create card at the stored position
+              await cardCreation.createCardAtPosition(type, position);
             } else {
               // Fallback to default position if no position stored
               await cardCreationHandlers.onCreateCard(type);

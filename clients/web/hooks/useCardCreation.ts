@@ -3,16 +3,26 @@
  *
  * Manages state and operations for card creation UI components including
  * modal states, position tracking, type selection, and integration with
- * existing card store and operations.
+ * Apollo GraphQL mutations for server-side card creation.
  */
 
 import { useCallback, useState } from 'react';
-import { useCardStore } from '@/stores/cardStore';
+import { useMutation } from '@apollo/client';
 import { useCanvasStore } from '@/stores/canvasStore';
+import { useCardStore } from '@/stores/cardStore';
+import { CREATE_CARD, GET_CARDS } from '@/lib/graphql/cardOperations';
+import type {
+  CreateCardMutationVariables,
+  CardResponse,
+} from '@/lib/graphql/cardOperations';
 import type {
   CardType,
-  CreateCardParams,
   CardId,
+  Card,
+  TextCard,
+  ImageCard,
+  LinkCard,
+  CodeCard
 } from '@/types/card.types';
 import { DEFAULT_CARD_DIMENSIONS } from '@/types/card.types';
 import type { CanvasPosition } from '@/types/canvas.types';
@@ -48,6 +58,8 @@ export interface CardCreationConfig {
   defaultOffset?: Position;
   /** Whether to auto-enter edit mode after creation */
   autoEnterEditMode?: boolean;
+  /** Workspace ID for card creation */
+  workspaceId: string;
 }
 
 /**
@@ -73,10 +85,10 @@ export interface UseCardCreationReturn {
   setSelectedType: (type: CardType) => void;
 
   /** Create card with current settings */
-  createCard: (params?: Partial<CreateCardParams>) => Promise<CardId | null>;
+  createCard: (params?: Partial<CreateCardMutationVariables['input']>) => Promise<string | null>;
 
   /** Create card of specific type at position */
-  createCardAtPosition: (type: CardType, position: CanvasPosition, content?: any) => Promise<CardId | null>;
+  createCardAtPosition: (type: CardType, position: CanvasPosition, content?: string) => Promise<string | null>;
 
   /** Get default position for card creation */
   getDefaultPosition: () => CanvasPosition;
@@ -89,59 +101,193 @@ export interface UseCardCreationReturn {
 }
 
 /**
- * Default content generators for each card type
+ * Default content for each card type
  */
-const getDefaultContent = (type: CardType): any => {
+const getDefaultContent = (type: CardType): string => {
   switch (type) {
     case 'text':
-      return {
-        type: 'text',
-        content: '',
-        markdown: false,
-        wordCount: 0,
-        lastEditedAt: new Date().toISOString(),
-      };
+      return 'Enter your text here';
     case 'image':
-      return {
-        type: 'image',
-        url: '',
-        alt: '',
-        caption: '',
-      };
+      return 'https://via.placeholder.com/300x200?text=Image';
     case 'link':
-      return {
-        type: 'link',
-        url: '',
-        title: '',
-        domain: '',
-        isAccessible: true,
-      };
+      return 'https://example.com';
     case 'code':
-      return {
-        type: 'code',
-        language: 'javascript',
-        content: '',
-        lineCount: 0,
-      };
+      return '// Your code here';
     default:
-      return {};
+      return 'Enter content here';
+  }
+};
+
+/**
+ * Convert frontend card type to GraphQL enum
+ * Resolver expects lowercase enum values: 'text' | 'image' | 'link' | 'code' | 'file' | 'drawing'
+ */
+const toGraphQLCardType = (type: CardType): 'text' | 'image' | 'link' | 'code' => {
+  return type.toLowerCase() as 'text' | 'image' | 'link' | 'code';
+};
+
+/**
+ * Transform backend GraphQL response to frontend Card type
+ * Handles backend single interface to frontend discriminated union conversion
+ */
+const transformBackendCardToFrontend = (backendCard: CardResponse): Card => {
+  const baseCard = {
+    id: backendCard.id as CardId,
+    ownerId: backendCard.ownerId,
+    position: {
+      x: backendCard.position.x,
+      y: backendCard.position.y,
+      z: backendCard.position.z,
+    },
+    dimensions: backendCard.dimensions,
+    style: backendCard.style,
+    isSelected: false,
+    isLocked: false,
+    isHidden: false,
+    isMinimized: false,
+    status: backendCard.status.toLowerCase() as 'draft' | 'active' | 'archived' | 'deleted',
+    priority: backendCard.priority.toLowerCase() as 'low' | 'normal' | 'high' | 'urgent',
+    createdAt: backendCard.createdAt,
+    updatedAt: backendCard.updatedAt,
+    tags: backendCard.tags,
+    metadata: backendCard.metadata,
+    animation: {
+      isAnimating: false,
+    },
+  };
+
+  // Create discriminated union based on backend type (GraphQL returns uppercase)
+  switch (backendCard.type) {
+    case 'TEXT':
+      return {
+        ...baseCard,
+        content: {
+          type: 'text' as const,
+          content: backendCard.content,
+          markdown: false,
+          wordCount: backendCard.content.length,
+          lastEditedAt: backendCard.updatedAt,
+        },
+      } as TextCard;
+
+    case 'IMAGE':
+      return {
+        ...baseCard,
+        content: {
+          type: 'image' as const,
+          url: backendCard.content,
+          alt: backendCard.title || '',
+          caption: backendCard.title,
+        },
+      } as ImageCard;
+
+    case 'LINK':
+      try {
+        const url = new URL(backendCard.content);
+        return {
+          ...baseCard,
+          content: {
+            type: 'link' as const,
+            url: backendCard.content,
+            title: backendCard.title || url.hostname,
+            description: backendCard.metadata?.description,
+            domain: url.hostname,
+            favicon: backendCard.metadata?.favicon,
+            previewImage: backendCard.metadata?.previewImage,
+            lastChecked: backendCard.metadata?.lastChecked,
+            isAccessible: true,
+          },
+        } as LinkCard;
+      } catch {
+        return {
+          ...baseCard,
+          content: {
+            type: 'link' as const,
+            url: backendCard.content,
+            title: backendCard.title || 'Link',
+            domain: '',
+            isAccessible: false,
+          },
+        } as LinkCard;
+      }
+
+    case 'CODE':
+      return {
+        ...baseCard,
+        content: {
+          type: 'code' as const,
+          language: backendCard.metadata?.language || 'text',
+          content: backendCard.content,
+          filename: backendCard.metadata?.filename,
+          lineCount: backendCard.content.split('\n').length,
+          hasExecuted: false,
+        },
+      } as CodeCard;
+
+    default:
+      return {
+        ...baseCard,
+        content: {
+          type: 'text' as const,
+          content: backendCard.content,
+          markdown: false,
+          wordCount: backendCard.content.length,
+          lastEditedAt: backendCard.updatedAt,
+        },
+      } as TextCard;
   }
 };
 
 /**
  * Custom hook for card creation state management
  */
-export const useCardCreation = (config: CardCreationConfig = {}): UseCardCreationReturn => {
+export const useCardCreation = (config: CardCreationConfig): UseCardCreationReturn => {
   const {
+    workspaceId,
     defaultType = 'text',
     defaultOffset = { x: 0, y: 0 },
     autoEnterEditMode = false,
   } = config;
 
   // Store hooks
-  const cardStore = useCardStore();
   const canvasStore = useCanvasStore();
+  const cardStore = useCardStore();
   const { viewport } = canvasStore;
+
+  // Apollo mutation
+  const [createCardMutation, { loading: isCreatingMutation }] = useMutation<
+    { createCard: CardResponse },
+    CreateCardMutationVariables
+  >(CREATE_CARD, {
+    // Update Apollo cache after successful card creation
+    update: (cache, { data }) => {
+      if (!data?.createCard) return;
+
+      // Update the GET_CARDS query cache
+      try {
+        const existingCards = cache.readQuery({
+          query: GET_CARDS,
+          variables: { workspaceId },
+        }) as { cards: { items: CardResponse[] } } | null;
+
+        if (existingCards) {
+          cache.writeQuery({
+            query: GET_CARDS,
+            variables: { workspaceId },
+            data: {
+              cards: {
+                ...existingCards.cards,
+                items: [data.createCard, ...existingCards.cards.items],
+              },
+            },
+          });
+        }
+      } catch (error) {
+        // Cache entry might not exist yet, that's okay
+        console.debug('Could not update cache after card creation:', error);
+      }
+    },
+  });
 
   // Creation state
   const [state, setState] = useState<CardCreationState>({
@@ -150,7 +296,7 @@ export const useCardCreation = (config: CardCreationConfig = {}): UseCardCreatio
     selectedType: null,
     creationPosition: null,
     contextMenuPosition: null,
-    isCreating: false,
+    isCreating: isCreatingMutation,
     error: null,
   });
 
@@ -163,7 +309,7 @@ export const useCardCreation = (config: CardCreationConfig = {}): UseCardCreatio
     return {
       x: (screenPos.x - position.x) / zoom,
       y: (screenPos.y - position.y) / zoom,
-      z: Date.now(), // Use timestamp for z-ordering
+      z: Math.floor(Date.now() / 1000) % 1000, // Use timestamp-based z-ordering within valid range
     };
   }, [viewport]);
 
@@ -180,7 +326,7 @@ export const useCardCreation = (config: CardCreationConfig = {}): UseCardCreatio
     return {
       x: centerX + defaultOffset.x,
       y: centerY + defaultOffset.y,
-      z: Date.now(),
+      z: Math.floor(Date.now() / 1000) % 1000, // Use timestamp-based z-ordering within valid range
     };
   }, [viewport, defaultOffset]);
 
@@ -262,7 +408,7 @@ export const useCardCreation = (config: CardCreationConfig = {}): UseCardCreatio
   /**
    * Create card with current settings
    */
-  const createCard = useCallback(async (params: Partial<CreateCardParams> = {}): Promise<CardId | null> => {
+  const createCard = useCallback(async (params: Partial<CreateCardMutationVariables['input']> = {}): Promise<string | null> => {
     const { selectedType, creationPosition } = state;
 
     if (!selectedType || !creationPosition) {
@@ -270,24 +416,42 @@ export const useCardCreation = (config: CardCreationConfig = {}): UseCardCreatio
       return null;
     }
 
-    setState(prev => ({ ...prev, isCreating: true, error: null }));
+    setState(prev => ({ ...prev, error: null }));
 
     try {
-      const createParams: CreateCardParams = {
-        type: selectedType,
-        position: creationPosition,
+      const input: CreateCardMutationVariables['input'] = {
+        workspaceId,
+        type: toGraphQLCardType(selectedType),
+        title: params.title || `New ${selectedType} card`,
         content: params.content || getDefaultContent(selectedType),
+        position: {
+          x: creationPosition.x,
+          y: creationPosition.y,
+          z: creationPosition.z || Math.floor(Date.now() / 1000) % 1000,
+        },
         dimensions: params.dimensions || DEFAULT_CARD_DIMENSIONS[selectedType],
         style: params.style,
-        ...params,
+        tags: params.tags || [],
+        metadata: params.metadata || {},
+        priority: params.priority || 'normal',
       };
 
-      const cardId = cardStore.createCard(createParams);
+      const result = await createCardMutation({
+        variables: { input },
+      });
+
+      const createdCard = result.data?.createCard;
+      if (!createdCard) {
+        throw new Error('No card returned from mutation');
+      }
+
+      // Transform and add card to local store for immediate rendering
+      const frontendCard = transformBackendCardToFrontend(createdCard);
+      cardStore.addCard(frontendCard);
 
       // Close UI after successful creation
       setState(prev => ({
         ...prev,
-        isCreating: false,
         isModalOpen: false,
         isContextMenuOpen: false,
         selectedType: null,
@@ -296,21 +460,19 @@ export const useCardCreation = (config: CardCreationConfig = {}): UseCardCreatio
       }));
 
       // TODO: Integrate with NEX-193 to auto-enter edit mode
-      if (autoEnterEditMode && cardId) {
-        // This will be implemented when NEX-193 is available
-        console.log('Auto-enter edit mode for card:', cardId);
+      if (autoEnterEditMode) {
+        console.log('Auto-enter edit mode for card:', createdCard.id);
       }
 
-      return cardId;
+      return createdCard.id;
     } catch (error) {
       setState(prev => ({
         ...prev,
-        isCreating: false,
         error: error instanceof Error ? error.message : 'Failed to create card',
       }));
       return null;
     }
-  }, [state, cardStore, autoEnterEditMode]);
+  }, [state, workspaceId, createCardMutation, autoEnterEditMode, cardStore]);
 
   /**
    * Create card of specific type at position
@@ -318,40 +480,70 @@ export const useCardCreation = (config: CardCreationConfig = {}): UseCardCreatio
   const createCardAtPosition = useCallback(async (
     type: CardType,
     position: CanvasPosition,
-    content?: any
-  ): Promise<CardId | null> => {
-    setState(prev => ({ ...prev, isCreating: true, error: null }));
+    content?: string
+  ): Promise<string | null> => {
+    console.log('🚀 createCardAtPosition called:', { type, position, workspaceId });
+    setState(prev => ({ ...prev, error: null }));
 
     try {
-      const createParams: CreateCardParams = {
-        type,
-        position,
+      const input: CreateCardMutationVariables['input'] = {
+        workspaceId,
+        type: toGraphQLCardType(type),
+        title: `New ${type} card`,
         content: content || getDefaultContent(type),
+        position: {
+          x: position.x,
+          y: position.y,
+          z: position.z || Math.floor(Date.now() / 1000) % 1000,
+        },
         dimensions: DEFAULT_CARD_DIMENSIONS[type],
+        tags: [],
+        metadata: {},
+        priority: 'normal',
       };
 
-      const cardId = cardStore.createCard(createParams);
+      console.log('📤 Sending GraphQL mutation with input:', input);
 
-      setState(prev => ({ ...prev, isCreating: false }));
+      const result = await createCardMutation({
+        variables: { input },
+      });
 
-      // TODO: Integrate with NEX-193 to auto-enter edit mode
-      if (autoEnterEditMode && cardId) {
-        console.log('Auto-enter edit mode for card:', cardId);
+      console.log('📥 GraphQL mutation result:', result);
+
+      const createdCard = result.data?.createCard;
+      if (!createdCard) {
+        console.error('❌ No card returned from mutation');
+        throw new Error('No card returned from mutation');
       }
 
-      return cardId;
+      console.log('✅ Card created successfully:', createdCard.id);
+
+      // Transform and add card to local store for immediate rendering
+      const frontendCard = transformBackendCardToFrontend(createdCard);
+      cardStore.addCard(frontendCard);
+      console.log('✅ Card added to local store for rendering');
+
+      // TODO: Integrate with NEX-193 to auto-enter edit mode
+      if (autoEnterEditMode) {
+        console.log('Auto-enter edit mode for card:', createdCard.id);
+      }
+
+      return createdCard.id;
     } catch (error) {
+      console.error('❌ createCardAtPosition error:', error);
       setState(prev => ({
         ...prev,
-        isCreating: false,
         error: error instanceof Error ? error.message : 'Failed to create card',
       }));
       return null;
     }
-  }, [cardStore, autoEnterEditMode]);
+  }, [workspaceId, createCardMutation, autoEnterEditMode, cardStore]);
 
   return {
-    state,
+    state: {
+      ...state,
+      isCreating: isCreatingMutation, // Use Apollo loading state
+    },
     openModal,
     closeModal,
     openContextMenu,
