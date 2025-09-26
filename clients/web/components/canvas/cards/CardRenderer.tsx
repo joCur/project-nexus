@@ -2,10 +2,10 @@
  * CardRenderer - Main orchestrator for rendering all card types
  *
  * This component determines the card type and delegates to specific renderers,
- * handles selection states, drag operations, and resize handles.
+ * handles selection states, drag operations, resize handles, and edit mode.
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Group } from 'react-konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type {
@@ -19,6 +19,7 @@ import {
   isCodeCard
 } from '@/types/card.types';
 import { useCardStore } from '@/stores/cardStore';
+import type { EditMode } from '@/components/canvas/editing';
 import { TextCardRenderer } from './TextCardRenderer';
 import { ImageCardRenderer } from './ImageCardRenderer';
 import { LinkCardRenderer } from './LinkCardRenderer';
@@ -35,6 +36,14 @@ interface CardRendererProps {
   onCardDoubleClick?: (card: Card, e: KonvaEventObject<MouseEvent>) => void;
   onCardHover?: (card: Card, e: KonvaEventObject<MouseEvent>) => void;
   onCardUnhover?: (card: Card, e: KonvaEventObject<MouseEvent>) => void;
+  /** Callback when entering edit mode */
+  onEditStart?: (cardId: string, mode: EditMode) => void;
+  /** Callback when saving edits */
+  onEditEnd?: (cardId: string, content: unknown) => void;
+  /** Callback when canceling edits */
+  onEditCancel?: (cardId: string) => void;
+  /** Whether inline editing is enabled */
+  enableInlineEdit?: boolean;
 }
 
 /**
@@ -49,6 +58,10 @@ export const CardRenderer = React.memo<CardRendererProps>(({
   onCardDoubleClick,
   onCardHover,
   onCardUnhover,
+  onEditStart,
+  onEditEnd,
+  onEditCancel,
+  enableInlineEdit = false,
 }) => {
   const {
     selection,
@@ -62,6 +75,9 @@ export const CardRenderer = React.memo<CardRendererProps>(({
     endDrag,
     setHoveredCard,
   } = useCardStore();
+
+  // State for edit mode (only used when inline editing is enabled)
+  const [, setIsEditing] = useState(false);
 
   // Determine card state with safe checks
   const isSelected = card?.id && selection?.selectedIds?.has(card.id) || false;
@@ -78,8 +94,20 @@ export const CardRenderer = React.memo<CardRendererProps>(({
   // Handle double click events
   const handleDoubleClick = useCallback((e: KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true;
-    onCardDoubleClick?.(card, e);
-  }, [card, onCardDoubleClick]);
+
+    // If inline editing is enabled, trigger edit mode instead of callback
+    if (enableInlineEdit && !card.isLocked) {
+      setIsEditing(true);
+      // Determine edit mode based on card type
+      const editMode = card.content.type === 'text' ? 'text' :
+                      card.content.type === 'code' ? 'code' :
+                      card.content.type === 'link' ? 'link' :
+                      card.content.type === 'image' ? 'image-caption' : 'metadata';
+      onEditStart?.(card.id, editMode as EditMode);
+    } else {
+      onCardDoubleClick?.(card, e);
+    }
+  }, [card, onCardDoubleClick, enableInlineEdit, onEditStart]);
 
   // Handle drag start
   const handleDragStart = useCallback((e: KonvaEventObject<DragEvent>) => {
@@ -147,6 +175,22 @@ export const CardRenderer = React.memo<CardRendererProps>(({
     setHoveredCard(undefined);
     onCardUnhover?.(card, e);
   }, [card, setHoveredCard, onCardUnhover]);
+
+  // Handle edit mode callbacks
+  const handleEditEnd = useCallback((cardId: string, content: unknown) => {
+    setIsEditing(false);
+    onEditEnd?.(cardId, content);
+  }, [onEditEnd]);
+
+  const handleEditCancel = useCallback((cardId: string) => {
+    setIsEditing(false);
+    onEditCancel?.(cardId);
+  }, [onEditCancel]);
+
+  // Note: handleEditEnd and handleEditCancel will be used when EditModeManager is integrated
+  // Currently they're defined but not yet connected to the UI
+  void handleEditEnd; // Suppress unused warning
+  void handleEditCancel; // Suppress unused warning
 
   // Don't render if card is invalid or hidden
   if (!card || !card.id || card.isHidden) {
