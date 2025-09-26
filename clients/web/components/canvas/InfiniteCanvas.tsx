@@ -8,8 +8,9 @@ import { useCanvasStore } from '@/stores/canvasStore';
 import useCardCreation from '@/hooks/useCardCreation';
 import CardCreationMenu from './CardCreationMenu';
 import CreateCardModal from './CreateCardModal';
-import type { CardType } from '@/types/card.types';
+import type { CardType, CreateCardParams } from '@/types/card.types';
 import type { EntityId } from '@/types/common.types';
+import type { CreateCardMutationVariables } from '@/lib/graphql/cardOperations';
 
 const CanvasStage = dynamic(() => import('./CanvasStage').then(mod => ({ default: mod.CanvasStage })), {
   ssr: false
@@ -98,12 +99,43 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
   useCanvasEvents(containerRef, cardCreationHandlers);
 
   // Handle modal card creation
-  const handleModalCardCreation = async (params: any) => {
+  const handleModalCardCreation = async (params: CreateCardParams) => {
     try {
-      await cardCreation.createCard(params);
+      // Convert CreateCardParams to the format expected by useCardCreation
+      // Extract content based on card type with proper type checking
+      let contentString: string | undefined;
+      if (params.content) {
+        switch (params.type) {
+          case 'text':
+            contentString = 'content' in params.content ? String(params.content.content) : undefined;
+            break;
+          case 'image':
+            contentString = 'url' in params.content ? String(params.content.url) : undefined;
+            break;
+          case 'link':
+            contentString = 'url' in params.content ? String(params.content.url) : undefined;
+            break;
+          case 'code':
+            contentString = 'content' in params.content ? String(params.content.content) : undefined;
+            break;
+          default:
+            contentString = undefined;
+        }
+      }
+
+      const createCardInput: Partial<CreateCardMutationVariables['input']> = {
+        title: params.type === 'text' && contentString ?
+          contentString.slice(0, 50) + '...' :
+          `New ${params.type} card`,
+        content: contentString,
+        dimensions: params.dimensions,
+        style: params.style,
+      };
+
+      await cardCreation.createCard(createCardInput);
     } catch (error) {
-      console.error('Failed to create card:', error);
       // Error handling is managed by the useCardCreation hook
+      // Silent failure - errors are displayed via hook's state management
     }
   };
   
