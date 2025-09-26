@@ -7,15 +7,17 @@
 ## Table of Contents
 
 1. [Introduction](#introduction)
-2. [Core Architecture Principles](#core-architecture-principles)
-3. [Proven Implementation Patterns](#proven-implementation-patterns)
-4. [Development Workflow](#development-workflow)
-5. [Code Structure Templates](#code-structure-templates)
-6. [Testing Patterns](#testing-patterns)
-7. [Performance Guidelines](#performance-guidelines)
-8. [Common Anti-Patterns](#common-anti-patterns)
-9. [Reference Examples](#reference-examples)
-10. [Architecture Decision Records](#architecture-decision-records)
+2. [Development Environment Setup](#development-environment-setup)
+3. [Project Organization Standards](#project-organization-standards)
+4. [Core Architecture Principles](#core-architecture-principles)
+5. [Proven Implementation Patterns](#proven-implementation-patterns)
+6. [Development Workflow](#development-workflow)
+7. [Code Structure Templates](#code-structure-templates)
+8. [Testing Patterns](#testing-patterns)
+9. [Performance Guidelines](#performance-guidelines)
+10. [Common Anti-Patterns](#common-anti-patterns)
+11. [Reference Examples](#reference-examples)
+12. [Architecture Decision Records](#architecture-decision-records)
 
 ---
 
@@ -36,6 +38,359 @@ Project Nexus is an AI-powered visual knowledge workspace with:
 - **Backend**: Node.js + GraphQL + PostgreSQL with pgvector + Redis
 - **Frontend**: Next.js 14 + Zustand + Apollo Client + Konva.js
 - **Infrastructure**: Docker Compose (development) + Auth0 authentication
+
+---
+
+## Development Environment Setup
+
+### Docker Development Stack
+
+Project Nexus uses Docker Compose for local development with the following services:
+
+```yaml
+# devops/docker-compose.yml
+services:
+  postgres:    # PostgreSQL with pgvector (AI embeddings)
+  redis:       # Cache and sessions
+  redis-commander: # Redis web interface (localhost:8081)
+  adminer:     # Database web interface (localhost:8080)
+```
+
+**Setup Commands:**
+```bash
+# User starts Docker services (Claude never runs this)
+cd devops && docker-compose up -d
+
+# Backend development
+npm run dev:backend
+
+# Frontend development
+npm run dev:frontend
+```
+
+**Important**: Never start docker-compose from Claude - always ask the user to start it.
+
+### Environment Configuration
+
+**Monorepo Environment Structure:**
+- Root `.env` file contains all environment variables
+- Backend and frontend read from root `.env` via relative paths
+- Docker Compose uses root `.env` automatically
+
+**Frontend Environment Variables (Next.js):**
+```javascript
+// clients/web/next.config.js
+require('dotenv').config({ path: '../../.env' });
+
+const nextConfig = {
+  env: {
+    AUTH0_SECRET: process.env.AUTH0_SECRET,
+    AUTH0_BASE_URL: process.env.AUTH0_BASE_URL,
+    GRAPHQL_ENDPOINT: process.env.GRAPHQL_ENDPOINT || 'http://localhost:3000/graphql',
+    // ... other variables
+  }
+};
+```
+
+---
+
+## Project Organization Standards
+
+### Directory Structure
+
+**Monorepo Layout:**
+```
+project-nexus/
+├── backend/           # Node.js GraphQL API
+│   ├── src/
+│   │   ├── resolvers/    # GraphQL resolvers
+│   │   ├── services/     # Business logic layer
+│   │   ├── models/       # Database models
+│   │   └── types/        # TypeScript types
+│   └── __tests__/        # Backend tests
+├── clients/
+│   └── web/           # Next.js frontend
+│       ├── components/   # React components
+│       ├── hooks/        # Custom React hooks
+│       ├── stores/       # Zustand stores
+│       ├── types/        # TypeScript types
+│       ├── lib/          # Utilities and GraphQL
+│       └── __tests__/    # Frontend tests
+├── devops/            # Docker Compose setup
+└── project-documentation/ # Architecture docs
+```
+
+### Path Aliases & Import Standards
+
+**Frontend Path Aliases (TypeScript):**
+```json
+// clients/web/tsconfig.json
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"],
+      "@/components/*": ["./components/*"],
+      "@/hooks/*": ["./hooks/*"],
+      "@/stores/*": ["./stores/*"],
+      "@/types/*": ["./types/*"],
+      "@/lib/*": ["./lib/*"],
+      "@/utils/*": ["./utils/*"]
+    }
+  }
+}
+```
+
+**Import Order Standards:**
+```typescript
+// 1. External libraries
+import React from 'react';
+import { useMutation } from '@apollo/client';
+
+// 2. Internal imports with @ aliases (grouped by type)
+import { useCardStore } from '@/stores/cardStore';
+import { useCardCreation } from '@/hooks/useCardCreation';
+import type { CardType } from '@/types/card.types';
+import { CREATE_CARD } from '@/lib/graphql/cardOperations';
+
+// 3. Relative imports (if any)
+import './Component.styles.css';
+```
+
+**Backend Import Standards:**
+```typescript
+// 1. Node.js built-ins
+import path from 'path';
+
+// 2. External libraries
+import { ApolloServer } from '@apollo/server';
+
+// 3. Internal imports (relative paths)
+import { resolvers } from './resolvers';
+import { typeDefs } from './schema';
+import type { Context } from './types';
+```
+
+### Canvas-Specific Patterns (Konva.js)
+
+**Canvas Architecture:**
+```typescript
+// Canvas layer hierarchy
+<Stage>
+  <Layer name="background" />
+  <Layer name="cards">
+    {cards.map(card => (
+      <CardRenderer key={card.id} card={card} />
+    ))}
+  </Layer>
+  <Layer name="ui-overlay" />
+</Stage>
+```
+
+**Canvas State Management:**
+```typescript
+// Canvas viewport state (Zustand)
+interface CanvasStore {
+  viewport: {
+    position: { x: number; y: number };
+    zoom: number;
+    bounds: { width: number; height: number };
+  };
+  // UI-only state, no server data
+}
+
+// Card data comes from GraphQL/Apollo (server state)
+const { data: cards } = useQuery(GET_CARDS);
+```
+
+**Canvas Coordinate Systems:**
+```typescript
+// Screen to canvas coordinate conversion
+const screenToCanvasPosition = (screenPos: Position): CanvasPosition => {
+  const { position, zoom } = viewport;
+  return {
+    x: (screenPos.x - position.x) / zoom,
+    y: (screenPos.y - position.y) / zoom,
+    z: Math.floor(Date.now() / 1000) % 1000
+  };
+};
+```
+
+**Konva.js Integration Standards:**
+- Use `ref` for direct Konva node access
+- Implement `onDragMove`, `onDragEnd` for position updates
+- Use `onTransform` for resize operations
+- Cache complex shapes with `cache()` for performance
+
+### File Naming Conventions
+
+**Components:**
+- PascalCase: `CardRenderer.tsx`, `UserProfile.tsx`
+- Test files: `CardRenderer.test.tsx`
+- Styles: `CardRenderer.module.css` (if needed)
+
+**Hooks:**
+- camelCase with `use` prefix: `useCardCreation.ts`, `useCanvasViewport.ts`
+- Test files: `useCardCreation.test.ts`
+
+**Stores:**
+- camelCase with Store suffix: `cardStore.ts`, `canvasStore.ts`
+- No test files (stores are tested through components/hooks)
+
+**Types:**
+- camelCase with `.types.ts` suffix: `card.types.ts`, `canvas.types.ts`
+- Use singular names: `card.types.ts` not `cards.types.ts`
+
+**GraphQL:**
+- camelCase descriptive names: `cardOperations.ts`, `workspaceQueries.ts`
+- Group related operations in single files
+
+### GraphQL Schema Organization
+
+**Backend Schema Structure:**
+```
+backend/src/
+├── graphql/
+│   ├── typeDefs.ts          # Main schema definitions
+│   ├── canvasTypeDefs.ts    # Feature-specific schemas
+│   └── canvasResolvers.ts   # Feature-specific resolvers
+├── resolvers/
+│   ├── index.ts             # Resolver merging
+│   ├── cardResolvers.ts     # Entity resolvers
+│   ├── userResolvers.ts
+│   └── workspaceResolvers.ts
+├── services/               # Business logic layer
+└── types/                  # TypeScript type definitions
+```
+
+**Schema Definition Patterns:**
+```typescript
+// graphql/typeDefs.ts - Main schema
+export const authTypeDefs = gql`
+  # Scalar types first
+  scalar DateTime
+  scalar JSON
+
+  # Entity types
+  type User {
+    id: ID!
+    email: String!
+    # ... fields
+  }
+
+  # Input types for mutations
+  input CreateUserInput {
+    email: String!
+    # ... fields
+  }
+
+  # Queries and Mutations
+  type Query {
+    user(id: ID!): User
+    users(filter: UserFilter): [User!]!
+  }
+
+  type Mutation {
+    createUser(input: CreateUserInput!): User!
+  }
+`;
+```
+
+**Resolver Implementation Patterns:**
+```typescript
+// resolvers/cardResolvers.ts
+import { CardService } from '@/services/CardService';
+import { GraphQLContext } from '@/types';
+import { AuthenticationError, ValidationError } from '@/utils/errors';
+
+export const cardResolvers = {
+  Query: {
+    card: async (
+      _: any,
+      { id }: { id: string },
+      context: GraphQLContext
+    ): Promise<Card | null> => {
+      // 1. Authentication check
+      if (!context.isAuthenticated) {
+        throw new AuthenticationError();
+      }
+
+      // 2. Service layer call
+      const cardService = new CardService();
+      return await cardService.getCardById(id, context.user.id);
+    },
+  },
+
+  Mutation: {
+    createCard: async (
+      _: any,
+      { input }: { input: CreateCardInput },
+      context: GraphQLContext
+    ): Promise<Card> => {
+      // Authentication, validation, service call pattern
+      if (!context.isAuthenticated) {
+        throw new AuthenticationError();
+      }
+
+      const cardService = new CardService();
+      return await cardService.createCard(input, context.user.id);
+    },
+  },
+};
+```
+
+**Frontend GraphQL Integration:**
+```typescript
+// lib/graphql/cardOperations.ts
+import { gql } from '@apollo/client';
+
+export const CREATE_CARD = gql`
+  mutation CreateCard($input: CreateCardInput!) {
+    createCard(input: $input) {
+      id
+      title
+      content
+      position {
+        x
+        y
+        z
+      }
+      dimensions {
+        width
+        height
+      }
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+export const GET_CARDS = gql`
+  query GetCards($workspaceId: ID!) {
+    cards(workspaceId: $workspaceId) {
+      items {
+        id
+        title
+        type
+        position {
+          x
+          y
+          z
+        }
+        # ... other fields
+      }
+    }
+  }
+`;
+```
+
+**GraphQL Standards:**
+- **Naming**: Use PascalCase for types, camelCase for fields
+- **Nullability**: Be explicit about required vs optional fields
+- **Input Types**: Always use input types for mutations
+- **Error Handling**: Use custom error types with proper HTTP status codes
+- **Context**: Always validate authentication in resolvers
+- **Service Layer**: Never put business logic in resolvers - delegate to services
 
 ---
 

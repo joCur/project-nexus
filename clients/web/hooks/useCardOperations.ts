@@ -292,7 +292,8 @@ export const useCardOperations = (workspaceId: EntityId) => {
       try {
         if (data?.data?.cardCreated) {
           const card = transformBackendCardToFrontend(data.data.cardCreated);
-          store.createCard(card);
+          // TODO: Handle via Apollo cache
+          // store.createCard(card); // Removed - cardStore no longer handles server data
         }
       } catch (error) {
         handleCardSubscriptionError('cardCreated', error);
@@ -310,7 +311,8 @@ export const useCardOperations = (workspaceId: EntityId) => {
       try {
         if (data?.data?.cardUpdated) {
           const card = transformBackendCardToFrontend(data.data.cardUpdated);
-          store.updateCard(card);
+          // TODO: Handle via Apollo cache
+          // store.updateCard(card); // Removed - cardStore no longer handles server data
         }
       } catch (error) {
         handleCardSubscriptionError('cardUpdated', error);
@@ -357,8 +359,8 @@ export const useCardOperations = (workspaceId: EntityId) => {
    */
   const updateCard = useCallback(async (params: UpdateCardParams): Promise<boolean> => {
     try {
-      // Apply optimistic update
-      store.updateCard(params);
+      // TODO: Apply optimistic update via Apollo cache
+      // store.updateCard(params); // Removed - cardStore no longer handles server data
 
       // Persist to server
       const input = params.updates;
@@ -379,8 +381,8 @@ export const useCardOperations = (workspaceId: EntityId) => {
    */
   const deleteCard = useCallback(async (cardId: CardId): Promise<boolean> => {
     try {
-      // Apply optimistic delete
-      store.deleteCard(cardId);
+      // TODO: Apply optimistic delete via Apollo cache
+      // store.deleteCard(cardId); // Removed - cardStore no longer handles server data
 
       // Persist to server
       const { data } = await deleteCardMutation({ variables: { id: cardId } });
@@ -404,7 +406,8 @@ export const useCardOperations = (workspaceId: EntityId) => {
         // Note: This is a simplistic approach - in production you'd want smarter syncing
         data.cards.items.forEach(serverCard => {
           const card = transformBackendCardToFrontend(serverCard);
-          store.addCard(card);
+          // TODO: Handle via Apollo cache
+          // store.addCard(card); // Removed - cardStore no longer handles server data
         });
       }
     } catch (error) {

@@ -18,6 +18,7 @@ export const createFallbackTextCard = (baseCard: Partial<Card>): TextCard => {
 
   return {
     id: baseCard.id || createCardId('fallback-' + Date.now()),
+    ownerId: baseCard.ownerId || 'fallback-user',
     content: {
       type: 'text' as const,
       content: '[Error: Card content missing]',

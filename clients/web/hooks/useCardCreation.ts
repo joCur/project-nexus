@@ -9,20 +9,14 @@
 import { useCallback, useState } from 'react';
 import { useMutation } from '@apollo/client';
 import { useCanvasStore } from '@/stores/canvasStore';
-import { useCardStore } from '@/stores/cardStore';
-import { CREATE_CARD, GET_CARDS } from '@/lib/graphql/cardOperations';
+import { CREATE_CARD, GET_CARDS, GET_CARDS_IN_BOUNDS } from '@/lib/graphql/cardOperations';
 import type {
   CreateCardMutationVariables,
   CardResponse,
 } from '@/lib/graphql/cardOperations';
 import type {
   CardType,
-  CardId,
-  Card,
-  TextCard,
-  ImageCard,
-  LinkCard,
-  CodeCard
+  CardId
 } from '@/types/card.types';
 import { DEFAULT_CARD_DIMENSIONS } from '@/types/card.types';
 import type { CanvasPosition } from '@/types/canvas.types';
@@ -127,118 +121,6 @@ const toGraphQLCardType = (type: CardType): 'text' | 'image' | 'link' | 'code' =
 };
 
 /**
- * Transform backend GraphQL response to frontend Card type
- * Handles backend single interface to frontend discriminated union conversion
- */
-const transformBackendCardToFrontend = (backendCard: CardResponse): Card => {
-  const baseCard = {
-    id: backendCard.id as CardId,
-    ownerId: backendCard.ownerId,
-    position: {
-      x: backendCard.position.x,
-      y: backendCard.position.y,
-      z: backendCard.position.z,
-    },
-    dimensions: backendCard.dimensions,
-    style: backendCard.style,
-    isSelected: false,
-    isLocked: false,
-    isHidden: false,
-    isMinimized: false,
-    status: backendCard.status.toLowerCase() as 'draft' | 'active' | 'archived' | 'deleted',
-    priority: backendCard.priority.toLowerCase() as 'low' | 'normal' | 'high' | 'urgent',
-    createdAt: backendCard.createdAt,
-    updatedAt: backendCard.updatedAt,
-    tags: backendCard.tags,
-    metadata: backendCard.metadata,
-    animation: {
-      isAnimating: false,
-    },
-  };
-
-  // Create discriminated union based on backend type (GraphQL returns uppercase)
-  switch (backendCard.type) {
-    case 'TEXT':
-      return {
-        ...baseCard,
-        content: {
-          type: 'text' as const,
-          content: backendCard.content,
-          markdown: false,
-          wordCount: backendCard.content.length,
-          lastEditedAt: backendCard.updatedAt,
-        },
-      } as TextCard;
-
-    case 'IMAGE':
-      return {
-        ...baseCard,
-        content: {
-          type: 'image' as const,
-          url: backendCard.content,
-          alt: backendCard.title || '',
-          caption: backendCard.title,
-        },
-      } as ImageCard;
-
-    case 'LINK':
-      try {
-        const url = new URL(backendCard.content);
-        return {
-          ...baseCard,
-          content: {
-            type: 'link' as const,
-            url: backendCard.content,
-            title: backendCard.title || url.hostname,
-            description: backendCard.metadata?.description,
-            domain: url.hostname,
-            favicon: backendCard.metadata?.favicon,
-            previewImage: backendCard.metadata?.previewImage,
-            lastChecked: backendCard.metadata?.lastChecked,
-            isAccessible: true,
-          },
-        } as LinkCard;
-      } catch {
-        return {
-          ...baseCard,
-          content: {
-            type: 'link' as const,
-            url: backendCard.content,
-            title: backendCard.title || 'Link',
-            domain: '',
-            isAccessible: false,
-          },
-        } as LinkCard;
-      }
-
-    case 'CODE':
-      return {
-        ...baseCard,
-        content: {
-          type: 'code' as const,
-          language: backendCard.metadata?.language || 'text',
-          content: backendCard.content,
-          filename: backendCard.metadata?.filename,
-          lineCount: backendCard.content.split('\n').length,
-          hasExecuted: false,
-        },
-      } as CodeCard;
-
-    default:
-      return {
-        ...baseCard,
-        content: {
-          type: 'text' as const,
-          content: backendCard.content,
-          markdown: false,
-          wordCount: backendCard.content.length,
-          lastEditedAt: backendCard.updatedAt,
-        },
-      } as TextCard;
-  }
-};
-
-/**
  * Custom hook for card creation state management
  */
 export const useCardCreation = (config: CardCreationConfig): UseCardCreationReturn => {
@@ -251,7 +133,6 @@ export const useCardCreation = (config: CardCreationConfig): UseCardCreationRetu
 
   // Store hooks
   const canvasStore = useCanvasStore();
-  const cardStore = useCardStore();
   const { viewport } = canvasStore;
 
   // Apollo mutation
@@ -445,9 +326,8 @@ export const useCardCreation = (config: CardCreationConfig): UseCardCreationRetu
         throw new Error('No card returned from mutation');
       }
 
-      // Transform and add card to local store for immediate rendering
-      const frontendCard = transformBackendCardToFrontend(createdCard);
-      cardStore.addCard(frontendCard);
+      // Apollo automatically updates the cache with the new card
+      // No need to manually add to local store - GraphQL queries will fetch updated data
 
       // Close UI after successful creation
       setState(prev => ({
@@ -472,7 +352,7 @@ export const useCardCreation = (config: CardCreationConfig): UseCardCreationRetu
       }));
       return null;
     }
-  }, [state, workspaceId, createCardMutation, autoEnterEditMode, cardStore]);
+  }, [state, workspaceId, createCardMutation, autoEnterEditMode]);
 
   /**
    * Create card of specific type at position
@@ -518,9 +398,8 @@ export const useCardCreation = (config: CardCreationConfig): UseCardCreationRetu
 
       console.log('✅ Card created successfully:', createdCard.id);
 
-      // Transform and add card to local store for immediate rendering
-      const frontendCard = transformBackendCardToFrontend(createdCard);
-      cardStore.addCard(frontendCard);
+      // Apollo automatically updates the cache with the new card
+      // No need to manually add to local store - GraphQL queries will fetch updated data
       console.log('✅ Card added to local store for rendering');
 
       // TODO: Integrate with NEX-193 to auto-enter edit mode
@@ -537,7 +416,7 @@ export const useCardCreation = (config: CardCreationConfig): UseCardCreationRetu
       }));
       return null;
     }
-  }, [workspaceId, createCardMutation, autoEnterEditMode, cardStore]);
+  }, [workspaceId, createCardMutation, autoEnterEditMode]);
 
   return {
     state: {

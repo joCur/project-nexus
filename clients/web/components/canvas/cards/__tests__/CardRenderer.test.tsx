@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { CardRenderer } from '../CardRenderer';
 import type { Card, TextCard, ImageCard, LinkCard, CodeCard, CardId, CardStatus, CardPriority, CardStyle } from '@/types/card.types';
+import type { EntityId } from '@/types/common.types';
 import type { KonvaEventObject } from 'konva/lib/Node';
 
 // Mock Konva components
@@ -223,6 +224,7 @@ describe('CardRenderer', () => {
   ): Card => {
     const baseCard = {
       id: id as CardId,
+      ownerId: 'test-user-id' as EntityId,
       position: { x, y, z: 0 },
       dimensions: { width: 200, height: 100 },
       style: {

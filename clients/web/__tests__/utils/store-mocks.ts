@@ -186,6 +186,7 @@ export const createTestCard = (
 
   return {
     id,
+    ownerId: 'test-user-id',
     content,
     position,
     dimensions: { width: 200, height: 100 },

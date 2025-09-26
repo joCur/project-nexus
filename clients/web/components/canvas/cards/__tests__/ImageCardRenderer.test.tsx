@@ -3,6 +3,7 @@ import { render, screen, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { ImageCardRenderer } from '../ImageCardRenderer';
 import type { ImageCard, CardId } from '@/types/card.types';
+import type { EntityId } from '@/types/common.types';
 
 // Mock Konva components
 jest.mock('react-konva', () => ({
@@ -133,6 +134,7 @@ describe('ImageCardRenderer', () => {
     overrides: Partial<ImageCard> = {}
   ): ImageCard => ({
     id: id as CardId,
+    ownerId: 'test-user-id' as EntityId,
     position: { x: 0, y: 0, z: 0 },
     dimensions: { width: 300, height: 200 },
     style: {
