@@ -11,7 +11,7 @@ import type {
   CardStore,
   CardId,
 } from '@/types/card.types';
-import type { Position } from '@/types/common.types';
+import type { Position, Dimensions } from '@/types/common.types';
 import type { CanvasPosition } from '@/types/canvas.types';
 
 /**
@@ -132,7 +132,7 @@ export const useCardStore = create<CardStore>()(
           }));
         },
 
-        endDrag: (finalPosition?: CanvasPosition) => {
+        endDrag: () => {
           set((state) => ({
             ...state,
             dragState: {
@@ -157,7 +157,7 @@ export const useCardStore = create<CardStore>()(
         },
 
         // Resize operations
-        startResize: (id: CardId, handle: any) => {
+        startResize: (id: CardId, handle: 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | undefined) => {
           set((state) => ({
             ...state,
             resizeState: {
@@ -171,7 +171,7 @@ export const useCardStore = create<CardStore>()(
           }));
         },
 
-        updateResize: (dimensions: any) => {
+        updateResize: (dimensions: Dimensions) => {
           set((state) => ({
             ...state,
             resizeState: {
@@ -220,25 +220,30 @@ export const useCardStore = create<CardStore>()(
       {
         name: 'card-store',
         // Only persist UI state, not server data
-        partialize: (state) => ({
+        partialize: (state: CardStore) => ({
           selection: {
             selectedIds: Array.from(state.selection.selectedIds), // Convert Set to Array for JSON serialization
             lastSelected: state.selection.lastSelected,
             primarySelected: state.selection.primarySelected,
             mode: state.selection.mode,
+            isDragSelection: state.selection.isDragSelection,
+            selectionBounds: undefined, // Don't persist bounds
           },
         }),
         // Custom merge function to handle Set serialization
-        merge: (persistedState: any, currentState: CardStore): CardStore => ({
-          ...currentState,
-          selection: {
-            ...currentState.selection,
-            selectedIds: new Set(persistedState?.selection?.selectedIds || []),
-            lastSelected: persistedState?.selection?.lastSelected,
-            primarySelected: persistedState?.selection?.primarySelected,
-            mode: persistedState?.selection?.mode || 'single',
-          },
-        }),
+        merge: (persistedState: unknown, currentState: CardStore): CardStore => {
+          const typedPersistedState = persistedState as Partial<CardStore>;
+          return {
+            ...currentState,
+            selection: {
+              ...currentState.selection,
+              selectedIds: new Set(typedPersistedState?.selection?.selectedIds || []),
+              lastSelected: typedPersistedState?.selection?.lastSelected,
+              primarySelected: typedPersistedState?.selection?.primarySelected,
+              mode: typedPersistedState?.selection?.mode || 'single',
+            },
+          };
+        },
       }
     ),
     {

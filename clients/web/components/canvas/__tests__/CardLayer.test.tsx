@@ -2,8 +2,7 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { MockedProvider } from '@apollo/client/testing';
-import { CardLayer } from '../CardLayer';
-import { GET_CARDS_IN_BOUNDS } from '@/lib/graphql/cardOperations';
+import { CardLayer, CardLayerDebugInfo } from '../CardLayer';
 import type { Card, TextCard, ImageCard, LinkCard, CodeCard, CardId, CardStatus, CardPriority } from '@/types/card.types';
 import type { EntityId } from '@/types/common.types';
 import type { CanvasBounds } from '@/types/canvas.types';
@@ -48,7 +47,7 @@ jest.mock('../cards/CardRenderer', () => ({
 const mockUseQuery = jest.fn();
 jest.mock('@apollo/client', () => ({
   ...jest.requireActual('@apollo/client'),
-  useQuery: (...args: any[]) => mockUseQuery(...args),
+  useQuery: (...args: unknown[]) => mockUseQuery(...args),
 }));
 
 // Mock stores and contexts
@@ -60,7 +59,7 @@ const mockCanvasStore = {
 };
 
 const mockWorkspaceContext = {
-  currentWorkspaceId: 'test-workspace-id',
+  currentWorkspaceId: 'test-workspace-id' as string | undefined,
 };
 
 jest.mock('@/stores/canvasStore', () => ({
@@ -88,44 +87,9 @@ Object.defineProperty(window, 'innerHeight', {
   value: 1080,
 });
 
-// Helper function to create GraphQL mocks that match CardResponse structure
-const createGraphQLMock = (cards: Card[] = []) => {
-  return {
-    request: {
-      query: GET_CARDS_IN_BOUNDS,
-    },
-    newData: () => ({
-      data: {
-        cardsInBounds: cards.map(card => ({
-          id: String(card.id), // Ensure ID is a string
-          workspaceId: 'test-workspace-id',
-          ownerId: card.ownerId,
-          type: card.content.type.toUpperCase(),
-          content: card.content.type === 'text' ? (card as TextCard).content.content :
-                   card.content.type === 'image' ? (card as ImageCard).content.url :
-                   card.content.type === 'link' ? (card as LinkCard).content.url :
-                   card.content.type === 'code' ? (card as CodeCard).content.content : '',
-          title: card.content.type === 'link' ? (card as LinkCard).content.title :
-                 card.content.type === 'image' ? (card as ImageCard).content.alt : null,
-          position: card.position,
-          dimensions: card.dimensions,
-          style: card.style,
-          status: card.status.toUpperCase(),
-          priority: card.priority.toUpperCase(),
-          tags: card.tags,
-          metadata: card.metadata,
-          createdAt: card.createdAt,
-          updatedAt: card.updatedAt,
-          version: 1,
-          // Note: isHidden is not part of backend CardResponse - it's UI state only
-        })),
-      },
-    }),
-  };
-};
 
 // Helper function to render CardLayer with mocked useQuery
-const renderCardLayer = (props: any = {}, cards: Card[] = [], options: { loading?: boolean; error?: any } = {}) => {
+const renderCardLayer = (props: Record<string, unknown> = {}, cards: Card[] = [], options: { loading?: boolean; error?: unknown } = {}) => {
   // Filter out hidden cards before mocking (simulating server behavior - server doesn't track isHidden)
   const serverCards = cards.filter(card => !card.isHidden);
 
@@ -308,22 +272,6 @@ describe('CardLayer', () => {
         maxY: 100,
       };
 
-      const mocks = [
-        {
-          request: {
-            query: GET_CARDS_IN_BOUNDS,
-            variables: {
-              workspaceId: 'test-workspace-id',
-              bounds: viewportBounds,
-            },
-          },
-          result: {
-            data: {
-              cardsInBounds: [],
-            },
-          },
-        },
-      ];
 
       renderCardLayer({ viewportBounds }, []);
 
@@ -360,7 +308,7 @@ describe('CardLayer', () => {
     });
 
     it('skips GraphQL query when workspace context is missing', async () => {
-      mockWorkspaceContext.currentWorkspaceId = null;
+      mockWorkspaceContext.currentWorkspaceId = undefined;
 
       renderCardLayer();
 
@@ -379,27 +327,6 @@ describe('CardLayer', () => {
       mockCanvasStore.viewport.zoom = 2;
       mockCanvasStore.viewport.position = { x: 100, y: 200 };
 
-      const mocks = [
-        {
-          request: {
-            query: GET_CARDS_IN_BOUNDS,
-            variables: {
-              workspaceId: 'test-workspace-id',
-              bounds: {
-                minX: -150,  // (-100) / 2 - 100
-                minY: -200,  // (-200) / 2 - 100
-                maxX: 1010,  // (-100 + 1920) / 2 + 100
-                maxY: 540,   // (-200 + 1080) / 2 + 100
-              },
-            },
-          },
-          result: {
-            data: {
-              cardsInBounds: [],
-            },
-          },
-        },
-      ];
 
       renderCardLayer({ viewportPadding: 100 }, []);
 
@@ -411,27 +338,6 @@ describe('CardLayer', () => {
 
     it('uses custom viewport padding', async () => {
       const customPadding = 500;
-      const mocks = [
-        {
-          request: {
-            query: GET_CARDS_IN_BOUNDS,
-            variables: {
-              workspaceId: 'test-workspace-id',
-              bounds: {
-                minX: -500,  // 0 / 1 - 500
-                minY: -500,  // 0 / 1 - 500
-                maxX: 2420,  // (0 + 1920) / 1 + 500
-                maxY: 1580,  // (0 + 1080) / 1 + 500
-              },
-            },
-          },
-          result: {
-            data: {
-              cardsInBounds: [],
-            },
-          },
-        },
-      ];
 
       renderCardLayer({ viewportPadding: customPadding }, []);
 
@@ -640,22 +546,6 @@ describe('CardLayer', () => {
         maxY: 500,
       };
 
-      const mocks = [
-        {
-          request: {
-            query: GET_CARDS_IN_BOUNDS,
-            variables: {
-              workspaceId: 'test-workspace-id',
-              bounds: customBounds,
-            },
-          },
-          result: {
-            data: {
-              cardsInBounds: [],
-            },
-          },
-        },
-      ];
 
       renderCardLayer({ viewportBounds: customBounds }, []);
 
@@ -669,7 +559,6 @@ describe('CardLayer', () => {
   describe('Component Lifecycle', () => {
     it('properly memoizes the component', async () => {
       const card = createTestCard('card1', 'text', 0, 0, 1);
-      const mocks = [createGraphQLMock([card])];
 
       const { rerender } = renderCardLayer({}, [card]);
 
@@ -680,7 +569,7 @@ describe('CardLayer', () => {
       const firstRender = screen.getByTestId('konva-layer');
 
       rerender(
-        <MockedProvider mocks={mocks} addTypename={false}>
+        <MockedProvider mocks={[]} addTypename={false}>
           <CardLayer />
         </MockedProvider>
       );
@@ -691,7 +580,7 @@ describe('CardLayer', () => {
     });
 
     it('provides debug information', () => {
-      const debugInfo = require('../CardLayer').CardLayerDebugInfo.getDebugInfo();
+      const debugInfo = CardLayerDebugInfo.getDebugInfo();
 
       expect(debugInfo).toEqual({
         performance: {

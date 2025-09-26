@@ -9,14 +9,13 @@
 import { useCallback, useState } from 'react';
 import { useMutation } from '@apollo/client';
 import { useCanvasStore } from '@/stores/canvasStore';
-import { CREATE_CARD, GET_CARDS, GET_CARDS_IN_BOUNDS } from '@/lib/graphql/cardOperations';
+import { CREATE_CARD, GET_CARDS } from '@/lib/graphql/cardOperations';
 import type {
   CreateCardMutationVariables,
   CardResponse,
 } from '@/lib/graphql/cardOperations';
 import type {
-  CardType,
-  CardId
+  CardType
 } from '@/types/card.types';
 import { DEFAULT_CARD_DIMENSIONS } from '@/types/card.types';
 import type { CanvasPosition } from '@/types/canvas.types';
@@ -165,7 +164,7 @@ export const useCardCreation = (config: CardCreationConfig): UseCardCreationRetu
         }
       } catch (error) {
         // Cache entry might not exist yet, that's okay
-        console.debug('Could not update cache after card creation:', error);
+        // Silent failure is acceptable for cache updates
       }
     },
   });
@@ -341,7 +340,7 @@ export const useCardCreation = (config: CardCreationConfig): UseCardCreationRetu
 
       // TODO: Integrate with NEX-193 to auto-enter edit mode
       if (autoEnterEditMode) {
-        console.log('Auto-enter edit mode for card:', createdCard.id);
+        // Auto-enter edit mode will be implemented in NEX-193
       }
 
       return createdCard.id;
@@ -362,7 +361,6 @@ export const useCardCreation = (config: CardCreationConfig): UseCardCreationRetu
     position: CanvasPosition,
     content?: string
   ): Promise<string | null> => {
-    console.log('🚀 createCardAtPosition called:', { type, position, workspaceId });
     setState(prev => ({ ...prev, error: null }));
 
     try {
@@ -382,34 +380,25 @@ export const useCardCreation = (config: CardCreationConfig): UseCardCreationRetu
         priority: 'normal',
       };
 
-      console.log('📤 Sending GraphQL mutation with input:', input);
-
       const result = await createCardMutation({
         variables: { input },
       });
 
-      console.log('📥 GraphQL mutation result:', result);
-
       const createdCard = result.data?.createCard;
       if (!createdCard) {
-        console.error('❌ No card returned from mutation');
         throw new Error('No card returned from mutation');
       }
 
-      console.log('✅ Card created successfully:', createdCard.id);
-
       // Apollo automatically updates the cache with the new card
       // No need to manually add to local store - GraphQL queries will fetch updated data
-      console.log('✅ Card added to local store for rendering');
 
       // TODO: Integrate with NEX-193 to auto-enter edit mode
       if (autoEnterEditMode) {
-        console.log('Auto-enter edit mode for card:', createdCard.id);
+        // Auto-enter edit mode will be implemented in NEX-193
       }
 
       return createdCard.id;
     } catch (error) {
-      console.error('❌ createCardAtPosition error:', error);
       setState(prev => ({
         ...prev,
         error: error instanceof Error ? error.message : 'Failed to create card',

@@ -6,10 +6,28 @@ import { useQuery } from '@apollo/client';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { useWorkspacePermissionContextSafe } from '@/contexts/WorkspacePermissionContext';
 import { useViewportDimensions } from '@/utils/viewport';
-import type { Card } from '@/types/card.types';
+import type { Card, CardId } from '@/types/card.types';
 import type { CanvasBounds } from '@/types/canvas.types';
 import { CARD_CONFIG } from './cards/cardConfig';
 import { GET_CARDS_IN_BOUNDS, type CardsInBoundsQueryVariables } from '@/lib/graphql/cardOperations';
+
+// Backend GraphQL response type
+interface BackendCard {
+  id: string;
+  ownerId: string;
+  type: string;
+  title?: string;
+  position?: { x: number; y: number; z: number };
+  dimensions?: { width: number; height: number };
+  style?: Record<string, unknown>;
+  status?: string;
+  priority?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
+  content: Record<string, unknown>;
+}
 
 // Import the CardRenderer from the cards directory
 const CardRenderer = React.lazy(() =>
@@ -119,8 +137,8 @@ export const CardLayer: React.FC<CardLayerProps> = ({
     }
 
     // Transform backend GraphQL response to frontend Card type
-    const cards = cardsData.cardsInBounds.map((backendCard: any): Card => {
-      const baseCard = {
+    const cards = cardsData.cardsInBounds.map((backendCard: BackendCard): Card => {
+      const baseCardProps = {
         id: backendCard.id as CardId,
         ownerId: backendCard.ownerId,
         position: {
@@ -129,7 +147,7 @@ export const CardLayer: React.FC<CardLayerProps> = ({
           z: backendCard.position?.z ?? 0,
         },
         dimensions: backendCard.dimensions || { width: 200, height: 100 },
-        style: backendCard.style || {
+        style: {
           backgroundColor: '#FFFFFF',
           borderColor: '#E5E7EB',
           textColor: '#1F2937',
@@ -137,6 +155,7 @@ export const CardLayer: React.FC<CardLayerProps> = ({
           borderRadius: 8,
           opacity: 1,
           shadow: true,
+          ...(backendCard.style as Record<string, unknown> || {}),
         },
         isSelected: false, // UI state, not from server
         isLocked: false,   // UI state, not from server
@@ -153,90 +172,102 @@ export const CardLayer: React.FC<CardLayerProps> = ({
         },
       };
 
-      // Create discriminated union based on backend type
-      switch (backendCard.type) {
-        case 'TEXT':
-          return {
-            ...baseCard,
+      // Create discriminated union based on backend type (using lowercase as per enum standard)
+      const cardType = backendCard.type.toLowerCase();
+      switch (cardType) {
+        case 'text': {
+          const textCard: Card = {
+            ...baseCardProps,
             content: {
               type: 'text' as const,
-              content: backendCard.content || '',
+              content: String(backendCard.content || ''),
               markdown: false,
-              wordCount: (backendCard.content || '').length,
+              wordCount: String(backendCard.content || '').length,
               lastEditedAt: backendCard.updatedAt || new Date().toISOString(),
             },
-          } as Card;
+          };
+          return textCard;
+        }
 
-        case 'IMAGE':
-          return {
-            ...baseCard,
+        case 'image': {
+          const imageCard: Card = {
+            ...baseCardProps,
             content: {
               type: 'image' as const,
-              url: backendCard.content || '',
+              url: String(backendCard.content || ''),
               alt: backendCard.title || '',
               caption: backendCard.title || '',
             },
-          } as Card;
+          };
+          return imageCard;
+        }
 
-        case 'LINK':
+        case 'link':
           try {
-            const url = new URL(backendCard.content || 'https://example.com');
-            return {
-              ...baseCard,
+            const urlString = String(backendCard.content || 'https://example.com');
+            const url = new URL(urlString);
+            const linkCard: Card = {
+              ...baseCardProps,
               content: {
                 type: 'link' as const,
-                url: backendCard.content || '',
+                url: urlString,
                 title: backendCard.title || url.hostname,
-                description: backendCard.metadata?.description,
+                description: String(backendCard.metadata?.description || ''),
                 domain: url.hostname,
-                favicon: backendCard.metadata?.favicon,
-                previewImage: backendCard.metadata?.previewImage,
-                lastChecked: backendCard.metadata?.lastChecked,
+                favicon: String(backendCard.metadata?.favicon || ''),
+                previewImage: String(backendCard.metadata?.previewImage || ''),
+                lastChecked: String(backendCard.metadata?.lastChecked || ''),
                 isAccessible: true,
               },
-            } as Card;
+            };
+            return linkCard;
           } catch {
-            return {
-              ...baseCard,
+            const linkCard: Card = {
+              ...baseCardProps,
               content: {
                 type: 'link' as const,
-                url: backendCard.content || '',
+                url: String(backendCard.content || ''),
                 title: backendCard.title || 'Link',
                 domain: '',
                 isAccessible: false,
               },
-            } as Card;
+            };
+            return linkCard;
           }
 
-        case 'CODE':
-          return {
-            ...baseCard,
+        case 'code': {
+          const codeCard: Card = {
+            ...baseCardProps,
             content: {
               type: 'code' as const,
-              language: backendCard.metadata?.language || 'text',
-              content: backendCard.content || '',
-              filename: backendCard.metadata?.filename,
-              lineCount: (backendCard.content || '').split('\n').length,
+              language: String(backendCard.metadata?.language || 'text'),
+              content: String(backendCard.content || ''),
+              filename: String(backendCard.metadata?.filename || ''),
+              lineCount: String(backendCard.content || '').split('\n').length,
               hasExecuted: false,
             },
-          } as Card;
+          };
+          return codeCard;
+        }
 
-        default:
-          return {
-            ...baseCard,
+        default: {
+          const textCard: Card = {
+            ...baseCardProps,
             content: {
               type: 'text' as const,
-              content: backendCard.content || '',
+              content: String(backendCard.content || ''),
               markdown: false,
-              wordCount: (backendCard.content || '').length,
+              wordCount: String(backendCard.content || '').length,
               lastEditedAt: backendCard.updatedAt || new Date().toISOString(),
             },
-          } as Card;
+          };
+          return textCard;
+        }
       }
     });
 
     // Filter out hidden cards (UI state only, server doesn't track this)
-    return cards.filter(card => !card.isHidden);
+    return cards.filter((card: Card) => !card.isHidden);
   }, [cardsData, loading, error]);
 
   // Sort cards by z-index for proper layering
