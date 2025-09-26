@@ -8,6 +8,7 @@
 
 import { useCallback, useState } from 'react';
 import { useMutation } from '@apollo/client';
+import DOMPurify from 'dompurify';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { CREATE_CARD, GET_CARDS } from '@/lib/graphql/cardOperations';
 import type {
@@ -302,8 +303,8 @@ export const useCardCreation = (config: CardCreationConfig): UseCardCreationRetu
       const input: CreateCardMutationVariables['input'] = {
         workspaceId,
         type: toGraphQLCardType(selectedType),
-        title: params.title || `New ${selectedType} card`,
-        content: params.content || getDefaultContent(selectedType),
+        title: DOMPurify.sanitize(params.title || `New ${selectedType} card`),
+        content: DOMPurify.sanitize(params.content || getDefaultContent(selectedType)),
         position: {
           x: creationPosition.x,
           y: creationPosition.y,
@@ -368,7 +369,7 @@ export const useCardCreation = (config: CardCreationConfig): UseCardCreationRetu
         workspaceId,
         type: toGraphQLCardType(type),
         title: `New ${type} card`,
-        content: content || getDefaultContent(type),
+        content: DOMPurify.sanitize(content || getDefaultContent(type)),
         position: {
           x: position.x,
           y: position.y,

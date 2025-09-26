@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { CardType } from '@/types/card.types';
 import type { Position } from '@/types/common.types';
@@ -157,7 +157,7 @@ export const CardCreationMenu: React.FC<CardCreationMenuProps> = ({
   /**
    * Handle menu item click
    */
-  const handleItemClick = (item: MenuItemType) => {
+  const handleItemClick = useCallback((item: MenuItemType) => {
     if ('separator' in item) return;
 
     // Don't handle clicks on disabled items
@@ -168,7 +168,7 @@ export const CardCreationMenu: React.FC<CardCreationMenuProps> = ({
     } else {
       onCreateCard(item.type as CardType);
     }
-  };
+  }, [onMoreOptions, onCreateCard]);
 
   /**
    * Position menu within viewport
@@ -281,7 +281,7 @@ export const CardCreationMenu: React.FC<CardCreationMenuProps> = ({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [focusedIndex, focusableItems, onClose, onCreateCard, handleItemClick]);
+  }, [focusedIndex, focusableItems, onClose, onCreateCard, handleItemClick, disabledTypes]);
 
   /**
    * Focus menu when it opens
