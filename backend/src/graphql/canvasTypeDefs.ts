@@ -131,26 +131,26 @@ export const canvasTypeDefs = gql`
 
   # Card types (aligns with frontend CardType)
   enum CardType {
-    TEXT         # Matches frontend 'text'
-    IMAGE        # Matches frontend 'image' 
-    LINK         # Matches frontend 'link'
-    CODE         # Matches frontend 'code'
+    text         # Matches frontend 'text'
+    image        # Matches frontend 'image'
+    link         # Matches frontend 'link'
+    code         # Matches frontend 'code'
   }
 
   # Card status for lifecycle management
   enum CardStatus {
-    DRAFT
-    ACTIVE
-    ARCHIVED
-    DELETED
+    draft
+    active
+    archived
+    deleted
   }
 
   # Card priority levels
   enum CardPriority {
-    LOW
-    NORMAL
-    HIGH
-    URGENT
+    low
+    normal
+    high
+    urgent
   }
 
   # Card styling properties (simplified for GraphQL)
@@ -209,13 +209,13 @@ export const canvasTypeDefs = gql`
 
   # Connection types (aligns with frontend ConnectionType enum)
   enum ConnectionType {
-    MANUAL           # Matches frontend ConnectionType.MANUAL
-    AI_SUGGESTED     # Matches frontend ConnectionType.AI_SUGGESTED
-    AI_GENERATED     # Matches frontend ConnectionType.AI_GENERATED
-    REFERENCE        # Matches frontend ConnectionType.REFERENCE
-    DEPENDENCY       # Matches frontend ConnectionType.DEPENDENCY
-    SIMILARITY       # Matches frontend ConnectionType.SIMILARITY
-    RELATED          # Matches frontend ConnectionType.RELATED
+    manual           # Matches frontend ConnectionType.MANUAL
+    ai_suggested     # Matches frontend ConnectionType.AI_SUGGESTED
+    ai_generated     # Matches frontend ConnectionType.AI_GENERATED
+    reference        # Matches frontend ConnectionType.REFERENCE
+    dependency       # Matches frontend ConnectionType.DEPENDENCY
+    similarity       # Matches frontend ConnectionType.SIMILARITY
+    related          # Matches frontend ConnectionType.RELATED
   }
 
   # Connection visual styling (aligns with frontend ConnectionStyle)
@@ -390,7 +390,7 @@ export const canvasTypeDefs = gql`
   input CreateConnectionInput {
     sourceCardId: ID!
     targetCardId: ID!
-    type: ConnectionType = MANUAL
+    type: ConnectionType = manual
     confidence: Float
     style: ConnectionStyleInput
     label: ConnectionLabelInput

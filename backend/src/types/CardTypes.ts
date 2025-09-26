@@ -94,6 +94,7 @@ export interface CardAnimation {
 export interface Card {
   id: string;
   workspaceId: string;
+  ownerId: string; // User ID who owns the card
   type: CardType;
   title?: string;
   content: string;
@@ -106,7 +107,6 @@ export interface Card {
   version: number; // For optimistic locking
   createdAt: Date;
   updatedAt: Date;
-  createdBy: string; // User ID
   lastModifiedBy: string; // User ID
   tags: string[];
   

@@ -100,6 +100,7 @@ export default function CanvasPage() {
       <InfiniteCanvas
         className="w-full h-full"
         showGrid={currentCanvas.settings.grid.enabled}
+        workspaceId={workspaceId}
         ariaLabel={`${currentCanvas.name} - Interactive knowledge workspace canvas`}
         ariaDescription="Navigate with arrow keys to pan, plus and minus keys to zoom, space to center view"
       />

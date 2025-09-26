@@ -2,12 +2,32 @@
 
 import React, { useMemo, useRef } from 'react';
 import { Layer } from 'react-konva';
-import { useCardStore } from '@/stores/cardStore';
+import { useQuery } from '@apollo/client';
 import { useCanvasStore } from '@/stores/canvasStore';
+import { useWorkspacePermissionContextSafe } from '@/contexts/WorkspacePermissionContext';
 import { useViewportDimensions } from '@/utils/viewport';
-import type { Card } from '@/types/card.types';
+import type { Card, CardId } from '@/types/card.types';
 import type { CanvasBounds } from '@/types/canvas.types';
 import { CARD_CONFIG } from './cards/cardConfig';
+import { GET_CARDS_IN_BOUNDS, type CardsInBoundsQueryVariables } from '@/lib/graphql/cardOperations';
+
+// Backend GraphQL response type
+interface BackendCard {
+  id: string;
+  ownerId: string;
+  type: string;
+  title?: string;
+  position?: { x: number; y: number; z: number };
+  dimensions?: { width: number; height: number };
+  style?: Record<string, unknown>;
+  status?: string;
+  priority?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
+  content: Record<string, unknown>;
+}
 
 // Import the CardRenderer from the cards directory
 const CardRenderer = React.lazy(() =>
@@ -27,27 +47,30 @@ interface CardLayerProps {
  * CardLayer component renders all cards within a Konva Layer.
  *
  * Features:
- * - Connects to cardStore for card data and state management
+ * - Uses GraphQL queries to fetch cards from server (not local cache)
  * - Viewport culling for performance optimization
  * - Z-order management based on position.z values
  * - Integration with canvas zoom and position
  * - Efficient re-rendering with memoization
+ * - Multi-device synchronization through server-side data
  *
  * Performance Optimizations:
  * - Only renders cards within viewport bounds (with padding)
  * - Sorts cards by z-index for proper layering
  * - Uses React.memo and useMemo for efficient re-renders
  * - Lazy loads CardRenderer component
+ * - Apollo cache-and-network policy for immediate cached data + fresh updates
  */
 export const CardLayer: React.FC<CardLayerProps> = ({
   viewportBounds,
   enableViewportCulling = true,
   viewportPadding = CARD_CONFIG.viewport.extraPadding, // Extra pixels around viewport to render
 }) => {
-  const { cards, getCardsInBounds } = useCardStore();
   const { viewport } = useCanvasStore();
   const { zoom, position } = viewport;
   const viewportDimensions = useViewportDimensions();
+  const workspaceContext = useWorkspacePermissionContextSafe();
+  const currentWorkspaceId = workspaceContext?.currentWorkspaceId;
 
   // Calculate current viewport bounds if not provided
   const currentViewportBounds = useMemo((): CanvasBounds => {
@@ -73,19 +96,179 @@ export const CardLayer: React.FC<CardLayerProps> = ({
     };
   }, [viewportBounds, position.x, position.y, zoom, viewportPadding, viewportDimensions]);
 
-  // Get visible cards with performance optimization
-  const visibleCards = useMemo((): Card[] => {
-    if (!enableViewportCulling) {
-      // Return all cards if culling is disabled
-      return Array.from(cards.values());
+  // Prepare GraphQL variables
+  const queryVariables: CardsInBoundsQueryVariables | null = useMemo(() => {
+    if (!currentWorkspaceId || !enableViewportCulling) {
+      return null;
     }
 
-    // Use the cardStore method to get cards in bounds
-    const cardsInBounds = getCardsInBounds(currentViewportBounds);
+    return {
+      workspaceId: currentWorkspaceId,
+      bounds: {
+        minX: currentViewportBounds.minX,
+        minY: currentViewportBounds.minY,
+        maxX: currentViewportBounds.maxX,
+        maxY: currentViewportBounds.maxY,
+      },
+    };
+  }, [currentWorkspaceId, currentViewportBounds, enableViewportCulling]);
 
-    // Filter out hidden cards
-    return cardsInBounds.filter(card => !card.isHidden);
-  }, [cards, currentViewportBounds, enableViewportCulling, getCardsInBounds]);
+  // Query cards from GraphQL server instead of local store
+  // Skip query if no workspace context (e.g., in tests)
+  const { data: cardsData, loading, error } = useQuery(GET_CARDS_IN_BOUNDS, {
+    variables: queryVariables || { workspaceId: currentWorkspaceId || '', bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 } },
+    skip: !currentWorkspaceId,
+    fetchPolicy: 'cache-and-network', // Get cached data immediately, but also fetch from network
+    errorPolicy: 'all', // Don't crash on GraphQL errors
+  });
+
+  // Get visible cards from GraphQL response
+  const visibleCards = useMemo((): Card[] => {
+    if (loading && !cardsData) {
+      return [];
+    }
+
+    if (error || !cardsData?.cardsInBounds) {
+      // Log error but don't crash the UI
+      if (error) {
+        console.warn('Failed to load cards:', error);
+      }
+      return [];
+    }
+
+    // Transform backend GraphQL response to frontend Card type
+    const cards = cardsData.cardsInBounds.map((backendCard: BackendCard): Card => {
+      const baseCardProps = {
+        id: backendCard.id as CardId,
+        ownerId: backendCard.ownerId,
+        position: {
+          x: backendCard.position?.x ?? 0,
+          y: backendCard.position?.y ?? 0,
+          z: backendCard.position?.z ?? 0,
+        },
+        dimensions: backendCard.dimensions || { width: 200, height: 100 },
+        style: {
+          backgroundColor: '#FFFFFF',
+          borderColor: '#E5E7EB',
+          textColor: '#1F2937',
+          borderWidth: 1,
+          borderRadius: 8,
+          opacity: 1,
+          shadow: true,
+          ...(backendCard.style as Record<string, unknown> || {}),
+        },
+        isSelected: false, // UI state, not from server
+        isLocked: false,   // UI state, not from server
+        isHidden: false,   // UI state, not from server
+        isMinimized: false, // UI state, not from server
+        status: (backendCard.status?.toLowerCase() || 'active') as 'draft' | 'active' | 'archived' | 'deleted',
+        priority: (backendCard.priority?.toLowerCase() || 'normal') as 'low' | 'normal' | 'high' | 'urgent',
+        createdAt: backendCard.createdAt || new Date().toISOString(),
+        updatedAt: backendCard.updatedAt || new Date().toISOString(),
+        tags: backendCard.tags || [],
+        metadata: backendCard.metadata || {},
+        animation: {
+          isAnimating: false, // UI state, not from server
+        },
+      };
+
+      // Create discriminated union based on backend type (using lowercase as per enum standard)
+      const cardType = backendCard.type.toLowerCase();
+      switch (cardType) {
+        case 'text': {
+          const textCard: Card = {
+            ...baseCardProps,
+            content: {
+              type: 'text' as const,
+              content: String(backendCard.content || ''),
+              markdown: false,
+              wordCount: String(backendCard.content || '').length,
+              lastEditedAt: backendCard.updatedAt || new Date().toISOString(),
+            },
+          };
+          return textCard;
+        }
+
+        case 'image': {
+          const imageCard: Card = {
+            ...baseCardProps,
+            content: {
+              type: 'image' as const,
+              url: String(backendCard.content || ''),
+              alt: backendCard.title || '',
+              caption: backendCard.title || '',
+            },
+          };
+          return imageCard;
+        }
+
+        case 'link':
+          try {
+            const urlString = String(backendCard.content || 'https://example.com');
+            const url = new URL(urlString);
+            const linkCard: Card = {
+              ...baseCardProps,
+              content: {
+                type: 'link' as const,
+                url: urlString,
+                title: backendCard.title || url.hostname,
+                description: String(backendCard.metadata?.description || ''),
+                domain: url.hostname,
+                favicon: String(backendCard.metadata?.favicon || ''),
+                previewImage: String(backendCard.metadata?.previewImage || ''),
+                lastChecked: String(backendCard.metadata?.lastChecked || ''),
+                isAccessible: true,
+              },
+            };
+            return linkCard;
+          } catch {
+            const linkCard: Card = {
+              ...baseCardProps,
+              content: {
+                type: 'link' as const,
+                url: String(backendCard.content || ''),
+                title: backendCard.title || 'Link',
+                domain: '',
+                isAccessible: false,
+              },
+            };
+            return linkCard;
+          }
+
+        case 'code': {
+          const codeCard: Card = {
+            ...baseCardProps,
+            content: {
+              type: 'code' as const,
+              language: String(backendCard.metadata?.language || 'text'),
+              content: String(backendCard.content || ''),
+              filename: String(backendCard.metadata?.filename || ''),
+              lineCount: String(backendCard.content || '').split('\n').length,
+              hasExecuted: false,
+            },
+          };
+          return codeCard;
+        }
+
+        default: {
+          const textCard: Card = {
+            ...baseCardProps,
+            content: {
+              type: 'text' as const,
+              content: String(backendCard.content || ''),
+              markdown: false,
+              wordCount: String(backendCard.content || '').length,
+              lastEditedAt: backendCard.updatedAt || new Date().toISOString(),
+            },
+          };
+          return textCard;
+        }
+      }
+    });
+
+    // Filter out hidden cards (UI state only, server doesn't track this)
+    return cards.filter((card: Card) => !card.isHidden);
+  }, [cardsData, loading, error]);
 
   // Sort cards by z-index for proper layering
   const sortedCards = useMemo((): Card[] => {

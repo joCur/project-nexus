@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { CardRenderer } from '../CardRenderer';
 import type { Card, TextCard, ImageCard, LinkCard, CodeCard, CardId, CardStatus, CardPriority, CardStyle } from '@/types/card.types';
+import type { EntityId } from '@/types/common.types';
 import type { KonvaEventObject } from 'konva/lib/Node';
 
 // Mock Konva components
@@ -223,6 +224,7 @@ describe('CardRenderer', () => {
   ): Card => {
     const baseCard = {
       id: id as CardId,
+      ownerId: 'test-user-id' as EntityId,
       position: { x, y, z: 0 },
       dimensions: { width: 200, height: 100 },
       style: {
@@ -514,7 +516,7 @@ describe('CardRenderer', () => {
 
     describe('Drag Events', () => {
       it('handles drag start for unlocked cards', () => {
-        const card = createTestCard('draggable-card', 'text');
+        const card = createTestCard('draggable-card', 'text', 100, 200);
         const onCardDragStart = jest.fn();
 
         render(<CardRenderer card={card} onCardDragStart={onCardDragStart} />);
@@ -525,6 +527,7 @@ describe('CardRenderer', () => {
         expect(mockStoreState.startDrag).toHaveBeenCalledWith(['draggable-card'], {
           x: 100,
           y: 200,
+          z: 0,
         });
         expect(onCardDragStart).toHaveBeenCalledWith(card, expect.any(Object));
       });
@@ -541,7 +544,7 @@ describe('CardRenderer', () => {
       });
 
       it('handles drag with selected cards', () => {
-        const card = createTestCard('selected-drag-card', 'text');
+        const card = createTestCard('selected-drag-card', 'text', 100, 200);
         mockStoreState.selection.selectedIds.add('selected-drag-card');
         mockStoreState.selection.selectedIds.add('other-selected-card');
 
@@ -552,7 +555,7 @@ describe('CardRenderer', () => {
 
         expect(mockStoreState.startDrag).toHaveBeenCalledWith(
           ['selected-drag-card', 'other-selected-card'],
-          { x: 100, y: 200 }
+          { x: 100, y: 200, z: 0 }
         );
       });
 
@@ -587,7 +590,7 @@ describe('CardRenderer', () => {
       });
 
       it('handles drag end events', () => {
-        const card = createTestCard('drag-end-card', 'text');
+        const card = createTestCard('drag-end-card', 'text', 100, 200);
         const onCardDragEnd = jest.fn();
 
         render(<CardRenderer card={card} onCardDragEnd={onCardDragEnd} />);
@@ -598,6 +601,7 @@ describe('CardRenderer', () => {
         expect(mockStoreState.endDrag).toHaveBeenCalledWith({
           x: 100,
           y: 200,
+          z: 0,
         });
         expect(onCardDragEnd).toHaveBeenCalledWith(card, expect.any(Object));
       });

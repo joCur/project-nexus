@@ -178,6 +178,8 @@ export interface CardAnimation {
 interface BaseCard {
   /** Unique card identifier */
   id: CardId;
+  /** Owner ID (user who created/owns the card) */
+  ownerId: EntityId;
   /** Card content with discriminated union */
   content: CardContent;
   /** Canvas position (z component is used for layering) */
@@ -447,8 +449,6 @@ export interface CardTemplate {
  * Card store state interface
  */
 export interface CardState {
-  /** Map of all cards by ID */
-  cards: Map<CardId, Card>;
   /** Selection state */
   selection: CardSelection;
   /** Drag state */
@@ -457,16 +457,6 @@ export interface CardState {
   resizeState: CardResizeState;
   /** Hover state */
   hoverState: CardHoverState;
-  /** Clipboard contents */
-  clipboard: Card[];
-  /** History for undo/redo */
-  history: CardHistory;
-  /** Available templates */
-  templates: Map<string, CardTemplate>;
-  /** Active filters */
-  activeFilter: CardFilter;
-  /** Search results */
-  searchResults: CardSearchResult[];
 }
 
 /**
@@ -493,94 +483,28 @@ export interface UpdateCardParams {
  * Card store actions interface
  */
 export interface CardActions {
-  // CRUD operations
-  createCard: (params: CreateCardParams) => CardId;
-  createCardFromTemplate: (templateId: string, position: CanvasPosition) => CardId;
-  updateCard: (params: UpdateCardParams) => void;
-  updateCards: (updates: UpdateCardParams[]) => void;
-  deleteCard: (id: CardId) => void;
-  deleteCards: (ids: CardId[]) => void;
-  duplicateCard: (id: CardId, offset?: Position) => CardId;
-  duplicateCards: (ids: CardId[], offset?: Position) => CardId[];
-  
-  // Selection management
+  // UI state management only - server data comes from GraphQL queries
+
+  // Selection management (UI state only)
   selectCard: (id: CardId, addToSelection?: boolean) => void;
   selectCards: (ids: CardId[]) => void;
-  selectCardsInBounds: (bounds: CanvasBounds) => void;
-  selectAll: () => void;
   clearSelection: () => void;
-  invertSelection: () => void;
   isCardSelected: (id: CardId) => boolean;
-  getSelectedCards: () => Card[];
-  
-  // Card manipulation
-  moveCard: (id: CardId, position: CanvasPosition) => void;
-  moveCards: (ids: CardId[], offset: Position) => void;
-  resizeCard: (id: CardId, dimensions: Dimensions) => void;
-  updateCardStyle: (id: CardId, style: Partial<CardStyle>) => void;
-  updateCardStatus: (id: CardId, status: CardStatus) => void;
-  updateCardPriority: (id: CardId, priority: CardPriority) => void;
-  bringToFront: (id: CardId) => void;
-  sendToBack: (id: CardId) => void;
-  arrangeCards: (ids: CardId[], arrangement: 'front' | 'back' | 'forward' | 'backward') => void;
-  
-  // Locking and visibility
-  lockCard: (id: CardId) => void;
-  unlockCard: (id: CardId) => void;
-  toggleCardLock: (id: CardId) => void;
-  hideCard: (id: CardId) => void;
-  showCard: (id: CardId) => void;
-  toggleCardVisibility: (id: CardId) => void;
-  minimizeCard: (id: CardId) => void;
-  maximizeCard: (id: CardId) => void;
   
   // Drag operations
   startDrag: (ids: CardId[], startPosition: CanvasPosition) => void;
   updateDrag: (currentOffset: Position) => void;
   endDrag: (finalPosition?: CanvasPosition) => void;
   cancelDrag: () => void;
-  
-  // Resize operations  
+
+  // Resize operations
   startResize: (id: CardId, handle: CardResizeState['handle']) => void;
   updateResize: (dimensions: Dimensions) => void;
   endResize: () => void;
   cancelResize: () => void;
-  
+
   // Hover operations
   setHoveredCard: (id: CardId | undefined) => void;
-  
-  // Clipboard operations
-  copyCards: (ids: CardId[]) => void;
-  cutCards: (ids: CardId[]) => void;
-  pasteCards: (position?: CanvasPosition) => CardId[];
-  
-  // History operations
-  undo: () => void;
-  redo: () => void;
-  canUndo: () => boolean;
-  canRedo: () => boolean;
-  clearHistory: () => void;
-  
-  // Template operations
-  saveAsTemplate: (id: CardId, name: string, description: string) => string;
-  deleteTemplate: (templateId: string) => void;
-  
-  // Filtering and search
-  setFilter: (filter: CardFilter) => void;
-  clearFilter: () => void;
-  searchCards: (query: string) => void;
-  clearSearch: () => void;
-  
-  // Utility functions
-  getCard: (id: CardId) => Card | undefined;
-  getCards: (ids?: CardId[]) => Card[];
-  getCardsInBounds: (bounds: CanvasBounds) => Card[];
-  getCardsByType: (type: CardType) => Card[];
-  getCardsByStatus: (status: CardStatus) => Card[];
-  getCardsByTag: (tag: string) => Card[];
-  getCardCount: () => number;
-  getCardBounds: (id: CardId) => CanvasBounds | undefined;
-  getAllCardsBounds: () => CanvasBounds | undefined;
 }
 
 /**

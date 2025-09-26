@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { TextCardRenderer } from '../TextCardRenderer';
 import type { TextCard, CardId } from '@/types/card.types';
+import type { EntityId } from '@/types/common.types';
 
 // Mock Konva components
 jest.mock('react-konva', () => ({
@@ -86,6 +87,7 @@ describe('TextCardRenderer', () => {
     overrides: Partial<TextCard> = {}
   ): TextCard => ({
     id: id as CardId,
+    ownerId: 'test-user-id' as EntityId,
     position: { x: 0, y: 0, z: 0 },
     dimensions: { width: 200, height: 150 },
     style: {

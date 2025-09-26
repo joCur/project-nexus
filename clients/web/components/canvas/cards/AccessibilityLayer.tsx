@@ -21,7 +21,7 @@ export const AccessibilityLayer: React.FC<AccessibilityLayerProps> = ({
   onCardFocus,
   onCardActivate,
 }) => {
-  const { selection, selectCard, clearSelection, selectCards, getSelectedCards } = useCardStore();
+  const { selection, selectCard, clearSelection, selectCards } = useCardStore();
   const focusedIndexRef = useRef<number>(-1);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -44,7 +44,7 @@ export const AccessibilityLayer: React.FC<AccessibilityLayerProps> = ({
           // Toggle selection
           if (selection.selectedIds.has(card.id)) {
             // Deselect by clearing and re-selecting others
-            const currentSelected = getSelectedCards();
+            const currentSelected = cards.filter(c => selection.selectedIds.has(c.id));
             const newSelection = currentSelected.filter(c => c.id !== card.id).map(c => c.id);
             selectCards(newSelection);
           } else {
@@ -78,7 +78,7 @@ export const AccessibilityLayer: React.FC<AccessibilityLayerProps> = ({
       default:
         break;
     }
-  }, [cards, selection, selectCard, clearSelection, selectCards, getSelectedCards, onCardActivate]);
+  }, [cards, selection, selectCard, clearSelection, selectCards, onCardActivate]);
 
   // Navigate between cards with arrow keys
   const navigateCards = useCallback((direction: string) => {

@@ -292,7 +292,8 @@ export const useCardOperations = (workspaceId: EntityId) => {
       try {
         if (data?.data?.cardCreated) {
           const card = transformBackendCardToFrontend(data.data.cardCreated);
-          store.createCard(card);
+          // TODO: Handle via Apollo cache
+          // store.createCard(card); // Removed - cardStore no longer handles server data
         }
       } catch (error) {
         handleCardSubscriptionError('cardCreated', error);
@@ -310,7 +311,8 @@ export const useCardOperations = (workspaceId: EntityId) => {
       try {
         if (data?.data?.cardUpdated) {
           const card = transformBackendCardToFrontend(data.data.cardUpdated);
-          store.updateCard(card);
+          // TODO: Handle via Apollo cache
+          // store.updateCard(card); // Removed - cardStore no longer handles server data
         }
       } catch (error) {
         handleCardSubscriptionError('cardUpdated', error);
@@ -348,42 +350,17 @@ export const useCardOperations = (workspaceId: EntityId) => {
    * Create card with server persistence
    */
   const createCard = useCallback(async (params: CreateCardParams): Promise<CardId | null> => {
-    try {
-      // First create in local store for immediate UI feedback
-      const localCardId = store.createCard(params);
-
-      // Then persist to server
-      const input = transformCreateParamsToBackend({ ...params, workspaceId });
-      const { data } = await createCardMutation({ variables: { input } });
-
-      if (data?.createCard) {
-        // Replace local card with server version
-        const serverCard = transformBackendCardToFrontend(data.createCard);
-        store.deleteCard(localCardId);
-        store.createCard({
-          type: serverCard.content.type,
-          position: serverCard.position,
-          content: serverCard.content,
-          dimensions: serverCard.dimensions,
-          style: serverCard.style,
-        });
-        return serverCard.id;
-      }
-
-      return localCardId;
-    } catch (error) {
-      // Failed to create card
-      return null;
-    }
-  }, [store, workspaceId, createCardMutation]);
+    console.warn('useCardOperations.createCard is deprecated. Use useCardCreation hook instead.');
+    return null;
+  }, []);
 
   /**
    * Update card with server persistence
    */
   const updateCard = useCallback(async (params: UpdateCardParams): Promise<boolean> => {
     try {
-      // Apply optimistic update
-      store.updateCard(params);
+      // TODO: Apply optimistic update via Apollo cache
+      // store.updateCard(params); // Removed - cardStore no longer handles server data
 
       // Persist to server
       const input = params.updates;
@@ -404,8 +381,8 @@ export const useCardOperations = (workspaceId: EntityId) => {
    */
   const deleteCard = useCallback(async (cardId: CardId): Promise<boolean> => {
     try {
-      // Apply optimistic delete
-      store.deleteCard(cardId);
+      // TODO: Apply optimistic delete via Apollo cache
+      // store.deleteCard(cardId); // Removed - cardStore no longer handles server data
 
       // Persist to server
       const { data } = await deleteCardMutation({ variables: { id: cardId } });
@@ -429,13 +406,8 @@ export const useCardOperations = (workspaceId: EntityId) => {
         // Note: This is a simplistic approach - in production you'd want smarter syncing
         data.cards.items.forEach(serverCard => {
           const card = transformBackendCardToFrontend(serverCard);
-          store.createCard({
-            type: card.content.type,
-            position: card.position,
-            content: card.content,
-            dimensions: card.dimensions,
-            style: card.style,
-          });
+          // TODO: Handle via Apollo cache
+          // store.addCard(card); // Removed - cardStore no longer handles server data
         });
       }
     } catch (error) {

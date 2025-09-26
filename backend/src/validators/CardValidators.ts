@@ -62,26 +62,26 @@ const tagsSchema = z.array(
 
 // Content validation by card type
 const contentValidationByType = {
-  TEXT: z.string()
+  text: z.string()
     .min(1, 'Text content cannot be empty')
     .max(CardConstraints.CONTENT_MAX_LENGTH, `Content must be <= ${CardConstraints.CONTENT_MAX_LENGTH} characters`),
-  
-  IMAGE: z.string()
+
+  image: z.string()
     .url('Image content must be a valid URL')
     .or(z.string().startsWith('data:image/', 'Must be a valid image URL or data URI')),
-  
-  LINK: z.string()
+
+  link: z.string()
     .url('Link content must be a valid URL'),
-  
-  CODE: z.string()
+
+  code: z.string()
     .min(1, 'Code content cannot be empty')
     .max(CardConstraints.CONTENT_MAX_LENGTH, `Code content must be <= ${CardConstraints.CONTENT_MAX_LENGTH} characters`),
-  
-  FILE: z.string()
+
+  file: z.string()
     .url('File content must be a valid URL')
     .or(z.string().startsWith('data:', 'Must be a valid file URL or data URI')),
-  
-  DRAWING: z.string()
+
+  drawing: z.string()
     .min(1, 'Drawing content cannot be empty')
     .refine(
       (content) => {
@@ -283,8 +283,8 @@ export class CardValidator {
    */
   static sanitizeContent(content: string, type: CardType): string {
     switch (type) {
-      case CardType.TEXT:
-      case CardType.CODE:
+      case 'text':
+      case 'code':
         // Basic HTML entity encoding to prevent XSS
         return content
           .replace(/&/g, '&amp;')
@@ -292,10 +292,10 @@ export class CardValidator {
           .replace(/>/g, '&gt;')
           .replace(/"/g, '&quot;')
           .replace(/'/g, '&#x27;');
-      
-      case CardType.LINK:
-      case CardType.IMAGE:
-      case CardType.FILE:
+
+      case 'link':
+      case 'image':
+      case 'file':
         // For URLs, ensure they're properly encoded
         try {
           const url = new URL(content);
@@ -303,15 +303,15 @@ export class CardValidator {
         } catch {
           return content; // Return as-is if not a valid URL
         }
-      
-      case CardType.DRAWING:
+
+      case 'drawing':
         // For drawing data, ensure it's valid JSON
         try {
           return JSON.stringify(JSON.parse(content));
         } catch {
           return content; // Return as-is if not valid JSON
         }
-      
+
       default:
         return content;
     }

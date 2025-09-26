@@ -66,7 +66,7 @@ export class CardService {
         content: sanitizedContent,
         position_x: validatedInput.position.x,
         position_y: validatedInput.position.y,
-        position_z: validatedInput.position.z,
+        z_index: validatedInput.position.z,
         width: validatedInput.dimensions.width,
         height: validatedInput.dimensions.height,
         metadata: JSON.stringify(validatedInput.metadata || {}),
@@ -304,7 +304,7 @@ export class CardService {
       if (validatedInput.position !== undefined) {
         updateData.position_x = validatedInput.position.x;
         updateData.position_y = validatedInput.position.y;
-        updateData.position_z = validatedInput.position.z;
+        updateData.z_index = validatedInput.position.z;
       }
 
       if (validatedInput.dimensions !== undefined) {
@@ -442,7 +442,7 @@ export class CardService {
               .update({
                 position_x: update.position.x,
                 position_y: update.position.y,
-                position_z: update.position.z,
+                z_index: update.position.z,
                 updated_at: new Date(),
                 version: existingCard.version + 1,
               })
@@ -617,7 +617,7 @@ export class CardService {
             if (input.position !== undefined) {
               updateData.position_x = input.position.x;
               updateData.position_y = input.position.y;
-              updateData.position_z = input.position.z;
+              updateData.z_index = input.position.z;
             }
 
             if (input.dimensions !== undefined) {
@@ -792,7 +792,7 @@ export class CardService {
               content: sanitizedContent,
               position_x: position.x,
               position_y: position.y,
-              position_z: position.z,
+              z_index: position.z,
               width: cardData.dimensions.width,
               height: cardData.dimensions.height,
               metadata: JSON.stringify(cardData.metadata || {}),
