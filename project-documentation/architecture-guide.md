@@ -1390,8 +1390,534 @@ export const EntityComponent: React.FC<ComponentProps> = ({ ...props }) => {
   );
 };
 ```
+### Component Template with Logging
 
----
+All frontend components must use structured logging via `createContextLogger`. Never use `console.log` directly.
+
+```typescript
+'use client';
+
+import React, { useCallback, useEffect, useState } from 'react';
+import { createContextLogger } from '@/utils/logger';
+import { useCardStore } from '@/stores/cardStore';
+import { useCreateCard } from '@/hooks/useCreateCard';
+
+// Create logger at module level with component context
+const logger = createContextLogger({ component: 'CardCreator' });
+
+interface CardCreatorProps {
+  canvasId: string;
+  position: { x: number; y: number };
+  onSuccess?: (cardId: string) => void;
+  onCancel?: () => void;
+}
+
+/**
+ * CardCreator component handles creation of new knowledge cards
+ *
+ * @requires ApolloProvider - Required for GraphQL mutations
+ * @requires CardStoreProvider - Required for card state management
+ *
+ * Context Requirements:
+ * - Apollo Client must be configured with proper authentication
+ * - Card store must be initialized before mounting
+ */
+export const CardCreator: React.FC<CardCreatorProps> = ({
+  canvasId,
+  position,
+  onSuccess,
+  onCancel
+}) => {
+  // Component state
+  const [title, setTitle] = useState<string>('');
+  const [content, setContent] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+
+  // Store integration
+  const { actions } = useCardStore();
+
+  // GraphQL mutation hook
+  const { createCard, loading, error } = useCreateCard();
+
+  // Log component mount
+  useEffect(() => {
+    logger.debug('CardCreator mounted', {
+      canvasId,
+      position,
+      hasSuccessCallback: !!onSuccess,
+      hasCancelCallback: !!onCancel
+    });
+
+    return (): void => {
+      logger.debug('CardCreator unmounting', { canvasId });
+    };
+  }, [canvasId, position, onSuccess, onCancel]);
+
+  // Log error state changes
+  useEffect(() => {
+    if (error) {
+      logger.error('Card creation error detected', {
+        error: error.message,
+        canvasId,
+        cardTitle: title
+      });
+    }
+  }, [error, canvasId, title]);
+
+  /**
+   * Handle form submission with comprehensive error handling
+   */
+  const handleSubmit = useCallback(async (e: React.FormEvent): Promise<void> => {
+    e.preventDefault();
+
+    if (!title.trim()) {
+      logger.warn('Attempted to create card without title', { canvasId });
+      return;
+    }
+
+    logger.info('Creating new card', {
+      canvasId,
+      position,
+      titleLength: title.length,
+      contentLength: content.length
+    });
+
+    setIsSubmitting(true);
+
+    try {
+      const result = await createCard({
+        canvasId,
+        title: title.trim(),
+        content: content.trim(),
+        position
+      });
+
+      if (result?.id) {
+        logger.info('Card created successfully', {
+          cardId: result.id,
+          canvasId,
+          title: title.trim()
+        });
+
+        // Update local store
+        actions.addCard(result);
+
+        // Call success callback
+        onSuccess?.(result.id);
+
+        // Reset form
+        setTitle('');
+        setContent('');
+      } else {
+        logger.error('Card creation returned no ID', {
+          canvasId,
+          result
+        });
+      }
+    } catch (err) {
+      logger.error('Failed to create card', {
+        error: err instanceof Error ? err.message : 'Unknown error',
+        errorStack: err instanceof Error ? err.stack : undefined,
+        canvasId,
+        title: title.trim(),
+        position
+      });
+
+      // Re-throw to allow component error boundary to handle
+      throw err;
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [title, content, canvasId, position, createCard, actions, onSuccess]);
+
+  /**
+   * Handle cancel action
+   */
+  const handleCancel = useCallback((): void => {
+    logger.debug('Card creation cancelled', {
+      canvasId,
+      hadTitle: !!title,
+      hadContent: !!content
+    });
+
+    setTitle('');
+    setContent('');
+    onCancel?.();
+  }, [canvasId, title, content, onCancel]);
+
+  /**
+   * Handle input changes with debug logging
+   */
+  const handleTitleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>): void => {
+    const newTitle = e.target.value;
+    logger.debug('Title changed', {
+      previousLength: title.length,
+      newLength: newTitle.length
+    });
+    setTitle(newTitle);
+  }, [title.length]);
+
+  const handleContentChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>): void => {
+    const newContent = e.target.value;
+    logger.debug('Content changed', {
+      previousLength: content.length,
+      newLength: newContent.length
+    });
+    setContent(newContent);
+  }, [content.length]);
+
+  return (
+    <form onSubmit={handleSubmit} className="card-creator">
+      <input
+        type="text"
+        value={title}
+        onChange={handleTitleChange}
+        placeholder="Card title"
+        disabled={isSubmitting}
+        required
+      />
+      <textarea
+        value={content}
+        onChange={handleContentChange}
+        placeholder="Card content"
+        disabled={isSubmitting}
+      />
+      <div className="actions">
+        <button type="submit" disabled={isSubmitting || !title.trim()}>
+          {isSubmitting ? 'Creating...' : 'Create Card'}
+        </button>
+        <button type="button" onClick={handleCancel} disabled={isSubmitting}>
+          Cancel
+        </button>
+      </div>
+      {error && (
+        <div className="error">
+          Failed to create card: {error.message}
+        </div>
+      )}
+    </form>
+  );
+};
+```
+
+### Logging Best Practices
+
+#### 1. Always Use Structured Logging
+
+**❌ Bad: Direct console usage**
+```typescript
+console.log('Card created');
+console.log('Error:', error);
+console.log('User clicked button', userId, cardId);
+```
+
+**✅ Good: Structured logging with context**
+```typescript
+const logger = createContextLogger({ component: 'CardList' });
+
+logger.info('Card created', {
+  cardId: result.id,
+  canvasId,
+  userId
+});
+
+logger.error('Card creation failed', {
+  error: error.message,
+  errorStack: error.stack,
+  userId,
+  canvasId
+});
+
+logger.debug('Button clicked', {
+  userId,
+  cardId,
+  buttonType: 'delete'
+});
+```
+
+#### 2. Create Logger Per Component/Module
+
+**❌ Bad: Shared or imported logger**
+```typescript
+import { logger } from '@/utils/logger'; // Generic logger
+
+export const MyComponent = () => {
+  logger.info('Something happened'); // No component context
+};
+```
+
+**✅ Good: Component-specific logger**
+```typescript
+import { createContextLogger } from '@/utils/logger';
+
+const logger = createContextLogger({ component: 'MyComponent' });
+
+export const MyComponent = () => {
+  logger.info('Something happened'); // Automatically includes component context
+};
+```
+
+#### 3. Use Appropriate Log Levels
+
+```typescript
+const logger = createContextLogger({ component: 'DataProcessor' });
+
+// DEBUG: Detailed diagnostic information (verbose)
+logger.debug('Processing item', {
+  itemId: item.id,
+  itemType: item.type,
+  processingStep: 'validation'
+});
+
+// INFO: General informational events
+logger.info('Processing completed', {
+  itemsProcessed: count,
+  duration: endTime - startTime
+});
+
+// WARN: Warning events that might need attention
+logger.warn('Processing took longer than expected', {
+  duration: endTime - startTime,
+  threshold: THRESHOLD_MS,
+  itemsProcessed: count
+});
+
+// ERROR: Error events that need immediate attention
+logger.error('Processing failed', {
+  error: error.message,
+  errorStack: error.stack,
+  itemId: item.id,
+  retryCount
+});
+```
+
+#### 4. Log Component Lifecycle Events
+
+```typescript
+const logger = createContextLogger({ component: 'CanvasRenderer' });
+
+export const CanvasRenderer: React.FC<Props> = ({ canvasId }) => {
+  // Mount logging
+  useEffect(() => {
+    logger.debug('CanvasRenderer mounted', {
+      canvasId,
+      timestamp: Date.now()
+    });
+
+    return (): void => {
+      logger.debug('CanvasRenderer unmounting', {
+        canvasId,
+        timestamp: Date.now()
+      });
+    };
+  }, [canvasId]);
+
+  // Dependency change logging
+  useEffect(() => {
+    logger.debug('Canvas ID changed', {
+      previousCanvasId: prevCanvasId,
+      newCanvasId: canvasId
+    });
+  }, [canvasId]);
+};
+```
+
+#### 5. Include Relevant Context in All Logs
+
+**❌ Bad: Missing context**
+```typescript
+logger.info('Operation completed');
+logger.error('Failed', { error: err.message });
+```
+
+**✅ Good: Rich contextual information**
+```typescript
+logger.info('Card update completed', {
+  cardId,
+  canvasId,
+  userId,
+  fieldsUpdated: ['title', 'content'],
+  duration: endTime - startTime
+});
+
+logger.error('Card update failed', {
+  error: err.message,
+  errorStack: err.stack,
+  cardId,
+  canvasId,
+  userId,
+  updateData,
+  retryCount,
+  previousState
+});
+```
+
+#### 6. Document Required Context Providers
+
+Always document context requirements in JSDoc comments:
+
+```typescript
+/**
+ * EditModeManager component handles inline editing state and operations
+ *
+ * @requires ApolloProvider - Required for GraphQL mutations (card updates)
+ * @requires EditModeStoreProvider - Required for edit mode state management
+ * @requires CardStoreProvider - Optional but recommended for optimistic updates
+ *
+ * Context Requirements:
+ * - Apollo Client must be configured with authenticated requests
+ * - Edit mode store must be initialized before mounting
+ * - Component will fail to render without required providers
+ *
+ * @example
+ * ```tsx
+ * <ApolloProvider client={apolloClient}>
+ *   <EditModeStoreProvider>
+ *     <EditModeManager />
+ *   </EditModeStoreProvider>
+ * </ApolloProvider>
+ * ```
+ */
+const logger = createContextLogger({ component: 'EditModeManager' });
+
+export const EditModeManager: React.FC = () => {
+  logger.debug('EditModeManager initialized', {
+    timestamp: Date.now()
+  });
+
+  // Component implementation
+};
+```
+
+#### 7. Error Handling with Comprehensive Logging
+
+```typescript
+const logger = createContextLogger({ component: 'CardEditor' });
+
+const handleSave = async (): Promise<void> => {
+  const startTime = Date.now();
+
+  logger.info('Saving card changes', {
+    cardId,
+    fieldsModified: Object.keys(changes),
+    changeCount: Object.keys(changes).length
+  });
+
+  try {
+    const result = await updateCard({
+      id: cardId,
+      ...changes
+    });
+
+    logger.info('Card saved successfully', {
+      cardId,
+      duration: Date.now() - startTime,
+      fieldsUpdated: Object.keys(changes)
+    });
+
+    return result;
+  } catch (error) {
+    logger.error('Failed to save card', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      errorStack: error instanceof Error ? error.stack : undefined,
+      errorType: error?.constructor?.name,
+      cardId,
+      changes,
+      duration: Date.now() - startTime,
+      retryCount: 0
+    });
+
+    // Re-throw for error boundary
+    throw error;
+  }
+};
+```
+
+#### 8. Async Operations and Promises
+
+```typescript
+const logger = createContextLogger({ component: 'DataFetcher' });
+
+const fetchData = useCallback(async (): Promise<void> => {
+  logger.debug('Starting data fetch', {
+    canvasId,
+    filters: activeFilters
+  });
+
+  try {
+    const data = await queryData({ canvasId });
+
+    logger.info('Data fetched successfully', {
+      canvasId,
+      recordCount: data.length,
+      duration: performance.now() - startTime
+    });
+  } catch (error) {
+    logger.error('Data fetch failed', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      errorStack: error instanceof Error ? error.stack : undefined,
+      canvasId,
+      filters: activeFilters
+    });
+    throw error;
+  }
+}, [canvasId, activeFilters]);
+```
+
+#### 9. Explicit Return Types for Callbacks
+
+Always specify return types for event handlers and callbacks:
+
+```typescript
+const logger = createContextLogger({ component: 'ActionHandler' });
+
+// ✅ Good: Explicit return types
+const handleClick = useCallback((): void => {
+  logger.debug('Button clicked', { buttonId });
+  performAction();
+}, [buttonId, performAction]);
+
+const handleAsyncAction = useCallback(async (): Promise<void> => {
+  logger.info('Starting async action', { actionType });
+  await performAsyncAction();
+  logger.info('Async action completed', { actionType });
+}, [actionType, performAsyncAction]);
+
+const handleFormSubmit = useCallback((e: React.FormEvent): void => {
+  e.preventDefault();
+  logger.info('Form submitted', { formId });
+  submitForm();
+}, [formId, submitForm]);
+
+// ❌ Bad: No return types
+const handleClick = useCallback(() => {
+  logger.debug('Button clicked', { buttonId });
+  performAction();
+}, [buttonId, performAction]);
+```
+
+#### 10. Logger Context Patterns
+
+Use appropriate context keys based on the module type:
+
+```typescript
+// Components
+const logger = createContextLogger({ component: 'CardList' });
+
+// Custom hooks
+const logger = createContextLogger({ hook: 'useCardOperations' });
+
+// Utility functions
+const logger = createContextLogger({ utility: 'canvasPositioning' });
+
+// Store actions
+const logger = createContextLogger({ store: 'cardStore' });
+
+// Service modules
+const logger = createContextLogger({ service: 'CanvasService' });
+```
+
+------
 
 ## Testing Patterns
 

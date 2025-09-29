@@ -14,8 +14,20 @@ interface LinkValue {
 }
 
 /**
- * LinkEditor component for inline link editing
- * Provides URL input with validation, display text, target options, and link preview
+ * LinkEditor Component
+ *
+ * Inline link editor for editing link cards.
+ * Built on BaseEditor component with link-specific features:
+ * - URL input with validation (http/https protocols)
+ * - Display text with auto-fill from domain
+ * - Target option (_blank/_self) for opening behavior
+ * - Link preview with favicon and domain display
+ * - Protocol-relative and mailto URL support
+ *
+ * Required Context Providers:
+ * - None (self-contained component)
+ *
+ * @remarks This component has no external context dependencies and can be used standalone.
  */
 export const LinkEditor: React.FC<LinkEditorProps> = ({
   onSave,

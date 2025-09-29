@@ -12,6 +12,13 @@
  * - Comprehensive keyboard navigation between fields
  * - Cross-platform keyboard shortcut support
  * - Field validation and error handling
+ *
+ * Required Context Providers:
+ * - Apollo Client (via ApolloProvider) - For GraphQL mutations in useCardOperations
+ * - CardStore (via useCardStore) - For managing card editing state
+ *
+ * @requires ApolloProvider For GraphQL operations via useCardOperations hook
+ * @requires CardStore For setEditingCard and clearEditingCard operations
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -19,7 +26,10 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useCardStore } from '@/stores/cardStore';
 import { useCardOperations } from '@/hooks/useCardOperations';
 import type { Card, CardId, CardContent } from '@/types/card.types';
-import { debounce } from 'lodash';
+import { debounce, type DebouncedFunc } from 'lodash';
+import { createContextLogger } from '@/utils/logger';
+
+const logger = createContextLogger({ component: 'EditModeManager' });
 
 /**
  * Singleton class for managing keyboard navigation and field focus
@@ -373,7 +383,7 @@ const transitionConfig = {
 const useFocusTrap = (
   containerRef: React.RefObject<HTMLDivElement>,
   isActive: boolean
-) => {
+): void => {
   useEffect(() => {
     if (!isActive || !containerRef.current) return;
 
@@ -390,7 +400,7 @@ const useFocusTrap = (
     // Focus first element
     firstElement.focus();
 
-    const handleTabKey = (e: KeyboardEvent) => {
+    const handleTabKey = (e: KeyboardEvent): void => {
       if (e.key !== 'Tab') return;
 
       if (e.shiftKey) {
@@ -409,7 +419,7 @@ const useFocusTrap = (
     };
 
     container.addEventListener('keydown', handleTabKey);
-    return () => container.removeEventListener('keydown', handleTabKey);
+    return (): void => container.removeEventListener('keydown', handleTabKey);
   }, [containerRef, isActive]);
 };
 
@@ -477,8 +487,8 @@ export const EditModeManagerComponent: React.FC<EditModeManagerProps> = ({
   /**
    * Debounced auto-save preparation
    */
-  const debouncedAutoSave = useCallback(() => {
-    const fn = debounce((cardId: CardId, content: unknown) => {
+  const debouncedAutoSave = useCallback((): DebouncedFunc<(cardId: CardId, content: unknown) => void> => {
+    const fn = debounce((cardId: CardId, content: unknown): void => {
       onAutoSavePrepare?.(cardId, content);
     }, autoSaveDelay);
     return fn;
@@ -487,7 +497,7 @@ export const EditModeManagerComponent: React.FC<EditModeManagerProps> = ({
   /**
    * Start editing mode
    */
-  const startEditing = useCallback(() => {
+  const startEditing = useCallback((): void => {
     if (!card || !canEdit || card.isLocked) return;
 
     const editMode = getEditModeForCard(card);
@@ -515,7 +525,7 @@ export const EditModeManagerComponent: React.FC<EditModeManagerProps> = ({
   /**
    * Save changes and exit edit mode
    */
-  const saveAndExit = useCallback(async (newContent: unknown) => {
+  const saveAndExit = useCallback(async (newContent: unknown): Promise<void> => {
     if (!editState.editingCardId || !card) return;
 
     // Clear auto-save timer
@@ -559,7 +569,11 @@ export const EditModeManagerComponent: React.FC<EditModeManagerProps> = ({
         clearEditingCard();
       } catch (error) {
         // Rollback on failure
-        console.error('Failed to save card:', error);
+        logger.error('Failed to save card', {
+          cardId: editState.editingCardId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          context: { enableServerPersistence }
+        });
         setSaveError('Failed to save changes');
 
         // Revert optimistic update
@@ -588,7 +602,7 @@ export const EditModeManagerComponent: React.FC<EditModeManagerProps> = ({
   /**
    * Cancel editing and restore original content
    */
-  const cancelEditing = useCallback(() => {
+  const cancelEditing = useCallback((): void => {
     if (!editState.editingCardId) return;
 
     // Clear auto-save timer
@@ -619,7 +633,7 @@ export const EditModeManagerComponent: React.FC<EditModeManagerProps> = ({
   useEffect(() => {
     if (!editState.isEditing) return;
 
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
       // Escape to cancel
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -634,13 +648,13 @@ export const EditModeManagerComponent: React.FC<EditModeManagerProps> = ({
     };
 
     document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    return (): void => document.removeEventListener('keydown', handleKeyDown);
   }, [editState.isEditing, cancelEditing]);
 
   /**
    * Handle double-click to enter edit mode
    */
-  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+  const handleDoubleClick = useCallback((e: React.MouseEvent): void => {
     if (!canEdit || !card || card.isLocked) return;
 
     e.preventDefault();
@@ -670,7 +684,7 @@ export const EditModeManagerComponent: React.FC<EditModeManagerProps> = ({
     }, [autoFocus]);
 
     // Handle value changes with auto-save trigger
-    const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>): void => {
       const newValue = e.target.value;
       setValue(newValue);
 
@@ -680,11 +694,11 @@ export const EditModeManagerComponent: React.FC<EditModeManagerProps> = ({
       }
     };
 
-    const handleSave = () => {
+    const handleSave = (): void => {
       onSave({ ...card.content, content: value });
     };
 
-    const handleKeyDown = (e: React.KeyboardEvent) => {
+    const handleKeyDown = (e: React.KeyboardEvent): void => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault();
         handleSave();
@@ -732,7 +746,7 @@ export const EditModeManagerComponent: React.FC<EditModeManagerProps> = ({
 
   // Cleanup on unmount
   useEffect(() => {
-    return () => {
+    return (): void => {
       if (autoSaveTimerRef.current) {
         clearTimeout(autoSaveTimerRef.current);
       }
@@ -808,7 +822,7 @@ export const useEditMode = () => {
     isDirty: false
   });
 
-  const startEdit = useCallback((cardId: CardId, mode: EditMode, content?: unknown) => {
+  const startEdit = useCallback((cardId: CardId, mode: EditMode, content?: unknown): void => {
     setEditState({
       isEditing: true,
       editingCardId: cardId,
@@ -818,7 +832,7 @@ export const useEditMode = () => {
     });
   }, []);
 
-  const endEdit = useCallback(() => {
+  const endEdit = useCallback((): void => {
     setEditState({
       isEditing: false,
       editingCardId: null,
@@ -828,7 +842,7 @@ export const useEditMode = () => {
     });
   }, []);
 
-  const setDirty = useCallback((isDirty: boolean) => {
+  const setDirty = useCallback((isDirty: boolean): void => {
     setEditState(prev => ({ ...prev, isDirty }));
   }, []);
 

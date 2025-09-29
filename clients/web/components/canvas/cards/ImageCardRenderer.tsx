@@ -5,7 +5,7 @@
  * optional captions and metadata. Includes proper aspect ratio handling.
  */
 
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Rect, Text, Group, Image as KonvaImage } from 'react-konva';
 import type { ImageCard } from '@/types/card.types';
 import { CARD_CONFIG, ImageCache } from './cardConfig';

@@ -1,3 +1,21 @@
+/**
+ * ImageEditor Component
+ *
+ * Inline image editor for editing image cards.
+ * Built on BaseEditor component with image-specific features:
+ * - Image URL input with validation (jpg, jpeg, png, gif, svg, webp)
+ * - Required alt text for accessibility
+ * - Optional caption text
+ * - Image size selection (small, medium, large, full)
+ * - Alignment options (left, center, right)
+ * - Live image preview with loading states
+ *
+ * Required Context Providers:
+ * - None (self-contained component)
+ *
+ * @remarks This component has no external context dependencies and can be used standalone.
+ */
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { BaseEditor } from './BaseEditor';
 

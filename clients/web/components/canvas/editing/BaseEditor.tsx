@@ -4,9 +4,17 @@
  * A generic base component that provides common inline editing functionality
  * with render props pattern for specialized editors (TextEditor, CodeEditor, LinkEditor, ImageEditor).
  * This is the foundation that all Phase 2 editors build upon.
+ *
+ * Required Context Providers:
+ * - None (self-contained component)
+ *
+ * @remarks This component has no external context dependencies and can be used standalone.
  */
 
 import React, { useState, useCallback, useEffect, ReactNode } from 'react';
+import { createContextLogger } from '@/utils/logger';
+
+const logger = createContextLogger({ component: 'BaseEditor' });
 
 /**
  * Props passed to the children render function
@@ -74,7 +82,7 @@ export function BaseEditor<T>({
   }, [value, initialValue]);
 
   // Handle save
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(async (): Promise<void> => {
     // Validate if validator provided
     if (validate) {
       const result = validate(value);
@@ -93,13 +101,16 @@ export function BaseEditor<T>({
     try {
       await onSave(value);
     } catch (error) {
-      console.error('Save failed:', error);
+      logger.error('Save failed', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        context: { hasChanges }
+      });
       setValidationError('Save failed');
     }
   }, [value, validate, onSave]);
 
   // Handle cancel
-  const handleCancel = useCallback(() => {
+  const handleCancel = useCallback((): void => {
     if (hasChanges) {
       const confirmCancel = window.confirm('You have unsaved changes. Are you sure you want to cancel?');
       if (!confirmCancel) return;
@@ -111,7 +122,7 @@ export function BaseEditor<T>({
   }, [hasChanges, initialValue, onCancel]);
 
   // Handle blur if saveOnBlur is enabled
-  const handleBlur = useCallback(() => {
+  const handleBlur = useCallback((): void => {
     if (saveOnBlur && hasChanges) {
       handleSave();
     }

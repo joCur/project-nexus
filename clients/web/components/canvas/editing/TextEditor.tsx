@@ -7,6 +7,11 @@
  * - Real-time character count with 10,000 character limit
  * - Auto-resize based on content with min/max constraints
  * - Plain text paste handling
+ *
+ * Required Context Providers:
+ * - None (self-contained component)
+ *
+ * @remarks This component has no external context dependencies and can be used standalone.
  */
 
 import React, {

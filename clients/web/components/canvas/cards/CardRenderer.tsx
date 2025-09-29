@@ -5,7 +5,7 @@
  * handles selection states, drag operations, resize handles, and edit mode.
  */
 
-import React, { useCallback, useState, useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { Group } from 'react-konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type {
@@ -263,7 +263,10 @@ export const CardRenderer = React.memo<CardRendererProps>(({
           isDragged={isDragged}
           isHovered={isHovered}
           isEditing={isInEditMode}
-          onStartEdit={() => handleDoubleClick({ cancelBubble: false, evt: {} } as any)}
+          onStartEdit={() => handleDoubleClick({
+            cancelBubble: false,
+            evt: {} as MouseEvent
+          } as KonvaEventObject<MouseEvent>)}
         />
       );
     }

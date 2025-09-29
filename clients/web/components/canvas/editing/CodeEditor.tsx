@@ -8,6 +8,11 @@
  * - Line numbers with virtualization for large files
  * - Tab key handling for indentation
  * - Copy to clipboard with feedback
+ *
+ * Required Context Providers:
+ * - None (self-contained component)
+ *
+ * @remarks This component has no external context dependencies and can be used standalone.
  */
 
 import React, {
@@ -17,13 +22,18 @@ import React, {
   useState,
   useMemo,
   KeyboardEvent,
-  ChangeEvent
+  ChangeEvent,
+  ReactNode
 } from 'react';
 import {
   BaseEditor,
   type BaseEditorChildProps
 } from './BaseEditor';
 import type { CodeCard, CodeCardContent } from '@/types/card.types';
+import { createContextLogger } from '@/utils/logger';
+
+// Logger
+const logger = createContextLogger({ component: 'CodeEditor' });
 
 // Constants
 const TAB_SIZE = 2; // Number of spaces for tab
@@ -287,11 +297,17 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       setCopyFeedback('Copied!');
       setTimeout(() => setCopyFeedback(''), COPY_FEEDBACK_DURATION);
     } catch (error) {
-      console.error('Failed to copy:', error);
+      logger.error('Failed to copy', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        context: {
+          contentLength: content.length,
+          language
+        }
+      });
       setCopyFeedback('Failed to copy');
       setTimeout(() => setCopyFeedback(''), COPY_FEEDBACK_DURATION);
     }
-  }, [content]);
+  }, [content, language]);
 
   /**
    * Validate content
@@ -307,7 +323,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
    * Generate line numbers
    */
   const lineNumbers = useMemo(() => {
-    const lines = [];
+    const lines: ReactNode[] = [];
     const startLine = 1;
     const endLine = Math.min(lineCount, MAX_VISIBLE_LINES);
 
@@ -348,23 +364,89 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       validate={validateContent}
       saveOnBlur={true}
     >
-      {({ handleCancel, validationError, setValue }: BaseEditorChildProps<CodeCardContent>) => {
-        // Sync content changes to BaseEditor for proper validation
-        // Note: This useEffect is inside a render function which violates React rules,
-        // but it's necessary for the current BaseEditor design
-        // TODO: Refactor BaseEditor to accept controlled value prop
-        // eslint-disable-next-line react-hooks/rules-of-hooks
-        React.useEffect(() => {
-          setValue({
-            type: 'code',
-            language,
-            content,
-            filename: card.content.filename,
-            lineCount: countLines(content)
-          });
-        }, [content, language, setValue]);
+      {({ handleCancel, validationError, setValue }: BaseEditorChildProps<CodeCardContent>) => (
+        <CodeEditorContent
+          card={card}
+          content={content}
+          language={language}
+          theme={theme}
+          placeholder={placeholder}
+          lineNumbers={lineNumbers}
+          highlightedCode={highlightedCode}
+          copyFeedback={copyFeedback}
+          textareaRef={textareaRef}
+          lineNumbersRef={lineNumbersRef}
+          handleContentChange={handleContentChange}
+          handleLanguageChange={handleLanguageChange}
+          handleKeyDown={handleKeyDown}
+          handleCopy={handleCopy}
+          handleSave={handleSave}
+          handleCancel={handleCancel}
+          validationError={validationError}
+          setValue={setValue}
+        />
+      )}
+    </BaseEditor>
+  );
+};
 
-        return (
+/**
+ * Inner component that handles the useEffect synchronization
+ * This separates the hook logic from the render prop to follow React Hook rules
+ */
+interface CodeEditorContentProps {
+  card: CodeCard;
+  content: string;
+  language: string;
+  theme: 'light' | 'dark';
+  placeholder: string;
+  lineNumbers: ReactNode[];
+  highlightedCode: string;
+  copyFeedback: string;
+  textareaRef: React.RefObject<HTMLTextAreaElement>;
+  lineNumbersRef: React.RefObject<HTMLDivElement>;
+  handleContentChange: (e: ChangeEvent<HTMLTextAreaElement>) => void;
+  handleLanguageChange: (e: ChangeEvent<HTMLSelectElement>) => void;
+  handleKeyDown: (e: KeyboardEvent<HTMLTextAreaElement>) => void;
+  handleCopy: () => void;
+  handleSave: () => void;
+  handleCancel: () => void;
+  validationError: string | null;
+  setValue: (value: CodeCardContent) => void;
+}
+
+const CodeEditorContent: React.FC<CodeEditorContentProps> = ({
+  card,
+  content,
+  language,
+  theme,
+  placeholder,
+  lineNumbers,
+  highlightedCode,
+  copyFeedback,
+  textareaRef,
+  lineNumbersRef,
+  handleContentChange,
+  handleLanguageChange,
+  handleKeyDown,
+  handleCopy,
+  handleSave,
+  handleCancel,
+  validationError,
+  setValue
+}) => {
+  // Sync content changes to BaseEditor for proper validation
+  useEffect(() => {
+    setValue({
+      type: 'code',
+      language,
+      content,
+      filename: card.content.filename,
+      lineCount: countLines(content)
+    });
+  }, [content, language, setValue, card.content.filename]);
+
+  return (
         <div
           className={`code-editor-wrapper theme-${theme}`}
           data-testid="code-editor-container"
@@ -407,9 +489,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
               className="line-numbers p-2 pr-3 text-right text-gray-500 select-none bg-gray-50"
               style={{ minWidth: '3rem' }}
             >
-              {lineNumbers.map(line => (
-                <div key={line.key} {...line.props} />
-              ))}
+              {lineNumbers}
             </div>
 
             {/* Code textarea */}
@@ -548,8 +628,6 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
             }
           `}</style>
         </div>
-      )}}
-    </BaseEditor>
   );
 };
 
