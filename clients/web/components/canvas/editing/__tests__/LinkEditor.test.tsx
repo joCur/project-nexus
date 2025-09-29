@@ -3,16 +3,27 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { LinkEditor } from '../LinkEditor';
 
-// Mock the InlineEditor base component
-jest.mock('../InlineEditor', () => ({
-  InlineEditor: jest.fn(({ children, onSave, onCancel, title }) => (
-    <div data-testid="inline-editor">
-      <div>{title}</div>
-      {children}
-      <button onClick={() => onSave()}>Save</button>
-      <button onClick={() => onCancel()}>Cancel</button>
-    </div>
-  ))
+// Mock the BaseEditor component
+jest.mock('../BaseEditor', () => ({
+  BaseEditor: jest.fn(({ children, onSave, onCancel, title }) => {
+    const content = typeof children === 'function' ? children({
+      value: {},
+      setValue: jest.fn(),
+      handleSave: onSave,
+      handleCancel: onCancel,
+      validationError: null,
+      hasChanges: false
+    }) : children;
+
+    return (
+      <div data-testid="inline-editor">
+        <div>{title}</div>
+        {content}
+        <button onClick={() => onSave()}>Save</button>
+        <button onClick={() => onCancel()}>Cancel</button>
+      </div>
+    );
+  })
 }));
 
 describe('LinkEditor', () => {

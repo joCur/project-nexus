@@ -2,7 +2,7 @@
  * CodeEditor Component
  *
  * Syntax-highlighted code editor for inline editing of code cards.
- * Extends InlineEditor base component with code-specific features:
+ * Built on BaseEditor component with code-specific features:
  * - Syntax highlighting with theme support
  * - Language selection with 10+ common languages
  * - Line numbers with virtualization for large files
@@ -20,9 +20,9 @@ import React, {
   ChangeEvent
 } from 'react';
 import {
-  InlineEditor,
-  type InlineEditorChildProps
-} from './InlineEditor';
+  BaseEditor,
+  type BaseEditorChildProps
+} from './BaseEditor';
 import type { CodeCard, CodeCardContent } from '@/types/card.types';
 
 // Constants
@@ -338,7 +338,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   }, [debouncedContent, language]);
 
   return (
-    <InlineEditor<CodeCardContent>
+    <BaseEditor<CodeCardContent>
       initialValue={card.content}
       onSave={onSave}
       onCancel={onCancel}
@@ -348,11 +348,11 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       validate={validateContent}
       saveOnBlur={true}
     >
-      {({ handleCancel, validationError, setValue }: InlineEditorChildProps<CodeCardContent>) => {
-        // Sync content changes to InlineEditor for proper validation
+      {({ handleCancel, validationError, setValue }: BaseEditorChildProps<CodeCardContent>) => {
+        // Sync content changes to BaseEditor for proper validation
         // Note: This useEffect is inside a render function which violates React rules,
-        // but it's necessary for the current InlineEditor design
-        // TODO: Refactor InlineEditor to accept controlled value prop
+        // but it's necessary for the current BaseEditor design
+        // TODO: Refactor BaseEditor to accept controlled value prop
         // eslint-disable-next-line react-hooks/rules-of-hooks
         React.useEffect(() => {
           setValue({
@@ -408,7 +408,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
               style={{ minWidth: '3rem' }}
             >
               {lineNumbers.map(line => (
-                <div key={line.key}>{line.props.children}</div>
+                <div key={line.key} {...line.props} />
               ))}
             </div>
 
@@ -549,7 +549,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
           `}</style>
         </div>
       )}}
-    </InlineEditor>
+    </BaseEditor>
   );
 };
 

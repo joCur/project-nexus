@@ -143,6 +143,60 @@ Object.defineProperty(document, 'createRange', {
 // Cast through unknown to bypass strict type checking
 (global as unknown as { Range: typeof MockRange }).Range = MockRange;
 
+// Mock the BaseEditor component with validation support
+jest.mock('../BaseEditor', () => {
+  const React = require('react');
+
+  const MockBaseEditor = jest.fn(({ children, initialValue, validate, ...props }) => {
+    const [value, setValue] = React.useState(initialValue);
+    const [validationError, setValidationError] = React.useState(null);
+    const hasChanges = JSON.stringify(value) !== JSON.stringify(initialValue);
+
+    // Run validation when value changes
+    React.useEffect(() => {
+      if (validate) {
+        const result = validate(value);
+        if (typeof result === 'string') {
+          setValidationError(result);
+        } else if (result === false) {
+          setValidationError('Validation failed');
+        } else {
+          setValidationError(null);
+        }
+      }
+    }, [value, validate]);
+
+    // Handle cancel with confirmation if there are unsaved changes
+    const handleCancel = React.useCallback(() => {
+      if (hasChanges) {
+        const confirmCancel = window.confirm('You have unsaved changes. Are you sure you want to cancel?');
+        if (!confirmCancel) return;
+      }
+      props.onCancel();
+    }, [hasChanges, props]);
+
+    if (typeof children === 'function') {
+      return children({
+        value,
+        setValue,
+        hasUnsavedChanges: hasChanges,
+        handleSave: props.onSave,
+        handleCancel,
+        validationError,
+        isSaving: false,
+        focusRef: React.createRef(),
+        hasChanges
+      });
+    }
+    return null;
+  });
+
+  return {
+    BaseEditor: MockBaseEditor,
+    default: MockBaseEditor
+  };
+});
+
 describe('CodeEditor', () => {
   // Default test props
   const defaultCard: CodeCard = {
@@ -201,12 +255,12 @@ describe('CodeEditor', () => {
       );
 
       // Check for code display area
-      const codeArea = screen.getByRole('textbox', { name: /code editor/i });
+      const codeArea = screen.getByLabelText('Code editor');
       expect(codeArea).toBeInTheDocument();
-      expect(codeArea).toHaveTextContent('console.log("Hello, World!");');
+      expect(codeArea).toHaveValue('console.log("Hello, World!");');
     });
 
-    it('should display line numbers', () => {
+    it('should display line numbers', async () => {
       const multilineCard = {
         ...defaultCard,
         content: {
@@ -224,10 +278,16 @@ describe('CodeEditor', () => {
         />
       );
 
-      // Check for line numbers
-      expect(screen.getByText('1')).toBeInTheDocument();
-      expect(screen.getByText('2')).toBeInTheDocument();
-      expect(screen.getByText('3')).toBeInTheDocument();
+      // Check for line numbers using data-testid
+      await waitFor(() => {
+        expect(screen.getByTestId('line-number-1')).toBeInTheDocument();
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId('line-number-2')).toBeInTheDocument();
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId('line-number-3')).toBeInTheDocument();
+      });
     });
 
     it('should show language selector dropdown', () => {

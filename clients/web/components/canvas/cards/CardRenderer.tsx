@@ -5,12 +5,13 @@
  * handles selection states, drag operations, resize handles, and edit mode.
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useMemo } from 'react';
 import { Group } from 'react-konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type {
   Card,
   TextCard,
+  CardId,
 } from '@/types/card.types';
 import {
   isTextCard,
@@ -19,7 +20,7 @@ import {
   isCodeCard
 } from '@/types/card.types';
 import { useCardStore } from '@/stores/cardStore';
-import type { EditMode } from '@/components/canvas/editing';
+import { EditModeManager, useEditMode, type EditMode } from '@/components/canvas/editing';
 import { TextCardRenderer } from './TextCardRenderer';
 import { ImageCardRenderer } from './ImageCardRenderer';
 import { LinkCardRenderer } from './LinkCardRenderer';
@@ -44,6 +45,10 @@ interface CardRendererProps {
   onEditCancel?: (cardId: string) => void;
   /** Whether inline editing is enabled */
   enableInlineEdit?: boolean;
+  /** Whether this specific card is currently being edited */
+  isEditingCard?: boolean;
+  /** Callback to clear selection when entering edit mode */
+  onClearSelection?: () => void;
 }
 
 /**
@@ -62,6 +67,8 @@ export const CardRenderer = React.memo<CardRendererProps>(({
   onEditEnd,
   onEditCancel,
   enableInlineEdit = false,
+  isEditingCard = false,
+  onClearSelection,
 }) => {
   const {
     selection,
@@ -74,22 +81,39 @@ export const CardRenderer = React.memo<CardRendererProps>(({
     updateDrag,
     endDrag,
     setHoveredCard,
+    // editingCardId, // Will be used in future for global edit state coordination
+    setEditingCard,
+    clearEditingCard,
   } = useCardStore();
 
-  // State for edit mode (only used when inline editing is enabled)
-  const [, setIsEditing] = useState(false);
+  // Use the edit mode hook from EditModeManager
+  const { editState, startEdit, endEdit } = useEditMode();
+
+  // State for managing local edit mode
+  // const [isLocallyEditing, setIsLocallyEditing] = useState(false); // Will be used when full edit state coordination is implemented
 
   // Determine card state with safe checks
   const isSelected = card?.id && selection?.selectedIds?.has(card.id) || false;
   const isDragged = card?.id && dragState?.draggedIds?.has(card.id) || false;
   const isHovered = card?.id && hoverState?.hoveredId === card.id || false;
 
+  // Check if this card is currently being edited
+  const isInEditMode = useMemo(() => {
+    return (enableInlineEdit && (isEditingCard || (editState.isEditing && editState.editingCardId === card.id))) || false;
+  }, [enableInlineEdit, isEditingCard, editState.isEditing, editState.editingCardId, card.id]);
+
   // Handle click events
   const handleClick = useCallback((e: KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true;
+
+    // Don't allow selection changes during edit mode
+    if (isInEditMode) {
+      return;
+    }
+
     selectCard(card.id, e.evt.ctrlKey || e.evt.metaKey);
     onCardClick?.(card, e);
-  }, [card, selectCard, onCardClick]);
+  }, [card, selectCard, onCardClick, isInEditMode]);
 
   // Handle double click events
   const handleDoubleClick = useCallback((e: KonvaEventObject<MouseEvent>) => {
@@ -97,21 +121,28 @@ export const CardRenderer = React.memo<CardRendererProps>(({
 
     // If inline editing is enabled, trigger edit mode instead of callback
     if (enableInlineEdit && !card.isLocked) {
-      setIsEditing(true);
+      // Clear selection when entering edit mode
+      onClearSelection?.();
+
+      // setIsLocallyEditing(true); // Will be used when full edit state coordination is implemented
+      setEditingCard?.(card.id);
+
       // Determine edit mode based on card type
       const editMode = card.content.type === 'text' ? 'text' :
                       card.content.type === 'code' ? 'code' :
                       card.content.type === 'link' ? 'link' :
                       card.content.type === 'image' ? 'image-caption' : 'metadata';
+
+      startEdit(card.id, editMode, card.content);
       onEditStart?.(card.id, editMode as EditMode);
     } else {
       onCardDoubleClick?.(card, e);
     }
-  }, [card, onCardDoubleClick, enableInlineEdit, onEditStart]);
+  }, [card, onCardDoubleClick, enableInlineEdit, onEditStart, onClearSelection, startEdit, setEditingCard]);
 
   // Handle drag start
   const handleDragStart = useCallback((e: KonvaEventObject<DragEvent>) => {
-    if (card?.isLocked) return;
+    if (card?.isLocked || isInEditMode) return;
 
     // Prevent Stage drag when dragging cards
     e.cancelBubble = true;
@@ -128,7 +159,7 @@ export const CardRenderer = React.memo<CardRendererProps>(({
 
     startDrag(selectedIds, startPosition);
     onCardDragStart?.(card, e);
-  }, [card, selection?.selectedIds, startDrag, onCardDragStart]);
+  }, [card, selection?.selectedIds, startDrag, onCardDragStart, isInEditMode]);
 
   // Handle drag move
   const handleDragMove = useCallback((e: KonvaEventObject<DragEvent>) => {
@@ -166,9 +197,12 @@ export const CardRenderer = React.memo<CardRendererProps>(({
 
   // Handle mouse enter
   const handleMouseEnter = useCallback((e: KonvaEventObject<MouseEvent>) => {
+    // Don't trigger hover effects during edit mode
+    if (isInEditMode) return;
+
     setHoveredCard(card.id);
     onCardHover?.(card, e);
-  }, [card, setHoveredCard, onCardHover]);
+  }, [card, setHoveredCard, onCardHover, isInEditMode]);
 
   // Handle mouse leave
   const handleMouseLeave = useCallback((e: KonvaEventObject<MouseEvent>) => {
@@ -177,20 +211,28 @@ export const CardRenderer = React.memo<CardRendererProps>(({
   }, [card, setHoveredCard, onCardUnhover]);
 
   // Handle edit mode callbacks
+  const handleEditStart = useCallback((cardId: string, mode: EditMode) => {
+    // Clear selection when entering edit mode
+    onClearSelection?.();
+    // setIsLocallyEditing(true); // Will be used when full edit state coordination is implemented
+    setEditingCard?.(cardId as CardId);
+    startEdit(cardId as CardId, mode, card.content);
+    onEditStart?.(cardId, mode);
+  }, [onEditStart, onClearSelection, startEdit, setEditingCard, card.content]);
+
   const handleEditEnd = useCallback((cardId: string, content: unknown) => {
-    setIsEditing(false);
+    // setIsLocallyEditing(false); // Will be used when full edit state coordination is implemented
+    clearEditingCard?.();
+    endEdit();
     onEditEnd?.(cardId, content);
-  }, [onEditEnd]);
+  }, [onEditEnd, endEdit, clearEditingCard]);
 
   const handleEditCancel = useCallback((cardId: string) => {
-    setIsEditing(false);
+    // setIsLocallyEditing(false); // Will be used when full edit state coordination is implemented
+    clearEditingCard?.();
+    endEdit();
     onEditCancel?.(cardId);
-  }, [onEditCancel]);
-
-  // Note: handleEditEnd and handleEditCancel will be used when EditModeManager is integrated
-  // Currently they're defined but not yet connected to the UI
-  void handleEditEnd; // Suppress unused warning
-  void handleEditCancel; // Suppress unused warning
+  }, [onEditCancel, endEdit, clearEditingCard]);
 
   // Don't render if card is invalid or hidden
   if (!card || !card.id || card.isHidden) {
@@ -220,6 +262,8 @@ export const CardRenderer = React.memo<CardRendererProps>(({
           isSelected={isSelected}
           isDragged={isDragged}
           isHovered={isHovered}
+          isEditing={isInEditMode}
+          onStartEdit={() => handleDoubleClick({ cancelBubble: false, evt: {} } as any)}
         />
       );
     }
@@ -269,11 +313,14 @@ export const CardRenderer = React.memo<CardRendererProps>(({
     );
   };
 
-  return (
+  // Wrap with EditModeManager if inline editing is enabled
+  const cardContent = renderCardContent();
+
+  const groupContent = (
     <Group
       x={card.position?.x ?? 0}
       y={card.position?.y ?? 0}
-      draggable={!card.isLocked}
+      draggable={!card.isLocked && !isInEditMode}
       onClick={handleClick}
       onDblClick={handleDoubleClick}
       onDragStart={handleDragStart}
@@ -282,11 +329,29 @@ export const CardRenderer = React.memo<CardRendererProps>(({
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       opacity={card.style?.opacity ?? 1}
-      listening={!card.isLocked}
+      listening={!card.isLocked && !isInEditMode}
     >
-      {renderCardContent()}
+      {cardContent}
     </Group>
   );
+
+  // If inline editing is enabled, wrap with EditModeManager
+  if (enableInlineEdit) {
+    return (
+      <EditModeManager
+        card={card}
+        onEditStart={handleEditStart}
+        onEditEnd={handleEditEnd}
+        onEditCancel={handleEditCancel}
+        canEdit={!card.isLocked}
+        className="card-edit-wrapper"
+      >
+        {groupContent}
+      </EditModeManager>
+    );
+  }
+
+  return groupContent;
 });
 
 CardRenderer.displayName = 'CardRenderer';

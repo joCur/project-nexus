@@ -2,7 +2,7 @@
  * TextEditor Component
  *
  * ContentEditable-based text editor for inline editing of text cards.
- * Extends InlineEditor base component with text-specific features:
+ * Built on BaseEditor component with text-specific features:
  * - Markdown formatting support (bold, italic, links)
  * - Real-time character count with 10,000 character limit
  * - Auto-resize based on content with min/max constraints
@@ -19,9 +19,9 @@ import React, {
   ClipboardEvent
 } from 'react';
 import {
-  InlineEditor,
-  type InlineEditorChildProps
-} from './InlineEditor';
+  BaseEditor,
+  type BaseEditorChildProps
+} from './BaseEditor';
 import type { TextCard, TextCardContent } from '@/types/card.types';
 
 // Constants
@@ -406,7 +406,7 @@ export const TextEditor: React.FC<TextEditorProps> = ({
   }, []);
 
   return (
-    <InlineEditor<TextCardContent>
+    <BaseEditor<TextCardContent>
       initialValue={card.content}
       onSave={onSave}
       onCancel={onCancel}
@@ -416,7 +416,7 @@ export const TextEditor: React.FC<TextEditorProps> = ({
       validate={validateContent}
       saveOnBlur={true}
     >
-      {({ handleCancel, validationError }: InlineEditorChildProps<TextCardContent>) => (
+      {({ handleCancel, validationError }: BaseEditorChildProps<TextCardContent>) => (
         <div className="relative w-full h-full flex flex-col">
           {/* Editor */}
           <div
@@ -525,7 +525,7 @@ export const TextEditor: React.FC<TextEditorProps> = ({
           </div>
         </div>
       )}
-    </InlineEditor>
+    </BaseEditor>
   );
 };
 

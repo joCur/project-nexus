@@ -457,6 +457,8 @@ export interface CardState {
   resizeState: CardResizeState;
   /** Hover state */
   hoverState: CardHoverState;
+  /** Currently editing card ID (UI state for inline editing) */
+  editingCardId?: CardId | null;
 }
 
 /**
@@ -505,6 +507,10 @@ export interface CardActions {
 
   // Hover operations
   setHoveredCard: (id: CardId | undefined) => void;
+
+  // Edit mode operations (UI state only)
+  setEditingCard: (id: CardId | null) => void;
+  clearEditingCard: () => void;
 }
 
 /**

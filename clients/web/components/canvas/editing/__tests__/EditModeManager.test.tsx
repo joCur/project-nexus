@@ -8,6 +8,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
+import { MockedProvider } from '@apollo/client/testing';
 import { EditModeManager, useEditMode } from '../EditModeManager';
 import type { Card } from '@/types/card.types';
 import { createCardId } from '@/types/card.types';
@@ -19,6 +20,14 @@ jest.mock('framer-motion', () => ({
     div: ({ children, ...props }: any) => <div {...props}>{children}</div>
   }
 }));
+
+// Mock the hooks to avoid Apollo Client dependency in simple tests
+jest.mock('@/stores/cardStore');
+jest.mock('@/hooks/useCardOperations');
+
+// Import mocked hooks
+import { useCardStore } from '@/stores/cardStore';
+import { useCardOperations } from '@/hooks/useCardOperations';
 
 describe('EditModeManager', () => {
   const mockCard: Card = {
@@ -60,13 +69,29 @@ describe('EditModeManager', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+
+    // Setup cardStore mock
+    (useCardStore as unknown as jest.Mock).mockReturnValue({
+      setEditingCard: jest.fn(),
+      clearEditingCard: jest.fn(),
+      editingCardId: null,
+    });
+
+    // Setup useCardOperations mock
+    (useCardOperations as unknown as jest.Mock).mockReturnValue({
+      updateCard: jest.fn().mockResolvedValue(true),
+      loading: false,
+      error: null,
+    });
   });
 
   it('renders children content by default', () => {
     render(
-      <EditModeManager card={mockCard}>
-        <div>Card Content</div>
-      </EditModeManager>
+      <MockedProvider mocks={[]} addTypename={false}>
+        <EditModeManager card={mockCard} enableServerPersistence={false}>
+          <div>Card Content</div>
+        </EditModeManager>
+      </MockedProvider>
     );
 
     expect(screen.getByText('Card Content')).toBeInTheDocument();
@@ -76,13 +101,16 @@ describe('EditModeManager', () => {
     const user = userEvent.setup();
 
     render(
-      <EditModeManager
-        card={mockCard}
-        canEdit={true}
-        onEditStart={mockOnEditStart}
-      >
-        <div>Card Content</div>
-      </EditModeManager>
+      <MockedProvider mocks={[]} addTypename={false}>
+        <EditModeManager
+          card={mockCard}
+          canEdit={true}
+          onEditStart={mockOnEditStart}
+          enableServerPersistence={false}
+        >
+          <div>Card Content</div>
+        </EditModeManager>
+      </MockedProvider>
     );
 
     const container = screen.getByText('Card Content').parentElement;
@@ -98,13 +126,16 @@ describe('EditModeManager', () => {
     const lockedCard = { ...mockCard, isLocked: true };
 
     render(
-      <EditModeManager
-        card={lockedCard}
-        canEdit={true}
-        onEditStart={mockOnEditStart}
-      >
-        <div>Card Content</div>
-      </EditModeManager>
+      <MockedProvider mocks={[]} addTypename={false}>
+        <EditModeManager
+          card={lockedCard}
+          canEdit={true}
+          onEditStart={mockOnEditStart}
+          enableServerPersistence={false}
+        >
+          <div>Card Content</div>
+        </EditModeManager>
+      </MockedProvider>
     );
 
     const container = screen.getByText('Card Content').parentElement;
@@ -117,13 +148,16 @@ describe('EditModeManager', () => {
     const user = userEvent.setup();
 
     render(
-      <EditModeManager
-        card={mockCard}
-        canEdit={false}
-        onEditStart={mockOnEditStart}
-      >
-        <div>Card Content</div>
-      </EditModeManager>
+      <MockedProvider mocks={[]} addTypename={false}>
+        <EditModeManager
+          card={mockCard}
+          canEdit={false}
+          onEditStart={mockOnEditStart}
+          enableServerPersistence={false}
+        >
+          <div>Card Content</div>
+        </EditModeManager>
+      </MockedProvider>
     );
 
     const container = screen.getByText('Card Content').parentElement;
@@ -136,12 +170,15 @@ describe('EditModeManager', () => {
     const user = userEvent.setup();
 
     const { container } = render(
-      <EditModeManager
-        card={mockCard}
-        canEdit={true}
-      >
-        <div>Card Content</div>
-      </EditModeManager>
+      <MockedProvider mocks={[]} addTypename={false}>
+        <EditModeManager
+          card={mockCard}
+          canEdit={true}
+          enableServerPersistence={false}
+        >
+          <div>Card Content</div>
+        </EditModeManager>
+      </MockedProvider>
     );
 
     const contentDiv = screen.getByText('Card Content').parentElement;
@@ -158,13 +195,16 @@ describe('EditModeManager', () => {
     const user = userEvent.setup();
 
     render(
-      <EditModeManager
-        card={mockCard}
-        canEdit={true}
-        onEditCancel={mockOnEditCancel}
-      >
-        <div>Card Content</div>
-      </EditModeManager>
+      <MockedProvider mocks={[]} addTypename={false}>
+        <EditModeManager
+          card={mockCard}
+          canEdit={true}
+          onEditCancel={mockOnEditCancel}
+          enableServerPersistence={false}
+        >
+          <div>Card Content</div>
+        </EditModeManager>
+      </MockedProvider>
     );
 
     const container = screen.getByText('Card Content').parentElement;
@@ -185,13 +225,16 @@ describe('EditModeManager', () => {
     const user = userEvent.setup();
 
     render(
-      <EditModeManager
-        card={mockCard}
-        canEdit={true}
-        onEditEnd={mockOnEditEnd}
-      >
-        <div>Card Content</div>
-      </EditModeManager>
+      <MockedProvider mocks={[]} addTypename={false}>
+        <EditModeManager
+          card={mockCard}
+          canEdit={true}
+          onEditEnd={mockOnEditEnd}
+          enableServerPersistence={false}
+        >
+          <div>Card Content</div>
+        </EditModeManager>
+      </MockedProvider>
     );
 
     const container = screen.getByText('Card Content').parentElement;
@@ -229,13 +272,16 @@ describe('EditModeManager', () => {
     };
 
     render(
-      <EditModeManager
-        card={codeCard}
-        canEdit={true}
-        onEditStart={mockOnEditStart}
-      >
-        <div>Code Card</div>
-      </EditModeManager>
+      <MockedProvider mocks={[]} addTypename={false}>
+        <EditModeManager
+          card={codeCard}
+          canEdit={true}
+          onEditStart={mockOnEditStart}
+          enableServerPersistence={false}
+        >
+          <div>Code Card</div>
+        </EditModeManager>
+      </MockedProvider>
     );
 
     const container = screen.getByText('Code Card').parentElement;

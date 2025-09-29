@@ -243,13 +243,6 @@ describe('CardRenderer', () => {
       status: 'active' as CardStatus,
       priority: 'medium' as CardPriority,
       tags: [] as string[],
-      linkedCardIds: [] as CardId[],
-      permissions: {
-        canEdit: true,
-        canDelete: true,
-        canShare: true,
-        canComment: true,
-      },
       animation: {
         isAnimating: false,
       },

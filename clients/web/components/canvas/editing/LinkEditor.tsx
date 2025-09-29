@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { InlineEditor } from './InlineEditor';
+import { BaseEditor } from './BaseEditor';
 
 interface LinkEditorProps {
   onSave: (value: LinkValue) => void;
@@ -198,12 +198,14 @@ export const LinkEditor: React.FC<LinkEditorProps> = ({
   };
 
   return (
-    <InlineEditor
+    <BaseEditor<LinkValue>
       initialValue={{ url, text: displayText, target }}
       onSave={handleSave}
       onCancel={onCancel}
+      showControls={false}
     >
-      <div className="space-y-4" onKeyDown={handleKeyDown}>
+      {() => (
+        <div className="space-y-4" onKeyDown={handleKeyDown}>
         {/* URL Input */}
         <div>
           <label
@@ -297,6 +299,7 @@ export const LinkEditor: React.FC<LinkEditorProps> = ({
           </div>
         )}
       </div>
-    </InlineEditor>
+      )}
+    </BaseEditor>
   );
 };

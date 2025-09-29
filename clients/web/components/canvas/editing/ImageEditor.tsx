@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { InlineEditor } from './InlineEditor';
+import { BaseEditor } from './BaseEditor';
 
 // Constants
 const IMAGE_EXTENSIONS_REGEX = /\.(jpg|jpeg|png|gif|svg|webp)$/i;
@@ -156,13 +156,11 @@ export function ImageEditor({ initialData, onSave, onCancel }: ImageEditorProps)
   }, [url, alt, caption, size, alignment, onSave]);
 
   return (
-    <InlineEditor<ImageData>
+    <BaseEditor<ImageData>
       initialValue={defaultData}
       onSave={handleSave}
       onCancel={onCancel}
       showControls={true}
-      saveText="Save"
-      cancelText="Cancel"
     >
       {(() => (
         <div className="p-4">
@@ -327,6 +325,6 @@ export function ImageEditor({ initialData, onSave, onCancel }: ImageEditorProps)
           </div>
         </div>
       ))}
-    </InlineEditor>
+    </BaseEditor>
   );
 }

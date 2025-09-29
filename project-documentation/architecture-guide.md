@@ -730,10 +730,11 @@ export const useCardStore = create<CardStore>()(
 - ✅ Fewer bugs in production
 - ✅ Confidence in refactoring
 
-**TDD Cycle**: RED → GREEN → REFACTOR
+**TDD Cycle**: RED → GREEN → REFACTOR → VERIFY
 1. **RED**: Write a failing test that describes the desired behavior
 2. **GREEN**: Write the minimal code to make the test pass
 3. **REFACTOR**: Clean up the code while keeping tests green
+4. **VERIFY**: Run ALL related tests, not just new ones - ensure no regression
 
 **TDD Example**:
 ```typescript
@@ -780,7 +781,13 @@ async createWorkspace(input: WorkspaceCreateInput): Promise<Workspace> {
 
   return this.mapDbWorkspaceToWorkspace(workspace);
 }
+
+// 4. VERIFY: Run all tests to ensure no regression
+// npm test workspace  // All workspace-related tests
+// npm test           // Full suite to catch unexpected breaks
 ```
+
+**Critical TDD Enhancement**: The VERIFY step is essential when modifying existing code. It's not enough to make your new tests pass - you must ensure existing functionality remains intact.
 
 ### Feature Implementation Process
 
@@ -1388,6 +1395,284 @@ export const EntityComponent: React.FC<ComponentProps> = ({ ...props }) => {
 
 ## Testing Patterns
 
+### Testing Integration Patterns
+
+**Critical Lesson**: When modifying existing components to add new dependencies (especially context providers like Apollo Client), ALL existing tests must be updated to provide those dependencies. This is a common source of test failures that can break CI/CD pipelines.
+
+#### Dependency Addition Checklist
+
+When adding a new dependency to an existing component:
+
+1. **Identify all affected tests**:
+```bash
+# Find all test files that import or test the modified component
+grep -r "ComponentName" --include="*.test.tsx" --include="*.test.ts"
+grep -r "ComponentName" --include="*.spec.tsx" --include="*.spec.ts"
+```
+
+2. **Update test wrappers to provide required context**:
+```typescript
+// BEFORE: Test without Apollo dependency
+import { render } from '@testing-library/react';
+import { EditModeManager } from '../EditModeManager';
+
+test('renders correctly', () => {
+  render(<EditModeManager />); // ❌ Will fail after adding Apollo dependency
+});
+
+// AFTER: Test with Apollo MockedProvider
+import { render } from '@testing-library/react';
+import { MockedProvider } from '@apollo/client/testing';
+import { EditModeManager } from '../EditModeManager';
+
+test('renders correctly', () => {
+  render(
+    <MockedProvider mocks={[]} addTypename={false}>
+      <EditModeManager />
+    </MockedProvider>
+  ); // ✅ Provides required Apollo context
+});
+```
+
+3. **Run the FULL test suite** - not just your new tests:
+```bash
+# Don't just run your new tests
+npm test EditModeManager.simple.test.tsx  # ❌ Insufficient
+
+# Run ALL tests for the component and related features
+npm test EditModeManager  # ✅ Catches all affected tests
+npm test canvas/editing  # ✅ Catches related component tests
+npm test  # ✅ Best - catches unexpected dependencies
+```
+
+#### Provider Hierarchy Pattern
+
+When components require multiple providers, maintain consistent hierarchy:
+
+```typescript
+// Reusable test wrapper for components with multiple dependencies
+const TestWrapper: React.FC<{ children: React.ReactNode; mocks?: any[] }> = ({
+  children,
+  mocks = []
+}) => (
+  <MockedProvider mocks={mocks} addTypename={false}>
+    <StoreProvider>
+      <ThemeProvider>
+        {children}
+      </ThemeProvider>
+    </StoreProvider>
+  </MockedProvider>
+);
+
+// Usage in tests
+test('component with multiple dependencies', () => {
+  render(
+    <TestWrapper mocks={apolloMocks}>
+      <ComplexComponent />
+    </TestWrapper>
+  );
+});
+```
+
+#### Component Context Requirements Documentation
+
+Components should clearly document their context dependencies:
+
+```typescript
+/**
+ * EditModeManager Component
+ *
+ * Required Context Providers:
+ * - Apollo Client (via MockedProvider in tests)
+ * - CardStore (via StoreProvider)
+ *
+ * @requires Apollo Client context for useCardOperations hook
+ * @requires CardStore for local state management
+ */
+export const EditModeManager: React.FC<Props> = ({ children }) => {
+  const { updateCard } = useCardOperations(); // Requires Apollo
+  const { cards } = useCardStore(); // Requires store
+  // ...
+};
+```
+
+### Common Testing Pitfalls
+
+#### The Apollo Client Context Missing Error
+
+**Symptom**: `Invariant Violation: Could not find "client" in the context or passed in as an option`
+
+**Cause**: Component uses Apollo hooks (useQuery, useMutation, etc.) but test doesn't provide MockedProvider
+
+**Solution**: Always wrap components using Apollo in MockedProvider:
+```typescript
+// Create a helper for consistent Apollo test setup
+export const renderWithApollo = (
+  component: React.ReactElement,
+  { mocks = [], ...options }: any = {}
+) => {
+  return render(
+    <MockedProvider mocks={mocks} addTypename={false}>
+      {component}
+    </MockedProvider>,
+    options
+  );
+};
+```
+
+#### The "TDD for New Features but Forgetting Existing Tests" Anti-Pattern
+
+**Problem**: You follow TDD perfectly for new features but break 149 existing tests by adding a dependency to a shared component.
+
+**Real Example**: Adding `useCardOperations` (Apollo hook) to `EditModeManager` broke all existing tests that didn't provide MockedProvider.
+
+**Prevention Strategy**:
+1. Before modifying shared components, run existing tests first
+2. After adding dependencies, run tests again before writing new ones
+3. Update existing tests to provide new dependencies
+4. Then proceed with TDD for new functionality
+
+#### Identifying When Tests Need Provider Updates
+
+**Red Flags** that indicate missing providers:
+- `Cannot read property 'store' of undefined` - Missing store provider
+- `useContext must be used within a Provider` - Missing specific context
+- `Invalid hook call` - Often missing provider or incorrect test setup
+- `Invariant Violation` with Apollo - Missing MockedProvider
+- Theme-related errors - Missing ThemeProvider
+
+**Proactive Detection**:
+```typescript
+// Add this to your component to make dependencies explicit
+if (typeof window !== 'undefined' && !client) {
+  console.warn('EditModeManager requires Apollo Client context');
+}
+```
+
+### Test Maintenance Best Practices
+
+#### Creating Reusable Test Utilities
+
+```typescript
+// test-utils/providers.tsx
+export const AllProviders: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const mockClient = new ApolloClient({
+    cache: new InMemoryCache(),
+    defaultOptions: {
+      query: { errorPolicy: 'all' },
+      mutate: { errorPolicy: 'all' },
+    },
+  });
+
+  return (
+    <ApolloProvider client={mockClient}>
+      <StoreProvider>
+        {children}
+      </StoreProvider>
+    </ApolloProvider>
+  );
+};
+
+// Custom render function
+export const renderWithProviders = (ui: React.ReactElement, options = {}) => {
+  return render(ui, {
+    wrapper: AllProviders,
+    ...options,
+  });
+};
+```
+
+#### Test File Organization Pattern
+
+```typescript
+// EditModeManager.test.tsx - Organized for clarity
+import { MockedProvider } from '@apollo/client/testing';
+import { render, screen } from '@testing-library/react';
+import { EditModeManager } from '../EditModeManager';
+
+// 1. Document required providers at the top
+/**
+ * Test Requirements:
+ * - Apollo MockedProvider (for useCardOperations)
+ * - CardStore mock (for useCardStore)
+ */
+
+// 2. Define mocks and test data
+const apolloMocks = [...];
+const storeMocks = {...};
+
+// 3. Create test-specific wrapper
+const renderEditModeManager = (props = {}, mocks = apolloMocks) => {
+  return render(
+    <MockedProvider mocks={mocks} addTypename={false}>
+      <EditModeManager {...props} />
+    </MockedProvider>
+  );
+};
+
+// 4. Use consistent wrapper in all tests
+describe('EditModeManager', () => {
+  test('handles edit mode correctly', () => {
+    renderEditModeManager({ cardId: 'test-1' });
+    // ... test implementation
+  });
+});
+```
+
+#### Regression Testing Strategy
+
+When modifying shared components:
+
+1. **Create a regression test checklist**:
+```typescript
+// Before making changes to shared component
+describe('EditModeManager - Regression Tests', () => {
+  test.todo('All existing Canvas tests pass');
+  test.todo('All existing Card tests pass');
+  test.todo('All parent component tests pass');
+  test.todo('Integration tests still work');
+});
+```
+
+2. **Run progressive test suites**:
+```bash
+# Level 1: Component tests
+npm test EditModeManager
+
+# Level 2: Feature tests
+npm test canvas/editing
+
+# Level 3: Related feature tests
+npm test canvas
+
+# Level 4: Full suite
+npm test
+```
+
+3. **Document breaking changes**:
+```typescript
+// BREAKING CHANGE: Added Apollo Client dependency
+// All tests using EditModeManager must now provide MockedProvider
+// See: EditModeManager.test.tsx for examples
+```
+
+### Quick Reference: Test Update Checklist
+
+When adding dependencies to existing components:
+
+- [ ] **Before changes**: Run `npm test [component]` to ensure tests pass
+- [ ] **Add dependency**: Implement your feature/change
+- [ ] **Find affected tests**: `grep -r "ComponentName" --include="*.test.*"`
+- [ ] **Update test setup**: Add required providers (MockedProvider, etc.)
+- [ ] **Run component tests**: `npm test [component]`
+- [ ] **Run feature tests**: `npm test [feature-folder]`
+- [ ] **Run full suite**: `npm test` (before committing)
+- [ ] **Document requirements**: Add `@requires` comments to component
+- [ ] **Update test utilities**: Add reusable wrappers if needed
+- [ ] **Commit message**: Note if tests were updated for new dependencies
+
+**Remember**: A component modification that breaks 149 tests is a failed modification, even if your 3 new tests pass perfectly!
+
 ### Backend Service Testing
 
 **Current Working Pattern**: Follow the Jest + service layer testing approach:
@@ -1428,6 +1713,34 @@ describe('WorkspaceService', () => {
       ).rejects.toThrow(ValidationError);
     });
   });
+});
+```
+
+### Dependency Injection for Testability
+
+**Pattern**: Design components with dependency injection in mind to simplify testing:
+
+```typescript
+// BAD: Hard dependency on Apollo hook makes testing difficult
+export const CardEditor: React.FC<Props> = ({ cardId }) => {
+  const { updateCard } = useCardOperations(); // Hard dependency
+  // Component logic...
+};
+
+// GOOD: Optional dependency injection for testing
+export const CardEditor: React.FC<Props & {
+  updateCard?: (id: string, data: any) => Promise<void>
+}> = ({ cardId, updateCard: updateCardProp }) => {
+  const { updateCard: updateCardHook } = useCardOperations();
+  const updateCard = updateCardProp || updateCardHook; // Use injected or default
+  // Component logic...
+};
+
+// In tests, you can now inject mocks directly
+test('updates card', async () => {
+  const mockUpdate = jest.fn();
+  render(<CardEditor cardId="1" updateCard={mockUpdate} />);
+  // No need for MockedProvider if not testing Apollo integration
 });
 ```
 

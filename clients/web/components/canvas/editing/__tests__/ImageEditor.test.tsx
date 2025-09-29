@@ -3,9 +3,9 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import { ImageEditor } from '../ImageEditor';
 
-// Mock the InlineEditor base component
-jest.mock('../InlineEditor', () => ({
-  InlineEditor: jest.fn(({ children, onSave, onCancel, initialValue }) => {
+// Mock the BaseEditor component
+jest.mock('../BaseEditor', () => ({
+  BaseEditor: jest.fn(({ children, onSave, onCancel, initialValue }) => {
     // Call children as a render prop function if it's a function
     const content = typeof children === 'function'
       ? children({
@@ -14,7 +14,8 @@ jest.mock('../InlineEditor', () => ({
           handleSave: onSave,
           handleCancel: onCancel,
           validationError: null,
-          focusRef: { current: null }
+          focusRef: { current: null },
+          hasChanges: false
         })
       : children;
 
@@ -543,12 +544,12 @@ describe('ImageEditor', () => {
 
   describe('Integration with InlineEditor', () => {
     it('should pass correct props to InlineEditor', () => {
-      // Access the mocked InlineEditor from the module mock
-      const { InlineEditor } = jest.requireMock('../InlineEditor');
+      // Access the mocked BaseEditor from the module mock
+      const { BaseEditor } = jest.requireMock('../BaseEditor');
 
       render(<ImageEditor {...defaultProps} />);
 
-      expect(InlineEditor).toHaveBeenCalledWith(
+      expect(BaseEditor).toHaveBeenCalledWith(
         expect.objectContaining({
           initialValue: expect.objectContaining({
             url: '',
@@ -560,8 +561,6 @@ describe('ImageEditor', () => {
           onSave: expect.any(Function),
           onCancel: mockOnCancel,
           showControls: true,
-          saveText: 'Save',
-          cancelText: 'Cancel',
           children: expect.any(Function),
         }),
         expect.anything()

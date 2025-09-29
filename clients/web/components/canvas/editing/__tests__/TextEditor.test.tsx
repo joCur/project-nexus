@@ -148,9 +148,9 @@ const mockSelection = {
 // Mock getSelection - cast through unknown to bypass type checking
 global.window.getSelection = jest.fn(() => mockSelection) as unknown as typeof window.getSelection;
 
-// Mock the InlineEditor component
-jest.mock('../InlineEditor', () => ({
-  InlineEditor: jest.fn(({ children, ...props }) => {
+// Mock the BaseEditor component - needs both named and default exports
+jest.mock('../BaseEditor', () => {
+  const MockBaseEditor = jest.fn(({ children, ...props }) => {
     if (typeof children === 'function') {
       return children({
         value: props.initialValue,
@@ -160,25 +160,31 @@ jest.mock('../InlineEditor', () => ({
         handleCancel: props.onCancel,
         validationError: undefined,
         isSaving: false,
-        focusRef: React.createRef()
+        focusRef: React.createRef(),
+        hasChanges: false
       });
     }
     return null;
-  }),
-  useInlineEditor: jest.fn(() => ({
-    value: '',
-    setValue: jest.fn(),
-    isEditing: false,
-    startEdit: jest.fn(),
-    save: jest.fn(),
-    cancel: jest.fn(),
-    hasUnsavedChanges: jest.fn(() => false),
-    originalValue: ''
-  })),
-  useUnsavedChanges: jest.fn(() => false),
-  useClickOutside: jest.fn(),
-  useFocusTrap: jest.fn()
-}));
+  });
+
+  return {
+    BaseEditor: MockBaseEditor,
+    default: MockBaseEditor,
+    useInlineEditor: jest.fn(() => ({
+      value: '',
+      setValue: jest.fn(),
+      isEditing: false,
+      startEdit: jest.fn(),
+      save: jest.fn(),
+      cancel: jest.fn(),
+      hasUnsavedChanges: jest.fn(() => false),
+      originalValue: ''
+    })),
+    useUnsavedChanges: jest.fn(() => false),
+    useClickOutside: jest.fn(),
+    useFocusTrap: jest.fn()
+  };
+});
 
 describe('TextEditor Component', () => {
   // Mock text card for testing
