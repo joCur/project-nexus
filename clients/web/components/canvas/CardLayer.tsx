@@ -195,7 +195,7 @@ export const CardLayer: React.FC<CardLayerProps> = ({
             content: {
               type: 'image' as const,
               url: String(backendCard.content || ''),
-              alt: backendCard.title || '',
+              alt: String(backendCard.metadata?.alt || ''),
               caption: backendCard.title || '',
             },
           };

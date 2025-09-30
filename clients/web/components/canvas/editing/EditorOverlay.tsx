@@ -150,7 +150,7 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
           content: {
             type: 'image' as const,
             url: String(backendCard.content || ''),
-            alt: backendCard.title || '',
+            alt: String(backendCard.metadata?.alt || ''),
             caption: backendCard.title || '',
           },
         } as Card;
@@ -247,6 +247,8 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
         let backendContent: string = '';
         let backendMetadata: Record<string, any> = {};
 
+        let backendTitle: string | undefined;
+
         switch (content.type) {
           case 'text':
             backendContent = content.content;
@@ -260,6 +262,7 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
             break;
           case 'link':
             backendContent = content.url;
+            backendTitle = content.title;
             backendMetadata = {
               description: content.description,
               domain: content.domain,
@@ -269,16 +272,30 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
             break;
           case 'image':
             backendContent = content.url;
+            // Backend stores caption in title field, alt in metadata
+            backendTitle = content.caption;
+            if (content.alt) {
+              backendMetadata = { alt: content.alt };
+            }
             break;
         }
 
         // Persist to server with backend format
+        const updates: Record<string, any> = {
+          content: backendContent
+        };
+
+        if (backendTitle) {
+          updates.title = backendTitle;
+        }
+
+        if (Object.keys(backendMetadata).length > 0) {
+          updates.metadata = backendMetadata;
+        }
+
         const updatePayload = {
           id: editingCardId,
-          updates: {
-            content: backendContent,
-            ...(Object.keys(backendMetadata).length > 0 && { metadata: backendMetadata })
-          }
+          updates
         };
 
         const success = await updateCardOnServer(updatePayload);
@@ -374,9 +391,7 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
           initialData={{
             url: imageCard.content.url,
             alt: imageCard.content.alt || '',
-            caption: imageCard.content.caption || '',
-            size: 'medium',
-            alignment: 'center'
+            caption: imageCard.content.caption || ''
           }}
           onSave={(imageData) => {
             handleSave({

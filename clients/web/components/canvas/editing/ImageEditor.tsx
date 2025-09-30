@@ -21,29 +21,12 @@ import { BaseEditor } from './BaseEditor';
 
 // Constants
 const IMAGE_EXTENSIONS_REGEX = /\.(jpg|jpeg|png|gif|svg|webp)$/i;
-const DEFAULT_SIZE: ImageData['size'] = 'medium';
-const DEFAULT_ALIGNMENT: ImageData['alignment'] = 'center';
-
-const SIZE_OPTIONS = [
-  { value: 'small' as const, label: 'Small' },
-  { value: 'medium' as const, label: 'Medium' },
-  { value: 'large' as const, label: 'Large' },
-  { value: 'full' as const, label: 'Full Width' },
-];
-
-const ALIGNMENT_OPTIONS = [
-  { value: 'left' as const, label: 'Left' },
-  { value: 'center' as const, label: 'Center' },
-  { value: 'right' as const, label: 'Right' },
-];
 
 // Types
 export interface ImageData {
   url: string;
   alt: string;
   caption: string;
-  size: 'small' | 'medium' | 'large' | 'full';
-  alignment: 'left' | 'center' | 'right';
 }
 
 interface ImageEditorProps {
@@ -109,8 +92,6 @@ export function ImageEditor({ initialData, onSave, onCancel }: ImageEditorProps)
     url: '',
     alt: '',
     caption: '',
-    size: DEFAULT_SIZE,
-    alignment: DEFAULT_ALIGNMENT,
     ...initialData
   };
 
@@ -118,8 +99,6 @@ export function ImageEditor({ initialData, onSave, onCancel }: ImageEditorProps)
   const [url, setUrl] = useState(defaultData.url);
   const [alt, setAlt] = useState(defaultData.alt);
   const [caption, setCaption] = useState(defaultData.caption);
-  const [size, setSize] = useState<ImageData['size']>(defaultData.size);
-  const [alignment, setAlignment] = useState<ImageData['alignment']>(defaultData.alignment);
 
   // Error state
   const [urlError, setUrlError] = useState('');
@@ -168,21 +147,19 @@ export function ImageEditor({ initialData, onSave, onCancel }: ImageEditorProps)
       url,
       alt,
       caption,
-      size,
-      alignment,
     });
-  }, [url, alt, caption, size, alignment, onSave]);
+  }, [url, alt, caption, onSave]);
 
   return (
     <BaseEditor<ImageData>
       initialValue={defaultData}
       onSave={handleSave}
       onCancel={onCancel}
-      showControls={true}
+      showControls={false}
     >
       {(() => (
-        <div className="p-4">
-          <h2 className="text-lg font-semibold mb-4">Image Settings</h2>
+        <div className="p-6">
+          <h2 className="text-lg font-semibold mb-4">Edit Image</h2>
           <div className="space-y-4">
         {/* URL Input */}
         <div>
@@ -295,51 +272,23 @@ export function ImageEditor({ initialData, onSave, onCancel }: ImageEditorProps)
           </div>
         )}
 
-        {/* Size Selection */}
-        <fieldset>
-          <legend className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Image Size
-          </legend>
-          <div className="space-y-2">
-            {SIZE_OPTIONS.map((option) => (
-              <label key={option.value} className="flex items-center">
-                <input
-                  type="radio"
-                  name="size"
-                  value={option.value}
-                  checked={size === option.value}
-                  onChange={(e) => setSize(e.target.value as ImageData['size'])}
-                  className="mr-2"
-                  aria-label={option.label}
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">{option.label}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
-
-        {/* Alignment Selection */}
-        <fieldset>
-          <legend className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Alignment
-          </legend>
-          <div className="space-y-2">
-            {ALIGNMENT_OPTIONS.map((option) => (
-              <label key={option.value} className="flex items-center">
-                <input
-                  type="radio"
-                  name="alignment"
-                  value={option.value}
-                  checked={alignment === option.value}
-                  onChange={(e) => setAlignment(e.target.value as ImageData['alignment'])}
-                  className="mr-2"
-                  aria-label={option.label}
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">{option.label}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
+        {/* Action Buttons */}
+        <div className="flex justify-end gap-2 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            Save
+          </button>
+        </div>
           </div>
         </div>
       ))}
