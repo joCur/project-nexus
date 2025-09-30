@@ -24,6 +24,10 @@ const CardLayer = dynamic(() => import('./CardLayer').then(mod => ({ default: mo
   ssr: false
 });
 
+const EditorOverlay = dynamic(() => import('./editing/EditorOverlay').then(mod => ({ default: mod.EditorOverlay })), {
+  ssr: false
+});
+
 interface InfiniteCanvasProps {
   className?: string;
   showGrid?: boolean;
@@ -75,7 +79,7 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
   const cardCreation = useCardCreation({
     workspaceId,
     defaultType: 'text',
-    autoEnterEditMode: true, // TODO: Will be implemented in NEX-193
+    autoEnterEditMode: false,
   });
 
   // Card creation event handlers
@@ -218,6 +222,12 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({
         isCreating={cardCreation.state.isCreating}
         error={cardCreation.state.error}
         onClearError={cardCreation.clearError}
+      />
+
+      {/* Inline Editor Overlay (NEX-193) */}
+      <EditorOverlay
+        workspaceId={workspaceId}
+        enableServerPersistence={true}
       />
     </div>
   );

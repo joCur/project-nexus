@@ -19,11 +19,10 @@ export {
   type BaseEditorChildProps
 } from './BaseEditor';
 
-// Export the singleton instance for keyboard navigation
 export { EditModeManagerInstance } from './EditModeManager';
 
-// Phase 2 specialized editors (built on BaseEditor)
 export { TextEditor, type TextEditorProps } from './TextEditor';
 export { CodeEditor, type CodeEditorProps, SUPPORTED_LANGUAGES } from './CodeEditor';
 export { LinkEditor } from './LinkEditor';
 export { ImageEditor, type ImageData } from './ImageEditor';
+export { EditorOverlay } from './EditorOverlay';

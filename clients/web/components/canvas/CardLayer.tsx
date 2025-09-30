@@ -310,6 +310,7 @@ export const CardLayer: React.FC<CardLayerProps> = ({
         >
           <CardRenderer
             card={card}
+            enableInlineEdit={true}
           />
         </React.Suspense>
       ));
@@ -322,6 +323,7 @@ export const CardLayer: React.FC<CardLayerProps> = ({
       >
         <CardRenderer
           card={card}
+          enableInlineEdit={true}
         />
       </React.Suspense>
     ));

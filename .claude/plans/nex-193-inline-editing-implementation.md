@@ -80,7 +80,11 @@ Implement inline editing functionality for cards on the canvas, allowing users t
 
 - [x] Task 3.1: Integrate with CardRenderer
   - Updated `CardRenderer.tsx` to trigger edit mode on double-click
-  - Added edit mode visual indicators (blue border, overlay background, "Editing" badge)
+  - **Fixed: Added `enableInlineEdit={true}` prop to CardRenderer in CardLayer.tsx**
+  - **Fixed: Created `EditorOverlay.tsx` component that renders editors as DOM portals outside Konva canvas**
+  - **Fixed: Wired specialized editor components (TextEditor, CodeEditor, LinkEditor, ImageEditor) to EditorOverlay based on card type**
+  - **Architecture Fix: Moved from EditModeManager wrapper (incompatible with Konva) to portal-based overlay rendering**
+  - Added edit mode visual indicators ("Editing" badge, backdrop overlay)
   - Disabled drag operations during editing
   - Handled edit mode conflicts with selection and other interactions
   - Created comprehensive test suite with 21 tests
@@ -119,6 +123,12 @@ Implement inline editing functionality for cards on the canvas, allowing users t
   - Error states for validation failures
   - Network error handling with retry options
   - Conflict resolution for concurrent edits (prepare for future collaboration)
+
+- [ ] Task 4.4: Implement auto-enter edit mode for newly created cards
+  - Integrate with `useCardCreation` hook's `autoEnterEditMode` parameter
+  - Automatically open editor overlay after card creation completes
+  - Handle transition from card creation to edit mode smoothly
+  - Ensure proper focus management when auto-entering edit mode
 
 ## Dependencies and Prerequisites
 
