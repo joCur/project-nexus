@@ -218,15 +218,18 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
   }, [editingCardId, cardsData]);
 
   // Store original content when edit starts
+  // Dependencies: editingCardId (not editingCard or originalContent) to ensure fresh state each time
   useEffect(() => {
-    if (editingCard && !originalContent) {
+    if (editingCard) {
       setOriginalContent(editingCard.content);
-    } else if (!editingCard) {
+      setSaveError(null);
+      setIsSaving(false);
+    } else if (editingCardId === null) {
       setOriginalContent(null);
       setSaveError(null);
       setIsSaving(false);
     }
-  }, [editingCard, originalContent]);
+  }, [editingCardId, editingCard]);
 
   /**
    * Save changes and exit edit mode
@@ -239,12 +242,43 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
 
     if (enableServerPersistence) {
       try {
-        // Persist to server
+        // Transform frontend CardContent to backend format
+        const content = newContent as CardContent;
+        let backendContent: string = '';
+        let backendMetadata: Record<string, any> = {};
+
+        switch (content.type) {
+          case 'text':
+            backendContent = content.content;
+            break;
+          case 'code':
+            backendContent = content.content;
+            backendMetadata = {
+              language: content.language,
+              filename: content.filename
+            };
+            break;
+          case 'link':
+            backendContent = content.url;
+            backendMetadata = {
+              description: content.description,
+              domain: content.domain,
+              favicon: content.favicon,
+              previewImage: content.previewImage
+            };
+            break;
+          case 'image':
+            backendContent = content.url;
+            break;
+        }
+
+        // Persist to server with backend format
         const updatePayload = {
           id: editingCardId,
           updates: {
-            content: newContent as CardContent
-          } as Partial<Card>
+            content: backendContent,
+            ...(Object.keys(backendMetadata).length > 0 && { metadata: backendMetadata })
+          }
         };
 
         const success = await updateCardOnServer(updatePayload);
@@ -291,10 +325,7 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
   const renderEditor = useCallback(() => {
     if (!editingCard) return null;
 
-    console.log('[EditorOverlay] Rendering editor for card type:', editingCard.content.type, editingCard);
-
     if (isTextCard(editingCard)) {
-      console.log('[EditorOverlay] Rendering TextEditor');
       return (
         <TextEditor
           card={editingCard as TextCard}
@@ -305,7 +336,6 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
       );
     }
     if (isCodeCard(editingCard)) {
-      console.log('[EditorOverlay] Rendering CodeEditor');
       return (
         <CodeEditor
           card={editingCard as CodeCard}
@@ -316,7 +346,6 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
       );
     }
     if (isLinkCard(editingCard)) {
-      console.log('[EditorOverlay] Rendering LinkEditor');
       const linkCard = editingCard as LinkCard;
       return (
         <LinkEditor
@@ -339,7 +368,6 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
       );
     }
     if (isImageCard(editingCard)) {
-      console.log('[EditorOverlay] Rendering ImageEditor');
       const imageCard = editingCard as ImageCard;
       return (
         <ImageEditor
@@ -362,8 +390,6 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
         />
       );
     }
-
-    console.log('[EditorOverlay] Falling back to TextEditor for unknown type');
 
     // Default to text editor for unknown types (type assertion for fallback)
     return (

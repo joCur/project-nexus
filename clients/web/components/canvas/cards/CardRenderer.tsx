@@ -5,7 +5,7 @@
  * handles selection states, drag operations, resize handles, and edit mode.
  */
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useEffect } from 'react';
 import { Group } from 'react-konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type {
@@ -80,7 +80,16 @@ export const CardRenderer = React.memo<CardRendererProps>(({
   } = useCardStore();
 
   // Use the edit mode hook from EditModeManager
-  const { editState, startEdit } = useEditMode();
+  const { editState, startEdit, endEdit } = useEditMode();
+
+  // Sync edit state: when cardStore's editingCardId changes away from this card, end local edit mode
+  const editingCardIdFromStore = useCardStore(state => state.editingCardId);
+  useEffect(() => {
+    // If this card was being edited but is no longer in the store's edit state, end edit mode
+    if (editState.isEditing && editState.editingCardId === card.id && editingCardIdFromStore !== card.id) {
+      endEdit();
+    }
+  }, [editingCardIdFromStore, card.id, editState.isEditing, editState.editingCardId, endEdit]);
 
   // State for managing local edit mode
   // const [isLocallyEditing, setIsLocallyEditing] = useState(false); // Will be used when full edit state coordination is implemented
