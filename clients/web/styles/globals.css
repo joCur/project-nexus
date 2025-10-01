@@ -321,6 +321,63 @@
     padding-left: var(--spacing-4);
     padding-right: var(--spacing-4);
   }
+
+  /* Enhanced focus indicators for accessibility - WCAG 2.1 compliant */
+  .focus-visible\:ring-2:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px #fff, 0 0 0 4px #2563EB;
+  }
+
+  .focus-visible\:ring-4:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 4px #fff, 0 0 0 8px #2563EB;
+  }
+
+  /* High contrast mode support for inline editing */
+  .high-contrast {
+    --focus-ring-width: 4px;
+    --focus-ring-color: #000;
+  }
+
+  @media (prefers-contrast: high) {
+    .high-contrast\:bg-black {
+      background-color: #000 !important;
+    }
+
+    .high-contrast\:bg-white {
+      background-color: #fff !important;
+    }
+
+    .high-contrast\:text-white {
+      color: #fff !important;
+    }
+
+    .high-contrast\:text-black {
+      color: #000 !important;
+    }
+
+    .high-contrast\:border-2 {
+      border-width: 2px !important;
+    }
+
+    .high-contrast\:border-white {
+      border-color: #fff !important;
+    }
+
+    .high-contrast\:border-black {
+      border-color: #000 !important;
+    }
+
+    .high-contrast\:ring-4 {
+      box-shadow: 0 0 0 4px #000 !important;
+    }
+  }
+
+  /* Reduced motion utilities */
+  .motion-reduce {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* Keyframes for animations with design tokens */

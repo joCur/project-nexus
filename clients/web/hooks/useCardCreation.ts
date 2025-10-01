@@ -10,6 +10,7 @@ import { useCallback, useState } from 'react';
 import { useMutation } from '@apollo/client';
 import DOMPurify from 'dompurify';
 import { useCanvasStore } from '@/stores/canvasStore';
+import { useCardStore } from '@/stores/cardStore';
 import { CREATE_CARD, GET_CARDS } from '@/lib/graphql/cardOperations';
 import type {
   CreateCardMutationVariables,
@@ -18,7 +19,7 @@ import type {
 import type {
   CardType
 } from '@/types/card.types';
-import { DEFAULT_CARD_DIMENSIONS } from '@/types/card.types';
+import { DEFAULT_CARD_DIMENSIONS, createCardId } from '@/types/card.types';
 import type { CanvasPosition } from '@/types/canvas.types';
 import type { Position } from '@/types/common.types';
 
@@ -134,6 +135,25 @@ export const useCardCreation = (config: CardCreationConfig): UseCardCreationRetu
   // Store hooks
   const canvasStore = useCanvasStore();
   const { viewport } = canvasStore;
+  const { setEditingCard } = useCardStore();
+
+  /**
+   * Transition duration for modal animations in milliseconds
+   * This should match the editTransitionConfig duration in @/utils/canvas/editAnimations
+   */
+  const MODAL_TRANSITION_DURATION = 150;
+
+  /**
+   * Helper function to auto-enter edit mode after card creation
+   * Waits for modal close animation before opening editor overlay
+   */
+  const autoEnterEditModeIfEnabled = useCallback(async (cardId: string): Promise<void> => {
+    if (!autoEnterEditMode || !cardId) return;
+
+    // Wait for modal close animation to complete for smooth transition
+    await new Promise(resolve => setTimeout(resolve, MODAL_TRANSITION_DURATION));
+    setEditingCard(createCardId(cardId));
+  }, [autoEnterEditMode, setEditingCard]);
 
   // Apollo mutation
   const [createCardMutation, { loading: isCreatingMutation }] = useMutation<
@@ -339,10 +359,8 @@ export const useCardCreation = (config: CardCreationConfig): UseCardCreationRetu
         contextMenuPosition: null,
       }));
 
-      // TODO: Integrate with NEX-193 to auto-enter edit mode
-      if (autoEnterEditMode) {
-        // Auto-enter edit mode will be implemented in NEX-193
-      }
+      // Auto-enter edit mode if enabled
+      await autoEnterEditModeIfEnabled(createdCard.id);
 
       return createdCard.id;
     } catch (error) {
@@ -352,7 +370,7 @@ export const useCardCreation = (config: CardCreationConfig): UseCardCreationRetu
       }));
       return null;
     }
-  }, [state, workspaceId, createCardMutation, autoEnterEditMode]);
+  }, [state, workspaceId, createCardMutation, autoEnterEditModeIfEnabled]);
 
   /**
    * Create card of specific type at position
@@ -393,10 +411,8 @@ export const useCardCreation = (config: CardCreationConfig): UseCardCreationRetu
       // Apollo automatically updates the cache with the new card
       // No need to manually add to local store - GraphQL queries will fetch updated data
 
-      // TODO: Integrate with NEX-193 to auto-enter edit mode
-      if (autoEnterEditMode) {
-        // Auto-enter edit mode will be implemented in NEX-193
-      }
+      // Auto-enter edit mode if enabled
+      await autoEnterEditModeIfEnabled(createdCard.id);
 
       return createdCard.id;
     } catch (error) {
@@ -406,7 +422,7 @@ export const useCardCreation = (config: CardCreationConfig): UseCardCreationRetu
       }));
       return null;
     }
-  }, [workspaceId, createCardMutation, autoEnterEditMode]);
+  }, [workspaceId, createCardMutation, autoEnterEditModeIfEnabled]);
 
   return {
     state: {

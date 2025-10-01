@@ -2,6 +2,18 @@
   "extends": ["next/core-web-vitals", "next/typescript"],
   "rules": {
     "@typescript-eslint/no-unused-vars": "error",
-    "@typescript-eslint/no-explicit-any": "warn"
+    "@typescript-eslint/no-explicit-any": "warn",
+    "@typescript-eslint/prefer-enum-initializers": "error",
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "TSTypeAliasDeclaration > TSUnionType > TSLiteralType[literal.type='Literal']",
+        "message": "Use TypeScript enum with lowercase string values instead of string literal unions. See architecture-guide.md Section 4: Enum Type Standardization. Example: enum Status { IDLE = 'idle', SAVING = 'saving' }"
+      },
+      {
+        "selector": "VariableDeclarator[id.typeAnnotation.typeAnnotation.type='TSUnionType'] > TSUnionType > TSLiteralType[literal.type='Literal']",
+        "message": "Use TypeScript enum instead of inline string literal union types. See architecture-guide.md Section 4: Enum Type Standardization"
+      }
+    ]
   }
 }

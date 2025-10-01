@@ -12,9 +12,19 @@ You are tasked with implementing a plan Step-by-Step in an organized and methodi
 
 1\. \*\*Load the Plan\*\*: First, look for the plan and read it
 
-2\. \*\*Set Up Tracking\*\*: Use the TodoWrite tool to create a todo list based on the plan's implementation tasks
+2\. \*\*Architecture Compliance Review\*\*: Before implementation, reference `.claude/workflows/architecture-compliance.md` and:
 
-3\. \*\*Implement Step-by-Step\*\*: Work through each task systematically:
+&nbsp;   - Review relevant sections of `project-documentation/architecture-guide.md`
+
+&nbsp;   - Verify enum standardization requirements (Section 4: use TypeScript enums with lowercase values)
+
+&nbsp;   - Plan state management approach (Apollo vs Zustand)
+
+&nbsp;   - Add "Run architecture compliance verification" as final todo task
+
+3\. \*\*Set Up Tracking\*\*: Use the TodoWrite tool to create a todo list based on the plan's implementation tasks
+
+4\. \*\*Implement Step-by-Step\*\*: Work through each task systematically:
 
 &nbsp;   - Mark current task as in\_progress
 
@@ -26,7 +36,19 @@ You are tasked with implementing a plan Step-by-Step in an organized and methodi
 
 &nbsp;   - Mark task as completed before moving to next
 
-4\. \*\*Validate Progress\*\*: After each major task, ensure the implementation works as expected
+5\. \*\*Validate Progress\*\*: After each major task, ensure the implementation works as expected
+
+6\. \*\*Architecture Compliance Verification\*\*: Before marking implementation complete:
+
+&nbsp;   - Run all quality gates: `npm run type-check && npm run lint && npm test`
+
+&nbsp;   - Verify enum standardization compliance (no string literal unions)
+
+&nbsp;   - Check state management follows guide (server data in Apollo, UI state in Zustand)
+
+&nbsp;   - Confirm error handling uses structured logging (no console.log)
+
+&nbsp;   - Reference Architecture Compliance Checklist in `architecture-guide.md`
 
 
 
@@ -77,6 +99,16 @@ You are tasked with implementing a plan Step-by-Step in an organized and methodi
 \- Follow existing code patterns and conventions
 
 \- Ensure proper error handling and edge case coverage
+
+\- \*\*Architecture Compliance\*\*: All implementations must conform to standards in `project-documentation/architecture-guide.md`:
+
+&nbsp;   - Use TypeScript enums with lowercase values (Section 4)
+
+&nbsp;   - Follow state management strategy (Section 2)
+
+&nbsp;   - Implement proper error handling (Section 3)
+
+&nbsp;   - Reference `.claude/workflows/architecture-compliance.md` for detailed checklist
 
 
 

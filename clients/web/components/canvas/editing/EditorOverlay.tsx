@@ -13,7 +13,7 @@
  * - Editor appears as DOM overlay positioned over the card
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useQuery } from '@apollo/client';
@@ -21,7 +21,7 @@ import { useCardStore } from '@/stores/cardStore';
 import { useCardOperations } from '@/hooks/useCardOperations';
 import { useWorkspacePermissionContextSafe } from '@/contexts/WorkspacePermissionContext';
 import type { Card, CardContent, TextCard, CodeCard, LinkCard, ImageCard } from '@/types/card.types';
-import { GET_CARDS_IN_BOUNDS } from '@/lib/graphql/cardOperations';
+import { GET_CARDS_IN_BOUNDS, type CardResponse } from '@/lib/graphql/cardOperations';
 import {
   TextEditor,
   CodeEditor,
@@ -29,22 +29,18 @@ import {
   ImageEditor} from './index';
 import { isTextCard, isCodeCard, isLinkCard, isImageCard } from '@/types/card.types';
 import { createContextLogger } from '@/utils/logger';
+import {
+  overlayVariants,
+  editTransitionConfig,
+  editorContentVariants} from '@/utils/canvas/editAnimations';
+import { SaveStatusIndicator, SaveStatus } from './SaveStatusIndicator';
+import {
+  announceEditModeEntered,
+  announceEditModeExited,
+  announceSaveStatus
+} from '@/utils/accessibility/announcements';
 
 const logger = createContextLogger({ component: 'EditorOverlay' });
-
-/**
- * Default transition animations for edit overlay
- */
-const overlayTransition = {
-  initial: { opacity: 0, scale: 0.95 },
-  animate: { opacity: 1, scale: 1 },
-  exit: { opacity: 0, scale: 0.95 }
-};
-
-const transitionConfig = {
-  duration: 0.15,
-  ease: 'easeInOut' as const
-};
 
 interface EditorOverlayProps {
   /** Workspace ID for server operations */
@@ -83,14 +79,20 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
   const { updateCard: updateCardOnServer } = useCardOperations(currentWorkspaceId);
 
   // Local state for save/error handling
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>(SaveStatus.IDLE);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [originalContent, setOriginalContent] = useState<unknown>(null);
+  const [, setOriginalContent] = useState<CardContent | null>(null);
+
+  // Accessibility state
+  const [highContrastMode, setHighContrastMode] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
 
   // Get the card being edited from GraphQL data
   const editingCard = useMemo((): Card | null => {
     if (!editingCardId || !cardsData?.cardsInBounds) return null;
-    const backendCard = cardsData.cardsInBounds.find((c: any) => c.id === editingCardId);
+    const backendCard = cardsData.cardsInBounds.find((c: CardResponse) => c.id === editingCardId);
     if (!backendCard) return null;
 
     // Transform backend card to frontend Card type using same logic as CardLayer
@@ -223,29 +225,128 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
     if (editingCard) {
       setOriginalContent(editingCard.content);
       setSaveError(null);
-      setIsSaving(false);
+      setSaveStatus(SaveStatus.IDLE);
     } else if (editingCardId === null) {
       setOriginalContent(null);
       setSaveError(null);
-      setIsSaving(false);
+      setSaveStatus(SaveStatus.IDLE);
     }
   }, [editingCardId, editingCard]);
+
+  // Detect high contrast mode
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-contrast: high)');
+    setHighContrastMode(mediaQuery.matches);
+
+    const handleChange = (e: MediaQueryListEvent): void => {
+      setHighContrastMode(e.matches);
+    };
+
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
+  // Detect reduced motion preference
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setReducedMotion(mediaQuery.matches);
+
+    const handleChange = (e: MediaQueryListEvent): void => {
+      setReducedMotion(e.matches);
+    };
+
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
+  // Screen reader announcements for edit mode
+  useEffect(() => {
+    if (editingCard) {
+      // Announce edit mode entered
+      announceEditModeEntered(editingCard.content.type);
+    } else if (editingCardId === null && previousFocusRef.current) {
+      // Announce edit mode exited
+      announceEditModeExited();
+    }
+  }, [editingCard, editingCardId]);
+
+  // Announce save status changes
+  useEffect(() => {
+    if (saveStatus === SaveStatus.SAVING) {
+      announceSaveStatus('saving');
+    } else if (saveStatus === SaveStatus.SUCCESS) {
+      announceSaveStatus('success');
+    } else if (saveStatus === SaveStatus.ERROR) {
+      announceSaveStatus('error');
+    }
+  }, [saveStatus]);
+
+  // Focus management - save previous focus and restore on close
+  useEffect(() => {
+    if (editingCard) {
+      // Save currently focused element
+      previousFocusRef.current = document.activeElement as HTMLElement;
+    } else if (editingCardId === null && previousFocusRef.current) {
+      // Restore focus when closing
+      previousFocusRef.current.focus();
+      previousFocusRef.current = null;
+    }
+  }, [editingCard, editingCardId]);
+
+  // Focus trap - keep focus within dialog
+  useEffect(() => {
+    if (!dialogRef.current || !editingCard) return;
+
+    const dialog = dialogRef.current;
+    const focusableElements = dialog.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+
+    if (focusableElements.length === 0) return;
+
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+
+    // Focus first element
+    firstElement.focus();
+
+    const handleTabKey = (e: KeyboardEvent): void => {
+      if (e.key !== 'Tab') return;
+
+      if (e.shiftKey) {
+        // Shift + Tab
+        if (document.activeElement === firstElement) {
+          e.preventDefault();
+          lastElement.focus();
+        }
+      } else {
+        // Tab
+        if (document.activeElement === lastElement) {
+          e.preventDefault();
+          firstElement.focus();
+        }
+      }
+    };
+
+    dialog.addEventListener('keydown', handleTabKey);
+    return () => dialog.removeEventListener('keydown', handleTabKey);
+  }, [editingCard]);
 
   /**
    * Save changes and exit edit mode
    */
-  const handleSave = useCallback(async (newContent: unknown): Promise<void> => {
+  const handleSave = useCallback(async (newContent: CardContent): Promise<void> => {
     if (!editingCard || !editingCardId) return;
 
-    setIsSaving(true);
+    setSaveStatus(SaveStatus.SAVING);
     setSaveError(null);
 
     if (enableServerPersistence) {
       try {
         // Transform frontend CardContent to backend format
-        const content = newContent as CardContent;
+        const content = newContent;
         let backendContent: string = '';
-        let backendMetadata: Record<string, any> = {};
+        let backendMetadata: Record<string, unknown> = {};
 
         let backendTitle: string | undefined;
 
@@ -281,7 +382,7 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
         }
 
         // Persist to server with backend format
-        const updates: Record<string, any> = {
+        const updates: Record<string, unknown> = {
           content: backendContent
         };
 
@@ -304,7 +405,11 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
           throw new Error('Failed to save changes to server');
         }
 
-        // Success - clear edit state
+        // Success - show success state briefly before closing
+        setSaveStatus(SaveStatus.SUCCESS);
+        await new Promise(resolve => setTimeout(resolve, 800)); // Show success for 800ms
+
+        // Clear edit state
         clearEditingCard();
       } catch (error) {
         // Rollback on failure
@@ -314,16 +419,16 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
           context: { enableServerPersistence }
         });
         setSaveError('Failed to save changes');
-        setIsSaving(false);
+        setSaveStatus(SaveStatus.ERROR);
         // Keep editor open for retry
         return;
       }
     } else {
       // No server persistence - just update local state
+      setSaveStatus(SaveStatus.SUCCESS);
+      await new Promise(resolve => setTimeout(resolve, 500)); // Brief success feedback
       clearEditingCard();
     }
-
-    setIsSaving(false);
   }, [editingCard, editingCardId, enableServerPersistence, updateCardOnServer, clearEditingCard]);
 
   /**
@@ -332,7 +437,7 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
   const handleCancel = useCallback((): void => {
     clearEditingCard();
     setSaveError(null);
-    setIsSaving(false);
+    setSaveStatus(SaveStatus.IDLE);
     setOriginalContent(null);
   }, [clearEditingCard]);
 
@@ -424,10 +529,13 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
 
   const overlay = (
     <AnimatePresence mode="wait">
+      {/* Backdrop */}
       <motion.div
         key={`editor-${editingCardId}`}
-        {...overlayTransition}
-        transition={transitionConfig}
+        initial={overlayVariants.initial}
+        animate={overlayVariants.animate}
+        exit={overlayVariants.exit}
+        transition={reducedMotion ? { duration: 0.01 } : editTransitionConfig}
         className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50 backdrop-blur-sm"
         onClick={(e) => {
           // Close on backdrop click
@@ -435,32 +543,89 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
             handleCancel();
           }
         }}
+        role="presentation"
+        aria-hidden="true"
+        data-testid="editor-backdrop"
       >
-        <div className="relative w-full max-w-2xl flex flex-col">
+        {/* Dialog */}
+        <motion.div
+          ref={dialogRef}
+          initial={editorContentVariants.initial}
+          animate={editorContentVariants.animate}
+          exit={editorContentVariants.exit}
+          transition={reducedMotion ? { duration: 0.01 } : undefined}
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Edit ${editingCard.content.type} card`}
+          aria-describedby="editor-description"
+          data-focus-trap="true"
+          className={`relative w-full max-w-2xl flex flex-col ${
+            highContrastMode ? 'high-contrast' : ''
+          } ${reducedMotion ? 'motion-reduce' : ''}`}
+        >
+          {/* Hidden description for screen readers */}
+          <div id="editor-description" className="sr-only">
+            Editing {editingCard.content.type} card. Press Escape to cancel. Press Ctrl+S or Ctrl+Enter to save.
+          </div>
+
+          {/* Save status announcement region */}
+          <div
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            aria-label="save status"
+            className="sr-only"
+          >
+            {saveStatus === SaveStatus.SAVING && 'Saving changes'}
+            {saveStatus === SaveStatus.SUCCESS && 'Changes saved successfully'}
+            {saveStatus === SaveStatus.ERROR && `Failed to save changes${saveError ? ': ' + saveError : ''}`}
+          </div>
+
+          {/* Edit mode announcement region */}
+          <div
+            role="status"
+            aria-live="polite"
+            aria-label="edit mode"
+            className="sr-only"
+          >
+            Edit mode entered for {editingCard.content.type} card
+          </div>
+
           {/* Status bar - above the editor */}
-          <div className="flex items-center justify-between px-4 py-2 bg-gray-800 text-white rounded-t-lg">
-            <div className="flex items-center gap-2 text-xs">
-              <span className="inline-block w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              {isSaving ? 'Saving...' : 'Editing'}
-            </div>
-            {saveError && (
-              <div className="flex items-center gap-2 text-xs text-red-300">
-                <span className="inline-block w-2 h-2 bg-red-500 rounded-full" />
-                {saveError}
+          <div
+            className={`flex items-center justify-between px-4 py-2 bg-gray-800 text-white rounded-t-lg ${
+              highContrastMode ? 'high-contrast:bg-black high-contrast:text-white high-contrast:border-2 high-contrast:border-white' : ''
+            }`}
+            id="editor-status-bar"
+          >
+            <SaveStatusIndicator
+              status={saveStatus}
+              errorMessage={saveError || undefined}
+              className="text-white"
+            />
+            {saveStatus === SaveStatus.IDLE && (
+              <div className="flex items-center gap-2 text-xs">
+                <span
+                  className="inline-block w-2 h-2 bg-green-500 rounded-full animate-pulse"
+                  aria-hidden="true"
+                />
+                Editing
               </div>
             )}
           </div>
 
           {/* Editor content */}
-          <motion.div
-            className="relative bg-white rounded-b-lg shadow-xl overflow-hidden max-h-[calc(80vh-2rem)]"
+          <div
+            className={`relative bg-white rounded-b-lg shadow-xl overflow-hidden max-h-[calc(80vh-2rem)] ${
+              highContrastMode ? 'high-contrast:bg-white high-contrast:text-black high-contrast:border-2 high-contrast:border-black' : ''
+            }`}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="overflow-y-auto max-h-[calc(80vh-2rem)]">
               {renderEditor()}
             </div>
-          </motion.div>
-        </div>
+          </div>
+        </motion.div>
       </motion.div>
     </AnimatePresence>
   );

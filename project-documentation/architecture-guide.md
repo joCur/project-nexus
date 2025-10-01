@@ -2733,6 +2733,164 @@ export interface CardResponse {
 
 ---
 
+## Architecture Compliance Checklist
+
+This checklist ensures all implementations follow the architecture guide standards. Use this before marking any task as complete or creating a pull request.
+
+### Section 1: Data Flow Architecture
+
+- [ ] Server data flows through Apollo Client cache only
+- [ ] UI state flows through Zustand stores only
+- [ ] No server data stored in Zustand stores (Section 1)
+- [ ] No UI state stored in Apollo cache (Section 1)
+- [ ] All database operations go through service layer (Section 1)
+- [ ] Unidirectional data flow maintained (Section 1)
+
+### Section 2: State Management Strategy
+
+- [ ] Apollo Client used for all persistent data (cards, workspaces, users) (Section 2)
+- [ ] Zustand used only for transient UI state (selection, modals, drag state) (Section 2)
+- [ ] No data duplication between Apollo and Zustand (Section 2)
+- [ ] Cache updates implemented for all mutations (Section 2)
+- [ ] Proper cache policies applied (`cache-and-network` for collaborative data) (Section 9)
+
+### Section 3: Error Handling Standards
+
+- [ ] All service methods use try-catch with proper logging (Section 3)
+- [ ] Zod schemas validate all inputs (Section 3)
+- [ ] ValidationError thrown for invalid inputs (Section 3)
+- [ ] Structured logging with context (no console.log) (Section 3)
+- [ ] Errors logged with full context before re-throwing (Section 3)
+- [ ] Frontend mutations have onError handlers (Section 3)
+
+### Section 4: Enum Type Standardization (CRITICAL)
+
+- [ ] **All enum values are lowercase strings** (Section 4)
+- [ ] **TypeScript enums used instead of string literal unions** (Section 4)
+- [ ] **Database stores lowercase enum values** (Section 4)
+- [ ] **GraphQL schema uses lowercase enum values** (Section 4)
+- [ ] **Frontend uses enum constants (e.g., `WorkspacePrivacy.PRIVATE`)** (Section 4)
+- [ ] **Backend uses enum constants (e.g., `CardType.TEXT`)** (Section 4)
+- [ ] **Zod schemas use `z.nativeEnum(EnumName)`** (Section 4)
+- [ ] **No string literals like `'PRIVATE'` or `'Private'` in code** (Section 4)
+
+### Section 5: API Design Patterns
+
+- [ ] GraphQL queries/mutations properly typed (Section 5)
+- [ ] Resolvers delegate to service layer (Section 5)
+- [ ] No business logic in resolvers (Section 5)
+- [ ] Input types defined for all mutations (Section 5)
+- [ ] Authentication validated in all resolvers (Section 5)
+
+### Section 6: Backend Service Layer Pattern
+
+- [ ] Service class follows template structure (Section 6)
+- [ ] Input validation with Zod schemas (Section 6)
+- [ ] Comprehensive error handling and logging (Section 6)
+- [ ] Database operations through Knex query builder (Section 6)
+- [ ] Transactions used for multi-step operations (Section 6)
+- [ ] Data mapping between DB and domain models (Section 6)
+
+### Section 7: Frontend Hook Pattern
+
+- [ ] Hooks follow template structure (Section 7)
+- [ ] Clear separation of UI state vs server operations (Section 7)
+- [ ] Memoized callbacks with useCallback (Section 7)
+- [ ] Apollo cache updates in mutation handlers (Section 7)
+- [ ] Error handling with state updates (Section 7)
+- [ ] Proper dependency arrays for hooks (Section 7)
+
+### Section 8: Frontend Store Pattern
+
+- [ ] Store contains UI state only (Section 8)
+- [ ] Immutable state updates (Section 8)
+- [ ] Proper Set/Map serialization in persist (Section 8)
+- [ ] DevTools integration enabled (Section 8)
+- [ ] TypeScript types for all state (Section 8)
+
+### Section 9: Testing Patterns
+
+- [ ] Tests written BEFORE implementation (TDD approach) (Section 9)
+- [ ] All existing tests pass after changes (Section 9)
+- [ ] MockedProvider added when using Apollo hooks (Section 9)
+- [ ] Test wrappers provide all required contexts (Section 9)
+- [ ] Component context requirements documented with @requires (Section 9)
+- [ ] Integration tests cover critical paths (Section 9)
+
+### Section 10: Performance Guidelines
+
+- [ ] Database queries use proper indexes (Section 9)
+- [ ] Expensive calculations memoized with useMemo (Section 9)
+- [ ] Callbacks memoized with useCallback (Section 9)
+- [ ] Apollo cache policies match data type (Section 9)
+- [ ] React.memo used for expensive renders (Section 9)
+- [ ] Canvas rendering optimized for Konva.js (Section 9)
+
+### Section 11: Code Quality Standards
+
+- [ ] `npm run type-check` passes with zero errors (Section 6.4)
+- [ ] `npm run lint` passes with zero errors (Section 6.4)
+- [ ] `npm test` passes all tests (Section 6.4)
+- [ ] No `any` types in new code (Section 6.4)
+- [ ] No `console.log` - use logger instead (Section 6.4)
+- [ ] Explicit return types on all functions (Section 6.4)
+- [ ] Proper variable declarations (const/let, no var) (Section 6.4)
+
+### Section 12: Common Anti-Patterns to Avoid
+
+- [ ] Server data NOT stored in Zustand (Section 10)
+- [ ] No direct database access in resolvers (Section 10)
+- [ ] No missing input validation (Section 10)
+- [ ] No swallowed errors (Section 10)
+- [ ] No inconsistent enum usage (Section 10)
+- [ ] No localStorage for server data (Section 10)
+
+### Pre-Commit Checklist
+
+Run these commands before every commit:
+
+```bash
+# TypeScript compilation
+npm run type-check
+
+# Linting
+npm run lint
+
+# Tests
+npm test
+
+# All quality gates
+npm run type-check && npm run lint && npm test
+```
+
+### Pull Request Checklist
+
+Before creating a PR, verify:
+
+- [ ] All checkboxes above are checked for modified code
+- [ ] Linear ticket updated with implementation summary
+- [ ] Breaking changes documented in PR description
+- [ ] Test coverage for new features
+- [ ] Architecture guide followed for all new code
+- [ ] No regressions in existing functionality
+
+### Quick Reference: Section Numbers
+
+- Section 1: Data Flow Architecture
+- Section 2: State Management Strategy
+- Section 3: Error Handling Standards
+- Section 4: Enum Type Standardization
+- Section 5: API Design Patterns
+- Section 6: Backend Service Layer Pattern
+- Section 7: Frontend Hook Pattern
+- Section 8: Frontend Store Pattern
+- Section 9: Testing Patterns & Performance Guidelines
+- Section 10: Common Anti-Patterns
+- Section 11: Code Quality Standards (6.4 in Development Workflow)
+- Section 12: Common Anti-Patterns
+
+---
+
 ## Conclusion
 
 This living architecture guide reflects the **current working state** of Project Nexus and provides practical guidelines for maintaining consistency as the codebase grows. The patterns documented here are proven to work in the current implementation and should be followed for new development.
@@ -2745,6 +2903,7 @@ This living architecture guide reflects the **current working state** of Project
 4. **Handle Errors Properly**: Comprehensive error handling and logging
 5. **Test Systematically**: Follow established testing patterns
 6. **Monitor Performance**: Use established optimization patterns
+7. **Use the Compliance Checklist**: Verify adherence before marking tasks complete
 
 **Next Steps**:
 
@@ -2752,5 +2911,6 @@ This living architecture guide reflects the **current working state** of Project
 - Add new ADRs for significant architectural decisions
 - Refactor inconsistent code to match established patterns
 - Create additional templates for common scenarios
+- Use the Architecture Compliance Checklist for all new development
 
 This guide should be the **authoritative reference** for all architectural decisions and implementation patterns in Project Nexus.
