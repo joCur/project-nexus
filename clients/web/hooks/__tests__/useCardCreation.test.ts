@@ -845,34 +845,4 @@ describe('useCardCreation', () => {
       });
     });
   });
-
-  describe('Apollo Cache Synchronization', () => {
-    /**
-     * NOTE: The cache update logic is implemented in useCardCreation.ts lines 167-254
-     * It updates both GET_CARDS and GET_CARDS_IN_BOUNDS (when card is within viewport).
-     *
-     * Testing Apollo cache updates requires complex mocking of the Apollo Client cache API.
-     * The implementation has been verified to work correctly in the actual application.
-     *
-     * Implementation details:
-     * 1. Always updates GET_CARDS cache (existing behavior)
-     * 2. Calculates current viewport bounds using viewport position, zoom, and dimensions
-     * 3. Checks if new card position is within calculated bounds
-     * 4. If within bounds, updates GET_CARDS_IN_BOUNDS cache
-     * 5. Uses proper error handling with try-catch for resilience
-     */
-    describe('GET_CARDS_IN_BOUNDS cache update', () => {
-      // Skipping complex Apollo cache mocking tests
-      // The implementation works correctly in production
-      it.skip('should update GET_CARDS_IN_BOUNDS cache when card is created within viewport bounds', () => {
-        // Implementation verified manually in development environment
-        // Cache update logic is in useCardCreation.ts lines 202-252
-      });
-
-      it.skip('should still update GET_CARDS cache regardless of viewport bounds', () => {
-        // Implementation verified manually in development environment
-        // Cache update logic is in useCardCreation.ts lines 178-200
-      });
-    });
-  });
 });
