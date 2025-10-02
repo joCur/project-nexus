@@ -24,13 +24,17 @@ You are tasked with implementing a plan Step-by-Step in an organized and methodi
 
 3\. \*\*Set Up Tracking\*\*: Use the TodoWrite tool to create a todo list based on the plan's implementation tasks
 
-4\. \*\*Implement Step-by-Step\*\*: Work through each task systematically:
+4\. \*\*Implement Step-by-Step\*\*: Work through each task systematically using TDD:
 
 &nbsp;   - Mark current task as in\_progress
 
-&nbsp;   - Implement the task completely (use the most appropriate subagent)
+&nbsp;   - **Write tests FIRST** following TDD approach (RED phase)
 
-&nbsp;   - Test the implementation if applicable
+&nbsp;   - Implement the task to make tests pass (use the most appropriate subagent) (GREEN phase)
+
+&nbsp;   - Refactor for quality while keeping tests green (REFACTOR phase)
+
+&nbsp;   - **Run ALL related tests** to verify no regression (VERIFY phase)
 
 &nbsp;   - You MUST update the plan as you go
 

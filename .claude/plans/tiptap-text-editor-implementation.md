@@ -1,0 +1,287 @@
+# Tiptap v3 Text Editor Implementation for Project Nexus
+
+## Objective and Scope
+
+Implement a Notion-like WYSIWYG text editor using Tiptap v3 (open-source extensions only) for text cards in Project Nexus. The editor will support both edit mode (full interactive editing) and read-only mode (rendered content display) with seamless transitions. Content will be stored in a Tiptap-compatible JSON format in the database.
+
+**MVP Focus:**
+- Replace existing ContentEditable-based TextEditor with Tiptap v3
+- Implement core text editing features matching Notion's UX
+- Support edit/read-only mode switching
+- Store content as Tiptap JSON in database
+- Maintain existing card architecture and styling
+
+## Technical Approach and Reasoning
+
+**Why Tiptap v3:**
+- Modern WYSIWYG editor built on ProseMirror
+- JSON-based content storage (database-friendly)
+- Strong TypeScript support
+- Extensive open-source extension ecosystem
+- Active maintenance and community
+
+**Content Storage Strategy:**
+- Store Tiptap JSON format in `TextCardContent.content` field
+- JSON is portable, versionable, and can be rendered in read-only mode
+- Maintains compatibility with existing card types system
+- Easy to validate and transform
+
+**Architecture Decisions:**
+1. **Rework existing TextEditor.tsx** - Maintain component location and interface
+2. **Bubble menu for formatting** - Notion-like contextual editing
+3. **Read-only renderer** - Separate component for display mode
+4. **JSON content storage** - Database stores Tiptap's native JSON format
+5. **Progressive enhancement** - Start with core features, add advanced later
+
+## Implementation Phases
+
+### Phase 1: Core Tiptap Setup and Basic Editor
+- [ ] Install Tiptap v3 dependencies
+  - Install `@tiptap/react` and `@tiptap/pm` core packages
+  - Install `@tiptap/starter-kit` for basic extensions bundle
+  - Verify compatibility with existing React/Next.js setup
+
+- [ ] Update TypeScript types for content storage
+  - Modify `TextCardContent` interface to support Tiptap JSON
+  - Add type definitions for Tiptap JSON content structure
+  - Update validation schemas to handle JSON format
+  - Ensure backward compatibility with existing markdown content
+
+- [ ] Create base Tiptap editor component
+  - Replace ContentEditable implementation in `TextEditor.tsx`
+  - Configure Tiptap editor with StarterKit extensions
+  - Set up basic editor props (editable, content, onUpdate)
+  - Implement auto-focus behavior
+  - Add placeholder text support using `@tiptap/extension-placeholder`
+
+- [ ] Implement content initialization
+  - Load existing card content into editor
+  - Handle migration from markdown to Tiptap JSON (if needed)
+  - Set up proper content serialization/deserialization
+  - Test content persistence and retrieval
+
+### Phase 2: Text Formatting and Bubble Menu
+- [ ] Install and configure text formatting extensions
+  - Add `@tiptap/extension-bold` for bold formatting
+  - Add `@tiptap/extension-italic` for italic formatting
+  - Add `@tiptap/extension-underline` for underline formatting
+  - Add `@tiptap/extension-strike` for strikethrough
+  - Add `@tiptap/extension-code` for inline code
+  - Configure keyboard shortcuts (Cmd+B, Cmd+I, Cmd+U, etc.)
+
+- [ ] Build bubble menu component
+  - Install `@tiptap/extension-bubble-menu`
+  - Create `BubbleMenu.tsx` component with formatting buttons
+  - Implement button states (active/inactive based on selection)
+  - Add visual styling matching design system (colors, spacing, shadows)
+  - Position bubble menu near selected text
+  - Add tooltips for keyboard shortcuts
+
+- [ ] Implement link functionality
+  - Add `@tiptap/extension-link` for link support
+  - Create link editor popup in bubble menu
+  - Implement "Add Link" (Cmd+K) and "Remove Link" actions
+  - Configure link to open in new tab by default
+  - Style links according to design system
+
+- [ ] Add heading transformations
+  - Configure `@tiptap/extension-heading` for H1, H2, H3
+  - Add heading buttons to bubble menu or dropdown
+  - Implement heading styles matching design system typography
+  - Add keyboard shortcuts or slash commands for headings
+
+### Phase 3: Lists and Block Elements
+- [ ] Implement list extensions
+  - Add `@tiptap/extension-bullet-list` for bullet lists
+  - Add `@tiptap/extension-ordered-list` for numbered lists
+  - Add `@tiptap/extension-list-item` for list items
+  - Configure list indentation and nesting
+  - Add list toggle buttons to toolbar/menu
+
+- [ ] Add task list functionality
+  - Install `@tiptap/extension-task-list` and `@tiptap/extension-task-item`
+  - Style checkboxes to match design system
+  - Enable checkbox toggling in both edit and read-only modes
+  - Persist task completion state in Tiptap JSON
+  - Add "Turn into task list" option
+
+- [ ] Implement blockquote and code blocks
+  - Add `@tiptap/extension-blockquote` for quotes
+  - Add `@tiptap/extension-code-block` for code snippets
+  - Style blockquotes with left border and italic text
+  - Style code blocks with monospace font and background
+  - Add copy-to-clipboard button for code blocks
+  - Implement syntax highlighting (simple, without external library)
+
+- [ ] Add horizontal rule
+  - Add `@tiptap/extension-horizontal-rule` for dividers
+  - Style divider to match design system
+  - Add insertion via slash command or menu option
+
+### Phase 4: Read-Only Mode and Content Rendering
+- [ ] Create read-only content renderer
+  - Build `ReadOnlyEditor.tsx` component using Tiptap
+  - Configure editor as non-editable (`editable: false`)
+  - Remove all editing UI (bubble menu, placeholders)
+  - Enable link clicking in read-only mode
+  - Allow task checkbox interaction in read-only mode
+
+- [ ] Implement mode switching
+  - Add edit/read-only toggle to card component
+  - Handle smooth transitions between modes (200ms animation)
+  - Preserve content state during mode switches
+  - Add visual indicators for edit mode (border, focus state)
+  - Implement "double-click to edit" interaction
+
+- [ ] Optimize read-only rendering
+  - Lazy load editor only when entering edit mode
+  - Use lightweight rendering for read-only display
+  - Ensure fast initial page load
+  - Add loading skeleton for editor initialization
+
+### Phase 5: Content Persistence and Database Integration
+- [ ] Update GraphQL schema for JSON content
+  - Modify card content type to support JSONB storage
+  - Add migration for existing markdown content
+  - Update GraphQL resolvers to handle JSON content
+  - Implement content validation on server side
+
+- [ ] Implement autosave functionality
+  - Debounce content updates (1 second delay)
+  - Serialize Tiptap editor state to JSON
+  - Send updates to GraphQL mutation
+  - Handle save errors gracefully with retry logic
+  - Show save status indicator (saving/saved)
+
+- [ ] Add content validation
+  - Validate Tiptap JSON structure before saving
+  - Enforce character/word limits
+  - Sanitize content to prevent XSS
+  - Add error handling for invalid content
+
+### Phase 6: Slash Commands (Optional Enhancement)
+- [ ] Implement slash command menu
+  - Create slash command extension or use community extension
+  - Build `SlashCommandMenu.tsx` component
+  - Add commands for: headings, lists, blockquote, code, divider
+  - Position menu below cursor on "/" character
+  - Implement keyboard navigation (arrow keys, enter)
+  - Add command search/filtering
+
+- [ ] Style slash command menu
+  - Match design system colors and spacing
+  - Add icons for each command type
+  - Show command descriptions
+  - Implement hover and selected states
+
+### Phase 7: Polish, Accessibility, and Testing
+- [ ] Accessibility improvements
+  - Add ARIA labels to all interactive elements
+  - Ensure keyboard navigation works throughout
+  - Test with screen readers
+  - Implement focus management
+  - Add announcements for mode changes
+  - Verify WCAG 2.1 AA contrast ratios
+
+- [ ] Mobile responsiveness
+  - Adjust bubble menu for touch targets (40x40px minimum)
+  - Optimize toolbar for small screens
+  - Test touch interactions
+  - Implement mobile-specific shortcuts
+
+- [ ] Performance optimization
+  - Implement lazy loading for editor
+  - Optimize re-render performance
+  - Add memoization where needed
+  - Measure and optimize bundle size
+  - Test with large documents
+
+- [ ] Testing and quality assurance
+  - Write unit tests for editor component
+  - Test content serialization/deserialization
+  - Test mode switching and state persistence
+  - Test keyboard shortcuts
+  - Test save/load functionality
+  - Cross-browser compatibility testing
+  - Accessibility audit
+
+- [ ] Documentation
+  - Create Notion documentation for Tiptap integration
+  - Document component usage and props
+  - Add inline code comments with Notion links
+  - Document content migration strategy
+
+## Dependencies and Prerequisites
+
+**NPM Packages (Tiptap v3 Open Source):**
+```json
+{
+  "@tiptap/react": "^3.x",
+  "@tiptap/pm": "^3.x",
+  "@tiptap/starter-kit": "^3.x",
+  "@tiptap/extension-underline": "^3.x",
+  "@tiptap/extension-link": "^3.x",
+  "@tiptap/extension-task-list": "^3.x",
+  "@tiptap/extension-task-item": "^3.x",
+  "@tiptap/extension-placeholder": "^3.x",
+  "@tiptap/extension-bubble-menu": "^3.x"
+}
+```
+
+**Existing Components to Integrate:**
+- `BaseEditor` component architecture
+- Card type system (`TextCard`, `TextCardContent`)
+- Design system (colors, typography, spacing)
+- GraphQL mutations for card updates
+
+**Backend Requirements:**
+- Database schema update for JSON content storage
+- GraphQL resolver updates for JSON handling
+- Content validation and sanitization
+
+## Challenges and Considerations
+
+**Content Migration:**
+- Need strategy to migrate existing markdown content to Tiptap JSON
+- Could keep `markdown` boolean flag for backward compatibility
+- Implement converter to transform markdown to Tiptap JSON on first load
+
+**Bundle Size:**
+- Tiptap and extensions add significant bundle size
+- Mitigate with lazy loading and code splitting
+- Only load editor when entering edit mode
+- Tree-shake unused extensions
+
+**Performance:**
+- Large documents may impact editor performance
+- Implement virtualization if needed
+- Consider content length limits
+- Optimize re-renders with React.memo and useMemo
+
+**Type Safety:**
+- Tiptap JSON structure needs proper TypeScript types
+- Create comprehensive type definitions
+- Ensure type safety between frontend and backend
+
+**Mobile Experience:**
+- Touch interactions need careful consideration
+- Bubble menu positioning on mobile
+- Virtual keyboard handling
+- Consider simplified toolbar for mobile
+
+**Backward Compatibility:**
+- Existing cards with markdown content must still work
+- Need graceful migration path
+- Consider keeping old editor as fallback
+
+**Validation and Security:**
+- JSON content must be validated before storage
+- Prevent XSS attacks through content sanitization
+- Implement rate limiting for save operations
+- Validate content size limits
+
+**User Experience:**
+- Smooth transitions between edit/read-only modes
+- Clear visual feedback for save state
+- Intuitive keyboard shortcuts
+- Helpful error messages
