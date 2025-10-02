@@ -26,20 +26,30 @@ The key insight is that we don't need to query new cards on every single zoom/pa
 
 ## Implementation Phases
 
-### Phase 1: Add viewport bounds debouncing
-- [ ] Task 1.1: Create debounced viewport bounds state
+### Phase 1: Add viewport bounds debouncing ✅ COMPLETED
+- [x] Task 1.1: Create debounced viewport bounds state
   - Import `useRef` and create a debounce timer ref in CardLayer
   - Add a `debouncedViewportBounds` state separate from `currentViewportBounds`
   - Set debounce delay to 150ms for smooth UX (not too fast, not too slow)
-- [ ] Task 1.2: Implement debounce logic for viewport changes
+- [x] Task 1.2: Implement debounce logic for viewport changes
   - In the `currentViewportBounds` useMemo, calculate bounds immediately for rendering
   - Add a `useEffect` that watches `currentViewportBounds` changes
   - Clear existing timer and set new timer to update `debouncedViewportBounds` after 150ms
   - Cleanup timer on unmount
-- [ ] Task 1.3: Update GraphQL query to use debounced bounds
+- [x] Task 1.3: Update GraphQL query to use debounced bounds
   - Change `queryVariables` useMemo to depend on `debouncedViewportBounds` instead of `currentViewportBounds`
   - Keep `viewportPadding` generous (current value) to ensure cards don't disappear during debounce
   - This breaks the zoom/pan → query → rerender cycle
+
+**Implementation Summary:**
+- Added `useState` and `useEffect` imports to CardLayer.tsx
+- Created `debouncedViewportBounds` state initialized to `currentViewportBounds`
+- Added `timerRef` using `useRef<NodeJS.Timeout | null>(null)` to track debounce timer
+- Implemented `useEffect` that debounces viewport changes with 150ms delay
+- Updated `queryVariables` useMemo to use `debouncedViewportBounds` instead of `currentViewportBounds`
+- Timer cleanup on unmount properly implemented
+- All tests passing (37/37 tests across 3 test files)
+- TDD process followed: RED → GREEN → REFACTOR → VERIFY
 
 ### Phase 2: Stabilize card renderer memoization
 - [ ] Task 2.1: Fix cardRenderers useMemo dependencies

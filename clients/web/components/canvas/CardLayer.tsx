@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useRef, useCallback } from 'react';
+import React, { useMemo, useRef, useCallback, useState, useEffect } from 'react';
 import { Layer } from 'react-konva';
 import { useQuery, useMutation } from '@apollo/client';
 import type { KonvaEventObject } from 'konva/lib/Node';
@@ -103,7 +103,33 @@ export const CardLayer: React.FC<CardLayerProps> = ({
     };
   }, [viewportBounds, position.x, position.y, zoom, viewportPadding, viewportDimensions]);
 
-  // Prepare GraphQL variables
+  // Debounced viewport bounds state to prevent rapid GraphQL queries
+  // This breaks the zoom/pan → immediate query → rerender cycle
+  const [debouncedViewportBounds, setDebouncedViewportBounds] = useState<CanvasBounds>(currentViewportBounds);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Debounce viewport bounds changes with 150ms delay
+  useEffect(() => {
+    // Clear any existing timer
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+
+    // Set new timer to update debounced bounds after 150ms
+    timerRef.current = setTimeout(() => {
+      setDebouncedViewportBounds(currentViewportBounds);
+    }, 150);
+
+    // Cleanup timer on unmount
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, [currentViewportBounds]);
+
+  // Prepare GraphQL variables using debounced bounds
+  // This prevents rapid query refetches during zoom/pan operations
   const queryVariables: CardsInBoundsQueryVariables | null = useMemo(() => {
     if (!currentWorkspaceId || !enableViewportCulling) {
       return null;
@@ -112,13 +138,13 @@ export const CardLayer: React.FC<CardLayerProps> = ({
     return {
       workspaceId: currentWorkspaceId,
       bounds: {
-        minX: currentViewportBounds.minX,
-        minY: currentViewportBounds.minY,
-        maxX: currentViewportBounds.maxX,
-        maxY: currentViewportBounds.maxY,
+        minX: debouncedViewportBounds.minX,
+        minY: debouncedViewportBounds.minY,
+        maxX: debouncedViewportBounds.maxX,
+        maxY: debouncedViewportBounds.maxY,
       },
     };
-  }, [currentWorkspaceId, currentViewportBounds, enableViewportCulling]);
+  }, [currentWorkspaceId, debouncedViewportBounds, enableViewportCulling]);
 
   // Query cards from GraphQL server instead of local store
   // Skip query if no workspace context (e.g., in tests)
