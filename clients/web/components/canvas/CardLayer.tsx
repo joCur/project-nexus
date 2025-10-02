@@ -1,15 +1,22 @@
 'use client';
 
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useCallback } from 'react';
 import { Layer } from 'react-konva';
-import { useQuery } from '@apollo/client';
+import { useQuery, useMutation } from '@apollo/client';
+import type { KonvaEventObject } from 'konva/lib/Node';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { useWorkspacePermissionContextSafe } from '@/contexts/WorkspacePermissionContext';
 import { useViewportDimensions } from '@/utils/viewport';
 import type { Card, CardId } from '@/types/card.types';
 import type { CanvasBounds } from '@/types/canvas.types';
 import { CARD_CONFIG } from './cards/cardConfig';
-import { GET_CARDS_IN_BOUNDS, type CardsInBoundsQueryVariables } from '@/lib/graphql/cardOperations';
+import {
+  GET_CARDS_IN_BOUNDS,
+  GET_CARDS,
+  UPDATE_CARD,
+  type CardsInBoundsQueryVariables,
+  type UpdateCardMutationVariables
+} from '@/lib/graphql/cardOperations';
 
 // Backend GraphQL response type
 interface BackendCard {
@@ -120,6 +127,70 @@ export const CardLayer: React.FC<CardLayerProps> = ({
     skip: !currentWorkspaceId,
     fetchPolicy: 'cache-and-network', // Get cached data immediately, but also fetch from network
     errorPolicy: 'all', // Don't crash on GraphQL errors
+  });
+
+  // Setup UPDATE_CARD mutation for drag persistence
+  const [updateCard] = useMutation<
+    { updateCard: BackendCard },
+    UpdateCardMutationVariables
+  >(UPDATE_CARD, {
+    // Error handling - log but don't crash UI
+    onError: (error) => {
+      console.error('Failed to update card position:', error);
+    },
+    // Update cache optimistically for smooth UX
+    update: (cache, { data }) => {
+      if (!data?.updateCard) return;
+
+      // Update GET_CARDS_IN_BOUNDS cache
+      try {
+        const existingData = cache.readQuery({
+          query: GET_CARDS_IN_BOUNDS,
+          variables: queryVariables,
+        });
+
+        if (existingData) {
+          cache.writeQuery({
+            query: GET_CARDS_IN_BOUNDS,
+            variables: queryVariables,
+            data: {
+              cardsInBounds: (existingData as { cardsInBounds: BackendCard[] }).cardsInBounds.map((card: BackendCard) =>
+                card.id === data.updateCard.id ? data.updateCard : card
+              ),
+            },
+          });
+        }
+      } catch (e) {
+        // Cache miss is okay - card might not be in current bounds
+        console.debug('Cache update skipped - card not in current bounds');
+      }
+
+      // Update GET_CARDS cache if it exists
+      try {
+        const cardsData = cache.readQuery({
+          query: GET_CARDS,
+          variables: { workspaceId: currentWorkspaceId },
+        });
+
+        if (cardsData) {
+          cache.writeQuery({
+            query: GET_CARDS,
+            variables: { workspaceId: currentWorkspaceId },
+            data: {
+              cards: {
+                ...(cardsData as { cards: { items: BackendCard[] } }).cards,
+                items: (cardsData as { cards: { items: BackendCard[] } }).cards.items.map((card: BackendCard) =>
+                  card.id === data.updateCard.id ? data.updateCard : card
+                ),
+              },
+            },
+          });
+        }
+      } catch (e) {
+        // Cache miss is okay - not all cards may be loaded
+        console.debug('GET_CARDS cache update skipped');
+      }
+    },
   });
 
   // Get visible cards from GraphQL response
@@ -281,6 +352,40 @@ export const CardLayer: React.FC<CardLayerProps> = ({
     });
   }, [visibleCards]);
 
+  // Drag end handler - persists position to server
+  const handleCardDragEnd = useCallback((card: Card, e: KonvaEventObject<DragEvent>) => {
+    // Get final position from Konva event
+    const finalPosition = {
+      x: e.target?.x() || 0,
+      y: e.target?.y() || 0,
+      z: card.position.z || 0,
+    };
+
+    // Check if position actually changed (avoid unnecessary updates)
+    const positionChanged =
+      finalPosition.x !== card.position.x ||
+      finalPosition.y !== card.position.y;
+
+    if (!positionChanged) {
+      console.debug('Card position unchanged, skipping update');
+      return;
+    }
+
+    // Call UPDATE_CARD mutation with new position
+    updateCard({
+      variables: {
+        id: card.id,
+        input: {
+          position: finalPosition,
+        },
+      },
+    }).catch((error) => {
+      // Error already logged by onError handler
+      console.error('Failed to persist card position:', error);
+      // Note: Apollo cache will automatically rollback on error
+    });
+  }, [updateCard]);
+
   // Use ref to track card count for more efficient memoization
   const cardCountRef = useRef(sortedCards.length);
   const previousCardsRef = useRef<Card[]>([]);
@@ -311,6 +416,7 @@ export const CardLayer: React.FC<CardLayerProps> = ({
           <CardRenderer
             card={card}
             enableInlineEdit={true}
+            onCardDragEnd={handleCardDragEnd}
           />
         </React.Suspense>
       ));
@@ -324,10 +430,11 @@ export const CardLayer: React.FC<CardLayerProps> = ({
         <CardRenderer
           card={card}
           enableInlineEdit={true}
+          onCardDragEnd={handleCardDragEnd}
         />
       </React.Suspense>
     ));
-  }, [sortedCards]);
+  }, [sortedCards, handleCardDragEnd]);
 
   return (
     <Layer
