@@ -74,6 +74,9 @@ describe('Enhanced Permission Audit Logger', () => {
     });
 
     it('should auto-determine log levels correctly', () => {
+      // Clear any existing entries from previous tests or localStorage
+      logger.clear();
+
       const events: Array<{ event: PermissionEvent; expectedLevel: PermissionAuditLogEntry['level'] }> = [
         {
           event: {
@@ -115,7 +118,7 @@ describe('Enhanced Permission Audit Logger', () => {
 
       const entries = logger.getEntries();
       expect(entries).toHaveLength(3);
-      
+
       entries.forEach((entry, index) => {
         expect(entry.level).toBe(events[index].expectedLevel);
       });
