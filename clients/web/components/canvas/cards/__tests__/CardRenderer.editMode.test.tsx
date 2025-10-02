@@ -375,13 +375,13 @@ describe('CardRenderer Edit Mode Integration', () => {
   });
 
   describe('Visual Indicators', () => {
-    it('should show edit mode visual indicators when card is being edited', async () => {
+    it('should pass editing state to card renderer when card is being edited', async () => {
       const card = createTestCard('card-1');
       mockEditState.isEditing = true;
       mockEditState.editingCardId = 'card-1' as CardId;
       mockStoreState.editingCardId = 'card-1' as CardId;
 
-      const { container } = render(
+      render(
         <CardRenderer
           card={card}
           enableInlineEdit={true}
@@ -389,12 +389,9 @@ describe('CardRenderer Edit Mode Integration', () => {
         />
       );
 
-      // Check for edit mode visual indicators
-      expect(container.querySelector('.edit-mode-overlay')).toBeInTheDocument();
-      expect(container.querySelector('.edit-mode-border')).toBeInTheDocument();
-      expect(container.querySelector('.edit-mode-background')).toBeInTheDocument();
-
       // Check that the card renderer receives editing state
+      // Note: Visual edit indicators (.edit-mode-overlay) are rendered by EditorOverlay component,
+      // not CardRenderer. CardRenderer only passes the editing state to the card renderer.
       const renderer = screen.getByTestId('text-card-renderer');
       expect(renderer).toHaveAttribute('data-editing', 'true');
       expect(renderer).toHaveClass('editing-mode');
@@ -651,55 +648,64 @@ describe('CardRenderer Edit Mode Integration', () => {
     });
   });
 
-  describe('Integration with EditModeManager', () => {
-    it('should wrap card content with EditModeManager when inline editing is enabled', () => {
-      const card = createTestCard('card-1');
-
-      const { container } = render(
-        <CardRenderer
-          card={card}
-          enableInlineEdit={true}
-        />
-      );
-
-      expect(container.querySelector('.edit-mode-manager')).toBeInTheDocument();
-    });
-
-    it('should pass correct props to EditModeManager', () => {
+  describe('Integration with Edit Mode System', () => {
+    it('should handle double-click to trigger edit mode when inline editing is enabled', () => {
       const card = createTestCard('card-1');
       const onEditStart = jest.fn();
-      const onEditEnd = jest.fn();
-      const onEditCancel = jest.fn();
 
-      const { container } = render(
+      render(
         <CardRenderer
           card={card}
           enableInlineEdit={true}
           onEditStart={onEditStart}
-          onEditEnd={onEditEnd}
-          onEditCancel={onEditCancel}
         />
       );
 
-      const editModeManager = container.querySelector('.edit-mode-manager');
-      expect(editModeManager).toBeInTheDocument();
+      const group = screen.getByTestId('konva-group');
 
       // Double-click to test that callbacks are wired correctly
-      fireEvent.doubleClick(editModeManager!);
+      fireEvent.doubleClick(group);
       expect(onEditStart).toHaveBeenCalledWith('card-1', 'text');
     });
 
-    it('should not wrap with EditModeManager when inline editing is disabled', () => {
+    it('should update edit state when entering edit mode', () => {
       const card = createTestCard('card-1');
+      const onEditStart = jest.fn();
 
-      const { container } = render(
+      render(
         <CardRenderer
           card={card}
-          enableInlineEdit={false}
+          enableInlineEdit={true}
+          onEditStart={onEditStart}
         />
       );
 
-      expect(container.querySelector('.edit-mode-manager')).not.toBeInTheDocument();
+      const group = screen.getByTestId('konva-group');
+      fireEvent.doubleClick(group);
+
+      // Verify edit state was updated
+      expect(mockStoreState.setEditingCard).toHaveBeenCalledWith('card-1');
+      expect(onEditStart).toHaveBeenCalledWith('card-1', 'text');
+    });
+
+    it('should not trigger edit mode callbacks when inline editing is disabled', () => {
+      const card = createTestCard('card-1');
+      const onEditStart = jest.fn();
+
+      render(
+        <CardRenderer
+          card={card}
+          enableInlineEdit={false}
+          onEditStart={onEditStart}
+        />
+      );
+
+      const group = screen.getByTestId('konva-group');
+      fireEvent.doubleClick(group);
+
+      // Edit mode should not be triggered
+      expect(onEditStart).not.toHaveBeenCalled();
+      expect(mockStoreState.setEditingCard).not.toHaveBeenCalled();
     });
   });
 

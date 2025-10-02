@@ -297,7 +297,7 @@ describe('SaveStatusIndicator - Visual Feedback', () => {
 
     it('should announce retry action result', async () => {
       const onRetry = jest.fn();
-      render(
+      const { rerender } = render(
         <SaveStatusIndicator
           status={SaveStatus.ERROR}
           errorMessage="Network error"
@@ -307,6 +307,16 @@ describe('SaveStatusIndicator - Visual Feedback', () => {
 
       const retryButton = screen.getByRole('button', { name: /retry/i });
       fireEvent.click(retryButton);
+
+      // Simulate parent setting isRetrying=true after onRetry is called
+      rerender(
+        <SaveStatusIndicator
+          status={SaveStatus.ERROR}
+          errorMessage="Network error"
+          onRetry={onRetry}
+          isRetrying={true}
+        />
+      );
 
       await waitFor(() => {
         const announcement = screen.getByRole('status');
@@ -347,15 +357,15 @@ describe('SaveStatusIndicator - Visual Feedback', () => {
 
   describe('Animation and Transitions', () => {
     it('should animate error appearance', () => {
-      const { container } = render(
+      render(
         <SaveStatusIndicator
           status={SaveStatus.ERROR}
           errorMessage="Error occurred"
         />
       );
 
-      const errorDiv = container.querySelector('[key="error"]');
-      expect(errorDiv).toBeInTheDocument();
+      const errorAlert = screen.getByRole('alert');
+      expect(errorAlert).toBeInTheDocument();
     });
 
     it('should respect prefers-reduced-motion', () => {
@@ -371,16 +381,16 @@ describe('SaveStatusIndicator - Visual Feedback', () => {
         dispatchEvent: jest.fn(),
       }));
 
-      const { container } = render(
+      render(
         <SaveStatusIndicator
           status={SaveStatus.ERROR}
           errorMessage="Error occurred"
         />
       );
 
-      // Check that animations are disabled or simplified
-      const errorDiv = container.querySelector('[key="error"]');
-      expect(errorDiv).toBeInTheDocument();
+      // Check that error still renders with reduced motion
+      const errorAlert = screen.getByRole('alert');
+      expect(errorAlert).toBeInTheDocument();
     });
   });
 

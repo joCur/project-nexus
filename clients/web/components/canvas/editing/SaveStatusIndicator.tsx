@@ -102,10 +102,9 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           className="flex items-center gap-1 text-orange-400"
-          aria-label="Unsaved changes"
         >
           <span className="text-orange-500 font-bold" aria-hidden="true">*</span>
-          <span>Unsaved changes</span>
+          <span aria-label="Unsaved changes">Unsaved changes</span>
         </motion.div>
       </div>
     );
@@ -245,10 +244,10 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
             aria-live="assertive"
             aria-atomic="true"
           >
-            <div className="flex items-center gap-2 text-red-400">
+            <div className="flex items-center gap-2">
               {getErrorIcon()}
               <div className="flex flex-col">
-                <span>{displayMessage || 'Save failed'}</span>
+                <span className="text-red-400">{displayMessage || 'Save failed'}</span>
                 {errorCode && (
                   <span className="text-xs text-red-300 font-mono">{errorCode}</span>
                 )}
@@ -256,7 +255,7 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
                   <span className="text-xs text-red-300">Check your connection</span>
                 )}
                 {retryCount > 0 && (
-                  <span className="text-xs text-red-300">Attempt {retryCount + 1}</span>
+                  <span className="text-xs text-red-300">Attempt {retryCount}</span>
                 )}
               </div>
             </div>
@@ -265,6 +264,12 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
             {onRetry && (
               <button
                 onClick={onRetry}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onRetry();
+                  }
+                }}
                 disabled={isRetrying}
                 className="px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 aria-label="Retry save operation"

@@ -117,16 +117,30 @@ const getSeverityIcon = (severity: ValidationSeverity): JSX.Element => {
 };
 
 /**
- * Get CSS classes for severity level
+ * Get CSS classes for severity level (background and border)
  */
 const getSeverityClasses = (severity: ValidationSeverity): string => {
   switch (severity) {
     case ValidationSeverity.ERROR:
-      return 'text-red-500 bg-red-50 border-red-200';
+      return 'bg-red-50 border-red-200';
     case ValidationSeverity.WARNING:
-      return 'text-orange-500 bg-orange-50 border-orange-200';
+      return 'bg-orange-50 border-orange-200';
     case ValidationSeverity.INFO:
-      return 'text-blue-500 bg-blue-50 border-blue-200';
+      return 'bg-blue-50 border-blue-200';
+  }
+};
+
+/**
+ * Get text color class for severity level
+ */
+const getSeverityTextColor = (severity: ValidationSeverity): string => {
+  switch (severity) {
+    case ValidationSeverity.ERROR:
+      return 'text-red-500';
+    case ValidationSeverity.WARNING:
+      return 'text-orange-500';
+    case ValidationSeverity.INFO:
+      return 'text-blue-500';
   }
 };
 
@@ -216,11 +230,6 @@ export const ValidationErrors: React.FC<ValidationErrorsProps> = ({
       ? errorTemplate(error.code)
       : error.message;
 
-    // Truncate very long messages
-    const truncatedMessage = message.length > 150
-      ? message.substring(0, 147) + '...'
-      : message;
-
     const errorContent = (
       <motion.div
         key={error.id || `${error.field}-${index}`}
@@ -229,14 +238,14 @@ export const ValidationErrors: React.FC<ValidationErrorsProps> = ({
         role={severity === ValidationSeverity.ERROR ? 'alert' : 'status'}
         aria-live={getAriaLive(severity)}
         aria-atomic="true"
-        id={error.id}
+        aria-label="Validation errors"
       >
         {getSeverityIcon(severity)}
-        <div className="flex-1 text-sm">
+        <div className={`flex-1 text-sm ${getSeverityTextColor(severity)}`}>
           {showFieldNames && error.field && (
             <span className="font-semibold mr-1">{error.field}:</span>
           )}
-          <span>{truncatedMessage}</span>
+          <span id={error.id}>{message}</span>
         </div>
         {dismissible && onDismiss && (
           <button
@@ -269,11 +278,9 @@ export const ValidationErrors: React.FC<ValidationErrorsProps> = ({
   const content = groupedErrors ? (
     Object.entries(groupedErrors).map(([field, fieldErrors]) => (
       <div key={field} className="space-y-1">
-        {showFieldNames && (
-          <div className="text-sm font-semibold text-gray-700">
-            {field}
-          </div>
-        )}
+        <div className="text-sm font-semibold text-gray-700" aria-hidden="true">
+          {field}
+        </div>
         {fieldErrors.map((error, index) => renderError(error, index))}
       </div>
     ))
@@ -282,19 +289,19 @@ export const ValidationErrors: React.FC<ValidationErrorsProps> = ({
   );
 
   const Container = animate && !reducedMotion ? motion.div : 'div';
+  const containerProps = {
+    className: `validation-errors space-y-2 ${animate && !reducedMotion ? 'animate-slide-down' : ''} ${className}`,
+    ...(animate && !reducedMotion ? {
+      variants: containerVariants,
+      initial: 'hidden' as const,
+      animate: 'visible' as const,
+      exit: 'exit' as const
+    } : {})
+  };
 
   return (
     <AnimatePresence mode="wait">
-      <Container
-        {...(animate && !reducedMotion ? {
-          variants: containerVariants,
-          initial: 'hidden',
-          animate: 'visible',
-          exit: 'exit'
-        } : {})}
-        className={`validation-errors space-y-2 ${animate && !reducedMotion ? 'animate-slide-down' : ''} ${className}`}
-        aria-label="Validation errors"
-      >
+      <Container {...containerProps}>
         {content}
       </Container>
     </AnimatePresence>

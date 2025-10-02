@@ -79,22 +79,21 @@ export function useUnsavedChanges<T>({
 
   // Track changes and update metadata
   useEffect(() => {
-    // Skip on initial render
+    // Initialize refs on first render
     if (isInitialRender.current) {
       isInitialRender.current = false;
       previousValueRef.current = currentValue;
+      previousHasChangesRef.current = !comparator(currentValue, baselineValue);
       return;
     }
 
     const hasChanges = !comparator(currentValue, baselineValue);
     const valueChanged = !comparator(currentValue, previousValueRef.current);
 
-    // Increment count whenever value actually changes (even if still different from baseline)
-    if (valueChanged) {
+    // Only increment count when moving away from baseline (not when reverting back)
+    if (valueChanged && hasChanges) {
       setChangeCount(prev => prev + 1);
-      if (hasChanges) {
-        setLastChangedAt(new Date());
-      }
+      setLastChangedAt(new Date());
     }
 
     // Call onChange callback if state changed

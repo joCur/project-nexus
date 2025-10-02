@@ -93,7 +93,7 @@ describe('ValidationErrors Component', () => {
       ];
       render(<ValidationErrors errors={errors} showFieldNames={true} />);
 
-      expect(screen.getByText(/email/i)).toBeInTheDocument();
+      expect(screen.getByText(/email:/i)).toBeInTheDocument();
       expect(screen.getByText(/invalid email format/i)).toBeInTheDocument();
     });
 
@@ -327,6 +327,7 @@ describe('ValidationErrors Component', () => {
     });
 
     it('should handle special characters in error messages', () => {
+      const alertMock = jest.spyOn(window, 'alert').mockImplementation();
       const errors = [
         { field: 'content', message: 'Error <script>alert("xss")</script>' }
       ];
@@ -335,7 +336,9 @@ describe('ValidationErrors Component', () => {
       // Should escape HTML
       expect(screen.queryByText(/script/i)).toBeInTheDocument();
       // But should not execute scripts
-      expect(window.alert).not.toHaveBeenCalled();
+      expect(alertMock).not.toHaveBeenCalled();
+
+      alertMock.mockRestore();
     });
 
     it('should handle duplicate error messages', () => {
