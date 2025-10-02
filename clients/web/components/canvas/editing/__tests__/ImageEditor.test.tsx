@@ -93,25 +93,6 @@ describe('ImageEditor', () => {
       expect(screen.getByLabelText(/Caption/i)).toBeInTheDocument();
     });
 
-    // TODO: Size options feature not yet implemented
-    it.skip('should render size options', () => {
-      render(<ImageEditor {...defaultProps} />);
-
-      expect(screen.getByLabelText(/Small/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/Medium/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/Large/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/Full Width/i)).toBeInTheDocument();
-    });
-
-    // TODO: Alignment options feature not yet implemented
-    it.skip('should render alignment options', () => {
-      render(<ImageEditor {...defaultProps} />);
-
-      expect(screen.getByLabelText(/Left/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/Center/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/Right/i)).toBeInTheDocument();
-    });
-
     it('should populate fields with initial data', () => {
       render(<ImageEditor {...defaultProps} initialData={initialData} />);
 
@@ -370,102 +351,6 @@ describe('ImageEditor', () => {
     });
   });
 
-  // TODO: Size selection feature not yet implemented
-  describe.skip('Size Selection', () => {
-    it('should default to medium size', () => {
-      render(<ImageEditor {...defaultProps} />);
-
-      const mediumRadio = screen.getByLabelText(/Medium/i) as HTMLInputElement;
-      expect(mediumRadio.checked).toBe(true);
-    });
-
-    it('should update size selection', async () => {
-      render(<ImageEditor {...defaultProps} />);
-
-      const smallRadio = screen.getByLabelText(/Small/i);
-      const largeRadio = screen.getByLabelText(/Large/i);
-      const fullRadio = screen.getByLabelText(/Full Width/i);
-
-      fireEvent.click(smallRadio);
-      expect((smallRadio as HTMLInputElement).checked).toBe(true);
-
-      fireEvent.click(largeRadio);
-      expect((largeRadio as HTMLInputElement).checked).toBe(true);
-
-      fireEvent.click(fullRadio);
-      expect((fullRadio as HTMLInputElement).checked).toBe(true);
-    });
-
-    it('should save with selected size', async () => {
-      render(<ImageEditor {...defaultProps} />);
-
-      const urlInput = screen.getByLabelText(/Image URL/i);
-      const altInput = screen.getByLabelText(/Alt Text/i);
-      const largeRadio = screen.getByLabelText(/Large/i);
-
-      await userEvent.type(urlInput, 'https://example.com/image.jpg');
-      await userEvent.type(altInput, 'Test alt');
-      fireEvent.click(largeRadio);
-
-      const saveButton = screen.getByText('Save');
-      fireEvent.click(saveButton);
-
-      await waitFor(() => {
-        expect(mockOnSave).toHaveBeenCalledWith(
-          expect.objectContaining({
-            size: 'large',
-          })
-        );
-      });
-    });
-  });
-
-  // TODO: Alignment selection feature not yet implemented
-  describe.skip('Alignment Selection', () => {
-    it('should default to center alignment', () => {
-      render(<ImageEditor {...defaultProps} />);
-
-      const centerRadio = screen.getByLabelText(/Center/i) as HTMLInputElement;
-      expect(centerRadio.checked).toBe(true);
-    });
-
-    it('should update alignment selection', () => {
-      render(<ImageEditor {...defaultProps} />);
-
-      const leftRadio = screen.getByLabelText(/Left/i);
-      const rightRadio = screen.getByLabelText(/Right/i);
-
-      fireEvent.click(leftRadio);
-      expect((leftRadio as HTMLInputElement).checked).toBe(true);
-
-      fireEvent.click(rightRadio);
-      expect((rightRadio as HTMLInputElement).checked).toBe(true);
-    });
-
-    it('should save with selected alignment', async () => {
-      render(<ImageEditor {...defaultProps} />);
-
-      const urlInput = screen.getByLabelText(/Image URL/i);
-      const altInput = screen.getByLabelText(/Alt Text/i);
-      const leftRadio = screen.getByLabelText(/Left/i);
-
-      await userEvent.type(urlInput, 'https://example.com/image.jpg');
-      await userEvent.type(altInput, 'Test alt');
-      fireEvent.click(leftRadio);
-
-      const saveButton = screen.getByText('Save');
-      fireEvent.click(saveButton);
-
-      await waitFor(() => {
-        expect(mockOnSave).toHaveBeenCalledWith(
-          expect.objectContaining({
-            alignment: 'left',
-          })
-        );
-      });
-    });
-  });
-
   describe('Form Submission', () => {
     it('should validate required fields on save', async () => {
       render(<ImageEditor {...defaultProps} />);
@@ -565,14 +450,6 @@ describe('ImageEditor', () => {
       expect(screen.getByLabelText(/Image URL/i)).toHaveAttribute('aria-required', 'true');
       expect(screen.getByLabelText(/Alt Text/i)).toHaveAttribute('aria-required', 'true');
       expect(screen.getByLabelText(/Caption/i)).toHaveAttribute('aria-required', 'false');
-    });
-
-    // TODO: Fieldset legends for size and alignment not yet implemented
-    it.skip('should have proper fieldset legends', () => {
-      render(<ImageEditor {...defaultProps} />);
-
-      expect(screen.getByText('Image Size')).toBeInTheDocument();
-      expect(screen.getByText('Alignment')).toBeInTheDocument();
     });
 
     it('should announce errors to screen readers', async () => {
