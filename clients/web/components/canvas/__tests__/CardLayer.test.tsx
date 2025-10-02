@@ -43,11 +43,13 @@ jest.mock('../cards/CardRenderer', () => ({
   ),
 }));
 
-// Mock Apollo Client useQuery hook
+// Mock Apollo Client useQuery and useMutation hooks
 const mockUseQuery = jest.fn();
+const mockUseMutation = jest.fn();
 jest.mock('@apollo/client', () => ({
   ...jest.requireActual('@apollo/client'),
   useQuery: (...args: unknown[]) => mockUseQuery(...args),
+  useMutation: (...args: unknown[]) => mockUseMutation(...args),
 }));
 
 // Mock stores and contexts
@@ -137,6 +139,18 @@ describe('CardLayer', () => {
     // Reset all mocks before each test
     jest.clearAllMocks();
     mockUseQuery.mockClear();
+    mockUseMutation.mockClear();
+
+    // Setup default mutation mock
+    mockUseMutation.mockReturnValue([
+      jest.fn(), // mutate function
+      {
+        data: null,
+        loading: false,
+        error: null,
+        called: false,
+      },
+    ]);
 
     // Reset viewport state
     mockCanvasStore.viewport.zoom = 1;

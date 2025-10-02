@@ -11,10 +11,11 @@ import { useMutation } from '@apollo/client';
 import DOMPurify from 'dompurify';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { useCardStore } from '@/stores/cardStore';
-import { CREATE_CARD, GET_CARDS } from '@/lib/graphql/cardOperations';
+import { CREATE_CARD, GET_CARDS, GET_CARDS_IN_BOUNDS } from '@/lib/graphql/cardOperations';
 import type {
   CreateCardMutationVariables,
   CardResponse,
+  CardsInBoundsQueryVariables,
 } from '@/lib/graphql/cardOperations';
 import type {
   CardType
@@ -22,6 +23,7 @@ import type {
 import { DEFAULT_CARD_DIMENSIONS, createCardId } from '@/types/card.types';
 import type { CanvasPosition } from '@/types/canvas.types';
 import type { Position } from '@/types/common.types';
+import { useViewportDimensions } from '@/utils/viewport';
 
 /**
  * Card creation state interface
@@ -96,6 +98,12 @@ export interface UseCardCreationReturn {
 }
 
 /**
+ * Viewport padding for bounds calculation (matches CardLayer default)
+ * Extra pixels around viewport to consider for cache updates
+ */
+const VIEWPORT_PADDING = 500;
+
+/**
  * Default content for each card type
  */
 const getDefaultContent = (type: CardType): string => {
@@ -136,6 +144,7 @@ export const useCardCreation = (config: CardCreationConfig): UseCardCreationRetu
   const canvasStore = useCanvasStore();
   const { viewport } = canvasStore;
   const { setEditingCard } = useCardStore();
+  const viewportDimensions = useViewportDimensions();
 
   /**
    * Transition duration for modal animations in milliseconds
@@ -164,7 +173,9 @@ export const useCardCreation = (config: CardCreationConfig): UseCardCreationRetu
     update: (cache, { data }) => {
       if (!data?.createCard) return;
 
-      // Update the GET_CARDS query cache
+      const newCard = data.createCard;
+
+      // 1. Update the GET_CARDS query cache (existing behavior)
       try {
         const existingCards = cache.readQuery({
           query: GET_CARDS,
@@ -178,13 +189,65 @@ export const useCardCreation = (config: CardCreationConfig): UseCardCreationRetu
             data: {
               cards: {
                 ...existingCards.cards,
-                items: [data.createCard, ...existingCards.cards.items],
+                items: [newCard, ...existingCards.cards.items],
               },
             },
           });
         }
       } catch (error) {
         // Cache entry might not exist yet, that's okay
+        // Silent failure is acceptable for cache updates
+      }
+
+      // 2. Update GET_CARDS_IN_BOUNDS cache if card is within current viewport
+      try {
+        const { position: viewportPosition, zoom } = viewport;
+        const { width: viewportWidth, height: viewportHeight } = viewportDimensions;
+
+        // Calculate current viewport bounds (matches CardLayer calculation)
+        const worldMinX = (-viewportPosition.x) / zoom - VIEWPORT_PADDING;
+        const worldMinY = (-viewportPosition.y) / zoom - VIEWPORT_PADDING;
+        const worldMaxX = (-viewportPosition.x + viewportWidth) / zoom + VIEWPORT_PADDING;
+        const worldMaxY = (-viewportPosition.y + viewportHeight) / zoom + VIEWPORT_PADDING;
+
+        // Check if new card is within viewport bounds
+        const cardPosition = newCard.position;
+        const isWithinBounds =
+          cardPosition.x >= worldMinX &&
+          cardPosition.x <= worldMaxX &&
+          cardPosition.y >= worldMinY &&
+          cardPosition.y <= worldMaxY;
+
+        if (isWithinBounds) {
+          // Card is within viewport, update GET_CARDS_IN_BOUNDS cache
+          const boundsVariables: CardsInBoundsQueryVariables = {
+            workspaceId,
+            bounds: {
+              minX: worldMinX,
+              minY: worldMinY,
+              maxX: worldMaxX,
+              maxY: worldMaxY,
+            },
+          };
+
+          const existingBoundsData = cache.readQuery({
+            query: GET_CARDS_IN_BOUNDS,
+            variables: boundsVariables,
+          }) as { cardsInBounds: CardResponse[] } | null;
+
+          if (existingBoundsData) {
+            // Add new card to bounds cache
+            cache.writeQuery({
+              query: GET_CARDS_IN_BOUNDS,
+              variables: boundsVariables,
+              data: {
+                cardsInBounds: [newCard, ...existingBoundsData.cardsInBounds],
+              },
+            });
+          }
+        }
+      } catch (error) {
+        // Cache entry might not exist yet or calculation failed, that's okay
         // Silent failure is acceptable for cache updates
       }
     },
