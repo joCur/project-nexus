@@ -556,7 +556,6 @@ describe('CardRenderer Edit Mode Integration', () => {
         <CardRenderer
           card={card1}
           enableInlineEdit={true}
-          onEditCancel={onEditCancel}
           isEditingCard={true}
         />
       );
@@ -597,10 +596,9 @@ describe('CardRenderer Edit Mode Integration', () => {
     });
   });
 
-  describe('Edit Mode Callbacks', () => {
-    it('should call onEditEnd when saving edits', async () => {
+  describe('Edit Mode State Management', () => {
+    it('should handle save action through EditModeManager', async () => {
       const card = createTestCard('card-1');
-      const onEditEnd = jest.fn();
       mockEditState.isEditing = true;
       mockEditState.editingCardId = 'card-1' as CardId;
 
@@ -608,7 +606,6 @@ describe('CardRenderer Edit Mode Integration', () => {
         <CardRenderer
           card={card}
           enableInlineEdit={true}
-          onEditEnd={onEditEnd}
           isEditingCard={true}
         />
       );
@@ -621,13 +618,12 @@ describe('CardRenderer Edit Mode Integration', () => {
       mockEditState.isEditing = false;
       mockEditState.editingCardId = null;
 
-      // The onEditEnd should be called with the card ID and new content
-      // In real implementation, this would be triggered by EditModeManager
+      // Edit state is managed by EditModeManager and cardStore
+      // CardRenderer responds to state changes but doesn't expose callbacks
     });
 
-    it('should call onEditCancel when canceling edits', async () => {
+    it('should handle cancel action through EditModeManager', async () => {
       const card = createTestCard('card-1');
-      const onEditCancel = jest.fn();
       mockEditState.isEditing = true;
       mockEditState.editingCardId = 'card-1' as CardId;
 
@@ -635,7 +631,6 @@ describe('CardRenderer Edit Mode Integration', () => {
         <CardRenderer
           card={card}
           enableInlineEdit={true}
-          onEditCancel={onEditCancel}
           isEditingCard={true}
         />
       );
@@ -643,8 +638,8 @@ describe('CardRenderer Edit Mode Integration', () => {
       // Simulate cancel action (ESC key)
       fireEvent.keyDown(document, { key: 'Escape' });
 
-      // The cancel handler should be triggered
-      // In real implementation, this would be handled by EditModeManager
+      // Cancel is handled by EditModeManager which updates cardStore
+      // CardRenderer responds to state changes via useEditMode hook
     });
   });
 
@@ -738,7 +733,6 @@ describe('CardRenderer Edit Mode Integration', () => {
 
     it('should clean up edit state when component unmounts', () => {
       const card = createTestCard('card-1');
-      const onEditCancel = jest.fn();
       mockEditState.isEditing = true;
       mockEditState.editingCardId = 'card-1' as CardId;
 
@@ -746,15 +740,14 @@ describe('CardRenderer Edit Mode Integration', () => {
         <CardRenderer
           card={card}
           enableInlineEdit={true}
-          onEditCancel={onEditCancel}
           isEditingCard={true}
         />
       );
 
       unmount();
 
-      // Should clean up edit state on unmount
-      // In real implementation, this would trigger cleanup
+      // Edit state cleanup is handled by EditModeManager
+      // CardRenderer unmount doesn't directly trigger edit state changes
     });
   });
 });
