@@ -195,7 +195,7 @@ export const CardLayer: React.FC<CardLayerProps> = ({
             content: {
               type: 'image' as const,
               url: String(backendCard.content || ''),
-              alt: backendCard.title || '',
+              alt: String(backendCard.metadata?.alt || ''),
               caption: backendCard.title || '',
             },
           };
@@ -310,6 +310,7 @@ export const CardLayer: React.FC<CardLayerProps> = ({
         >
           <CardRenderer
             card={card}
+            enableInlineEdit={true}
           />
         </React.Suspense>
       ));
@@ -322,6 +323,7 @@ export const CardLayer: React.FC<CardLayerProps> = ({
       >
         <CardRenderer
           card={card}
+          enableInlineEdit={true}
         />
       </React.Suspense>
     ));

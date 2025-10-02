@@ -179,6 +179,26 @@ class Logger {
 // Create singleton logger instance
 const logger = new Logger();
 
+/**
+ * Create a context-aware logger with additional context data
+ * @param context - Context data to include with all log entries
+ * @returns Logger instance with context
+ */
+export function createContextLogger(context: Record<string, unknown>) {
+  return {
+    error: (message: string, data?: Record<string, unknown>) =>
+      logger.error(message, { ...context, ...data }),
+    warn: (message: string, data?: Record<string, unknown>) =>
+      logger.warn(message, { ...context, ...data }),
+    info: (message: string, data?: Record<string, unknown>) =>
+      logger.info(message, { ...context, ...data }),
+    debug: (message: string, data?: Record<string, unknown>) =>
+      logger.debug(message, { ...context, ...data }),
+    performance: (operation: string, duration: number, data?: Record<string, unknown>) =>
+      logger.performance(operation, duration, { ...context, ...data }),
+  };
+}
+
 export default logger;
 export { Logger, type LogLevel, type LogEntry };
 

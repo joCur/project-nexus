@@ -15,6 +15,8 @@ interface TextCardRendererProps {
   isSelected: boolean;
   isDragged: boolean;
   isHovered: boolean;
+  isEditing?: boolean;
+  onStartEdit?: () => void;
 }
 
 /**
@@ -25,24 +27,31 @@ export const TextCardRenderer: React.FC<TextCardRendererProps> = ({
   isSelected,
   isDragged,
   isHovered,
+  isEditing = false,
+  // onStartEdit, // Will be used for direct edit triggers in future
 }) => {
   const { content, dimensions, style } = card;
 
   // Calculate visual state modifiers
-  const isHighlighted = isSelected || isHovered;
+  const isHighlighted = isSelected || isHovered || isEditing;
   const selectionAlpha = isSelected ? CARD_CONFIG.opacity.selection : 0;
   const hoverAlpha = isHovered && !isSelected ? CARD_CONFIG.opacity.hover : 0;
-  const highlightAlpha = Math.max(selectionAlpha, hoverAlpha);
+  const editingAlpha = isEditing ? 0.1 : 0;
+  const highlightAlpha = Math.max(selectionAlpha, hoverAlpha, editingAlpha);
 
-  // Calculate border color with selection/hover feedback
-  const borderColor = isSelected
+  // Calculate border color with selection/hover/edit feedback
+  const borderColor = isEditing
+    ? '#3B82F6'  // Blue border for edit mode
+    : isSelected
     ? CARD_CONFIG.colors.selectedBorder
     : isHovered
     ? CARD_CONFIG.colors.hoverBorder
     : style.borderColor;
 
-  // Calculate border width with selection feedback
-  const borderWidth = isSelected
+  // Calculate border width with selection/edit feedback
+  const borderWidth = isEditing
+    ? 2  // Thicker border for edit mode
+    : isSelected
     ? Math.max(style.borderWidth, CARD_CONFIG.borderWidth)
     : style.borderWidth;
 
@@ -110,7 +119,7 @@ export const TextCardRenderer: React.FC<TextCardRendererProps> = ({
           if (lines.length >= maxLinesCount) {
             // Truncate the last line to fit ellipsis
             const lastLine = lines[lines.length - 1];
-            const ellipsisWidth = measureTextWidth('...');
+            // const ellipsisWidth = measureTextWidth('...'); // Ellipsis width calculation for future precision
             let truncatedLine = lastLine;
 
             while (measureTextWidth(truncatedLine + '...') > maxWidth && truncatedLine.length > 0) {
@@ -123,7 +132,7 @@ export const TextCardRenderer: React.FC<TextCardRendererProps> = ({
         } else {
           // Single word is too long, truncate it
           let truncatedWord = word;
-          const ellipsisWidth = measureTextWidth('...');
+          // const ellipsisWidth = measureTextWidth('...'); // Ellipsis width calculation for future precision
 
           while (measureTextWidth(truncatedWord + '...') > maxWidth && truncatedWord.length > 0) {
             truncatedWord = truncatedWord.slice(0, -1);
@@ -237,6 +246,45 @@ export const TextCardRenderer: React.FC<TextCardRendererProps> = ({
           fill={CARD_CONFIG.colors.secondaryText}
           align="right"
         />
+      )}
+
+      {/* Edit mode overlay */}
+      {isEditing && (
+        <Group>
+          {/* Semi-transparent overlay background */}
+          <Rect
+            x={0}
+            y={0}
+            width={dimensions.width}
+            height={dimensions.height}
+            fill="#3B82F6"
+            opacity={0.05}
+            cornerRadius={style.borderRadius}
+            listening={false}
+          />
+
+          {/* Edit mode badge */}
+          <Group>
+            <Rect
+              x={8}
+              y={8}
+              width={50}
+              height={20}
+              fill="#3B82F6"
+              cornerRadius={10}
+              opacity={0.9}
+            />
+            <Text
+              x={13}
+              y={11}
+              text="Editing"
+              fontSize={11}
+              fontFamily="Inter, sans-serif"
+              fill="white"
+              fontStyle="bold"
+            />
+          </Group>
+        </Group>
       )}
 
       {/* Drag visual feedback */}

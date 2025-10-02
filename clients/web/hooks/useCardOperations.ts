@@ -89,8 +89,8 @@ const transformBackendCardToFrontend = (backendCard: CardResponse): Card => {
         content: {
           type: 'image' as const,
           url: backendCard.content,
-          alt: backendCard.title || '',
-          caption: backendCard.title,
+          alt: backendCard.metadata?.alt || '',
+          caption: backendCard.title || '',
         },
       } as ImageCard;
 
@@ -176,7 +176,11 @@ const transformCreateParamsToBackend = (params: CreateCardParams & { workspaceId
         break;
       case 'image':
         baseInput.content = params.content.url;
-        baseInput.title = params.content.alt;
+        baseInput.title = params.content.caption;
+        baseInput.metadata = {
+          ...(baseInput.metadata || {}),
+          alt: params.content.alt
+        };
         break;
       case 'link':
         baseInput.content = params.content.url;

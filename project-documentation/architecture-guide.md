@@ -730,10 +730,11 @@ export const useCardStore = create<CardStore>()(
 - ✅ Fewer bugs in production
 - ✅ Confidence in refactoring
 
-**TDD Cycle**: RED → GREEN → REFACTOR
+**TDD Cycle**: RED → GREEN → REFACTOR → VERIFY
 1. **RED**: Write a failing test that describes the desired behavior
 2. **GREEN**: Write the minimal code to make the test pass
 3. **REFACTOR**: Clean up the code while keeping tests green
+4. **VERIFY**: Run ALL related tests, not just new ones - ensure no regression
 
 **TDD Example**:
 ```typescript
@@ -780,7 +781,13 @@ async createWorkspace(input: WorkspaceCreateInput): Promise<Workspace> {
 
   return this.mapDbWorkspaceToWorkspace(workspace);
 }
+
+// 4. VERIFY: Run all tests to ensure no regression
+// npm test workspace  // All workspace-related tests
+// npm test           // Full suite to catch unexpected breaks
 ```
+
+**Critical TDD Enhancement**: The VERIFY step is essential when modifying existing code. It's not enough to make your new tests pass - you must ensure existing functionality remains intact.
 
 ### Feature Implementation Process
 
@@ -1383,10 +1390,814 @@ export const EntityComponent: React.FC<ComponentProps> = ({ ...props }) => {
   );
 };
 ```
+### Component Template with Logging
 
----
+All frontend components must use structured logging via `createContextLogger`. Never use `console.log` directly.
+
+```typescript
+'use client';
+
+import React, { useCallback, useEffect, useState } from 'react';
+import { createContextLogger } from '@/utils/logger';
+import { useCardStore } from '@/stores/cardStore';
+import { useCreateCard } from '@/hooks/useCreateCard';
+
+// Create logger at module level with component context
+const logger = createContextLogger({ component: 'CardCreator' });
+
+interface CardCreatorProps {
+  canvasId: string;
+  position: { x: number; y: number };
+  onSuccess?: (cardId: string) => void;
+  onCancel?: () => void;
+}
+
+/**
+ * CardCreator component handles creation of new knowledge cards
+ *
+ * @requires ApolloProvider - Required for GraphQL mutations
+ * @requires CardStoreProvider - Required for card state management
+ *
+ * Context Requirements:
+ * - Apollo Client must be configured with proper authentication
+ * - Card store must be initialized before mounting
+ */
+export const CardCreator: React.FC<CardCreatorProps> = ({
+  canvasId,
+  position,
+  onSuccess,
+  onCancel
+}) => {
+  // Component state
+  const [title, setTitle] = useState<string>('');
+  const [content, setContent] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+
+  // Store integration
+  const { actions } = useCardStore();
+
+  // GraphQL mutation hook
+  const { createCard, loading, error } = useCreateCard();
+
+  // Log component mount
+  useEffect(() => {
+    logger.debug('CardCreator mounted', {
+      canvasId,
+      position,
+      hasSuccessCallback: !!onSuccess,
+      hasCancelCallback: !!onCancel
+    });
+
+    return (): void => {
+      logger.debug('CardCreator unmounting', { canvasId });
+    };
+  }, [canvasId, position, onSuccess, onCancel]);
+
+  // Log error state changes
+  useEffect(() => {
+    if (error) {
+      logger.error('Card creation error detected', {
+        error: error.message,
+        canvasId,
+        cardTitle: title
+      });
+    }
+  }, [error, canvasId, title]);
+
+  /**
+   * Handle form submission with comprehensive error handling
+   */
+  const handleSubmit = useCallback(async (e: React.FormEvent): Promise<void> => {
+    e.preventDefault();
+
+    if (!title.trim()) {
+      logger.warn('Attempted to create card without title', { canvasId });
+      return;
+    }
+
+    logger.info('Creating new card', {
+      canvasId,
+      position,
+      titleLength: title.length,
+      contentLength: content.length
+    });
+
+    setIsSubmitting(true);
+
+    try {
+      const result = await createCard({
+        canvasId,
+        title: title.trim(),
+        content: content.trim(),
+        position
+      });
+
+      if (result?.id) {
+        logger.info('Card created successfully', {
+          cardId: result.id,
+          canvasId,
+          title: title.trim()
+        });
+
+        // Update local store
+        actions.addCard(result);
+
+        // Call success callback
+        onSuccess?.(result.id);
+
+        // Reset form
+        setTitle('');
+        setContent('');
+      } else {
+        logger.error('Card creation returned no ID', {
+          canvasId,
+          result
+        });
+      }
+    } catch (err) {
+      logger.error('Failed to create card', {
+        error: err instanceof Error ? err.message : 'Unknown error',
+        errorStack: err instanceof Error ? err.stack : undefined,
+        canvasId,
+        title: title.trim(),
+        position
+      });
+
+      // Re-throw to allow component error boundary to handle
+      throw err;
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [title, content, canvasId, position, createCard, actions, onSuccess]);
+
+  /**
+   * Handle cancel action
+   */
+  const handleCancel = useCallback((): void => {
+    logger.debug('Card creation cancelled', {
+      canvasId,
+      hadTitle: !!title,
+      hadContent: !!content
+    });
+
+    setTitle('');
+    setContent('');
+    onCancel?.();
+  }, [canvasId, title, content, onCancel]);
+
+  /**
+   * Handle input changes with debug logging
+   */
+  const handleTitleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>): void => {
+    const newTitle = e.target.value;
+    logger.debug('Title changed', {
+      previousLength: title.length,
+      newLength: newTitle.length
+    });
+    setTitle(newTitle);
+  }, [title.length]);
+
+  const handleContentChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>): void => {
+    const newContent = e.target.value;
+    logger.debug('Content changed', {
+      previousLength: content.length,
+      newLength: newContent.length
+    });
+    setContent(newContent);
+  }, [content.length]);
+
+  return (
+    <form onSubmit={handleSubmit} className="card-creator">
+      <input
+        type="text"
+        value={title}
+        onChange={handleTitleChange}
+        placeholder="Card title"
+        disabled={isSubmitting}
+        required
+      />
+      <textarea
+        value={content}
+        onChange={handleContentChange}
+        placeholder="Card content"
+        disabled={isSubmitting}
+      />
+      <div className="actions">
+        <button type="submit" disabled={isSubmitting || !title.trim()}>
+          {isSubmitting ? 'Creating...' : 'Create Card'}
+        </button>
+        <button type="button" onClick={handleCancel} disabled={isSubmitting}>
+          Cancel
+        </button>
+      </div>
+      {error && (
+        <div className="error">
+          Failed to create card: {error.message}
+        </div>
+      )}
+    </form>
+  );
+};
+```
+
+### Logging Best Practices
+
+#### 1. Always Use Structured Logging
+
+**❌ Bad: Direct console usage**
+```typescript
+console.log('Card created');
+console.log('Error:', error);
+console.log('User clicked button', userId, cardId);
+```
+
+**✅ Good: Structured logging with context**
+```typescript
+const logger = createContextLogger({ component: 'CardList' });
+
+logger.info('Card created', {
+  cardId: result.id,
+  canvasId,
+  userId
+});
+
+logger.error('Card creation failed', {
+  error: error.message,
+  errorStack: error.stack,
+  userId,
+  canvasId
+});
+
+logger.debug('Button clicked', {
+  userId,
+  cardId,
+  buttonType: 'delete'
+});
+```
+
+#### 2. Create Logger Per Component/Module
+
+**❌ Bad: Shared or imported logger**
+```typescript
+import { logger } from '@/utils/logger'; // Generic logger
+
+export const MyComponent = () => {
+  logger.info('Something happened'); // No component context
+};
+```
+
+**✅ Good: Component-specific logger**
+```typescript
+import { createContextLogger } from '@/utils/logger';
+
+const logger = createContextLogger({ component: 'MyComponent' });
+
+export const MyComponent = () => {
+  logger.info('Something happened'); // Automatically includes component context
+};
+```
+
+#### 3. Use Appropriate Log Levels
+
+```typescript
+const logger = createContextLogger({ component: 'DataProcessor' });
+
+// DEBUG: Detailed diagnostic information (verbose)
+logger.debug('Processing item', {
+  itemId: item.id,
+  itemType: item.type,
+  processingStep: 'validation'
+});
+
+// INFO: General informational events
+logger.info('Processing completed', {
+  itemsProcessed: count,
+  duration: endTime - startTime
+});
+
+// WARN: Warning events that might need attention
+logger.warn('Processing took longer than expected', {
+  duration: endTime - startTime,
+  threshold: THRESHOLD_MS,
+  itemsProcessed: count
+});
+
+// ERROR: Error events that need immediate attention
+logger.error('Processing failed', {
+  error: error.message,
+  errorStack: error.stack,
+  itemId: item.id,
+  retryCount
+});
+```
+
+#### 4. Log Component Lifecycle Events
+
+```typescript
+const logger = createContextLogger({ component: 'CanvasRenderer' });
+
+export const CanvasRenderer: React.FC<Props> = ({ canvasId }) => {
+  // Mount logging
+  useEffect(() => {
+    logger.debug('CanvasRenderer mounted', {
+      canvasId,
+      timestamp: Date.now()
+    });
+
+    return (): void => {
+      logger.debug('CanvasRenderer unmounting', {
+        canvasId,
+        timestamp: Date.now()
+      });
+    };
+  }, [canvasId]);
+
+  // Dependency change logging
+  useEffect(() => {
+    logger.debug('Canvas ID changed', {
+      previousCanvasId: prevCanvasId,
+      newCanvasId: canvasId
+    });
+  }, [canvasId]);
+};
+```
+
+#### 5. Include Relevant Context in All Logs
+
+**❌ Bad: Missing context**
+```typescript
+logger.info('Operation completed');
+logger.error('Failed', { error: err.message });
+```
+
+**✅ Good: Rich contextual information**
+```typescript
+logger.info('Card update completed', {
+  cardId,
+  canvasId,
+  userId,
+  fieldsUpdated: ['title', 'content'],
+  duration: endTime - startTime
+});
+
+logger.error('Card update failed', {
+  error: err.message,
+  errorStack: err.stack,
+  cardId,
+  canvasId,
+  userId,
+  updateData,
+  retryCount,
+  previousState
+});
+```
+
+#### 6. Document Required Context Providers
+
+Always document context requirements in JSDoc comments:
+
+```typescript
+/**
+ * EditModeManager component handles inline editing state and operations
+ *
+ * @requires ApolloProvider - Required for GraphQL mutations (card updates)
+ * @requires EditModeStoreProvider - Required for edit mode state management
+ * @requires CardStoreProvider - Optional but recommended for optimistic updates
+ *
+ * Context Requirements:
+ * - Apollo Client must be configured with authenticated requests
+ * - Edit mode store must be initialized before mounting
+ * - Component will fail to render without required providers
+ *
+ * @example
+ * ```tsx
+ * <ApolloProvider client={apolloClient}>
+ *   <EditModeStoreProvider>
+ *     <EditModeManager />
+ *   </EditModeStoreProvider>
+ * </ApolloProvider>
+ * ```
+ */
+const logger = createContextLogger({ component: 'EditModeManager' });
+
+export const EditModeManager: React.FC = () => {
+  logger.debug('EditModeManager initialized', {
+    timestamp: Date.now()
+  });
+
+  // Component implementation
+};
+```
+
+#### 7. Error Handling with Comprehensive Logging
+
+```typescript
+const logger = createContextLogger({ component: 'CardEditor' });
+
+const handleSave = async (): Promise<void> => {
+  const startTime = Date.now();
+
+  logger.info('Saving card changes', {
+    cardId,
+    fieldsModified: Object.keys(changes),
+    changeCount: Object.keys(changes).length
+  });
+
+  try {
+    const result = await updateCard({
+      id: cardId,
+      ...changes
+    });
+
+    logger.info('Card saved successfully', {
+      cardId,
+      duration: Date.now() - startTime,
+      fieldsUpdated: Object.keys(changes)
+    });
+
+    return result;
+  } catch (error) {
+    logger.error('Failed to save card', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      errorStack: error instanceof Error ? error.stack : undefined,
+      errorType: error?.constructor?.name,
+      cardId,
+      changes,
+      duration: Date.now() - startTime,
+      retryCount: 0
+    });
+
+    // Re-throw for error boundary
+    throw error;
+  }
+};
+```
+
+#### 8. Async Operations and Promises
+
+```typescript
+const logger = createContextLogger({ component: 'DataFetcher' });
+
+const fetchData = useCallback(async (): Promise<void> => {
+  logger.debug('Starting data fetch', {
+    canvasId,
+    filters: activeFilters
+  });
+
+  try {
+    const data = await queryData({ canvasId });
+
+    logger.info('Data fetched successfully', {
+      canvasId,
+      recordCount: data.length,
+      duration: performance.now() - startTime
+    });
+  } catch (error) {
+    logger.error('Data fetch failed', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      errorStack: error instanceof Error ? error.stack : undefined,
+      canvasId,
+      filters: activeFilters
+    });
+    throw error;
+  }
+}, [canvasId, activeFilters]);
+```
+
+#### 9. Explicit Return Types for Callbacks
+
+Always specify return types for event handlers and callbacks:
+
+```typescript
+const logger = createContextLogger({ component: 'ActionHandler' });
+
+// ✅ Good: Explicit return types
+const handleClick = useCallback((): void => {
+  logger.debug('Button clicked', { buttonId });
+  performAction();
+}, [buttonId, performAction]);
+
+const handleAsyncAction = useCallback(async (): Promise<void> => {
+  logger.info('Starting async action', { actionType });
+  await performAsyncAction();
+  logger.info('Async action completed', { actionType });
+}, [actionType, performAsyncAction]);
+
+const handleFormSubmit = useCallback((e: React.FormEvent): void => {
+  e.preventDefault();
+  logger.info('Form submitted', { formId });
+  submitForm();
+}, [formId, submitForm]);
+
+// ❌ Bad: No return types
+const handleClick = useCallback(() => {
+  logger.debug('Button clicked', { buttonId });
+  performAction();
+}, [buttonId, performAction]);
+```
+
+#### 10. Logger Context Patterns
+
+Use appropriate context keys based on the module type:
+
+```typescript
+// Components
+const logger = createContextLogger({ component: 'CardList' });
+
+// Custom hooks
+const logger = createContextLogger({ hook: 'useCardOperations' });
+
+// Utility functions
+const logger = createContextLogger({ utility: 'canvasPositioning' });
+
+// Store actions
+const logger = createContextLogger({ store: 'cardStore' });
+
+// Service modules
+const logger = createContextLogger({ service: 'CanvasService' });
+```
+
+------
 
 ## Testing Patterns
+
+### Testing Integration Patterns
+
+**Critical Lesson**: When modifying existing components to add new dependencies (especially context providers like Apollo Client), ALL existing tests must be updated to provide those dependencies. This is a common source of test failures that can break CI/CD pipelines.
+
+#### Dependency Addition Checklist
+
+When adding a new dependency to an existing component:
+
+1. **Identify all affected tests**:
+```bash
+# Find all test files that import or test the modified component
+grep -r "ComponentName" --include="*.test.tsx" --include="*.test.ts"
+grep -r "ComponentName" --include="*.spec.tsx" --include="*.spec.ts"
+```
+
+2. **Update test wrappers to provide required context**:
+```typescript
+// BEFORE: Test without Apollo dependency
+import { render } from '@testing-library/react';
+import { EditModeManager } from '../EditModeManager';
+
+test('renders correctly', () => {
+  render(<EditModeManager />); // ❌ Will fail after adding Apollo dependency
+});
+
+// AFTER: Test with Apollo MockedProvider
+import { render } from '@testing-library/react';
+import { MockedProvider } from '@apollo/client/testing';
+import { EditModeManager } from '../EditModeManager';
+
+test('renders correctly', () => {
+  render(
+    <MockedProvider mocks={[]} addTypename={false}>
+      <EditModeManager />
+    </MockedProvider>
+  ); // ✅ Provides required Apollo context
+});
+```
+
+3. **Run the FULL test suite** - not just your new tests:
+```bash
+# Don't just run your new tests
+npm test EditModeManager.simple.test.tsx  # ❌ Insufficient
+
+# Run ALL tests for the component and related features
+npm test EditModeManager  # ✅ Catches all affected tests
+npm test canvas/editing  # ✅ Catches related component tests
+npm test  # ✅ Best - catches unexpected dependencies
+```
+
+#### Provider Hierarchy Pattern
+
+When components require multiple providers, maintain consistent hierarchy:
+
+```typescript
+// Reusable test wrapper for components with multiple dependencies
+const TestWrapper: React.FC<{ children: React.ReactNode; mocks?: any[] }> = ({
+  children,
+  mocks = []
+}) => (
+  <MockedProvider mocks={mocks} addTypename={false}>
+    <StoreProvider>
+      <ThemeProvider>
+        {children}
+      </ThemeProvider>
+    </StoreProvider>
+  </MockedProvider>
+);
+
+// Usage in tests
+test('component with multiple dependencies', () => {
+  render(
+    <TestWrapper mocks={apolloMocks}>
+      <ComplexComponent />
+    </TestWrapper>
+  );
+});
+```
+
+#### Component Context Requirements Documentation
+
+Components should clearly document their context dependencies:
+
+```typescript
+/**
+ * EditModeManager Component
+ *
+ * Required Context Providers:
+ * - Apollo Client (via MockedProvider in tests)
+ * - CardStore (via StoreProvider)
+ *
+ * @requires Apollo Client context for useCardOperations hook
+ * @requires CardStore for local state management
+ */
+export const EditModeManager: React.FC<Props> = ({ children }) => {
+  const { updateCard } = useCardOperations(); // Requires Apollo
+  const { cards } = useCardStore(); // Requires store
+  // ...
+};
+```
+
+### Common Testing Pitfalls
+
+#### The Apollo Client Context Missing Error
+
+**Symptom**: `Invariant Violation: Could not find "client" in the context or passed in as an option`
+
+**Cause**: Component uses Apollo hooks (useQuery, useMutation, etc.) but test doesn't provide MockedProvider
+
+**Solution**: Always wrap components using Apollo in MockedProvider:
+```typescript
+// Create a helper for consistent Apollo test setup
+export const renderWithApollo = (
+  component: React.ReactElement,
+  { mocks = [], ...options }: any = {}
+) => {
+  return render(
+    <MockedProvider mocks={mocks} addTypename={false}>
+      {component}
+    </MockedProvider>,
+    options
+  );
+};
+```
+
+#### The "TDD for New Features but Forgetting Existing Tests" Anti-Pattern
+
+**Problem**: You follow TDD perfectly for new features but break 149 existing tests by adding a dependency to a shared component.
+
+**Real Example**: Adding `useCardOperations` (Apollo hook) to `EditModeManager` broke all existing tests that didn't provide MockedProvider.
+
+**Prevention Strategy**:
+1. Before modifying shared components, run existing tests first
+2. After adding dependencies, run tests again before writing new ones
+3. Update existing tests to provide new dependencies
+4. Then proceed with TDD for new functionality
+
+#### Identifying When Tests Need Provider Updates
+
+**Red Flags** that indicate missing providers:
+- `Cannot read property 'store' of undefined` - Missing store provider
+- `useContext must be used within a Provider` - Missing specific context
+- `Invalid hook call` - Often missing provider or incorrect test setup
+- `Invariant Violation` with Apollo - Missing MockedProvider
+- Theme-related errors - Missing ThemeProvider
+
+**Proactive Detection**:
+```typescript
+// Add this to your component to make dependencies explicit
+if (typeof window !== 'undefined' && !client) {
+  console.warn('EditModeManager requires Apollo Client context');
+}
+```
+
+### Test Maintenance Best Practices
+
+#### Creating Reusable Test Utilities
+
+```typescript
+// test-utils/providers.tsx
+export const AllProviders: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const mockClient = new ApolloClient({
+    cache: new InMemoryCache(),
+    defaultOptions: {
+      query: { errorPolicy: 'all' },
+      mutate: { errorPolicy: 'all' },
+    },
+  });
+
+  return (
+    <ApolloProvider client={mockClient}>
+      <StoreProvider>
+        {children}
+      </StoreProvider>
+    </ApolloProvider>
+  );
+};
+
+// Custom render function
+export const renderWithProviders = (ui: React.ReactElement, options = {}) => {
+  return render(ui, {
+    wrapper: AllProviders,
+    ...options,
+  });
+};
+```
+
+#### Test File Organization Pattern
+
+```typescript
+// EditModeManager.test.tsx - Organized for clarity
+import { MockedProvider } from '@apollo/client/testing';
+import { render, screen } from '@testing-library/react';
+import { EditModeManager } from '../EditModeManager';
+
+// 1. Document required providers at the top
+/**
+ * Test Requirements:
+ * - Apollo MockedProvider (for useCardOperations)
+ * - CardStore mock (for useCardStore)
+ */
+
+// 2. Define mocks and test data
+const apolloMocks = [...];
+const storeMocks = {...};
+
+// 3. Create test-specific wrapper
+const renderEditModeManager = (props = {}, mocks = apolloMocks) => {
+  return render(
+    <MockedProvider mocks={mocks} addTypename={false}>
+      <EditModeManager {...props} />
+    </MockedProvider>
+  );
+};
+
+// 4. Use consistent wrapper in all tests
+describe('EditModeManager', () => {
+  test('handles edit mode correctly', () => {
+    renderEditModeManager({ cardId: 'test-1' });
+    // ... test implementation
+  });
+});
+```
+
+#### Regression Testing Strategy
+
+When modifying shared components:
+
+1. **Create a regression test checklist**:
+```typescript
+// Before making changes to shared component
+describe('EditModeManager - Regression Tests', () => {
+  test.todo('All existing Canvas tests pass');
+  test.todo('All existing Card tests pass');
+  test.todo('All parent component tests pass');
+  test.todo('Integration tests still work');
+});
+```
+
+2. **Run progressive test suites**:
+```bash
+# Level 1: Component tests
+npm test EditModeManager
+
+# Level 2: Feature tests
+npm test canvas/editing
+
+# Level 3: Related feature tests
+npm test canvas
+
+# Level 4: Full suite
+npm test
+```
+
+3. **Document breaking changes**:
+```typescript
+// BREAKING CHANGE: Added Apollo Client dependency
+// All tests using EditModeManager must now provide MockedProvider
+// See: EditModeManager.test.tsx for examples
+```
+
+### Quick Reference: Test Update Checklist
+
+When adding dependencies to existing components:
+
+- [ ] **Before changes**: Run `npm test [component]` to ensure tests pass
+- [ ] **Add dependency**: Implement your feature/change
+- [ ] **Find affected tests**: `grep -r "ComponentName" --include="*.test.*"`
+- [ ] **Update test setup**: Add required providers (MockedProvider, etc.)
+- [ ] **Run component tests**: `npm test [component]`
+- [ ] **Run feature tests**: `npm test [feature-folder]`
+- [ ] **Run full suite**: `npm test` (before committing)
+- [ ] **Document requirements**: Add `@requires` comments to component
+- [ ] **Update test utilities**: Add reusable wrappers if needed
+- [ ] **Commit message**: Note if tests were updated for new dependencies
+
+**Remember**: A component modification that breaks 149 tests is a failed modification, even if your 3 new tests pass perfectly!
 
 ### Backend Service Testing
 
@@ -1428,6 +2239,34 @@ describe('WorkspaceService', () => {
       ).rejects.toThrow(ValidationError);
     });
   });
+});
+```
+
+### Dependency Injection for Testability
+
+**Pattern**: Design components with dependency injection in mind to simplify testing:
+
+```typescript
+// BAD: Hard dependency on Apollo hook makes testing difficult
+export const CardEditor: React.FC<Props> = ({ cardId }) => {
+  const { updateCard } = useCardOperations(); // Hard dependency
+  // Component logic...
+};
+
+// GOOD: Optional dependency injection for testing
+export const CardEditor: React.FC<Props & {
+  updateCard?: (id: string, data: any) => Promise<void>
+}> = ({ cardId, updateCard: updateCardProp }) => {
+  const { updateCard: updateCardHook } = useCardOperations();
+  const updateCard = updateCardProp || updateCardHook; // Use injected or default
+  // Component logic...
+};
+
+// In tests, you can now inject mocks directly
+test('updates card', async () => {
+  const mockUpdate = jest.fn();
+  render(<CardEditor cardId="1" updateCard={mockUpdate} />);
+  // No need for MockedProvider if not testing Apollo integration
 });
 ```
 
@@ -1894,6 +2733,164 @@ export interface CardResponse {
 
 ---
 
+## Architecture Compliance Checklist
+
+This checklist ensures all implementations follow the architecture guide standards. Use this before marking any task as complete or creating a pull request.
+
+### Section 1: Data Flow Architecture
+
+- [ ] Server data flows through Apollo Client cache only
+- [ ] UI state flows through Zustand stores only
+- [ ] No server data stored in Zustand stores (Section 1)
+- [ ] No UI state stored in Apollo cache (Section 1)
+- [ ] All database operations go through service layer (Section 1)
+- [ ] Unidirectional data flow maintained (Section 1)
+
+### Section 2: State Management Strategy
+
+- [ ] Apollo Client used for all persistent data (cards, workspaces, users) (Section 2)
+- [ ] Zustand used only for transient UI state (selection, modals, drag state) (Section 2)
+- [ ] No data duplication between Apollo and Zustand (Section 2)
+- [ ] Cache updates implemented for all mutations (Section 2)
+- [ ] Proper cache policies applied (`cache-and-network` for collaborative data) (Section 9)
+
+### Section 3: Error Handling Standards
+
+- [ ] All service methods use try-catch with proper logging (Section 3)
+- [ ] Zod schemas validate all inputs (Section 3)
+- [ ] ValidationError thrown for invalid inputs (Section 3)
+- [ ] Structured logging with context (no console.log) (Section 3)
+- [ ] Errors logged with full context before re-throwing (Section 3)
+- [ ] Frontend mutations have onError handlers (Section 3)
+
+### Section 4: Enum Type Standardization (CRITICAL)
+
+- [ ] **All enum values are lowercase strings** (Section 4)
+- [ ] **TypeScript enums used instead of string literal unions** (Section 4)
+- [ ] **Database stores lowercase enum values** (Section 4)
+- [ ] **GraphQL schema uses lowercase enum values** (Section 4)
+- [ ] **Frontend uses enum constants (e.g., `WorkspacePrivacy.PRIVATE`)** (Section 4)
+- [ ] **Backend uses enum constants (e.g., `CardType.TEXT`)** (Section 4)
+- [ ] **Zod schemas use `z.nativeEnum(EnumName)`** (Section 4)
+- [ ] **No string literals like `'PRIVATE'` or `'Private'` in code** (Section 4)
+
+### Section 5: API Design Patterns
+
+- [ ] GraphQL queries/mutations properly typed (Section 5)
+- [ ] Resolvers delegate to service layer (Section 5)
+- [ ] No business logic in resolvers (Section 5)
+- [ ] Input types defined for all mutations (Section 5)
+- [ ] Authentication validated in all resolvers (Section 5)
+
+### Section 6: Backend Service Layer Pattern
+
+- [ ] Service class follows template structure (Section 6)
+- [ ] Input validation with Zod schemas (Section 6)
+- [ ] Comprehensive error handling and logging (Section 6)
+- [ ] Database operations through Knex query builder (Section 6)
+- [ ] Transactions used for multi-step operations (Section 6)
+- [ ] Data mapping between DB and domain models (Section 6)
+
+### Section 7: Frontend Hook Pattern
+
+- [ ] Hooks follow template structure (Section 7)
+- [ ] Clear separation of UI state vs server operations (Section 7)
+- [ ] Memoized callbacks with useCallback (Section 7)
+- [ ] Apollo cache updates in mutation handlers (Section 7)
+- [ ] Error handling with state updates (Section 7)
+- [ ] Proper dependency arrays for hooks (Section 7)
+
+### Section 8: Frontend Store Pattern
+
+- [ ] Store contains UI state only (Section 8)
+- [ ] Immutable state updates (Section 8)
+- [ ] Proper Set/Map serialization in persist (Section 8)
+- [ ] DevTools integration enabled (Section 8)
+- [ ] TypeScript types for all state (Section 8)
+
+### Section 9: Testing Patterns
+
+- [ ] Tests written BEFORE implementation (TDD approach) (Section 9)
+- [ ] All existing tests pass after changes (Section 9)
+- [ ] MockedProvider added when using Apollo hooks (Section 9)
+- [ ] Test wrappers provide all required contexts (Section 9)
+- [ ] Component context requirements documented with @requires (Section 9)
+- [ ] Integration tests cover critical paths (Section 9)
+
+### Section 10: Performance Guidelines
+
+- [ ] Database queries use proper indexes (Section 9)
+- [ ] Expensive calculations memoized with useMemo (Section 9)
+- [ ] Callbacks memoized with useCallback (Section 9)
+- [ ] Apollo cache policies match data type (Section 9)
+- [ ] React.memo used for expensive renders (Section 9)
+- [ ] Canvas rendering optimized for Konva.js (Section 9)
+
+### Section 11: Code Quality Standards
+
+- [ ] `npm run type-check` passes with zero errors (Section 6.4)
+- [ ] `npm run lint` passes with zero errors (Section 6.4)
+- [ ] `npm test` passes all tests (Section 6.4)
+- [ ] No `any` types in new code (Section 6.4)
+- [ ] No `console.log` - use logger instead (Section 6.4)
+- [ ] Explicit return types on all functions (Section 6.4)
+- [ ] Proper variable declarations (const/let, no var) (Section 6.4)
+
+### Section 12: Common Anti-Patterns to Avoid
+
+- [ ] Server data NOT stored in Zustand (Section 10)
+- [ ] No direct database access in resolvers (Section 10)
+- [ ] No missing input validation (Section 10)
+- [ ] No swallowed errors (Section 10)
+- [ ] No inconsistent enum usage (Section 10)
+- [ ] No localStorage for server data (Section 10)
+
+### Pre-Commit Checklist
+
+Run these commands before every commit:
+
+```bash
+# TypeScript compilation
+npm run type-check
+
+# Linting
+npm run lint
+
+# Tests
+npm test
+
+# All quality gates
+npm run type-check && npm run lint && npm test
+```
+
+### Pull Request Checklist
+
+Before creating a PR, verify:
+
+- [ ] All checkboxes above are checked for modified code
+- [ ] Linear ticket updated with implementation summary
+- [ ] Breaking changes documented in PR description
+- [ ] Test coverage for new features
+- [ ] Architecture guide followed for all new code
+- [ ] No regressions in existing functionality
+
+### Quick Reference: Section Numbers
+
+- Section 1: Data Flow Architecture
+- Section 2: State Management Strategy
+- Section 3: Error Handling Standards
+- Section 4: Enum Type Standardization
+- Section 5: API Design Patterns
+- Section 6: Backend Service Layer Pattern
+- Section 7: Frontend Hook Pattern
+- Section 8: Frontend Store Pattern
+- Section 9: Testing Patterns & Performance Guidelines
+- Section 10: Common Anti-Patterns
+- Section 11: Code Quality Standards (6.4 in Development Workflow)
+- Section 12: Common Anti-Patterns
+
+---
+
 ## Conclusion
 
 This living architecture guide reflects the **current working state** of Project Nexus and provides practical guidelines for maintaining consistency as the codebase grows. The patterns documented here are proven to work in the current implementation and should be followed for new development.
@@ -1906,6 +2903,7 @@ This living architecture guide reflects the **current working state** of Project
 4. **Handle Errors Properly**: Comprehensive error handling and logging
 5. **Test Systematically**: Follow established testing patterns
 6. **Monitor Performance**: Use established optimization patterns
+7. **Use the Compliance Checklist**: Verify adherence before marking tasks complete
 
 **Next Steps**:
 
@@ -1913,5 +2911,6 @@ This living architecture guide reflects the **current working state** of Project
 - Add new ADRs for significant architectural decisions
 - Refactor inconsistent code to match established patterns
 - Create additional templates for common scenarios
+- Use the Architecture Compliance Checklist for all new development
 
 This guide should be the **authoritative reference** for all architectural decisions and implementation patterns in Project Nexus.

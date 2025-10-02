@@ -16,8 +16,7 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import useCardCreation from '../useCardCreation';
 import { createMockCanvasStore } from '../../__tests__/utils';
 import type { CanvasPosition } from '@/types/canvas.types';
-
-const { useCanvasStore } = require('@/stores/canvasStore');
+import { useCanvasStore } from '@/stores/canvasStore';
 
 // Mock canvas store
 let mockCanvasStore: ReturnType<typeof createMockCanvasStore>;
@@ -34,6 +33,8 @@ const mockCardStore = {
   selectCard: jest.fn(),
   deselectCard: jest.fn(),
   clearSelection: jest.fn(),
+  setEditingCard: jest.fn(),
+  clearEditingCard: jest.fn(),
   cards: new Map(),
   selectedIds: new Set(),
 };
@@ -124,7 +125,7 @@ describe('useCardCreation', () => {
     });
 
     // Setup mocks
-    (useCanvasStore as jest.Mock).mockReturnValue(mockCanvasStore);
+    jest.mocked(useCanvasStore).mockReturnValue(mockCanvasStore);
   });
 
   describe('Initial State', () => {
@@ -456,6 +457,386 @@ describe('useCardCreation', () => {
       // Should be center + offset
       expect(position.x).toBe(522); // 512 + 10
       expect(position.y).toBe(404); // 384 + 20
+    });
+  });
+
+  describe('Auto-Enter Edit Mode', () => {
+    describe('Auto-enter enabled', () => {
+      it('should enter edit mode automatically after successful card creation', async () => {
+        const { result } = renderHook(
+          () => useCardCreation({
+            workspaceId: mockWorkspaceId,
+            autoEnterEditMode: true
+          }),
+          { wrapper: TestWrapper }
+        );
+        const position: CanvasPosition = { x: 100, y: 200, z: 123 };
+
+        // Set up state for card creation
+        act(() => {
+          result.current.openModal(position, 'text');
+        });
+
+        let cardId: string | null = null;
+        await act(async () => {
+          cardId = await result.current.createCard();
+        });
+
+        await waitFor(() => {
+          expect(cardId).toBe('test-card-id');
+          // Verify that setEditingCard was called with the new card ID
+          expect(mockCardStore.setEditingCard).toHaveBeenCalledWith('test-card-id');
+        }, { timeout: 2000 });
+      });
+
+      it('should enter edit mode after createCardAtPosition', async () => {
+        const { result } = renderHook(
+          () => useCardCreation({
+            workspaceId: mockWorkspaceId,
+            autoEnterEditMode: true
+          }),
+          { wrapper: TestWrapper }
+        );
+        const position: CanvasPosition = { x: 100, y: 200, z: 123 };
+
+        let cardId: string | null = null;
+        await act(async () => {
+          cardId = await result.current.createCardAtPosition('text', position);
+        });
+
+        await waitFor(() => {
+          expect(cardId).toBe('test-card-id');
+          // Verify that setEditingCard was called with the new card ID
+          expect(mockCardStore.setEditingCard).toHaveBeenCalledWith('test-card-id');
+        }, { timeout: 2000 });
+      });
+
+      it('should enter edit mode with custom content', async () => {
+        const { result } = renderHook(
+          () => useCardCreation({
+            workspaceId: mockWorkspaceId,
+            autoEnterEditMode: true
+          }),
+          { wrapper: TestWrapper }
+        );
+        const position: CanvasPosition = { x: 100, y: 200, z: 123 };
+
+        let cardId: string | null = null;
+        await act(async () => {
+          cardId = await result.current.createCardAtPosition('code', position, '// Custom code');
+        });
+
+        await waitFor(() => {
+          expect(cardId).toBe('test-card-id');
+          expect(mockCardStore.setEditingCard).toHaveBeenCalledWith('test-card-id');
+        }, { timeout: 2000 });
+      });
+
+      it('should close modal/context menu before entering edit mode', async () => {
+        const { result } = renderHook(
+          () => useCardCreation({
+            workspaceId: mockWorkspaceId,
+            autoEnterEditMode: true
+          }),
+          { wrapper: TestWrapper }
+        );
+        const position: CanvasPosition = { x: 100, y: 200, z: 123 };
+
+        // Set up state with modal open
+        act(() => {
+          result.current.openModal(position, 'text');
+        });
+
+        expect(result.current.state.isModalOpen).toBe(true);
+
+        await act(async () => {
+          await result.current.createCard();
+        });
+
+        await waitFor(() => {
+          // Modal should be closed before entering edit mode
+          expect(result.current.state.isModalOpen).toBe(false);
+          expect(result.current.state.isContextMenuOpen).toBe(false);
+          expect(mockCardStore.setEditingCard).toHaveBeenCalledWith('test-card-id');
+        }, { timeout: 2000 });
+      });
+    });
+
+    describe('Auto-enter disabled', () => {
+      it('should NOT enter edit mode when autoEnterEditMode is false', async () => {
+        const { result } = renderHook(
+          () => useCardCreation({
+            workspaceId: mockWorkspaceId,
+            autoEnterEditMode: false
+          }),
+          { wrapper: TestWrapper }
+        );
+        const position: CanvasPosition = { x: 100, y: 200, z: 123 };
+
+        act(() => {
+          result.current.openModal(position, 'text');
+        });
+
+        await act(async () => {
+          await result.current.createCard();
+        });
+
+        await waitFor(() => {
+          // setEditingCard should NOT be called
+          expect(mockCardStore.setEditingCard).not.toHaveBeenCalled();
+        }, { timeout: 2000 });
+      });
+
+      it('should NOT enter edit mode by default when config not provided', async () => {
+        const { result } = renderHook(
+          () => useCardCreation({ workspaceId: mockWorkspaceId }),
+          { wrapper: TestWrapper }
+        );
+        const position: CanvasPosition = { x: 100, y: 200, z: 123 };
+
+        act(() => {
+          result.current.openModal(position, 'text');
+        });
+
+        await act(async () => {
+          await result.current.createCard();
+        });
+
+        await waitFor(() => {
+          expect(mockCardStore.setEditingCard).not.toHaveBeenCalled();
+        }, { timeout: 2000 });
+      });
+    });
+
+    describe('Error scenarios', () => {
+      it('should NOT enter edit mode if card creation fails', async () => {
+        // Configure mutation to reject
+        mockMutationResult.mockRejectedValue(new Error('Failed to create card'));
+
+        const { result } = renderHook(
+          () => useCardCreation({
+            workspaceId: mockWorkspaceId,
+            autoEnterEditMode: true
+          }),
+          { wrapper: TestWrapper }
+        );
+        const position: CanvasPosition = { x: 100, y: 200, z: 123 };
+
+        act(() => {
+          result.current.openModal(position, 'text');
+        });
+
+        await act(async () => {
+          await result.current.createCard();
+        });
+
+        await waitFor(() => {
+          // setEditingCard should NOT be called on failure
+          expect(mockCardStore.setEditingCard).not.toHaveBeenCalled();
+          expect(result.current.state.error).toContain('Failed to create card');
+        });
+      });
+
+      it('should NOT enter edit mode if no card ID is returned', async () => {
+        // Configure mutation to return no card
+        mockMutationResult.mockResolvedValue({
+          data: {
+            createCard: null
+          }
+        });
+
+        const { result } = renderHook(
+          () => useCardCreation({
+            workspaceId: mockWorkspaceId,
+            autoEnterEditMode: true
+          }),
+          { wrapper: TestWrapper }
+        );
+        const position: CanvasPosition = { x: 100, y: 200, z: 123 };
+
+        act(() => {
+          result.current.openModal(position, 'text');
+        });
+
+        await act(async () => {
+          await result.current.createCard();
+        });
+
+        await waitFor(() => {
+          expect(mockCardStore.setEditingCard).not.toHaveBeenCalled();
+          expect(result.current.state.error).toContain('No card returned from mutation');
+        });
+      });
+
+      it('should handle missing card ID gracefully', async () => {
+        // Configure mutation to return card without ID
+        mockMutationResult.mockResolvedValue({
+          data: {
+            createCard: {
+              // Missing id field
+              workspaceId: mockWorkspaceId,
+              title: 'Test',
+              content: 'Test content'
+            }
+          }
+        });
+
+        const { result } = renderHook(
+          () => useCardCreation({
+            workspaceId: mockWorkspaceId,
+            autoEnterEditMode: true
+          }),
+          { wrapper: TestWrapper }
+        );
+        const position: CanvasPosition = { x: 100, y: 200, z: 123 };
+
+        act(() => {
+          result.current.openModal(position, 'text');
+        });
+
+        const cardId = await act(async () => {
+          return await result.current.createCard();
+        });
+
+        // Should still succeed but not enter edit mode
+        expect(cardId).toBe(undefined);
+        expect(mockCardStore.setEditingCard).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('Animation timing and transitions', () => {
+      it('should wait for modal close animation before entering edit mode', async () => {
+        const { result } = renderHook(
+          () => useCardCreation({
+            workspaceId: mockWorkspaceId,
+            autoEnterEditMode: true
+          }),
+          { wrapper: TestWrapper }
+        );
+        const position: CanvasPosition = { x: 100, y: 200, z: 123 };
+
+        act(() => {
+          result.current.openModal(position, 'text');
+        });
+
+        const startTime = Date.now();
+        await act(async () => {
+          await result.current.createCard();
+        });
+
+        await waitFor(() => {
+          expect(mockCardStore.setEditingCard).toHaveBeenCalledWith('test-card-id');
+          // Should have waited a brief moment for animation (at least 50ms)
+          const elapsed = Date.now() - startTime;
+          expect(elapsed).toBeGreaterThanOrEqual(50);
+        }, { timeout: 2000 });
+      });
+
+      it('should enter edit mode smoothly without flickering', async () => {
+        const { result } = renderHook(
+          () => useCardCreation({
+            workspaceId: mockWorkspaceId,
+            autoEnterEditMode: true
+          }),
+          { wrapper: TestWrapper }
+        );
+        const position: CanvasPosition = { x: 100, y: 200, z: 123 };
+
+        act(() => {
+          result.current.openModal(position, 'text');
+        });
+
+        await act(async () => {
+          await result.current.createCard();
+        });
+
+        await waitFor(() => {
+          // Modal should be closed
+          expect(result.current.state.isModalOpen).toBe(false);
+          // Edit mode should be entered
+          expect(mockCardStore.setEditingCard).toHaveBeenCalledWith('test-card-id');
+          // Exactly one call to setEditingCard (no flickering)
+          expect(mockCardStore.setEditingCard).toHaveBeenCalledTimes(1);
+        }, { timeout: 2000 });
+      });
+    });
+
+    describe('Integration with different card types', () => {
+      it('should enter edit mode for text cards', async () => {
+        const { result } = renderHook(
+          () => useCardCreation({
+            workspaceId: mockWorkspaceId,
+            autoEnterEditMode: true
+          }),
+          { wrapper: TestWrapper }
+        );
+        const position: CanvasPosition = { x: 100, y: 200, z: 123 };
+
+        await act(async () => {
+          await result.current.createCardAtPosition('text', position);
+        });
+
+        await waitFor(() => {
+          expect(mockCardStore.setEditingCard).toHaveBeenCalledWith('test-card-id');
+        }, { timeout: 2000 });
+      });
+
+      it('should enter edit mode for code cards', async () => {
+        const { result } = renderHook(
+          () => useCardCreation({
+            workspaceId: mockWorkspaceId,
+            autoEnterEditMode: true
+          }),
+          { wrapper: TestWrapper }
+        );
+        const position: CanvasPosition = { x: 100, y: 200, z: 123 };
+
+        await act(async () => {
+          await result.current.createCardAtPosition('code', position);
+        });
+
+        await waitFor(() => {
+          expect(mockCardStore.setEditingCard).toHaveBeenCalledWith('test-card-id');
+        }, { timeout: 2000 });
+      });
+
+      it('should enter edit mode for link cards', async () => {
+        const { result } = renderHook(
+          () => useCardCreation({
+            workspaceId: mockWorkspaceId,
+            autoEnterEditMode: true
+          }),
+          { wrapper: TestWrapper }
+        );
+        const position: CanvasPosition = { x: 100, y: 200, z: 123 };
+
+        await act(async () => {
+          await result.current.createCardAtPosition('link', position);
+        });
+
+        await waitFor(() => {
+          expect(mockCardStore.setEditingCard).toHaveBeenCalledWith('test-card-id');
+        }, { timeout: 2000 });
+      });
+
+      it('should enter edit mode for image cards', async () => {
+        const { result } = renderHook(
+          () => useCardCreation({
+            workspaceId: mockWorkspaceId,
+            autoEnterEditMode: true
+          }),
+          { wrapper: TestWrapper }
+        );
+        const position: CanvasPosition = { x: 100, y: 200, z: 123 };
+
+        await act(async () => {
+          await result.current.createCardAtPosition('image', position);
+        });
+
+        await waitFor(() => {
+          expect(mockCardStore.setEditingCard).toHaveBeenCalledWith('test-card-id');
+        }, { timeout: 2000 });
+      });
     });
   });
 });

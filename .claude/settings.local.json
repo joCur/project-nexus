@@ -57,7 +57,8 @@
       "mcp__notion__notion-create-pages",
       "Bash(npm run test:*)",
       "Bash(npm run test:frontend:*)",
-      "mcp__notion__notion-fetch"
+      "mcp__notion__notion-fetch",
+      "Bash(npx eslint:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"

@@ -51,6 +51,7 @@ export const useCardStore = create<CardStore>()(
           showTooltip: false,
           tooltipPosition: undefined,
         },
+        editingCardId: null,
 
         // Selection management (UI state only)
         selectCard: (id: CardId, addToSelection: boolean = false) => {
@@ -214,6 +215,21 @@ export const useCardStore = create<CardStore>()(
               ...state.hoverState,
               hoveredId: id,
             },
+          }));
+        },
+
+        // Edit mode operations (UI state only)
+        setEditingCard: (id: CardId | null) => {
+          set((state) => ({
+            ...state,
+            editingCardId: id,
+          }));
+        },
+
+        clearEditingCard: () => {
+          set((state) => ({
+            ...state,
+            editingCardId: null,
           }));
         },
       }),
