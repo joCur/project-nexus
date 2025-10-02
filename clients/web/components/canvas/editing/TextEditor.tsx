@@ -28,6 +28,10 @@ import {
   type BaseEditorChildProps
 } from './BaseEditor';
 import type { TextCard, TextCardContent } from '@/types/card.types';
+import { createContextLogger } from '@/utils/logger';
+
+// Create logger at module level with component context
+const logger = createContextLogger({ component: 'TextEditor' });
 
 // Constants
 const MAX_CHARACTERS = 10000;
@@ -132,18 +136,50 @@ export const TextEditor: React.FC<TextEditorProps> = ({
   // Refs
   const editorRef = useRef<HTMLDivElement>(null);
   const linkInputRef = useRef<HTMLInputElement>(null);
+  const hasInitializedRef = useRef<boolean>(false);
 
   // Debounced content for character count
   const debouncedContent = useDebounce(content, 300);
   const characterCount = debouncedContent.length;
   const wordCount = useMemo(() => countWords(debouncedContent), [debouncedContent]);
 
-  // Initialize content display
+  // Log component mount
   useEffect(() => {
-    if (editorRef.current && card.content.markdown) {
-      editorRef.current.innerHTML = markdownToHtml(card.content.content || '');
+    logger.debug('TextEditor mounted', {
+      cardId: card.id,
+      hasMarkdown: card.content.markdown,
+      contentLength: card.content.content?.length || 0,
+      autoFocus
+    });
+
+    return (): void => {
+      logger.debug('TextEditor unmounting', {
+        cardId: card.id
+      });
+    };
+  }, [card.id, card.content.markdown, card.content.content, autoFocus]);
+
+  // Initialize content display only once on mount
+  useEffect(() => {
+    if (editorRef.current && !hasInitializedRef.current) {
+      if (card.content.markdown) {
+        // For markdown cards, convert markdown to HTML and set innerHTML
+        editorRef.current.innerHTML = markdownToHtml(card.content.content || '');
+        logger.debug('Initialized markdown content', {
+          cardId: card.id,
+          contentLength: card.content.content?.length || 0
+        });
+      } else {
+        // For plain text cards, use textContent (safer, no HTML injection)
+        editorRef.current.textContent = card.content.content || '';
+        logger.debug('Initialized plain text content', {
+          cardId: card.id,
+          contentLength: card.content.content?.length || 0
+        });
+      }
+      hasInitializedRef.current = true;
     }
-  }, []);
+  }, [card.id, card.content.markdown, card.content.content]);
 
   // Auto-focus
   useEffect(() => {
@@ -189,14 +225,26 @@ export const TextEditor: React.FC<TextEditorProps> = ({
   /**
    * Handle content changes
    */
-  const handleInput = useCallback(() => {
+  const handleInput = useCallback((): void => {
     if (!editorRef.current) return;
 
     // Convert to plain text for character counting
     const plainText = editorRef.current.textContent || '';
 
+    logger.debug('Content changed', {
+      cardId: card.id,
+      newLength: plainText.length,
+      wordCount: countWords(plainText)
+    });
+
     // Enforce character limit
     if (plainText.length > MAX_CHARACTERS) {
+      logger.warn('Character limit exceeded', {
+        currentLength: plainText.length,
+        limit: MAX_CHARACTERS,
+        cardId: card.id
+      });
+
       // Truncate content
       const truncated = plainText.slice(0, MAX_CHARACTERS);
       editorRef.current.textContent = truncated;
@@ -211,16 +259,22 @@ export const TextEditor: React.FC<TextEditorProps> = ({
     }
 
     setContent(plainText);
-  }, []);
+  }, [card.id]);
 
   /**
    * Handle paste events - convert to plain text
    */
-  const handlePaste = useCallback((e: ClipboardEvent<HTMLDivElement>) => {
+  const handlePaste = useCallback((e: ClipboardEvent<HTMLDivElement>): void => {
     e.preventDefault();
 
     const text = e.clipboardData.getData('text/plain');
     if (!text) return;
+
+    logger.debug('Paste event', {
+      cardId: card.id,
+      pasteLength: text.length,
+      hasNewlines: text.includes('\n')
+    });
 
     // Get current content length
     const currentLength = editorRef.current?.textContent?.length || 0;
@@ -248,7 +302,7 @@ export const TextEditor: React.FC<TextEditorProps> = ({
     selection.addRange(range);
 
     handleInput();
-  }, [handleInput]);
+  }, [card.id, handleInput]);
 
   /**
    * Prepare content for saving
@@ -272,8 +326,13 @@ export const TextEditor: React.FC<TextEditorProps> = ({
   /**
    * Apply formatting to selected text
    */
-  const applyFormat = useCallback((formatType: 'bold' | 'italic') => {
+  const applyFormat = useCallback((formatType: 'bold' | 'italic'): void => {
     if (!editorRef.current) return;
+
+    logger.debug('Applying format', {
+      cardId: card.id,
+      formatType
+    });
 
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) return;
@@ -314,12 +373,12 @@ export const TextEditor: React.FC<TextEditorProps> = ({
     selection.addRange(range);
 
     handleInput();
-  }, [handleInput]);
+  }, [card.id, handleInput]);
 
   /**
    * Handle keyboard shortcuts
    */
-  const handleKeyDown = useCallback((e: KeyboardEvent<HTMLDivElement>) => {
+  const handleKeyDown = useCallback((e: KeyboardEvent<HTMLDivElement>): void => {
     const isCtrl = e.ctrlKey || e.metaKey;
 
     if (isCtrl) {
@@ -360,8 +419,14 @@ export const TextEditor: React.FC<TextEditorProps> = ({
   /**
    * Insert link with URL
    */
-  const insertLink = useCallback((url: string) => {
+  const insertLink = useCallback((url: string): void => {
     if (!url) return;
+
+    logger.debug('Inserting link', {
+      cardId: card.id,
+      url,
+      selectedTextLength: selectedText.length
+    });
 
     // Restore selection and create link
     const selection = window.getSelection();
@@ -385,7 +450,7 @@ export const TextEditor: React.FC<TextEditorProps> = ({
     setIsLinkDialogOpen(false);
     setSelectedText('');
     handleInput();
-  }, [selectedText, handleInput]);
+  }, [card.id, selectedText, handleInput]);
 
   /**
    * Validate content
@@ -393,13 +458,21 @@ export const TextEditor: React.FC<TextEditorProps> = ({
   const validateContent = useCallback((value: TextCardContent): boolean | string => {
     const content = value.content || '';
     if (!content || content.trim().length === 0) {
+      logger.warn('Validation failed: empty content', {
+        cardId: card.id
+      });
       return 'Content cannot be empty';
     }
     if (content.length > MAX_CHARACTERS) {
+      logger.warn('Validation failed: content too long', {
+        cardId: card.id,
+        contentLength: content.length,
+        limit: MAX_CHARACTERS
+      });
       return `Content exceeds ${MAX_CHARACTERS} character limit`;
     }
     return true;
-  }, []);
+  }, [card.id]);
 
   /**
    * Character count color based on length

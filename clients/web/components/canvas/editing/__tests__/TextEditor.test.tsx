@@ -805,4 +805,64 @@ describe('TextEditor Component', () => {
       expect(container.firstChild).toBeInTheDocument();
     });
   });
+
+  describe('Content Initialization', () => {
+    it('initializes with plain text content when card is not markdown', () => {
+      // Create a plain text card (markdown: false)
+      const plainTextCard: TextCard = {
+        ...mockTextCard,
+        content: {
+          type: 'text',
+          content: 'Hello, this is plain text',
+          markdown: false,
+          wordCount: 4,
+          lastEditedAt: Date.now().toString()
+        }
+      };
+
+      render(<TextEditor {...defaultProps} card={plainTextCard} />);
+      const editor = screen.getByRole('textbox');
+
+      // Verify the editor displays the plain text content using textContent
+      // Plain text should not contain any HTML formatting
+      expect(editor.textContent).toBe('Hello, this is plain text');
+
+      // Verify no HTML elements are rendered in the editor
+      expect(editor.querySelector('strong')).toBeNull();
+      expect(editor.querySelector('em')).toBeNull();
+      expect(editor.querySelector('a')).toBeNull();
+    });
+
+    it('initializes with markdown content when card is markdown', () => {
+      // Create a markdown card (markdown: true)
+      const markdownCard: TextCard = {
+        ...mockTextCard,
+        content: {
+          type: 'text',
+          content: '**Bold text** and *italic text* with [link](https://example.com)',
+          markdown: true,
+          wordCount: 7,
+          lastEditedAt: Date.now().toString()
+        }
+      };
+
+      render(<TextEditor {...defaultProps} card={markdownCard} />);
+      const editor = screen.getByRole('textbox');
+
+      // Verify the editor displays formatted HTML content
+      // Bold text should be wrapped in <strong> tags
+      expect(editor.innerHTML).toContain('<strong>Bold text</strong>');
+
+      // Italic text should be wrapped in <em> tags
+      expect(editor.innerHTML).toContain('<em>italic text</em>');
+
+      // Link should be wrapped in <a> tags with proper attributes
+      const linkElement = editor.querySelector('a');
+      expect(linkElement).toBeInTheDocument();
+      expect(linkElement?.getAttribute('href')).toBe('https://example.com');
+      expect(linkElement?.getAttribute('target')).toBe('_blank');
+      expect(linkElement?.getAttribute('rel')).toBe('noopener noreferrer');
+      expect(linkElement?.textContent).toBe('link');
+    });
+  });
 });
