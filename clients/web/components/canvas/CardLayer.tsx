@@ -155,6 +155,7 @@ export const CardLayer: React.FC<CardLayerProps> = ({
     errorPolicy: 'all', // Don't crash on GraphQL errors
   });
 
+
   // Setup UPDATE_CARD mutation for drag persistence
   const [updateCard] = useMutation<
     { updateCard: BackendCard },
@@ -219,10 +220,15 @@ export const CardLayer: React.FC<CardLayerProps> = ({
     },
   });
 
+  // Track previous cards to prevent flicker during loading
+  const previousVisibleCardsRef = useRef<Card[]>([]);
+
   // Get visible cards from GraphQL response
   const visibleCards = useMemo((): Card[] => {
+    // If we're loading and have no data yet, return previous cards to prevent flicker
+    // This handles the case where we scroll to a new area and Apollo is fetching
     if (loading && !cardsData) {
-      return [];
+      return previousVisibleCardsRef.current;
     }
 
     if (error || !cardsData?.cardsInBounds) {
@@ -230,7 +236,8 @@ export const CardLayer: React.FC<CardLayerProps> = ({
       if (error) {
         console.warn('Failed to load cards:', error);
       }
-      return [];
+      // Return previous cards even on error to prevent flicker
+      return previousVisibleCardsRef.current;
     }
 
     // Transform backend GraphQL response to frontend Card type
@@ -364,7 +371,12 @@ export const CardLayer: React.FC<CardLayerProps> = ({
     });
 
     // Filter out hidden cards (UI state only, server doesn't track this)
-    return cards.filter((card: Card) => !card.isHidden);
+    const filteredCards = cards.filter((card: Card) => !card.isHidden);
+
+    // Update ref for next render
+    previousVisibleCardsRef.current = filteredCards;
+
+    return filteredCards;
   }, [cardsData, loading, error]);
 
   // Sort cards by z-index for proper layering
@@ -532,7 +544,7 @@ export const CardLayer: React.FC<CardLayerProps> = ({
     previousRenderersRef.current = newRenderers;
 
     return newRenderers;
-  }, [sortedCards, hasCardDataChanged, handleCardDragEnd]);
+  }, [sortedCards, hasCardDataChanged]);
 
   return (
     <Layer

@@ -36,12 +36,12 @@ describe('CardLayer useMemo Dependencies (TDD - Phase 2, Task 2.1)', () => {
       if (match) {
         const dependencies = match[1];
 
-        // After Phase 2.2: Dependencies include sortedCards, hasCardDataChanged, and handleCardDragEnd
-        // hasCardDataChanged is included because it's a useCallback that's used in the comparison
-        // handleCardDragEnd is included because it's passed to CardRenderer
+        // After Phase 2.1 fix: Dependencies should only include sortedCards and hasCardDataChanged
+        // hasCardDataChanged is included because it's a useCallback used in the comparison
+        // handleCardDragEnd should NOT be included - it's stable and including it causes unnecessary recalculations
         expect(dependencies).toContain('sortedCards');
         expect(dependencies).toContain('hasCardDataChanged');
-        expect(dependencies).toContain('handleCardDragEnd');
+        expect(dependencies).not.toContain('handleCardDragEnd');
       }
     });
 
