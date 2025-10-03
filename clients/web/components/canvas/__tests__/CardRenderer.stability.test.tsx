@@ -818,8 +818,10 @@ describe('CardRenderer - Stability During Zoom/Pan Operations', () => {
       const card1 = createTestImageCard('cache-share-1', 100, 100, 'https://example.com/shared.jpg');
       const card2 = createTestImageCard('cache-share-2', 300, 300, 'https://example.com/shared.jpg');
 
-      const { rerender: rerender1 } = render(<CardRenderer card={card1} />);
-      const { rerender: rerender2 } = render(<CardRenderer card={card2} />);
+      const stableCallback = jest.fn();
+
+      const { rerender: rerender1 } = render(<CardRenderer card={card1} onCardClick={stableCallback} />);
+      const { rerender: rerender2 } = render(<CardRenderer card={card2} onCardClick={stableCallback} />);
 
       // Wait for images to load
       await waitFor(() => {
@@ -828,11 +830,11 @@ describe('CardRenderer - Stability During Zoom/Pan Operations', () => {
 
       const renderCountAfterLoad = imageCardRenderCount;
 
-      // Viewport changes shouldn't affect either
-      rerender1(<CardRenderer card={card1} onCardClick={jest.fn()} />);
-      rerender2(<CardRenderer card={card2} onCardClick={jest.fn()} />);
+      // Viewport changes with same card data and callbacks shouldn't trigger re-render
+      rerender1(<CardRenderer card={card1} onCardClick={stableCallback} />);
+      rerender2(<CardRenderer card={card2} onCardClick={stableCallback} />);
 
-      // Neither should re-render
+      // Neither should re-render (callbacks are stable, card data unchanged)
       expect(imageCardRenderCount).toBe(renderCountAfterLoad);
     });
   });
