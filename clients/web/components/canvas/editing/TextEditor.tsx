@@ -142,6 +142,7 @@ export const TextEditor: React.FC<TextEditorProps> = ({
 
   // Initialize Tiptap editor
   const editor = useEditor({
+    immediatelyRender: false, // Prevent SSR hydration mismatches in Next.js
     extensions: [
       StarterKit.configure({
         // Configure StarterKit extensions
