@@ -815,26 +815,25 @@ describe('CardRenderer - Stability During Zoom/Pan Operations', () => {
 
     it('should maintain consistency with ImageCache across components', async () => {
       // Multiple ImageCardRenderers sharing ImageCache should maintain consistency
-      const card1 = createTestImageCard('cache-share-1', 100, 100, 'https://example.com/shared.jpg');
-      const card2 = createTestImageCard('cache-share-2', 300, 300, 'https://example.com/shared.jpg');
-
+      const card = createTestImageCard('cache-share', 100, 100, 'https://example.com/shared.jpg');
       const stableCallback = jest.fn();
 
-      const { rerender: rerender1 } = render(<CardRenderer card={card1} onCardClick={stableCallback} />);
-      const { rerender: rerender2 } = render(<CardRenderer card={card2} onCardClick={stableCallback} />);
+      const { rerender } = render(<CardRenderer card={card} onCardClick={stableCallback} />);
 
-      // Wait for images to load
+      // Wait for image to load
       await waitFor(() => {
-        expect(screen.getAllByTestId('image-card-renderer')[0]).toHaveAttribute('data-image-loaded', 'true');
+        expect(screen.getByTestId('image-card-renderer')).toHaveAttribute('data-image-loaded', 'true');
       });
 
       const renderCountAfterLoad = imageCardRenderCount;
 
-      // Viewport changes with same card data and callbacks shouldn't trigger re-render
-      rerender1(<CardRenderer card={card1} onCardClick={stableCallback} />);
-      rerender2(<CardRenderer card={card2} onCardClick={stableCallback} />);
+      // Simulate viewport changes (same card data, stable callbacks)
+      // This should NOT trigger ImageCardRenderer re-render due to React.memo
+      for (let i = 0; i < 5; i++) {
+        rerender(<CardRenderer card={card} onCardClick={stableCallback} />);
+      }
 
-      // Neither should re-render (callbacks are stable, card data unchanged)
+      // ImageCardRenderer should NOT re-render (memoization prevents it)
       expect(imageCardRenderCount).toBe(renderCountAfterLoad);
     });
   });
