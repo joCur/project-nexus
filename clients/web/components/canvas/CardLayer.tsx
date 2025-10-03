@@ -412,43 +412,108 @@ export const CardLayer: React.FC<CardLayerProps> = ({
     });
   }, [updateCard]);
 
-  // Use ref to track card count for more efficient memoization
+  // ============================================================================
+  // CARD RENDERER MEMOIZATION WITH DEEP COMPARISON (Phase 2, Task 2.2)
+  // ============================================================================
+  //
+  // Optimization strategy:
+  // 1. Track previous cards and renderers in refs
+  // 2. When sortedCards changes, perform deep comparison of card data
+  // 3. Only recreate renderer array if actual card data changed
+  // 4. Return cached renderer array when only array reference changed
+  //
+  // This prevents unnecessary re-renders during zoom/pan operations where
+  // the cards array reference changes but card data remains identical.
+  // ============================================================================
+
   const cardCountRef = useRef(sortedCards.length);
   const previousCardsRef = useRef<Card[]>([]);
+  const previousRenderersRef = useRef<React.ReactElement[]>([]);
 
-  // Memoized card renderers with ref-based optimization
+  /**
+   * Deep comparison of card properties to determine if re-render is needed.
+   * Compares position, dimensions, and content to detect actual data changes.
+   *
+   * This is more thorough than ID-only comparison, which would miss updates
+   * to card position, dimensions, or content when the ID stays the same.
+   *
+   * @param card1 - First card to compare
+   * @param card2 - Second card to compare
+   * @returns true if cards have different data, false if identical
+   */
+  const hasCardDataChanged = useCallback((card1: Card, card2: Card): boolean => {
+    // Position comparison (x, y, z)
+    if (
+      card1.position.x !== card2.position.x ||
+      card1.position.y !== card2.position.y ||
+      card1.position.z !== card2.position.z
+    ) {
+      return true;
+    }
+
+    // Dimensions comparison (width, height)
+    if (
+      card1.dimensions.width !== card2.dimensions.width ||
+      card1.dimensions.height !== card2.dimensions.height
+    ) {
+      return true;
+    }
+
+    // Content comparison (type-specific)
+    // Note: JSON.stringify is safe here because content objects are simple data
+    // structures without functions, circular references, or non-enumerable properties.
+    // Performance is acceptable as this only runs when array reference changes.
+    if (JSON.stringify(card1.content) !== JSON.stringify(card2.content)) {
+      return true;
+    }
+
+    return false;
+  }, []);
+
+  /**
+   * Memoized card renderers with deep comparison optimization.
+   *
+   * This useMemo uses a ref-based comparison strategy to prevent unnecessary
+   * re-renders. It only recreates the renderer array when:
+   * 1. Card count changes
+   * 2. Card IDs change (order/new cards)
+   * 3. Card data changes (position, dimensions, content)
+   *
+   * When only the sortedCards array reference changes (e.g., during zoom/pan),
+   * it returns the cached renderer array, preventing React from recreating
+   * all card components.
+   */
   const cardRenderers = useMemo(() => {
     const currentCount = sortedCards.length;
     const countChanged = cardCountRef.current !== currentCount;
 
-    // Check if cards actually changed (not just reordered)
+    // Check if cards actually changed (deep comparison when IDs match)
     const cardsChanged = countChanged ||
       sortedCards.some((card, index) => {
         const prevCard = previousCardsRef.current[index];
-        return !prevCard || prevCard.id !== card.id;
+
+        // Card doesn't exist in previous state
+        if (!prevCard) {
+          return true;
+        }
+
+        // Card ID changed (reorder or different card)
+        if (prevCard.id !== card.id) {
+          return true;
+        }
+
+        // Same ID - perform deep comparison to detect data changes
+        return hasCardDataChanged(card, prevCard);
       });
 
-    // Update refs
-    cardCountRef.current = currentCount;
-    previousCardsRef.current = sortedCards;
-
-    // Only recreate renderers if cards actually changed
-    if (!cardsChanged && sortedCards.length > 0) {
-      return sortedCards.map((card) => (
-        <React.Suspense
-          key={card.id}
-          fallback={null}
-        >
-          <CardRenderer
-            card={card}
-            enableInlineEdit={true}
-            onCardDragEnd={handleCardDragEnd}
-          />
-        </React.Suspense>
-      ));
+    // If nothing changed, return the cached renderer array
+    // This is the key optimization: prevents React element recreation
+    if (!cardsChanged && previousRenderersRef.current.length > 0) {
+      return previousRenderersRef.current;
     }
 
-    return sortedCards.map((card) => (
+    // Cards changed - create new renderers
+    const newRenderers = sortedCards.map((card) => (
       <React.Suspense
         key={card.id}
         fallback={null}
@@ -460,7 +525,14 @@ export const CardLayer: React.FC<CardLayerProps> = ({
         />
       </React.Suspense>
     ));
-  }, [sortedCards, handleCardDragEnd]);
+
+    // Update refs for next comparison
+    cardCountRef.current = currentCount;
+    previousCardsRef.current = sortedCards;
+    previousRenderersRef.current = newRenderers;
+
+    return newRenderers;
+  }, [sortedCards, hasCardDataChanged, handleCardDragEnd]);
 
   return (
     <Layer
