@@ -145,4 +145,20 @@ export class ImageCache {
     this.cache.delete(src);
     this.loadingPromises.delete(src);
   }
+
+  /**
+   * Synchronously check if an image is cached
+   * Used for initial state determination to avoid loading flashes
+   */
+  static has(src: string): boolean {
+    return this.cache.has(src);
+  }
+
+  /**
+   * Synchronously get a cached image if available
+   * Returns null if not cached
+   */
+  static getSync(src: string): HTMLImageElement | null {
+    return this.cache.get(src) || null;
+  }
 }

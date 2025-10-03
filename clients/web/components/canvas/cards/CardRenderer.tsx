@@ -11,7 +11,6 @@ import type { KonvaEventObject } from 'konva/lib/Node';
 import type {
   Card,
   TextCard,
-  CardId,
 } from '@/types/card.types';
 import {
   isTextCard,
@@ -48,7 +47,98 @@ interface CardRendererProps {
 }
 
 /**
- * CardRenderer component with memoization for performance
+ * Custom comparison function for React.memo
+ *
+ * This function prevents unnecessary re-renders during viewport changes (pan/zoom)
+ * while maintaining reactivity for actual card data changes and critical callbacks.
+ *
+ * **Optimization Strategy:**
+ * - Early return on most common changes (card.id) for fast path
+ * - Skip comparing callback references (except critical onCardDragEnd) to prevent
+ *   viewport-triggered re-renders when CardLayer recreates callbacks
+ * - Interaction states (isSelected, isHovered, isDragged) come from store, not props,
+ *   so they remain reactive without prop comparison
+ *
+ * **Related:** Phase 2, Task 2.3 of fix-card-rerender-on-zoom-pan
+ *
+ * @param prevProps - Previous component props
+ * @param nextProps - Next component props
+ * @returns true if props are equal (skip re-render), false if different (re-render)
+ */
+const arePropsEqual = (
+  prevProps: Readonly<CardRendererProps>,
+  nextProps: Readonly<CardRendererProps>
+): boolean => {
+  const prev = prevProps.card;
+  const next = nextProps.card;
+
+  // Fast path: Compare card.id first (most common change - different card entirely)
+  if (prev.id !== next.id) {
+    return false;
+  }
+
+  // Compare position (x, y, z) - card moved
+  // Handle null/undefined gracefully
+  const prevPos = prev.position;
+  const nextPos = next.position;
+  if (
+    prevPos?.x !== nextPos?.x ||
+    prevPos?.y !== nextPos?.y ||
+    prevPos?.z !== nextPos?.z
+  ) {
+    return false;
+  }
+
+  // Compare dimensions (width, height) - card resized
+  // Handle null/undefined gracefully
+  const prevDim = prev.dimensions;
+  const nextDim = next.dimensions;
+  if (
+    prevDim?.width !== nextDim?.width ||
+    prevDim?.height !== nextDim?.height
+  ) {
+    return false;
+  }
+
+  // Deep compare content - this is critical for card updates
+  // Use JSON.stringify for deep comparison of content object
+  // NOTE: This could be optimized further with a custom deep equal if performance becomes an issue
+  const prevContent = prev.content;
+  const nextContent = next.content;
+  if (prevContent !== nextContent) {
+    // Only stringify if references differ (optimization)
+    if (JSON.stringify(prevContent) !== JSON.stringify(nextContent)) {
+      return false;
+    }
+  }
+
+  // Compare enableInlineEdit flag
+  if (prevProps.enableInlineEdit !== nextProps.enableInlineEdit) {
+    return false;
+  }
+
+  // Compare isEditingCard flag
+  if (prevProps.isEditingCard !== nextProps.isEditingCard) {
+    return false;
+  }
+
+  // Compare onCardDragEnd callback - critical for drag persistence (NEX-200)
+  // This ensures drag operations complete successfully and persist to backend
+  if (prevProps.onCardDragEnd !== nextProps.onCardDragEnd) {
+    return false;
+  }
+
+  // All other props (especially callback references) are considered stable
+  // This prevents re-renders during viewport changes when CardLayer recreates callbacks
+  // during pan/zoom operations. Interaction states come from store, not props.
+  return true;
+};
+
+/**
+ * CardRenderer component with custom memoization for performance
+ *
+ * Uses custom arePropsEqual to prevent re-renders during viewport changes
+ * while maintaining reactivity for card data updates and user interactions.
  */
 export const CardRenderer = React.memo<CardRendererProps>(({
   card,
@@ -318,6 +408,6 @@ export const CardRenderer = React.memo<CardRendererProps>(({
     </Group>
   );
   return groupContent;
-});
+}, arePropsEqual); // Apply custom comparison function
 
 CardRenderer.displayName = 'CardRenderer';

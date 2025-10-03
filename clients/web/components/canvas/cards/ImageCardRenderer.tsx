@@ -9,7 +9,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Rect, Text, Group, Image as KonvaImage } from 'react-konva';
 import type { ImageCard } from '@/types/card.types';
 import { CARD_CONFIG, ImageCache } from './cardConfig';
-import { sanitizeImageUrl, cleanupImage } from './imageSecurityUtils';
+import { sanitizeImageUrl } from './imageSecurityUtils';
 
 interface ImageCardRendererProps {
   card: ImageCard;
@@ -28,8 +28,19 @@ export const ImageCardRenderer: React.FC<ImageCardRendererProps> = ({
   isHovered,
 }) => {
   const { content, dimensions, style } = card;
-  const [image, setImage] = useState<HTMLImageElement | null>(null);
-  const [imageLoaded, setImageLoaded] = useState(false);
+
+  const [image, setImage] = useState<HTMLImageElement | null>(() => {
+    // Synchronously check if image is already cached to avoid loading flash
+    const imageSrc = content.thumbnail || content.url;
+    const sanitizedUrl = sanitizeImageUrl(imageSrc);
+    return sanitizedUrl ? ImageCache.getSync(sanitizedUrl) : null;
+  });
+  const [imageLoaded, setImageLoaded] = useState(() => {
+    // Synchronously check if image is already cached to avoid loading flash
+    const imageSrc = content.thumbnail || content.url;
+    const sanitizedUrl = sanitizeImageUrl(imageSrc);
+    return sanitizedUrl ? ImageCache.has(sanitizedUrl) : false;
+  });
   const [imageError, setImageError] = useState(false);
   const imageRef = useRef<HTMLImageElement>();
 
@@ -72,7 +83,9 @@ export const ImageCardRenderer: React.FC<ImageCardRendererProps> = ({
     // Cleanup function with improved security
     return () => {
       isMounted = false;
-      cleanupImage(imageRef.current);
+      // DON'T cleanup the image - it's managed by ImageCache
+      // Cleaning up here would clear img.src='', breaking the cache
+      // The cache will handle cleanup when images are removed
       imageRef.current = undefined;
     };
   }, [content.url, content.thumbnail]);
