@@ -7,7 +7,7 @@
 export {
   EditModeManager,
   useEditMode,
-  type EditMode,
+  EditMode,
   type EditModeState,
   type EditModeManagerProps,
   type EditModeEditorProps

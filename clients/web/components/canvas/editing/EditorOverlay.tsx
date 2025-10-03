@@ -27,7 +27,7 @@ import {
   CodeEditor,
   LinkEditor,
   ImageEditor} from './index';
-import { isTextCard, isCodeCard, isLinkCard, isImageCard } from '@/types/card.types';
+import { isTextCard, isCodeCard, isLinkCard, isImageCard, isTextCardTiptap } from '@/types/card.types';
 import { createContextLogger } from '@/utils/logger';
 import {
   overlayVariants,
@@ -352,7 +352,12 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
 
         switch (content.type) {
           case 'text':
-            backendContent = content.content;
+            // For Tiptap content, serialize to JSON string for backend
+            if (isTextCardTiptap(content)) {
+              backendContent = JSON.stringify(content.content);
+            } else {
+              backendContent = typeof content.content === 'string' ? content.content : '';
+            }
             break;
           case 'code':
             backendContent = content.content;

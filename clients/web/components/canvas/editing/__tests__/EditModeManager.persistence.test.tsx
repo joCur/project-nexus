@@ -14,6 +14,7 @@ import { useCardStore } from '@/stores/cardStore';
 import { useCardOperations } from '@/hooks/useCardOperations';
 import { UPDATE_CARD } from '@/lib/graphql/cardOperations';
 import type { TextCard, CardId } from '@/types/card.types';
+import { TextContentFormat } from '@/types/card.types';
 
 // Mock the hooks
 jest.mock('@/stores/cardStore');
@@ -36,10 +37,10 @@ const createMockTextCard = (id: CardId = 'card-1' as CardId): TextCard => ({
   },
   content: {
     type: 'text' as const,
+    format: TextContentFormat.MARKDOWN,
     content: 'Original content',
     markdown: false,
     wordCount: 2,
-    lastEditedAt: '2024-01-01T00:00:00Z',
   },
   isSelected: false,
   isLocked: false,
@@ -100,7 +101,7 @@ describe('EditModeManager - Server Persistence', () => {
             card={card}
             onEditEnd={onEditEnd}
           >
-            <div>{card.content.content}</div>
+            <div>{typeof card.content.content === 'string' ? card.content.content : JSON.stringify(card.content.content)}</div>
           </EditModeManager>
         </MockedProvider>
       );
@@ -166,7 +167,7 @@ describe('EditModeManager - Server Persistence', () => {
       render(
         <MockedProvider mocks={[apolloMock]} addTypename={false}>
           <EditModeManager card={card}>
-            <div>{card.content.content}</div>
+            <div>{typeof card.content.content === 'string' ? card.content.content : JSON.stringify(card.content.content)}</div>
           </EditModeManager>
         </MockedProvider>
       );
@@ -193,10 +194,10 @@ describe('EditModeManager - Server Persistence', () => {
         updates: {
           content: {
             type: 'text',
+            format: TextContentFormat.MARKDOWN,
             content: 'Updated content',
             markdown: false,
             wordCount: 2,
-            lastEditedAt: expect.any(String)
           },
         },
       });
@@ -218,7 +219,7 @@ describe('EditModeManager - Server Persistence', () => {
       render(
         <MockedProvider mocks={[]} addTypename={false}>
           <EditModeManager card={card}>
-            <div>{card.content.content}</div>
+            <div>{typeof card.content.content === 'string' ? card.content.content : JSON.stringify(card.content.content)}</div>
           </EditModeManager>
         </MockedProvider>
       );
@@ -263,7 +264,7 @@ describe('EditModeManager - Server Persistence', () => {
       render(
         <MockedProvider mocks={[]} addTypename={false}>
           <EditModeManager card={card}>
-            <div>{card.content.content}</div>
+            <div>{typeof card.content.content === 'string' ? card.content.content : JSON.stringify(card.content.content)}</div>
           </EditModeManager>
         </MockedProvider>
       );
@@ -317,7 +318,7 @@ describe('EditModeManager - Server Persistence', () => {
             onEditEnd={onEditEnd}
             onEditCancel={onEditCancel}
           >
-            <div>{card.content.content}</div>
+            <div>{typeof card.content.content === 'string' ? card.content.content : JSON.stringify(card.content.content)}</div>
           </EditModeManager>
         </MockedProvider>
       );
@@ -353,7 +354,7 @@ describe('EditModeManager - Server Persistence', () => {
       render(
         <MockedProvider mocks={[]} addTypename={false}>
           <EditModeManager card={card}>
-            <div>{card.content.content}</div>
+            <div>{typeof card.content.content === 'string' ? card.content.content : JSON.stringify(card.content.content)}</div>
           </EditModeManager>
         </MockedProvider>
       );
@@ -390,7 +391,7 @@ describe('EditModeManager - Server Persistence', () => {
       render(
         <MockedProvider mocks={[]} addTypename={false}>
           <EditModeManager card={card}>
-            <div>{card.content.content}</div>
+            <div>{typeof card.content.content === 'string' ? card.content.content : JSON.stringify(card.content.content)}</div>
           </EditModeManager>
         </MockedProvider>
       );

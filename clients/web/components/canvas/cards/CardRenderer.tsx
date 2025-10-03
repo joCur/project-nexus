@@ -19,7 +19,7 @@ import {
   isCodeCard
 } from '@/types/card.types';
 import { useCardStore } from '@/stores/cardStore';
-import { useEditMode, type EditMode } from '@/components/canvas/editing';
+import { useEditMode, EditMode } from '@/components/canvas/editing';
 import { TextCardRenderer } from './TextCardRenderer';
 import { ImageCardRenderer } from './ImageCardRenderer';
 import { LinkCardRenderer } from './LinkCardRenderer';
@@ -220,13 +220,13 @@ export const CardRenderer = React.memo<CardRendererProps>(({
       setEditingCard?.(card.id);
 
       // Determine edit mode based on card type
-      const editMode = card.content.type === 'text' ? 'text' :
-                      card.content.type === 'code' ? 'code' :
-                      card.content.type === 'link' ? 'link' :
-                      card.content.type === 'image' ? 'image-caption' : 'metadata';
+      const editMode = card.content.type === 'text' ? EditMode.TEXT :
+                      card.content.type === 'code' ? EditMode.CODE :
+                      card.content.type === 'link' ? EditMode.LINK :
+                      card.content.type === 'image' ? EditMode.IMAGE_CAPTION : EditMode.METADATA;
 
       startEdit(card.id, editMode, card.content);
-      onEditStart?.(card.id, editMode as EditMode);
+      onEditStart?.(card.id, editMode);
     } else {
       onCardDoubleClick?.(card, e);
     }
