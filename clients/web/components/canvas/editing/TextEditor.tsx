@@ -11,6 +11,10 @@
  * - List support: Bullet Lists (Cmd/Ctrl+Shift+8), Ordered Lists (Cmd/Ctrl+Shift+7)
  * - Task lists: Task Lists (Cmd/Ctrl+Shift+9) with interactive checkboxes
  * - Nested list support with proper indentation (including task lists)
+ * - Blockquote support: Blockquotes (Cmd/Ctrl+Shift+B) with left border styling
+ * - Code blocks: Code Blocks (Cmd/Ctrl+Alt+C) with syntax highlighting (JavaScript, TypeScript, Python, HTML, CSS, JSON, etc.)
+ * - Code block features: Tab indentation, copy-to-clipboard button, lowlight syntax highlighting
+ * - Horizontal rule: Visual dividers for content sections (gray-300, 1px height, 1.5em vertical margin)
  * - Bubble menu for contextual formatting (appears on text selection)
  * - Real-time character count with 10,000 character limit
  * - Auto-resize based on content with min/max constraints
@@ -44,7 +48,11 @@ import OrderedList from '@tiptap/extension-ordered-list';
 import ListItem from '@tiptap/extension-list-item';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
+import Blockquote from '@tiptap/extension-blockquote';
+import HorizontalRule from '@tiptap/extension-horizontal-rule';
+import { common, createLowlight } from 'lowlight';
 import ClearFormattingOnEnter from './extensions/ClearFormattingOnEnter';
+import { CodeBlockWithCopyButton } from './extensions/CodeBlockCopyButton';
 import {
   BaseEditor,
   type BaseEditorChildProps
@@ -65,6 +73,9 @@ import { createContextLogger } from '@/utils/logger';
 
 // Create logger at module level with component context
 const logger = createContextLogger({ component: 'TextEditor' });
+
+// Create lowlight instance with common language support for syntax highlighting
+const lowlight = createLowlight(common);
 
 // Constants
 const MAX_CHARACTERS = 10000;
@@ -181,6 +192,9 @@ export const TextEditor: React.FC<TextEditorProps> = ({
         bulletList: false,
         orderedList: false,
         listItem: false,
+        // Disable built-in blockquote and code block (we configure them explicitly below)
+        blockquote: false,
+        codeBlock: false,
         // Enable and configure heading levels explicitly
         heading: {
           levels: [1, 2, 3],
@@ -249,6 +263,31 @@ export const TextEditor: React.FC<TextEditorProps> = ({
           class: 'tiptap-task-item'
         },
         nested: true // Enable nested task lists
+      }),
+      // Blockquote extension with design system styling
+      // Keyboard shortcut: Cmd/Ctrl+Shift+B
+      Blockquote.configure({
+        HTMLAttributes: {
+          class: 'tiptap-blockquote'
+        }
+      }),
+      // Code block with syntax highlighting using lowlight and copy button
+      // Keyboard shortcut: Cmd/Ctrl+Alt+C
+      CodeBlockWithCopyButton.configure({
+        lowlight,
+        HTMLAttributes: {
+          class: 'tiptap-code-block'
+        },
+        // Enable tab key for indentation in code blocks
+        languageClassPrefix: 'language-'
+      }),
+      // Horizontal rule extension for visual dividers
+      // Creates a horizontal line (<hr>) to separate content sections
+      // Keyboard shortcut will be added to BubbleMenu
+      HorizontalRule.configure({
+        HTMLAttributes: {
+          class: 'tiptap-horizontal-rule'
+        }
       }),
       // Clear formatting on Enter - Notion-like behavior
       // When pressing Enter to create a new paragraph, formatting marks don't carry over

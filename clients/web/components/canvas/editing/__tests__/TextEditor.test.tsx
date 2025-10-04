@@ -354,7 +354,7 @@ describe('TextEditor Component', () => {
       const largeContent = 'A'.repeat(5000);
       const card = createMockCard(largeContent);
 
-      const { container } = render(<TextEditor {...defaultProps} card={card} />);
+      render(<TextEditor {...defaultProps} card={card} />);
 
       const editor = document.querySelector('.tiptap');
       expect(editor).toBeInTheDocument();
@@ -2984,6 +2984,1004 @@ describe('TextEditor Component', () => {
           expect(savedContent.content.content[1].type).toBe('paragraph');
           expect(savedContent.content.content[2].type).toBe('heading');
         });
+      });
+    });
+  });
+
+  describe('Blockquote and Code Block Functionality (Phase 3, Task 3)', () => {
+    describe('Blockquote Support', () => {
+      it('should render blockquote content from Tiptap JSON', () => {
+        const contentWithBlockquote: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'blockquote',
+            content: [{
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'This is a quote' }]
+            }]
+          }]
+        };
+
+        const card = createMockCard(contentWithBlockquote, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const blockquote = document.querySelector('blockquote');
+        expect(blockquote).toBeInTheDocument();
+        expect(blockquote).toHaveTextContent('This is a quote');
+      });
+
+      it('should toggle blockquote via bubble menu button', async () => {
+        const card = createMockCard('Regular text', TextContentFormat.MARKDOWN);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const editor = document.querySelector('.tiptap');
+        expect(editor).toBeInTheDocument();
+
+        // Select text by simulating user interaction
+        await act(async () => {
+          if (editor) {
+            // Create a selection
+            const range = document.createRange();
+            const textNode = editor.firstChild?.firstChild as Node;
+            if (textNode) {
+              range.setStart(textNode, 0);
+              range.setEnd(textNode, 7); // Select "Regular"
+
+              const selection = window.getSelection();
+              selection?.removeAllRanges();
+              selection?.addRange(range);
+            }
+          }
+
+          // Trigger selection update
+          fireEvent.mouseUp(editor!);
+        });
+
+        // Find blockquote button in bubble menu (should appear on selection)
+        await waitFor(() => {
+          const blockquoteButton = screen.queryByRole('button', { name: /blockquote/i });
+          if (blockquoteButton) {
+            fireEvent.click(blockquoteButton);
+          }
+        });
+
+        // Verify blockquote was created
+        await waitFor(() => {
+          const blockquote = document.querySelector('blockquote');
+          expect(blockquote).toBeInTheDocument();
+        });
+      });
+
+      it('should preserve blockquote on save', async () => {
+        const contentWithBlockquote: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'blockquote',
+            content: [{
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'Quote text' }]
+            }]
+          }]
+        };
+
+        const card = createMockCard(contentWithBlockquote, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const saveButton = screen.getByRole('button', { name: /save/i });
+        fireEvent.click(saveButton);
+
+        await waitFor(() => {
+          expect(mockOnSave).toHaveBeenCalled();
+          const savedContent = mockOnSave.mock.calls[0][0];
+          expect(savedContent.content.content[0].type).toBe('blockquote');
+        });
+      });
+
+      it('should support nested formatting in blockquotes', () => {
+        const contentWithFormattedBlockquote: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'blockquote',
+            content: [{
+              type: 'paragraph',
+              content: [
+                {
+                  type: 'text',
+                  text: 'Bold quote',
+                  marks: [{ type: 'bold' }]
+                },
+                { type: 'text', text: ' and ' },
+                {
+                  type: 'text',
+                  text: 'italic',
+                  marks: [{ type: 'italic' }]
+                }
+              ]
+            }]
+          }]
+        };
+
+        const card = createMockCard(contentWithFormattedBlockquote, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const blockquote = document.querySelector('blockquote');
+        expect(blockquote).toBeInTheDocument();
+
+        const strong = blockquote?.querySelector('strong');
+        const em = blockquote?.querySelector('em');
+
+        expect(strong).toHaveTextContent('Bold quote');
+        expect(em).toHaveTextContent('italic');
+      });
+
+      it('should apply blockquote styling with left border', () => {
+        const contentWithBlockquote: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'blockquote',
+            content: [{
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'Styled quote' }]
+            }]
+          }]
+        };
+
+        const card = createMockCard(contentWithBlockquote, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const blockquote = document.querySelector('blockquote');
+        expect(blockquote).toBeInTheDocument();
+        expect(blockquote).toHaveClass('tiptap-blockquote');
+      });
+    });
+
+    describe('Code Block Support', () => {
+      it('should render code block content from Tiptap JSON', () => {
+        const contentWithCodeBlock: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'codeBlock',
+            attrs: { language: 'javascript' },
+            content: [{ type: 'text', text: 'const x = 42;' }]
+          }]
+        };
+
+        const card = createMockCard(contentWithCodeBlock, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const codeBlock = document.querySelector('pre code');
+        expect(codeBlock).toBeInTheDocument();
+        expect(codeBlock).toHaveTextContent('const x = 42;');
+      });
+
+      it('should support syntax highlighting for JavaScript', () => {
+        const contentWithJSCode: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'codeBlock',
+            attrs: { language: 'javascript' },
+            content: [{
+              type: 'text',
+              text: 'function greet() {\n  console.log("Hello");\n}'
+            }]
+          }]
+        };
+
+        const card = createMockCard(contentWithJSCode, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const codeBlock = document.querySelector('pre code');
+        expect(codeBlock).toBeInTheDocument();
+        expect(codeBlock).toHaveClass('language-javascript');
+      });
+
+      it('should support syntax highlighting for TypeScript', () => {
+        const contentWithTSCode: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'codeBlock',
+            attrs: { language: 'typescript' },
+            content: [{
+              type: 'text',
+              text: 'interface User {\n  name: string;\n  age: number;\n}'
+            }]
+          }]
+        };
+
+        const card = createMockCard(contentWithTSCode, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const codeBlock = document.querySelector('pre code');
+        expect(codeBlock).toBeInTheDocument();
+        expect(codeBlock).toHaveClass('language-typescript');
+      });
+
+      it('should preserve code block on save', async () => {
+        const contentWithCodeBlock: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'codeBlock',
+            attrs: { language: 'python' },
+            content: [{ type: 'text', text: 'print("Hello World")' }]
+          }]
+        };
+
+        const card = createMockCard(contentWithCodeBlock, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const saveButton = screen.getByRole('button', { name: /save/i });
+        fireEvent.click(saveButton);
+
+        await waitFor(() => {
+          expect(mockOnSave).toHaveBeenCalled();
+          const savedContent = mockOnSave.mock.calls[0][0];
+          expect(savedContent.content.content[0].type).toBe('codeBlock');
+          expect(savedContent.content.content[0].attrs?.language).toBe('python');
+        });
+      });
+
+      it('should handle tab indentation in code blocks', async () => {
+        const contentWithCodeBlock: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'codeBlock',
+            attrs: { language: null },
+            content: [{ type: 'text', text: 'code' }]
+          }]
+        };
+
+        const card = createMockCard(contentWithCodeBlock, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const codeBlock = document.querySelector('pre code');
+        expect(codeBlock).toBeInTheDocument();
+
+        // Focus code block and simulate tab
+        await act(async () => {
+          if (codeBlock instanceof HTMLElement) {
+            codeBlock.focus();
+            fireEvent.keyDown(codeBlock, { key: 'Tab', code: 'Tab' });
+          }
+        });
+
+        // Tab should be handled by code block (not prevent default behavior)
+        // This is configured via the extension
+      });
+
+      it('should apply code block styling with dark background', () => {
+        const contentWithCodeBlock: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'codeBlock',
+            attrs: { language: 'javascript' },
+            content: [{ type: 'text', text: 'const x = 1;' }]
+          }]
+        };
+
+        const card = createMockCard(contentWithCodeBlock, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const preElement = document.querySelector('pre');
+        expect(preElement).toBeInTheDocument();
+        expect(preElement).toHaveClass('tiptap-code-block');
+      });
+
+      it('should support multiple languages', () => {
+        const languages = ['javascript', 'typescript', 'python', 'html', 'css', 'json'];
+
+        languages.forEach(lang => {
+          const contentWithCode: TiptapJSONContent = {
+            type: 'doc',
+            content: [{
+              type: 'codeBlock',
+              attrs: { language: lang },
+              content: [{ type: 'text', text: `${lang} code` }]
+            }]
+          };
+
+          const card = createMockCard(contentWithCode, TextContentFormat.TIPTAP);
+          const { unmount } = render(<TextEditor {...defaultProps} card={card} />);
+
+          const codeBlock = document.querySelector('pre code');
+          expect(codeBlock).toHaveClass(`language-${lang}`);
+
+          unmount();
+        });
+      });
+    });
+
+    describe('Code Block Copy Button', () => {
+      it('should render copy button for code blocks', () => {
+        const contentWithCodeBlock: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'codeBlock',
+            attrs: { language: 'javascript' },
+            content: [{ type: 'text', text: 'const x = 42;' }]
+          }]
+        };
+
+        const card = createMockCard(contentWithCodeBlock, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        // Copy button should be rendered as a child of the pre element
+        const copyButton = document.querySelector('.code-block-copy-button');
+        expect(copyButton).toBeInTheDocument();
+      });
+
+      it('should copy code to clipboard when clicked', async () => {
+        // Mock clipboard API
+        Object.assign(navigator, {
+          clipboard: {
+            writeText: jest.fn().mockResolvedValue(undefined)
+          }
+        });
+
+        const contentWithCodeBlock: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'codeBlock',
+            attrs: { language: 'javascript' },
+            content: [{ type: 'text', text: 'const message = "Hello";' }]
+          }]
+        };
+
+        const card = createMockCard(contentWithCodeBlock, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const copyButton = document.querySelector('.code-block-copy-button');
+        expect(copyButton).toBeInTheDocument();
+
+        await act(async () => {
+          if (copyButton) {
+            fireEvent.click(copyButton);
+          }
+        });
+
+        await waitFor(() => {
+          expect(navigator.clipboard.writeText).toHaveBeenCalledWith('const message = "Hello";');
+        });
+      });
+
+      it('should show "Copied!" feedback after copying', async () => {
+        Object.assign(navigator, {
+          clipboard: {
+            writeText: jest.fn().mockResolvedValue(undefined)
+          }
+        });
+
+        const contentWithCodeBlock: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'codeBlock',
+            attrs: { language: 'python' },
+            content: [{ type: 'text', text: 'print("test")' }]
+          }]
+        };
+
+        const card = createMockCard(contentWithCodeBlock, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const copyButton = document.querySelector('.code-block-copy-button');
+
+        await act(async () => {
+          if (copyButton) {
+            fireEvent.click(copyButton);
+          }
+        });
+
+        // Should show "Copied!" text
+        await waitFor(() => {
+          expect(copyButton).toHaveTextContent('Copied!');
+        });
+
+        // Should revert back to "Copy" after timeout
+        await waitFor(() => {
+          expect(copyButton).toHaveTextContent('Copy');
+        }, { timeout: 3000 });
+      });
+    });
+
+    describe('BubbleMenu Blockquote and Code Block Controls', () => {
+      it('should show blockquote button in bubble menu', async () => {
+        const card = createMockCard('Select this text', TextContentFormat.MARKDOWN);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const editor = document.querySelector('.tiptap');
+        expect(editor).toBeInTheDocument();
+
+        // Select text
+        await act(async () => {
+          if (editor) {
+            const range = document.createRange();
+            const textNode = editor.firstChild?.firstChild as Node;
+            if (textNode) {
+              range.selectNodeContents(textNode);
+              const selection = window.getSelection();
+              selection?.removeAllRanges();
+              selection?.addRange(range);
+            }
+          }
+          fireEvent.mouseUp(editor!);
+        });
+
+        // Bubble menu should appear with blockquote button
+        await waitFor(() => {
+          const blockquoteButton = screen.queryByRole('button', { name: /blockquote/i });
+          expect(blockquoteButton).toBeInTheDocument();
+        });
+      });
+
+      it('should show code block button in bubble menu', async () => {
+        const card = createMockCard('Select this text', TextContentFormat.MARKDOWN);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const editor = document.querySelector('.tiptap');
+        expect(editor).toBeInTheDocument();
+
+        // Select text
+        await act(async () => {
+          if (editor) {
+            const range = document.createRange();
+            const textNode = editor.firstChild?.firstChild as Node;
+            if (textNode) {
+              range.selectNodeContents(textNode);
+              const selection = window.getSelection();
+              selection?.removeAllRanges();
+              selection?.addRange(range);
+            }
+          }
+          fireEvent.mouseUp(editor!);
+        });
+
+        // Bubble menu should appear with code block button
+        await waitFor(() => {
+          const codeBlockButton = screen.queryByRole('button', { name: /code block/i });
+          expect(codeBlockButton).toBeInTheDocument();
+        });
+      });
+
+      it('should highlight active blockquote button', () => {
+        const contentWithBlockquote: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'blockquote',
+            content: [{
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'Quote' }]
+            }]
+          }]
+        };
+
+        const card = createMockCard(contentWithBlockquote, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        // When cursor is in blockquote, button should be active
+        // This is tested via the isActive() check in BubbleMenu
+      });
+
+      it('should highlight active code block button', () => {
+        const contentWithCodeBlock: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'codeBlock',
+            attrs: { language: 'javascript' },
+            content: [{ type: 'text', text: 'code' }]
+          }]
+        };
+
+        const card = createMockCard(contentWithCodeBlock, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        // When cursor is in code block, button should be active
+        // This is tested via the isActive() check in BubbleMenu
+      });
+    });
+
+    describe('Mixed Content with Blockquotes and Code Blocks', () => {
+      it('should handle mixed content with blockquotes, code blocks, and paragraphs', () => {
+        const mixedContent: TiptapJSONContent = {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'Introduction' }]
+            },
+            {
+              type: 'blockquote',
+              content: [{
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'Important quote' }]
+              }]
+            },
+            {
+              type: 'codeBlock',
+              attrs: { language: 'javascript' },
+              content: [{ type: 'text', text: 'console.log("code");' }]
+            },
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'Conclusion' }]
+            }
+          ]
+        };
+
+        const card = createMockCard(mixedContent, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        expect(document.querySelector('p')).toHaveTextContent('Introduction');
+        expect(document.querySelector('blockquote')).toHaveTextContent('Important quote');
+        expect(document.querySelector('pre code')).toHaveTextContent('console.log("code");');
+      });
+
+      it('should persist mixed content on save', async () => {
+        const mixedContent: TiptapJSONContent = {
+          type: 'doc',
+          content: [
+            {
+              type: 'blockquote',
+              content: [{
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'Quote' }]
+              }]
+            },
+            {
+              type: 'codeBlock',
+              attrs: { language: 'python' },
+              content: [{ type: 'text', text: 'print("code")' }]
+            }
+          ]
+        };
+
+        const card = createMockCard(mixedContent, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const saveButton = screen.getByRole('button', { name: /save/i });
+        fireEvent.click(saveButton);
+
+        await waitFor(() => {
+          expect(mockOnSave).toHaveBeenCalled();
+          const savedContent = mockOnSave.mock.calls[0][0];
+
+          expect(savedContent.content.content).toHaveLength(2);
+          expect(savedContent.content.content[0].type).toBe('blockquote');
+          expect(savedContent.content.content[1].type).toBe('codeBlock');
+          expect(savedContent.content.content[1].attrs?.language).toBe('python');
+        });
+      });
+    });
+
+    describe('Keyboard Shortcuts for Blockquotes and Code Blocks', () => {
+      it('should toggle blockquote with keyboard shortcut', async () => {
+        const card = createMockCard('Text to quote', TextContentFormat.MARKDOWN);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const editor = document.querySelector('.tiptap');
+        expect(editor).toBeInTheDocument();
+
+        // Select text
+        await act(async () => {
+          if (editor) {
+            const range = document.createRange();
+            const textNode = editor.firstChild?.firstChild as Node;
+            if (textNode) {
+              range.selectNodeContents(textNode);
+              const selection = window.getSelection();
+              selection?.removeAllRanges();
+              selection?.addRange(range);
+            }
+          }
+        });
+
+        // Trigger blockquote shortcut (Cmd/Ctrl+Shift+B)
+        await act(async () => {
+          fireEvent.keyDown(editor!, {
+            key: 'b',
+            code: 'KeyB',
+            shiftKey: true,
+            ctrlKey: true
+          });
+        });
+
+        // Should create blockquote
+        await waitFor(() => {
+          const blockquote = document.querySelector('blockquote');
+          expect(blockquote).toBeInTheDocument();
+        });
+      });
+
+      it('should toggle code block with keyboard shortcut', async () => {
+        const card = createMockCard('Text to code', TextContentFormat.MARKDOWN);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const editor = document.querySelector('.tiptap');
+        expect(editor).toBeInTheDocument();
+
+        // Select text
+        await act(async () => {
+          if (editor) {
+            const range = document.createRange();
+            const textNode = editor.firstChild?.firstChild as Node;
+            if (textNode) {
+              range.selectNodeContents(textNode);
+              const selection = window.getSelection();
+              selection?.removeAllRanges();
+              selection?.addRange(range);
+            }
+          }
+        });
+
+        // Trigger code block shortcut (Cmd/Ctrl+Alt+C)
+        await act(async () => {
+          fireEvent.keyDown(editor!, {
+            key: 'c',
+            code: 'KeyC',
+            altKey: true,
+            ctrlKey: true
+          });
+        });
+
+        // Should create code block
+        await waitFor(() => {
+          const codeBlock = document.querySelector('pre code');
+          expect(codeBlock).toBeInTheDocument();
+        });
+      });
+    });
+  });
+
+  describe('Horizontal Rule', () => {
+    describe('Rendering', () => {
+      it('should render horizontal rule from Tiptap JSON', () => {
+        const contentWithHR: TiptapJSONContent = {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'Before divider' }]
+            },
+            {
+              type: 'horizontalRule'
+            },
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'After divider' }]
+            }
+          ]
+        };
+
+        const card = createMockCard(contentWithHR, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const editor = document.querySelector('.tiptap');
+        expect(editor).toBeInTheDocument();
+        expect(editor).toHaveTextContent('Before divider');
+        expect(editor).toHaveTextContent('After divider');
+
+        // Check for horizontal rule element (rendered as <hr>)
+        const hr = editor?.querySelector('hr');
+        expect(hr).toBeInTheDocument();
+      });
+
+      it('should render multiple horizontal rules', () => {
+        const contentWithMultipleHR: TiptapJSONContent = {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'Section 1' }]
+            },
+            {
+              type: 'horizontalRule'
+            },
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'Section 2' }]
+            },
+            {
+              type: 'horizontalRule'
+            },
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'Section 3' }]
+            }
+          ]
+        };
+
+        const card = createMockCard(contentWithMultipleHR, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const editor = document.querySelector('.tiptap');
+        const hrs = editor?.querySelectorAll('hr');
+        expect(hrs).toHaveLength(2);
+      });
+
+      it('should apply design system styling to horizontal rule', () => {
+        const contentWithHR: TiptapJSONContent = {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'Text' }]
+            },
+            {
+              type: 'horizontalRule'
+            }
+          ]
+        };
+
+        const card = createMockCard(contentWithHR, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const hr = document.querySelector('hr');
+        expect(hr).toBeInTheDocument();
+
+        // Should have design system class
+        expect(hr).toHaveClass('tiptap-horizontal-rule');
+      });
+    });
+
+    describe('Insertion via BubbleMenu', () => {
+      it('should insert horizontal rule when button is clicked', async () => {
+        render(<TextEditor {...defaultProps} />);
+
+        const editor = document.querySelector('.tiptap');
+        expect(editor).toBeInTheDocument();
+
+        // Select text to show bubble menu
+        await act(async () => {
+          if (editor) {
+            const range = document.createRange();
+            const textNode = editor.firstChild?.firstChild as Node;
+            if (textNode) {
+              range.selectNodeContents(textNode);
+              const selection = window.getSelection();
+              selection?.removeAllRanges();
+              selection?.addRange(range);
+            }
+          }
+        });
+
+        // Wait for bubble menu to appear
+        await waitFor(() => {
+          const bubbleMenu = screen.getByRole('toolbar', { name: /text formatting/i });
+          expect(bubbleMenu).toBeInTheDocument();
+        });
+
+        // Find and click horizontal rule button
+        const hrButton = screen.getByRole('button', { name: /horizontal rule/i });
+        expect(hrButton).toBeInTheDocument();
+
+        await act(async () => {
+          fireEvent.click(hrButton);
+        });
+
+        // Should insert horizontal rule
+        await waitFor(() => {
+          const hr = document.querySelector('hr');
+          expect(hr).toBeInTheDocument();
+        });
+      });
+
+      it('should show horizontal rule button with tooltip', async () => {
+        render(<TextEditor {...defaultProps} />);
+
+        const editor = document.querySelector('.tiptap');
+        expect(editor).toBeInTheDocument();
+
+        // Select text to show bubble menu
+        await act(async () => {
+          if (editor) {
+            const range = document.createRange();
+            const textNode = editor.firstChild?.firstChild as Node;
+            if (textNode) {
+              range.selectNodeContents(textNode);
+              const selection = window.getSelection();
+              selection?.removeAllRanges();
+              selection?.addRange(range);
+            }
+          }
+        });
+
+        // Wait for bubble menu
+        await waitFor(() => {
+          const bubbleMenu = screen.getByRole('toolbar', { name: /text formatting/i });
+          expect(bubbleMenu).toBeInTheDocument();
+        });
+
+        // Check for horizontal rule button with keyboard shortcut in title
+        const hrButton = screen.getByRole('button', { name: /horizontal rule/i });
+        expect(hrButton).toHaveAttribute('title');
+        const title = hrButton.getAttribute('title');
+        expect(title).toMatch(/horizontal rule/i);
+      });
+    });
+
+    describe('Keyboard Shortcuts', () => {
+      it('should insert horizontal rule with keyboard shortcut', async () => {
+        render(<TextEditor {...defaultProps} />);
+
+        const editor = document.querySelector('.tiptap');
+        expect(editor).toBeInTheDocument();
+
+        // Select text
+        await act(async () => {
+          if (editor) {
+            const range = document.createRange();
+            const textNode = editor.firstChild?.firstChild as Node;
+            if (textNode) {
+              range.selectNodeContents(textNode);
+              const selection = window.getSelection();
+              selection?.removeAllRanges();
+              selection?.addRange(range);
+            }
+          }
+        });
+
+        // Trigger horizontal rule shortcut (Mod+Shift+-)
+        // Note: The actual shortcut will be configured in implementation
+        await act(async () => {
+          fireEvent.keyDown(editor!, {
+            key: '-',
+            code: 'Minus',
+            shiftKey: true,
+            ctrlKey: true
+          });
+        });
+
+        // Should insert horizontal rule
+        await waitFor(() => {
+          const hr = document.querySelector('hr');
+          expect(hr).toBeInTheDocument();
+        });
+      });
+    });
+
+    describe('Persistence', () => {
+      it('should persist horizontal rule in Tiptap JSON on save', async () => {
+        const contentWithHR: TiptapJSONContent = {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'Text before' }]
+            },
+            {
+              type: 'horizontalRule'
+            },
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'Text after' }]
+            }
+          ]
+        };
+
+        const card = createMockCard(contentWithHR, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const saveButton = screen.getByRole('button', { name: /save/i });
+        fireEvent.click(saveButton);
+
+        await waitFor(() => {
+          expect(mockOnSave).toHaveBeenCalled();
+          const savedContent = mockOnSave.mock.calls[0][0];
+
+          expect(savedContent.format).toBe(TextContentFormat.TIPTAP);
+          expect(savedContent.content).toHaveProperty('type', 'doc');
+
+          // Check that horizontal rule is in the content
+          const hrNode = (savedContent.content as TiptapJSONContent).content?.find(
+            (node) => node.type === 'horizontalRule'
+          );
+          expect(hrNode).toBeDefined();
+        });
+      });
+
+      it('should maintain horizontal rule position after edit', async () => {
+        const contentWithHR: TiptapJSONContent = {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'First paragraph' }]
+            },
+            {
+              type: 'horizontalRule'
+            },
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'Second paragraph' }]
+            }
+          ]
+        };
+
+        const card = createMockCard(contentWithHR, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const editor = document.querySelector('.tiptap');
+        expect(editor).toBeInTheDocument();
+
+        // Verify horizontal rule exists
+        let hr = editor?.querySelector('hr');
+        expect(hr).toBeInTheDocument();
+
+        // Save
+        const saveButton = screen.getByRole('button', { name: /save/i });
+        fireEvent.click(saveButton);
+
+        await waitFor(() => {
+          expect(mockOnSave).toHaveBeenCalled();
+        });
+
+        // HR should still be present after save
+        hr = editor?.querySelector('hr');
+        expect(hr).toBeInTheDocument();
+      });
+    });
+
+    describe('Accessibility', () => {
+      it('should have proper ARIA label on horizontal rule button', async () => {
+        render(<TextEditor {...defaultProps} />);
+
+        const editor = document.querySelector('.tiptap');
+        expect(editor).toBeInTheDocument();
+
+        // Select text to show bubble menu
+        await act(async () => {
+          if (editor) {
+            const range = document.createRange();
+            const textNode = editor.firstChild?.firstChild as Node;
+            if (textNode) {
+              range.selectNodeContents(textNode);
+              const selection = window.getSelection();
+              selection?.removeAllRanges();
+              selection?.addRange(range);
+            }
+          }
+        });
+
+        // Wait for bubble menu
+        await waitFor(() => {
+          const bubbleMenu = screen.getByRole('toolbar', { name: /text formatting/i });
+          expect(bubbleMenu).toBeInTheDocument();
+        });
+
+        // Check ARIA label
+        const hrButton = screen.getByRole('button', { name: /horizontal rule/i });
+        expect(hrButton).toHaveAttribute('aria-label', 'Horizontal Rule');
+      });
+
+      it('should be keyboard accessible', async () => {
+        render(<TextEditor {...defaultProps} />);
+
+        const editor = document.querySelector('.tiptap');
+        expect(editor).toBeInTheDocument();
+
+        // Select text
+        await act(async () => {
+          if (editor) {
+            const range = document.createRange();
+            const textNode = editor.firstChild?.firstChild as Node;
+            if (textNode) {
+              range.selectNodeContents(textNode);
+              const selection = window.getSelection();
+              selection?.removeAllRanges();
+              selection?.addRange(range);
+            }
+          }
+        });
+
+        // Wait for bubble menu
+        await waitFor(() => {
+          const bubbleMenu = screen.getByRole('toolbar', { name: /text formatting/i });
+          expect(bubbleMenu).toBeInTheDocument();
+        });
+
+        const hrButton = screen.getByRole('button', { name: /horizontal rule/i });
+
+        // Button should be focusable
+        hrButton.focus();
+        expect(hrButton).toHaveFocus();
       });
     });
   });

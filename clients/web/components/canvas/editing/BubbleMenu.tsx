@@ -314,16 +314,18 @@ export const BubbleMenu: React.FC<BubbleMenuProps> = ({ editor, onOpenLinkEditor
     },
     {
       id: 'code',
-      label: 'Code',
+      label: 'Inline Code',
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+          {/* Backticks icon for inline code */}
+          <text x="4" y="18" fontSize="16" fontWeight="bold" fill="currentColor">`</text>
+          <text x="14" y="18" fontSize="16" fontWeight="bold" fill="currentColor">`</text>
         </svg>
       ),
       command: () => editor.chain().focus().toggleCode().run(),
       isActive: () => editor.isActive('code'),
       shortcut: 'Mod+E',
-      ariaLabel: 'Code',
+      ariaLabel: 'Inline Code',
     },
     {
       id: 'link',
@@ -392,6 +394,53 @@ export const BubbleMenu: React.FC<BubbleMenuProps> = ({ editor, onOpenLinkEditor
       isActive: () => editor.isActive('taskList'),
       shortcut: 'Mod+Shift+9',
       ariaLabel: 'Task List',
+    },
+  ];
+
+  /**
+   * Define block element buttons (blockquote, code block, horizontal rule)
+   */
+  const blockButtons: FormatButton[] = [
+    {
+      id: 'blockquote',
+      label: 'Blockquote',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+        </svg>
+      ),
+      command: () => editor.chain().focus().toggleBlockquote().run(),
+      isActive: () => editor.isActive('blockquote'),
+      shortcut: 'Mod+Shift+B',
+      ariaLabel: 'Blockquote',
+    },
+    {
+      id: 'codeBlock',
+      label: 'Code Block',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          {/* Terminal/code window icon for code blocks */}
+          <rect x="3" y="4" width="18" height="16" rx="2" strokeWidth={2} />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 10l2 2-2 2m4 0h4" />
+        </svg>
+      ),
+      command: () => editor.chain().focus().toggleCodeBlock().run(),
+      isActive: () => editor.isActive('codeBlock'),
+      shortcut: 'Mod+Alt+C',
+      ariaLabel: 'Code Block (multi-line)',
+    },
+    {
+      id: 'horizontalRule',
+      label: 'Horizontal Rule',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14" />
+        </svg>
+      ),
+      command: () => editor.chain().focus().setHorizontalRule().run(),
+      isActive: () => false, // Horizontal rule is not a toggle, it's always inactive
+      shortcut: 'Mod+Shift+-',
+      ariaLabel: 'Horizontal Rule',
     },
   ];
 
@@ -566,6 +615,47 @@ export const BubbleMenu: React.FC<BubbleMenuProps> = ({ editor, onOpenLinkEditor
 
         {/* List Buttons */}
         {listButtons.map((button) => {
+          const isActive = button.isActive();
+
+          return (
+            <button
+              key={button.id}
+              type="button"
+              onClick={() => handleButtonClick(button)}
+              aria-label={button.ariaLabel}
+              aria-pressed={isActive}
+              title={`${button.label} (${getShortcutText(button.shortcut)})`}
+              className={cn(
+                // Base button styling
+                'inline-flex items-center justify-center',
+                // Size - minimum 40x40px for touch targets
+                'w-8 h-8',
+                // Rounded corners
+                'rounded',
+                // Transitions
+                'transition-all duration-150',
+                // Focus state
+                'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1',
+                // Hover state
+                'hover:bg-gray-100',
+                // Active state styling
+                isActive
+                  ? 'bg-primary-100 text-primary-700 hover:bg-primary-200'
+                  : 'text-gray-700',
+                // Disabled state
+                'disabled:opacity-50 disabled:cursor-not-allowed'
+              )}
+            >
+              {button.icon}
+            </button>
+          );
+        })}
+
+        {/* Separator */}
+        <div className="w-px h-6 bg-gray-200 mx-1" />
+
+        {/* Block Element Buttons (Blockquote, Code Block) */}
+        {blockButtons.map((button) => {
           const isActive = button.isActive();
 
           return (
