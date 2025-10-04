@@ -15,24 +15,25 @@ export const ClearFormattingOnEnter = Extension.create({
   addKeyboardShortcuts() {
     return {
       // Handle Enter key
-      'Enter': ({ editor }) => {
-        // First, let the default Enter behavior create a new paragraph
-        const defaultBehavior = this.editor.commands.first(({ commands }) => [
+      'Enter': () => {
+        const { editor } = this;
+
+        return editor.commands.first(({ commands, chain }) => [
           () => commands.newlineInCode(),
           () => commands.createParagraphNear(),
           () => commands.liftEmptyBlock(),
-          () => commands.splitBlock(),
+          () => {
+            // Split block and clear stored marks in a chain
+            return chain()
+              .splitBlock()
+              .command(({ tr }) => {
+                // Clear stored marks to prevent formatting carryover
+                tr.setStoredMarks([]);
+                return true;
+              })
+              .run();
+          },
         ]);
-
-        if (defaultBehavior) {
-          // After creating the new paragraph, clear all marks
-          // Use setTimeout to ensure the new paragraph is created first
-          setTimeout(() => {
-            editor.chain().unsetAllMarks().run();
-          }, 0);
-        }
-
-        return defaultBehavior;
       },
     };
   },
