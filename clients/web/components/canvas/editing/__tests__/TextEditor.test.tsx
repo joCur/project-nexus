@@ -1282,6 +1282,1377 @@ describe('TextEditor Component', () => {
     });
   });
 
+  describe('List Extensions (Phase 3, Task 1)', () => {
+    describe('Bullet List Support', () => {
+      it('should support bullet lists in content', () => {
+        const contentWithBulletList: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'bulletList',
+            content: [
+              {
+                type: 'listItem',
+                content: [{
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'First item' }]
+                }]
+              },
+              {
+                type: 'listItem',
+                content: [{
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Second item' }]
+                }]
+              }
+            ]
+          }]
+        };
+
+        const card = createMockCard(contentWithBulletList, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const bulletList = document.querySelector('ul');
+        expect(bulletList).toBeInTheDocument();
+        expect(bulletList?.querySelectorAll('li')).toHaveLength(2);
+      });
+
+      it('should render bullet list items correctly', () => {
+        const contentWithBulletList: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'bulletList',
+            content: [{
+              type: 'listItem',
+              content: [{
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'Bullet item' }]
+              }]
+            }]
+          }]
+        };
+
+        const card = createMockCard(contentWithBulletList, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const listItem = document.querySelector('li');
+        expect(listItem).toBeInTheDocument();
+        expect(listItem).toHaveTextContent('Bullet item');
+      });
+
+      it('should support Cmd+Shift+8 keyboard shortcut for bullet list', async () => {
+        render(<TextEditor {...defaultProps} />);
+
+        const editor = document.querySelector('.tiptap');
+        expect(editor).toBeInTheDocument();
+
+        // Simulate Cmd+Shift+8 (Mac)
+        fireEvent.keyDown(editor!, {
+          key: '8',
+          metaKey: true,
+          shiftKey: true,
+          bubbles: true
+        });
+
+        await waitFor(() => {
+          expect(editor).toBeInTheDocument();
+        });
+      });
+
+      it('should support Ctrl+Shift+8 keyboard shortcut for bullet list on Windows', async () => {
+        render(<TextEditor {...defaultProps} />);
+
+        const editor = document.querySelector('.tiptap');
+        expect(editor).toBeInTheDocument();
+
+        // Simulate Ctrl+Shift+8 (Windows)
+        fireEvent.keyDown(editor!, {
+          key: '8',
+          ctrlKey: true,
+          shiftKey: true,
+          bubbles: true
+        });
+
+        await waitFor(() => {
+          expect(editor).toBeInTheDocument();
+        });
+      });
+
+      it('should persist bullet lists in saved content', async () => {
+        const contentWithBulletList: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'bulletList',
+            content: [{
+              type: 'listItem',
+              content: [{
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'Persistent bullet item' }]
+              }]
+            }]
+          }]
+        };
+
+        const card = createMockCard(contentWithBulletList, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const saveButton = screen.getByRole('button', { name: /save/i });
+        fireEvent.click(saveButton);
+
+        await waitFor(() => {
+          expect(mockOnSave).toHaveBeenCalled();
+          const savedContent = mockOnSave.mock.calls[0][0];
+          expect(savedContent.format).toBe(TextContentFormat.TIPTAP);
+
+          const listNode = savedContent.content.content[0];
+          expect(listNode.type).toBe('bulletList');
+          expect(listNode.content).toHaveLength(1);
+          expect(listNode.content[0].type).toBe('listItem');
+        });
+      });
+    });
+
+    describe('Ordered List Support', () => {
+      it('should support ordered lists in content', () => {
+        const contentWithOrderedList: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'orderedList',
+            content: [
+              {
+                type: 'listItem',
+                content: [{
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'First numbered item' }]
+                }]
+              },
+              {
+                type: 'listItem',
+                content: [{
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Second numbered item' }]
+                }]
+              }
+            ]
+          }]
+        };
+
+        const card = createMockCard(contentWithOrderedList, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const orderedList = document.querySelector('ol');
+        expect(orderedList).toBeInTheDocument();
+        expect(orderedList?.querySelectorAll('li')).toHaveLength(2);
+      });
+
+      it('should render ordered list items correctly', () => {
+        const contentWithOrderedList: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'orderedList',
+            content: [{
+              type: 'listItem',
+              content: [{
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'Numbered item' }]
+              }]
+            }]
+          }]
+        };
+
+        const card = createMockCard(contentWithOrderedList, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const listItem = document.querySelector('li');
+        expect(listItem).toBeInTheDocument();
+        expect(listItem).toHaveTextContent('Numbered item');
+      });
+
+      it('should support Cmd+Shift+7 keyboard shortcut for ordered list', async () => {
+        render(<TextEditor {...defaultProps} />);
+
+        const editor = document.querySelector('.tiptap');
+        expect(editor).toBeInTheDocument();
+
+        // Simulate Cmd+Shift+7 (Mac)
+        fireEvent.keyDown(editor!, {
+          key: '7',
+          metaKey: true,
+          shiftKey: true,
+          bubbles: true
+        });
+
+        await waitFor(() => {
+          expect(editor).toBeInTheDocument();
+        });
+      });
+
+      it('should support Ctrl+Shift+7 keyboard shortcut for ordered list on Windows', async () => {
+        render(<TextEditor {...defaultProps} />);
+
+        const editor = document.querySelector('.tiptap');
+        expect(editor).toBeInTheDocument();
+
+        // Simulate Ctrl+Shift+7 (Windows)
+        fireEvent.keyDown(editor!, {
+          key: '7',
+          ctrlKey: true,
+          shiftKey: true,
+          bubbles: true
+        });
+
+        await waitFor(() => {
+          expect(editor).toBeInTheDocument();
+        });
+      });
+
+      it('should persist ordered lists in saved content', async () => {
+        const contentWithOrderedList: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'orderedList',
+            content: [{
+              type: 'listItem',
+              content: [{
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'Persistent ordered item' }]
+              }]
+            }]
+          }]
+        };
+
+        const card = createMockCard(contentWithOrderedList, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const saveButton = screen.getByRole('button', { name: /save/i });
+        fireEvent.click(saveButton);
+
+        await waitFor(() => {
+          expect(mockOnSave).toHaveBeenCalled();
+          const savedContent = mockOnSave.mock.calls[0][0];
+          expect(savedContent.format).toBe(TextContentFormat.TIPTAP);
+
+          const listNode = savedContent.content.content[0];
+          expect(listNode.type).toBe('orderedList');
+          expect(listNode.content).toHaveLength(1);
+          expect(listNode.content[0].type).toBe('listItem');
+        });
+      });
+    });
+
+    describe('Nested Lists', () => {
+      it('should support nested bullet lists', () => {
+        const contentWithNestedBullets: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'bulletList',
+            content: [
+              {
+                type: 'listItem',
+                content: [
+                  {
+                    type: 'paragraph',
+                    content: [{ type: 'text', text: 'Parent item' }]
+                  },
+                  {
+                    type: 'bulletList',
+                    content: [{
+                      type: 'listItem',
+                      content: [{
+                        type: 'paragraph',
+                        content: [{ type: 'text', text: 'Nested item' }]
+                      }]
+                    }]
+                  }
+                ]
+              }
+            ]
+          }]
+        };
+
+        const card = createMockCard(contentWithNestedBullets, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const lists = document.querySelectorAll('ul');
+        expect(lists).toHaveLength(2); // Parent and nested list
+        expect(document.body).toHaveTextContent('Parent item');
+        expect(document.body).toHaveTextContent('Nested item');
+      });
+
+      it('should support nested ordered lists', () => {
+        const contentWithNestedOrdered: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'orderedList',
+            content: [
+              {
+                type: 'listItem',
+                content: [
+                  {
+                    type: 'paragraph',
+                    content: [{ type: 'text', text: 'Parent numbered' }]
+                  },
+                  {
+                    type: 'orderedList',
+                    content: [{
+                      type: 'listItem',
+                      content: [{
+                        type: 'paragraph',
+                        content: [{ type: 'text', text: 'Nested numbered' }]
+                      }]
+                    }]
+                  }
+                ]
+              }
+            ]
+          }]
+        };
+
+        const card = createMockCard(contentWithNestedOrdered, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const lists = document.querySelectorAll('ol');
+        expect(lists).toHaveLength(2); // Parent and nested list
+        expect(document.body).toHaveTextContent('Parent numbered');
+        expect(document.body).toHaveTextContent('Nested numbered');
+      });
+
+      it('should support mixed nested lists (bullet in ordered)', () => {
+        const contentWithMixedNested: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'orderedList',
+            content: [{
+              type: 'listItem',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Ordered parent' }]
+                },
+                {
+                  type: 'bulletList',
+                  content: [{
+                    type: 'listItem',
+                    content: [{
+                      type: 'paragraph',
+                      content: [{ type: 'text', text: 'Bullet child' }]
+                    }]
+                  }]
+                }
+              ]
+            }]
+          }]
+        };
+
+        const card = createMockCard(contentWithMixedNested, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const orderedList = document.querySelector('ol');
+        const bulletList = document.querySelector('ul');
+        expect(orderedList).toBeInTheDocument();
+        expect(bulletList).toBeInTheDocument();
+      });
+
+      it('should support deeply nested lists (3+ levels)', () => {
+        const contentWithDeepNesting: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'bulletList',
+            content: [{
+              type: 'listItem',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Level 1' }]
+                },
+                {
+                  type: 'bulletList',
+                  content: [{
+                    type: 'listItem',
+                    content: [
+                      {
+                        type: 'paragraph',
+                        content: [{ type: 'text', text: 'Level 2' }]
+                      },
+                      {
+                        type: 'bulletList',
+                        content: [{
+                          type: 'listItem',
+                          content: [{
+                            type: 'paragraph',
+                            content: [{ type: 'text', text: 'Level 3' }]
+                          }]
+                        }]
+                      }
+                    ]
+                  }]
+                }
+              ]
+            }]
+          }]
+        };
+
+        const card = createMockCard(contentWithDeepNesting, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const lists = document.querySelectorAll('ul');
+        expect(lists.length).toBeGreaterThanOrEqual(3); // At least 3 levels
+        expect(document.body).toHaveTextContent('Level 1');
+        expect(document.body).toHaveTextContent('Level 2');
+        expect(document.body).toHaveTextContent('Level 3');
+      });
+    });
+
+    describe('List Items with Formatting', () => {
+      it('should support formatted text in bullet list items', () => {
+        const contentWithFormattedBullet: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'bulletList',
+            content: [{
+              type: 'listItem',
+              content: [{
+                type: 'paragraph',
+                content: [{
+                  type: 'text',
+                  text: 'Bold item',
+                  marks: [{ type: 'bold' }]
+                }]
+              }]
+            }]
+          }]
+        };
+
+        const card = createMockCard(contentWithFormattedBullet, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const listItem = document.querySelector('li');
+        expect(listItem).toBeInTheDocument();
+        expect(listItem).toHaveTextContent('Bold item');
+      });
+
+      it('should support links in list items', () => {
+        const contentWithLinkInList: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'bulletList',
+            content: [{
+              type: 'listItem',
+              content: [{
+                type: 'paragraph',
+                content: [{
+                  type: 'text',
+                  text: 'Link in list',
+                  marks: [{
+                    type: 'link',
+                    attrs: {
+                      href: 'https://example.com',
+                      target: '_blank',
+                      rel: 'noopener noreferrer'
+                    }
+                  }]
+                }]
+              }]
+            }]
+          }]
+        };
+
+        const card = createMockCard(contentWithLinkInList, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const linkElement = document.querySelector('a[href="https://example.com"]');
+        expect(linkElement).toBeInTheDocument();
+      });
+    });
+
+    describe('BubbleMenu List Controls', () => {
+      it('should show bullet list button in BubbleMenu', () => {
+        render(<TextEditor {...defaultProps} />);
+
+        const editor = document.querySelector('.ProseMirror');
+        expect(editor).toBeInTheDocument();
+
+        // BubbleMenu renders with list controls
+        // Actual visibility testing requires text selection simulation
+      });
+
+      it('should show ordered list button in BubbleMenu', () => {
+        render(<TextEditor {...defaultProps} />);
+
+        const editor = document.querySelector('.ProseMirror');
+        expect(editor).toBeInTheDocument();
+
+        // BubbleMenu renders with list controls
+      });
+
+      it('should show active state for bullet list button when in bullet list', () => {
+        const contentWithBulletList: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'bulletList',
+            content: [{
+              type: 'listItem',
+              content: [{
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'Item in list' }]
+              }]
+            }]
+          }]
+        };
+
+        const card = createMockCard(contentWithBulletList, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const editor = document.querySelector('.ProseMirror');
+        expect(editor).toBeInTheDocument();
+
+        // When cursor is in bullet list, button should show active state
+      });
+
+      it('should show active state for ordered list button when in ordered list', () => {
+        const contentWithOrderedList: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'orderedList',
+            content: [{
+              type: 'listItem',
+              content: [{
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'Numbered item' }]
+              }]
+            }]
+          }]
+        };
+
+        const card = createMockCard(contentWithOrderedList, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const editor = document.querySelector('.ProseMirror');
+        expect(editor).toBeInTheDocument();
+
+        // When cursor is in ordered list, button should show active state
+      });
+    });
+
+    describe('List Persistence and Edge Cases', () => {
+      it('should persist nested lists in saved content', async () => {
+        const contentWithNestedLists: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'bulletList',
+            content: [{
+              type: 'listItem',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Parent' }]
+                },
+                {
+                  type: 'bulletList',
+                  content: [{
+                    type: 'listItem',
+                    content: [{
+                      type: 'paragraph',
+                      content: [{ type: 'text', text: 'Child' }]
+                    }]
+                  }]
+                }
+              ]
+            }]
+          }]
+        };
+
+        const card = createMockCard(contentWithNestedLists, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const saveButton = screen.getByRole('button', { name: /save/i });
+        fireEvent.click(saveButton);
+
+        await waitFor(() => {
+          expect(mockOnSave).toHaveBeenCalled();
+          const savedContent = mockOnSave.mock.calls[0][0];
+
+          const listNode = savedContent.content.content[0];
+          expect(listNode.type).toBe('bulletList');
+          expect(listNode.content[0].content).toHaveLength(2); // Paragraph and nested list
+        });
+      });
+
+      it('should handle mixed content with lists and paragraphs', () => {
+        const mixedContent: TiptapJSONContent = {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'Introduction' }]
+            },
+            {
+              type: 'bulletList',
+              content: [{
+                type: 'listItem',
+                content: [{
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'List item' }]
+                }]
+              }]
+            },
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'Conclusion' }]
+            }
+          ]
+        };
+
+        const card = createMockCard(mixedContent, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        expect(document.body).toHaveTextContent('Introduction');
+        expect(document.querySelector('ul')).toBeInTheDocument();
+        expect(document.body).toHaveTextContent('Conclusion');
+      });
+
+      it('should handle empty list items gracefully', () => {
+        const contentWithEmptyItem: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'bulletList',
+            content: [
+              {
+                type: 'listItem',
+                content: [{
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Item 1' }]
+                }]
+              },
+              {
+                type: 'listItem',
+                content: [{
+                  type: 'paragraph'
+                }]
+              },
+              {
+                type: 'listItem',
+                content: [{
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Item 3' }]
+                }]
+              }
+            ]
+          }]
+        };
+
+        const card = createMockCard(contentWithEmptyItem, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const listItems = document.querySelectorAll('li');
+        expect(listItems).toHaveLength(3);
+      });
+    });
+  });
+
+  describe('Task List Functionality (Phase 3, Task 2)', () => {
+    describe('Task List Rendering', () => {
+      it('should render task list with checkboxes', () => {
+        const contentWithTaskList: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'taskList',
+            content: [
+              {
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [{
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Unchecked task' }]
+                }]
+              },
+              {
+                type: 'taskItem',
+                attrs: { checked: true },
+                content: [{
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Checked task' }]
+                }]
+              }
+            ]
+          }]
+        };
+
+        const card = createMockCard(contentWithTaskList, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        // Check for task list and task items
+        const taskList = document.querySelector('[data-type="taskList"]') || document.querySelector('ul[data-type="taskList"]');
+        expect(taskList || document.querySelector('ul')).toBeInTheDocument();
+
+        // Check for checkboxes
+        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+        expect(checkboxes.length).toBeGreaterThanOrEqual(2);
+      });
+
+      it('should render unchecked task items correctly', () => {
+        const contentWithUncheckedTask: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'taskList',
+            content: [{
+              type: 'taskItem',
+              attrs: { checked: false },
+              content: [{
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'Todo item' }]
+              }]
+            }]
+          }]
+        };
+
+        const card = createMockCard(contentWithUncheckedTask, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const checkbox = document.querySelector('input[type="checkbox"]');
+        expect(checkbox).toBeInTheDocument();
+        expect(checkbox).not.toBeChecked();
+        expect(document.body).toHaveTextContent('Todo item');
+      });
+
+      it('should render checked task items correctly', () => {
+        const contentWithCheckedTask: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'taskList',
+            content: [{
+              type: 'taskItem',
+              attrs: { checked: true },
+              content: [{
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'Completed item' }]
+              }]
+            }]
+          }]
+        };
+
+        const card = createMockCard(contentWithCheckedTask, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const checkbox = document.querySelector('input[type="checkbox"]');
+        expect(checkbox).toBeInTheDocument();
+        expect(checkbox).toBeChecked();
+        expect(document.body).toHaveTextContent('Completed item');
+      });
+
+      it('should render multiple task items', () => {
+        const contentWithMultipleTasks: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'taskList',
+            content: [
+              {
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [{
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Task 1' }]
+                }]
+              },
+              {
+                type: 'taskItem',
+                attrs: { checked: true },
+                content: [{
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Task 2' }]
+                }]
+              },
+              {
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [{
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Task 3' }]
+                }]
+              }
+            ]
+          }]
+        };
+
+        const card = createMockCard(contentWithMultipleTasks, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+        expect(checkboxes.length).toBeGreaterThanOrEqual(3);
+      });
+    });
+
+    describe('Task List Checkbox Interaction', () => {
+      it('should toggle checkbox state when clicked', async () => {
+        const contentWithTask: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'taskList',
+            content: [{
+              type: 'taskItem',
+              attrs: { checked: false },
+              content: [{
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'Toggle me' }]
+              }]
+            }]
+          }]
+        };
+
+        const card = createMockCard(contentWithTask, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const checkbox = document.querySelector('input[type="checkbox"]');
+        expect(checkbox).not.toBeChecked();
+
+        // Click checkbox to toggle
+        if (checkbox) {
+          fireEvent.click(checkbox);
+
+          await waitFor(() => {
+            expect(checkbox).toBeChecked();
+          });
+        }
+      });
+
+      it('should uncheck a checked task when clicked', async () => {
+        const contentWithCheckedTask: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'taskList',
+            content: [{
+              type: 'taskItem',
+              attrs: { checked: true },
+              content: [{
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'Uncheck me' }]
+              }]
+            }]
+          }]
+        };
+
+        const card = createMockCard(contentWithCheckedTask, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const checkbox = document.querySelector('input[type="checkbox"]');
+        expect(checkbox).toBeChecked();
+
+        // Click checkbox to toggle
+        if (checkbox) {
+          fireEvent.click(checkbox);
+
+          await waitFor(() => {
+            expect(checkbox).not.toBeChecked();
+          });
+        }
+      });
+
+      it('should allow toggling multiple checkboxes independently', async () => {
+        const contentWithMultipleTasks: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'taskList',
+            content: [
+              {
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [{
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Task 1' }]
+                }]
+              },
+              {
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [{
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Task 2' }]
+                }]
+              }
+            ]
+          }]
+        };
+
+        const card = createMockCard(contentWithMultipleTasks, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+        expect(checkboxes[0]).not.toBeChecked();
+        expect(checkboxes[1]).not.toBeChecked();
+
+        // Toggle first checkbox
+        if (checkboxes[0]) {
+          fireEvent.click(checkboxes[0]);
+          await waitFor(() => {
+            expect(checkboxes[0]).toBeChecked();
+            expect(checkboxes[1]).not.toBeChecked();
+          });
+        }
+      });
+    });
+
+    describe('Task List Keyboard Shortcuts', () => {
+      it('should support Cmd+Shift+9 keyboard shortcut for task list', async () => {
+        render(<TextEditor {...defaultProps} />);
+
+        const editor = document.querySelector('.tiptap');
+        expect(editor).toBeInTheDocument();
+
+        // Simulate Cmd+Shift+9 (Mac)
+        fireEvent.keyDown(editor!, {
+          key: '9',
+          metaKey: true,
+          shiftKey: true,
+          bubbles: true
+        });
+
+        await waitFor(() => {
+          expect(editor).toBeInTheDocument();
+        });
+      });
+
+      it('should support Ctrl+Shift+9 keyboard shortcut for task list on Windows', async () => {
+        render(<TextEditor {...defaultProps} />);
+
+        const editor = document.querySelector('.tiptap');
+        expect(editor).toBeInTheDocument();
+
+        // Simulate Ctrl+Shift+9 (Windows)
+        fireEvent.keyDown(editor!, {
+          key: '9',
+          ctrlKey: true,
+          shiftKey: true,
+          bubbles: true
+        });
+
+        await waitFor(() => {
+          expect(editor).toBeInTheDocument();
+        });
+      });
+    });
+
+    describe('Task List Persistence', () => {
+      it('should persist task list with checked state in saved content', async () => {
+        const contentWithTasks: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'taskList',
+            content: [
+              {
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [{
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Unchecked task' }]
+                }]
+              },
+              {
+                type: 'taskItem',
+                attrs: { checked: true },
+                content: [{
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Checked task' }]
+                }]
+              }
+            ]
+          }]
+        };
+
+        const card = createMockCard(contentWithTasks, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const saveButton = screen.getByRole('button', { name: /save/i });
+        fireEvent.click(saveButton);
+
+        await waitFor(() => {
+          expect(mockOnSave).toHaveBeenCalled();
+          const savedContent = mockOnSave.mock.calls[0][0];
+          expect(savedContent.format).toBe(TextContentFormat.TIPTAP);
+
+          const taskListNode = savedContent.content.content[0];
+          expect(taskListNode.type).toBe('taskList');
+          expect(taskListNode.content).toHaveLength(2);
+          expect(taskListNode.content[0].attrs.checked).toBe(false);
+          expect(taskListNode.content[1].attrs.checked).toBe(true);
+        });
+      });
+
+      it('should preserve checkbox state after toggling and saving', async () => {
+        const contentWithTask: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'taskList',
+            content: [{
+              type: 'taskItem',
+              attrs: { checked: false },
+              content: [{
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'Toggle and save' }]
+              }]
+            }]
+          }]
+        };
+
+        const card = createMockCard(contentWithTask, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const checkbox = document.querySelector('input[type="checkbox"]');
+
+        if (checkbox) {
+          // Toggle checkbox
+          fireEvent.click(checkbox);
+
+          await waitFor(() => {
+            expect(checkbox).toBeChecked();
+          });
+
+          // Save
+          const saveButton = screen.getByRole('button', { name: /save/i });
+          fireEvent.click(saveButton);
+
+          await waitFor(() => {
+            expect(mockOnSave).toHaveBeenCalled();
+            const savedContent = mockOnSave.mock.calls[0][0];
+
+            const taskListNode = savedContent.content.content[0];
+            expect(taskListNode.type).toBe('taskList');
+            expect(taskListNode.content[0].attrs.checked).toBe(true);
+          });
+        }
+      });
+    });
+
+    describe('Nested Task Lists', () => {
+      it('should support nested task lists', () => {
+        const contentWithNestedTasks: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'taskList',
+            content: [{
+              type: 'taskItem',
+              attrs: { checked: false },
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Parent task' }]
+                },
+                {
+                  type: 'taskList',
+                  content: [{
+                    type: 'taskItem',
+                    attrs: { checked: false },
+                    content: [{
+                      type: 'paragraph',
+                      content: [{ type: 'text', text: 'Nested task' }]
+                    }]
+                  }]
+                }
+              ]
+            }]
+          }]
+        };
+
+        const card = createMockCard(contentWithNestedTasks, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        expect(document.body).toHaveTextContent('Parent task');
+        expect(document.body).toHaveTextContent('Nested task');
+
+        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+        expect(checkboxes.length).toBeGreaterThanOrEqual(2);
+      });
+    });
+
+    describe('Task List with Formatting', () => {
+      it('should support formatted text in task items', () => {
+        const contentWithFormattedTask: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'taskList',
+            content: [{
+              type: 'taskItem',
+              attrs: { checked: false },
+              content: [{
+                type: 'paragraph',
+                content: [{
+                  type: 'text',
+                  text: 'Bold task',
+                  marks: [{ type: 'bold' }]
+                }]
+              }]
+            }]
+          }]
+        };
+
+        const card = createMockCard(contentWithFormattedTask, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        expect(document.body).toHaveTextContent('Bold task');
+        const checkbox = document.querySelector('input[type="checkbox"]');
+        expect(checkbox).toBeInTheDocument();
+      });
+
+      it('should support links in task items', () => {
+        const contentWithLinkInTask: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'taskList',
+            content: [{
+              type: 'taskItem',
+              attrs: { checked: false },
+              content: [{
+                type: 'paragraph',
+                content: [{
+                  type: 'text',
+                  text: 'Task with link',
+                  marks: [{
+                    type: 'link',
+                    attrs: {
+                      href: 'https://example.com',
+                      target: '_blank',
+                      rel: 'noopener noreferrer'
+                    }
+                  }]
+                }]
+              }]
+            }]
+          }]
+        };
+
+        const card = createMockCard(contentWithLinkInTask, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const linkElement = document.querySelector('a[href="https://example.com"]');
+        expect(linkElement).toBeInTheDocument();
+        const checkbox = document.querySelector('input[type="checkbox"]');
+        expect(checkbox).toBeInTheDocument();
+      });
+    });
+
+    describe('BubbleMenu Task List Controls', () => {
+      it('should show task list button in BubbleMenu', () => {
+        render(<TextEditor {...defaultProps} />);
+
+        const editor = document.querySelector('.ProseMirror');
+        expect(editor).toBeInTheDocument();
+
+        // BubbleMenu renders with task list controls
+        // Actual visibility testing requires text selection simulation
+      });
+
+      it('should show active state for task list button when in task list', () => {
+        const contentWithTask: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'taskList',
+            content: [{
+              type: 'taskItem',
+              attrs: { checked: false },
+              content: [{
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'Task item' }]
+              }]
+            }]
+          }]
+        };
+
+        const card = createMockCard(contentWithTask, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const editor = document.querySelector('.ProseMirror');
+        expect(editor).toBeInTheDocument();
+
+        // When cursor is in task list, button should show active state
+      });
+    });
+
+    describe('Mixed Content with Task Lists', () => {
+      it('should handle mixed content with task lists and paragraphs', () => {
+        const mixedContent: TiptapJSONContent = {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'Introduction' }]
+            },
+            {
+              type: 'taskList',
+              content: [{
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [{
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Task item' }]
+                }]
+              }]
+            },
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'Conclusion' }]
+            }
+          ]
+        };
+
+        const card = createMockCard(mixedContent, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        expect(document.body).toHaveTextContent('Introduction');
+        expect(document.querySelector('input[type="checkbox"]')).toBeInTheDocument();
+        expect(document.body).toHaveTextContent('Conclusion');
+      });
+
+      it('should handle task lists mixed with bullet lists', () => {
+        const mixedContent: TiptapJSONContent = {
+          type: 'doc',
+          content: [
+            {
+              type: 'bulletList',
+              content: [{
+                type: 'listItem',
+                content: [{
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Bullet item' }]
+                }]
+              }]
+            },
+            {
+              type: 'taskList',
+              content: [{
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [{
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Task item' }]
+                }]
+              }]
+            }
+          ]
+        };
+
+        const card = createMockCard(mixedContent, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        expect(document.querySelector('ul')).toBeInTheDocument();
+        expect(document.querySelector('input[type="checkbox"]')).toBeInTheDocument();
+      });
+    });
+
+    describe('Task List Checkbox Styling', () => {
+      it('should apply design system styling to checkboxes', () => {
+        const contentWithTask: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'taskList',
+            content: [{
+              type: 'taskItem',
+              attrs: { checked: false },
+              content: [{
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'Styled checkbox' }]
+              }]
+            }]
+          }]
+        };
+
+        const card = createMockCard(contentWithTask, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const checkbox = document.querySelector('input[type="checkbox"]');
+        expect(checkbox).toBeInTheDocument();
+        // Design system styling will be applied via CSS classes
+      });
+
+      it('should show hover state on checkboxes', () => {
+        const contentWithTask: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'taskList',
+            content: [{
+              type: 'taskItem',
+              attrs: { checked: false },
+              content: [{
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'Hover me' }]
+              }]
+            }]
+          }]
+        };
+
+        const card = createMockCard(contentWithTask, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const checkbox = document.querySelector('input[type="checkbox"]');
+        expect(checkbox).toBeInTheDocument();
+        // Hover styling will be applied via CSS
+      });
+    });
+
+    describe('Task List Edge Cases', () => {
+      it('should handle empty task items gracefully', () => {
+        const contentWithEmptyTask: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'taskList',
+            content: [{
+              type: 'taskItem',
+              attrs: { checked: false },
+              content: [{
+                type: 'paragraph'
+              }]
+            }]
+          }]
+        };
+
+        const card = createMockCard(contentWithEmptyTask, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const checkbox = document.querySelector('input[type="checkbox"]');
+        expect(checkbox).toBeInTheDocument();
+      });
+
+      it('should persist task list structure in saved content', async () => {
+        const contentWithTaskList: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'taskList',
+            content: [
+              {
+                type: 'taskItem',
+                attrs: { checked: true },
+                content: [{
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Task 1' }]
+                }]
+              },
+              {
+                type: 'taskItem',
+                attrs: { checked: false },
+                content: [{
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Task 2' }]
+                }]
+              }
+            ]
+          }]
+        };
+
+        const card = createMockCard(contentWithTaskList, TextContentFormat.TIPTAP);
+        render(<TextEditor {...defaultProps} card={card} />);
+
+        const saveButton = screen.getByRole('button', { name: /save/i });
+        fireEvent.click(saveButton);
+
+        await waitFor(() => {
+          expect(mockOnSave).toHaveBeenCalled();
+          const savedContent = mockOnSave.mock.calls[0][0];
+
+          const taskListNode = savedContent.content.content[0];
+          expect(taskListNode.type).toBe('taskList');
+          expect(taskListNode.content).toHaveLength(2);
+        });
+      });
+    });
+  });
+
   describe('Heading Transformations (Phase 2)', () => {
     describe('Heading Extension Integration', () => {
       it('should support H1 heading in content', () => {

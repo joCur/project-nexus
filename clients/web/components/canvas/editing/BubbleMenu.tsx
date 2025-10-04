@@ -7,6 +7,7 @@
  * Features:
  * - Formatting buttons: Bold, Italic, Underline, Strikethrough, Code
  * - Heading dropdown: H1, H2, H3 transformations
+ * - List buttons: Bullet List, Ordered List, Task List
  * - Active state indication for applied formats
  * - Keyboard shortcut tooltips
  * - Design system compliant styling
@@ -346,6 +347,55 @@ export const BubbleMenu: React.FC<BubbleMenuProps> = ({ editor, onOpenLinkEditor
   ];
 
   /**
+   * Define list buttons with their configurations
+   */
+  const listButtons: FormatButton[] = [
+    {
+      id: 'bulletList',
+      label: 'Bullet List',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          <circle cx="4" cy="6" r="1" fill="currentColor" />
+          <circle cx="4" cy="12" r="1" fill="currentColor" />
+          <circle cx="4" cy="18" r="1" fill="currentColor" />
+        </svg>
+      ),
+      command: () => editor.chain().focus().toggleBulletList().run(),
+      isActive: () => editor.isActive('bulletList'),
+      shortcut: 'Mod+Shift+8',
+      ariaLabel: 'Bullet List',
+    },
+    {
+      id: 'orderedList',
+      label: 'Ordered List',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+        </svg>
+      ),
+      command: () => editor.chain().focus().toggleOrderedList().run(),
+      isActive: () => editor.isActive('orderedList'),
+      shortcut: 'Mod+Shift+7',
+      ariaLabel: 'Ordered List',
+    },
+    {
+      id: 'taskList',
+      label: 'Task List',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4" />
+        </svg>
+      ),
+      command: () => editor.chain().focus().toggleTaskList().run(),
+      isActive: () => editor.isActive('taskList'),
+      shortcut: 'Mod+Shift+9',
+      ariaLabel: 'Task List',
+    },
+  ];
+
+  /**
    * Handle button click with logging
    */
   const handleButtonClick = useCallback((button: FormatButton): void => {
@@ -475,6 +525,47 @@ export const BubbleMenu: React.FC<BubbleMenuProps> = ({ editor, onOpenLinkEditor
 
         {/* Format Buttons */}
         {formatButtons.map((button) => {
+          const isActive = button.isActive();
+
+          return (
+            <button
+              key={button.id}
+              type="button"
+              onClick={() => handleButtonClick(button)}
+              aria-label={button.ariaLabel}
+              aria-pressed={isActive}
+              title={`${button.label} (${getShortcutText(button.shortcut)})`}
+              className={cn(
+                // Base button styling
+                'inline-flex items-center justify-center',
+                // Size - minimum 40x40px for touch targets
+                'w-8 h-8',
+                // Rounded corners
+                'rounded',
+                // Transitions
+                'transition-all duration-150',
+                // Focus state
+                'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1',
+                // Hover state
+                'hover:bg-gray-100',
+                // Active state styling
+                isActive
+                  ? 'bg-primary-100 text-primary-700 hover:bg-primary-200'
+                  : 'text-gray-700',
+                // Disabled state
+                'disabled:opacity-50 disabled:cursor-not-allowed'
+              )}
+            >
+              {button.icon}
+            </button>
+          );
+        })}
+
+        {/* Separator */}
+        <div className="w-px h-6 bg-gray-200 mx-1" />
+
+        {/* List Buttons */}
+        {listButtons.map((button) => {
           const isActive = button.isActive();
 
           return (

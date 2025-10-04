@@ -8,6 +8,9 @@
  *   Strikethrough (Cmd/Ctrl+Shift+X), Inline Code (Cmd/Ctrl+E)
  * - Link support: Add/Edit Links (Cmd/Ctrl+K), Remove Links
  * - Links open in new tab by default with security attributes (target="_blank", rel="noopener noreferrer")
+ * - List support: Bullet Lists (Cmd/Ctrl+Shift+8), Ordered Lists (Cmd/Ctrl+Shift+7)
+ * - Task lists: Task Lists (Cmd/Ctrl+Shift+9) with interactive checkboxes
+ * - Nested list support with proper indentation (including task lists)
  * - Bubble menu for contextual formatting (appears on text selection)
  * - Real-time character count with 10,000 character limit
  * - Auto-resize based on content with min/max constraints
@@ -36,6 +39,11 @@ import Underline from '@tiptap/extension-underline';
 import Strike from '@tiptap/extension-strike';
 import Code from '@tiptap/extension-code';
 import Link from '@tiptap/extension-link';
+import BulletList from '@tiptap/extension-bullet-list';
+import OrderedList from '@tiptap/extension-ordered-list';
+import ListItem from '@tiptap/extension-list-item';
+import TaskList from '@tiptap/extension-task-list';
+import TaskItem from '@tiptap/extension-task-item';
 import ClearFormattingOnEnter from './extensions/ClearFormattingOnEnter';
 import {
   BaseEditor,
@@ -169,6 +177,10 @@ export const TextEditor: React.FC<TextEditorProps> = ({
         italic: false,
         strike: false,
         code: false,
+        // Disable built-in list extensions (we configure them explicitly below)
+        bulletList: false,
+        orderedList: false,
+        listItem: false,
         // Enable and configure heading levels explicitly
         heading: {
           levels: [1, 2, 3],
@@ -205,6 +217,38 @@ export const TextEditor: React.FC<TextEditorProps> = ({
           // Allow http, https, mailto protocols
           return /^https?:\/\//.test(url) || /^mailto:/.test(url);
         }
+      }),
+      // List extensions with nesting support
+      // Keyboard shortcuts:
+      // Bullet List: Cmd/Ctrl+Shift+8
+      // Ordered List: Cmd/Ctrl+Shift+7
+      BulletList.configure({
+        HTMLAttributes: {
+          class: 'tiptap-bullet-list'
+        }
+      }),
+      OrderedList.configure({
+        HTMLAttributes: {
+          class: 'tiptap-ordered-list'
+        }
+      }),
+      ListItem.configure({
+        HTMLAttributes: {
+          class: 'tiptap-list-item'
+        }
+      }),
+      // Task list extensions with design system styling
+      // Keyboard shortcut: Cmd/Ctrl+Shift+9
+      TaskList.configure({
+        HTMLAttributes: {
+          class: 'tiptap-task-list'
+        }
+      }),
+      TaskItem.configure({
+        HTMLAttributes: {
+          class: 'tiptap-task-item'
+        },
+        nested: true // Enable nested task lists
       }),
       // Clear formatting on Enter - Notion-like behavior
       // When pressing Enter to create a new paragraph, formatting marks don't carry over

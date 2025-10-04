@@ -135,14 +135,124 @@
     letter-spacing: -0.01em !important;
   }
 
-  .ProseMirror ul,
-  .ProseMirror ol {
+  /* Regular List Styles (Bullet and Ordered) */
+  .ProseMirror ul:not([data-type="taskList"]) {
+    list-style-type: disc;
+    list-style-position: outside;
     padding-left: 1.5em;
     margin-bottom: 0.5em;
+    margin-top: 0.5em;
   }
 
-  .ProseMirror li {
+  .ProseMirror ol {
+    list-style-type: decimal;
+    list-style-position: outside;
+    padding-left: 1.5em;
+    margin-bottom: 0.5em;
+    margin-top: 0.5em;
+  }
+
+  .ProseMirror ul:not([data-type="taskList"]) li,
+  .ProseMirror ol li {
+    display: list-item;
+    list-style-position: outside;
     margin-bottom: 0.25em;
+    margin-left: 0;
+  }
+
+  /* Nested list indentation */
+  .ProseMirror ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) {
+    list-style-type: circle;
+    margin-top: 0.25em;
+    padding-left: 1.5em;
+  }
+
+  .ProseMirror ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) {
+    list-style-type: square;
+    padding-left: 1.5em;
+  }
+
+  .ProseMirror ol ol {
+    margin-top: 0.25em;
+    padding-left: 1.5em;
+  }
+
+  /* Task List Styles - Design System Compliant */
+  .ProseMirror ul[data-type="taskList"] {
+    list-style: none;
+    padding-left: 0;
+  }
+
+  .ProseMirror ul[data-type="taskList"] li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5em;
+  }
+
+  .ProseMirror ul[data-type="taskList"] li > label {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    user-select: none;
+    margin-top: 0.125em; /* Align checkbox with first line of text */
+  }
+
+  .ProseMirror ul[data-type="taskList"] li > div {
+    flex: 1;
+  }
+
+  /* Checkbox styling - Design System Colors */
+  .ProseMirror ul[data-type="taskList"] input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 1.125em;
+    height: 1.125em;
+    border: 2px solid #d1d5db; /* gray-300 */
+    border-radius: 0.25rem;
+    cursor: pointer;
+    position: relative;
+    margin: 0;
+    flex-shrink: 0;
+    transition: all 0.15s ease-in-out;
+    background-color: white;
+  }
+
+  .ProseMirror ul[data-type="taskList"] input[type="checkbox"]:hover {
+    border-color: #9ca3af; /* gray-400 */
+    background-color: #f9fafb; /* gray-50 */
+  }
+
+  .ProseMirror ul[data-type="taskList"] input[type="checkbox"]:focus {
+    outline: 2px solid #3b82f6; /* primary-500 */
+    outline-offset: 2px;
+  }
+
+  .ProseMirror ul[data-type="taskList"] input[type="checkbox"]:checked {
+    background-color: #2563eb; /* primary-600 */
+    border-color: #2563eb; /* primary-600 */
+  }
+
+  .ProseMirror ul[data-type="taskList"] input[type="checkbox"]:checked::after {
+    content: "";
+    position: absolute;
+    left: 0.25em;
+    top: 0.0625em;
+    width: 0.375em;
+    height: 0.625em;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+
+  /* Nested task lists */
+  .ProseMirror ul[data-type="taskList"] ul[data-type="taskList"] {
+    margin-top: 0.5em;
+    margin-left: 1.5em;
+  }
+
+  /* Strikethrough for completed tasks (optional visual enhancement) */
+  .ProseMirror ul[data-type="taskList"] li:has(input[type="checkbox"]:checked) > div {
+    color: #6b7280; /* gray-500 */
   }
 
   .ProseMirror strong {
