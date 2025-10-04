@@ -283,8 +283,14 @@ export const TextEditor: React.FC<TextEditorProps> = ({
       }),
       // Horizontal rule extension for visual dividers
       // Creates a horizontal line (<hr>) to separate content sections
-      // Keyboard shortcut will be added to BubbleMenu
-      HorizontalRule.configure({
+      // Keyboard shortcut: Mod+Shift+- (Cmd+Shift+- on Mac, Ctrl+Shift+- on Windows)
+      HorizontalRule.extend({
+        addKeyboardShortcuts() {
+          return {
+            'Mod-Shift--': () => this.editor.commands.setHorizontalRule(),
+          };
+        },
+      }).configure({
         HTMLAttributes: {
           class: 'tiptap-horizontal-rule'
         }
