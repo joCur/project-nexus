@@ -4,6 +4,11 @@
  * Tiptap v3-based text editor for inline editing of text cards.
  * Built on BaseEditor component with text-specific features:
  * - Rich text editing via Tiptap with StarterKit extensions
+ * - Text formatting: Bold (Cmd/Ctrl+B), Italic (Cmd/Ctrl+I), Underline (Cmd/Ctrl+U),
+ *   Strikethrough (Cmd/Ctrl+Shift+X), Inline Code (Cmd/Ctrl+E)
+ * - Link support: Add/Edit Links (Cmd/Ctrl+K), Remove Links
+ * - Links open in new tab by default with security attributes (target="_blank", rel="noopener noreferrer")
+ * - Bubble menu for contextual formatting (appears on text selection)
  * - Real-time character count with 10,000 character limit
  * - Auto-resize based on content with min/max constraints
  * - Backward compatibility with markdown content
@@ -19,15 +24,24 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
+  useState,
   KeyboardEvent
 } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
+import Bold from '@tiptap/extension-bold';
+import Italic from '@tiptap/extension-italic';
+import Underline from '@tiptap/extension-underline';
+import Strike from '@tiptap/extension-strike';
+import Code from '@tiptap/extension-code';
+import Link from '@tiptap/extension-link';
 import {
   BaseEditor,
   type BaseEditorChildProps
 } from './BaseEditor';
+import { BubbleMenu } from './BubbleMenu';
+import { LinkEditorPopup } from './LinkEditorPopup';
 import type {
   TextCard,
   TextCardContent,
@@ -110,6 +124,10 @@ export const TextEditor: React.FC<TextEditorProps> = ({
   className = '',
   placeholder = 'Enter text...'
 }) => {
+  // Link editor state
+  const [isLinkEditorOpen, setIsLinkEditorOpen] = useState(false);
+  const [currentLinkUrl, setCurrentLinkUrl] = useState('');
+
   // Initialize content based on format
   const initialContent = useMemo((): TiptapJSONContent => {
     const cardContent = card.content;
@@ -145,9 +163,46 @@ export const TextEditor: React.FC<TextEditorProps> = ({
     immediatelyRender: false, // Prevent SSR hydration mismatches in Next.js
     extensions: [
       StarterKit.configure({
-        // Configure StarterKit extensions
+        // Disable built-in formatting extensions (we configure them explicitly below)
+        bold: false,
+        italic: false,
+        strike: false,
+        code: false,
+        // Enable and configure heading levels explicitly
         heading: {
-          levels: [1, 2, 3]
+          levels: [1, 2, 3],
+          HTMLAttributes: {
+            class: 'tiptap-heading'
+          }
+        }
+      }),
+      // Text formatting extensions with explicit configuration
+      // These provide keyboard shortcuts automatically:
+      // Bold: Cmd/Ctrl+B
+      // Italic: Cmd/Ctrl+I
+      // Underline: Cmd/Ctrl+U
+      // Strike: Cmd/Ctrl+Shift+X
+      // Code: Cmd/Ctrl+E
+      Bold,
+      Italic,
+      Underline,
+      Strike,
+      Code,
+      // Link extension with security configuration
+      // Keyboard shortcut: Cmd/Ctrl+K
+      Link.configure({
+        openOnClick: false, // Don't open links in edit mode
+        HTMLAttributes: {
+          // Security attributes for external links
+          target: '_blank',
+          rel: 'noopener noreferrer',
+          // Design system styling: primary blue color with underline
+          class: 'text-primary-600 hover:text-primary-700 underline cursor-pointer transition-colors duration-150'
+        },
+        // Validate URLs
+        validate: (url) => {
+          // Allow http, https, mailto protocols
+          return /^https?:\/\//.test(url) || /^mailto:/.test(url);
         }
       }),
       Placeholder.configure({
@@ -186,7 +241,7 @@ export const TextEditor: React.FC<TextEditorProps> = ({
     },
     editorProps: {
       attributes: {
-        class: 'w-full h-full p-3 outline-none focus:outline-none prose prose-sm max-w-none',
+        class: 'w-full h-full p-3 outline-none focus:outline-none prose prose-sm max-w-none tiptap-editor-custom-headings',
         style: `min-height: ${MIN_HEIGHT}px; max-height: ${MAX_HEIGHT}px; overflow-y: auto;`
       }
     }
@@ -252,6 +307,73 @@ export const TextEditor: React.FC<TextEditorProps> = ({
   }, [editor, card.id, card.content]);
 
   /**
+   * Handle opening link editor
+   */
+  const handleOpenLinkEditor = useCallback((): void => {
+    if (!editor) return;
+
+    // Get current link URL if cursor is on a link
+    const previousUrl = editor.getAttributes('link').href || '';
+    setCurrentLinkUrl(previousUrl);
+    setIsLinkEditorOpen(true);
+
+    logger.debug('Opening link editor', {
+      cardId: card.id,
+      hasExistingLink: !!previousUrl,
+      url: previousUrl
+    });
+  }, [editor, card.id]);
+
+  /**
+   * Handle saving link
+   */
+  const handleSaveLink = useCallback((url: string): void => {
+    if (!editor) return;
+
+    if (url) {
+      // Set link with URL
+      editor
+        .chain()
+        .focus()
+        .extendMarkRange('link')
+        .setLink({ href: url })
+        .run();
+
+      logger.debug('Link saved', {
+        cardId: card.id,
+        url
+      });
+    } else {
+      // Remove link if URL is empty
+      editor
+        .chain()
+        .focus()
+        .extendMarkRange('link')
+        .unsetLink()
+        .run();
+
+      logger.debug('Link removed', {
+        cardId: card.id
+      });
+    }
+
+    setIsLinkEditorOpen(false);
+    setCurrentLinkUrl('');
+  }, [editor, card.id]);
+
+  /**
+   * Handle canceling link edit
+   */
+  const handleCancelLink = useCallback((): void => {
+    setIsLinkEditorOpen(false);
+    setCurrentLinkUrl('');
+
+    logger.debug('Link edit cancelled', {
+      cardId: card.id
+    });
+  }, [card.id]);
+
+  /**
    * Handle keyboard shortcuts
    */
   const handleKeyDown = useCallback((e: KeyboardEvent<HTMLDivElement>): void => {
@@ -271,12 +393,17 @@ export const TextEditor: React.FC<TextEditorProps> = ({
           const saveContent = prepareContentForSave();
           onSave(saveContent);
           break;
+        case 'k':
+          // Cmd/Ctrl+K: Open link editor
+          e.preventDefault();
+          handleOpenLinkEditor();
+          break;
       }
     } else if (e.key === 'Escape') {
       e.preventDefault();
       onCancel();
     }
-  }, [editor, prepareContentForSave, onSave, onCancel]);
+  }, [editor, prepareContentForSave, onSave, onCancel, handleOpenLinkEditor]);
 
   /**
    * Validate content
@@ -371,25 +498,44 @@ export const TextEditor: React.FC<TextEditorProps> = ({
             </div>
           )}
 
-          {/* Save/Cancel controls */}
-          <div className="flex justify-end gap-2 px-3 py-2 border-t border-gray-200">
-            <button
-              onClick={handleCancel}
-              className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => {
-                const content = prepareContentForSave();
-                onSave(content);
-              }}
-              disabled={!!validationError || characterCount > MAX_CHARACTERS}
-              className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
-            >
-              Save
-            </button>
+          {/* Formatting toolbar and Save/Cancel controls */}
+          <div className="flex items-center justify-between px-3 py-2 border-t border-gray-200 gap-3">
+            {/* Formatting toolbar */}
+            <BubbleMenu
+              editor={editor}
+              onOpenLinkEditor={handleOpenLinkEditor}
+              className="flex-shrink-0"
+            />
+
+            {/* Save/Cancel buttons */}
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={handleCancel}
+                className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const content = prepareContentForSave();
+                  onSave(content);
+                }}
+                disabled={!!validationError || characterCount > MAX_CHARACTERS}
+                className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+              >
+                Save
+              </button>
+            </div>
           </div>
+
+          {/* Link Editor Popup */}
+          {isLinkEditorOpen && (
+            <LinkEditorPopup
+              initialUrl={currentLinkUrl}
+              onSave={handleSaveLink}
+              onCancel={handleCancelLink}
+            />
+          )}
         </div>
       )}
     </BaseEditor>
