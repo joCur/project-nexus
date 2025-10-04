@@ -21,7 +21,7 @@
  * @requires CardStore For setEditingCard and clearEditingCard operations
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useCardStore } from '@/stores/cardStore';
 import { useCardOperations } from '@/hooks/useCardOperations';
@@ -298,8 +298,15 @@ export const EditModeManagerInstance = EditModeManagerSingleton;
 
 /**
  * Edit mode types based on card type
+ * Using TypeScript enum with lowercase values per architecture guidelines
  */
-export type EditMode = 'text' | 'code' | 'link' | 'image-caption' | 'metadata';
+export enum EditMode {
+  TEXT = 'text',
+  CODE = 'code',
+  LINK = 'link',
+  IMAGE_CAPTION = 'image-caption',
+  METADATA = 'metadata'
+}
 
 /**
  * Edit mode state interface
@@ -472,15 +479,15 @@ export const EditModeManagerComponent: React.FC<EditModeManagerProps> = ({
   const getEditModeForCard = useCallback((card: Card): EditMode => {
     switch (card.content.type) {
       case 'text':
-        return 'text';
+        return EditMode.TEXT;
       case 'code':
-        return 'code';
+        return EditMode.CODE;
       case 'link':
-        return 'link';
+        return EditMode.LINK;
       case 'image':
-        return 'image-caption';
+        return EditMode.IMAGE_CAPTION;
       default:
-        return 'metadata';
+        return EditMode.METADATA;
     }
   }, []);
 
@@ -671,9 +678,20 @@ export const EditModeManagerComponent: React.FC<EditModeManagerProps> = ({
     onCancel,
     autoFocus = true
   }) => {
-    const [value, setValue] = useState(
-      card.content.type === 'text' ? card.content.content : ''
-    );
+    // Extract string content from card - handle both string and Tiptap JSON
+    const initialValue = useMemo(() => {
+      if (card.content.type === 'text') {
+        if (typeof card.content.content === 'string') {
+          return card.content.content;
+        } else {
+          // If it's Tiptap JSON, extract plain text
+          return JSON.stringify(card.content.content);
+        }
+      }
+      return '';
+    }, [card.content]);
+
+    const [value, setValue] = useState(initialValue);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     useEffect(() => {

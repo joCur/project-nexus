@@ -65,6 +65,360 @@
 }
 
 @layer components {
+  /* Tiptap Editor Styles */
+  .ProseMirror {
+    outline: none;
+    min-height: 100px;
+  }
+
+  .ProseMirror p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    float: left;
+    color: #adb5bd;
+    pointer-events: none;
+    height: 0;
+  }
+
+  .ProseMirror p {
+    margin-bottom: 0.5em;
+  }
+
+  .ProseMirror p:last-child {
+    margin-bottom: 0;
+  }
+
+  /*
+   * Heading Styles - Design System Typography
+   * Based on Project Nexus Typography System (Notion Documentation)
+   * H1: Section Headers (30px/36px, Semibold, -0.02em)
+   * H2: Subsection Headers (24px/32px, Semibold, -0.015em)
+   * H3: Card Titles (20px/28px, Medium, -0.01em)
+   *
+   * Note: Higher specificity (.ProseMirror h1.tiptap-heading) to override Tailwind prose classes
+   */
+  .ProseMirror h1.tiptap-heading,
+  .ProseMirror h2.tiptap-heading,
+  .ProseMirror h3.tiptap-heading {
+    line-height: 1.2 !important;
+    margin-top: 1.25em !important;
+    margin-bottom: 0.5em !important;
+    color: #1a1a1a !important; /* Dark text color for readability */
+  }
+
+  .ProseMirror h1.tiptap-heading:first-child,
+  .ProseMirror h2.tiptap-heading:first-child,
+  .ProseMirror h3.tiptap-heading:first-child {
+    margin-top: 0 !important;
+  }
+
+  /* H1 - Section Headers */
+  .ProseMirror h1.tiptap-heading {
+    font-size: 1.875rem !important; /* 30px */
+    line-height: 2.25rem !important; /* 36px */
+    font-weight: 600 !important; /* Semibold */
+    letter-spacing: -0.02em !important;
+  }
+
+  /* H2 - Subsection Headers */
+  .ProseMirror h2.tiptap-heading {
+    font-size: 1.5rem !important; /* 24px */
+    line-height: 2rem !important; /* 32px */
+    font-weight: 600 !important; /* Semibold */
+    letter-spacing: -0.015em !important;
+  }
+
+  /* H3 - Card Titles / Minor Headers */
+  .ProseMirror h3.tiptap-heading {
+    font-size: 1.25rem !important; /* 20px */
+    line-height: 1.75rem !important; /* 28px */
+    font-weight: 500 !important; /* Medium */
+    letter-spacing: -0.01em !important;
+  }
+
+  /* Regular List Styles (Bullet and Ordered) */
+  .ProseMirror ul:not([data-type="taskList"]) {
+    list-style-type: disc;
+    list-style-position: outside;
+    padding-left: 1.5em;
+    margin-bottom: 0.5em;
+    margin-top: 0.5em;
+  }
+
+  .ProseMirror ol {
+    list-style-type: decimal;
+    list-style-position: outside;
+    padding-left: 1.5em;
+    margin-bottom: 0.5em;
+    margin-top: 0.5em;
+  }
+
+  .ProseMirror ul:not([data-type="taskList"]) li,
+  .ProseMirror ol li {
+    display: list-item;
+    list-style-position: outside;
+    margin-bottom: 0.25em;
+    margin-left: 0;
+  }
+
+  /* Nested list indentation */
+  .ProseMirror ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) {
+    list-style-type: circle;
+    margin-top: 0.25em;
+    padding-left: 1.5em;
+  }
+
+  .ProseMirror ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) ul:not([data-type="taskList"]) {
+    list-style-type: square;
+    padding-left: 1.5em;
+  }
+
+  .ProseMirror ol ol {
+    margin-top: 0.25em;
+    padding-left: 1.5em;
+  }
+
+  /* Task List Styles - Design System Compliant */
+  .ProseMirror ul[data-type="taskList"] {
+    list-style: none;
+    padding-left: 0;
+  }
+
+  .ProseMirror ul[data-type="taskList"] li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5em;
+  }
+
+  .ProseMirror ul[data-type="taskList"] li > label {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    user-select: none;
+    margin-top: 0.125em; /* Align checkbox with first line of text */
+  }
+
+  .ProseMirror ul[data-type="taskList"] li > div {
+    flex: 1;
+  }
+
+  /* Checkbox styling - Design System Colors */
+  .ProseMirror ul[data-type="taskList"] input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 1.125em;
+    height: 1.125em;
+    border: 2px solid #d1d5db; /* gray-300 */
+    border-radius: 0.25rem;
+    cursor: pointer;
+    position: relative;
+    margin: 0;
+    flex-shrink: 0;
+    transition: all 0.15s ease-in-out;
+    background-color: white;
+  }
+
+  .ProseMirror ul[data-type="taskList"] input[type="checkbox"]:hover {
+    border-color: #9ca3af; /* gray-400 */
+    background-color: #f9fafb; /* gray-50 */
+  }
+
+  .ProseMirror ul[data-type="taskList"] input[type="checkbox"]:focus {
+    outline: 2px solid #3b82f6; /* primary-500 */
+    outline-offset: 2px;
+  }
+
+  .ProseMirror ul[data-type="taskList"] input[type="checkbox"]:checked {
+    background-color: #2563eb; /* primary-600 */
+    border-color: #2563eb; /* primary-600 */
+  }
+
+  .ProseMirror ul[data-type="taskList"] input[type="checkbox"]:checked::after {
+    content: "";
+    position: absolute;
+    left: 0.25em;
+    top: 0.0625em;
+    width: 0.375em;
+    height: 0.625em;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+
+  /* Nested task lists */
+  .ProseMirror ul[data-type="taskList"] ul[data-type="taskList"] {
+    margin-top: 0.5em;
+    margin-left: 1.5em;
+  }
+
+  /* Strikethrough for completed tasks (optional visual enhancement) */
+  .ProseMirror ul[data-type="taskList"] li:has(input[type="checkbox"]:checked) > div {
+    color: #6b7280; /* gray-500 */
+  }
+
+  .ProseMirror strong {
+    font-weight: 600;
+  }
+
+  .ProseMirror em {
+    font-style: italic;
+  }
+
+  .ProseMirror code {
+    background-color: rgba(0, 0, 0, 0.05);
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 0.9em;
+  }
+
+  /* Blockquote Styles - Design System Compliant */
+  .ProseMirror blockquote.tiptap-blockquote {
+    border-left: 4px solid #2563eb; /* primary-600 - matching design system */
+    padding-left: 1em;
+    padding-right: 1em;
+    padding-top: 0.5em;
+    padding-bottom: 0.5em;
+    margin-left: 0;
+    margin-bottom: 0.75em;
+    margin-top: 0.75em;
+    background-color: #f9fafb; /* gray-50 - subtle background */
+    border-radius: 0.25rem;
+    font-style: italic;
+    color: #374151; /* gray-700 - readable italic text */
+  }
+
+  .ProseMirror blockquote.tiptap-blockquote p {
+    margin-bottom: 0.25em;
+  }
+
+  .ProseMirror blockquote.tiptap-blockquote p:last-child {
+    margin-bottom: 0;
+  }
+
+  /* Code Block Styles - Design System Compliant with Syntax Highlighting */
+  .ProseMirror pre.tiptap-code-block {
+    background-color: #1f2937; /* gray-800 - dark background for code */
+    color: #f3f4f6; /* gray-100 - light text for contrast */
+    padding: 1em;
+    border-radius: 0.5rem;
+    overflow-x: auto;
+    margin-bottom: 0.75em;
+    margin-top: 0.75em;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.875em;
+    line-height: 1.5;
+    position: relative;
+  }
+
+  .ProseMirror pre.tiptap-code-block code {
+    background: none;
+    padding: 0;
+    color: inherit;
+    font-size: inherit;
+  }
+
+  /* Code Block Copy Button Styles */
+  .code-block-copy-button {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    color: #9ca3af; /* gray-400 */
+    background-color: #374151; /* gray-700 */
+    border: none;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+    z-index: 10;
+  }
+
+  .code-block-copy-button:hover {
+    color: #e5e7eb; /* gray-200 */
+    background-color: #4b5563; /* gray-600 */
+  }
+
+  .code-block-copy-button:focus {
+    outline: 2px solid #3b82f6; /* primary-500 */
+    outline-offset: 2px;
+  }
+
+  /* Syntax Highlighting Colors (lowlight default theme) */
+  .ProseMirror pre.tiptap-code-block .hljs-comment,
+  .ProseMirror pre.tiptap-code-block .hljs-quote {
+    color: #6b7280; /* gray-500 - comments */
+  }
+
+  .ProseMirror pre.tiptap-code-block .hljs-keyword,
+  .ProseMirror pre.tiptap-code-block .hljs-selector-tag,
+  .ProseMirror pre.tiptap-code-block .hljs-subst {
+    color: #c084fc; /* purple-400 - keywords */
+  }
+
+  .ProseMirror pre.tiptap-code-block .hljs-number,
+  .ProseMirror pre.tiptap-code-block .hljs-literal,
+  .ProseMirror pre.tiptap-code-block .hljs-variable,
+  .ProseMirror pre.tiptap-code-block .hljs-template-variable {
+    color: #fb923c; /* orange-400 - numbers and variables */
+  }
+
+  .ProseMirror pre.tiptap-code-block .hljs-string,
+  .ProseMirror pre.tiptap-code-block .hljs-doctag {
+    color: #34d399; /* green-400 - strings */
+  }
+
+  .ProseMirror pre.tiptap-code-block .hljs-title,
+  .ProseMirror pre.tiptap-code-block .hljs-section,
+  .ProseMirror pre.tiptap-code-block .hljs-selector-id {
+    color: #60a5fa; /* blue-400 - functions and sections */
+  }
+
+  .ProseMirror pre.tiptap-code-block .hljs-type,
+  .ProseMirror pre.tiptap-code-block .hljs-class .hljs-title {
+    color: #fbbf24; /* yellow-400 - types and classes */
+  }
+
+  .ProseMirror pre.tiptap-code-block .hljs-tag,
+  .ProseMirror pre.tiptap-code-block .hljs-name,
+  .ProseMirror pre.tiptap-code-block .hljs-attribute {
+    color: #f87171; /* red-400 - tags and attributes */
+  }
+
+  .ProseMirror pre.tiptap-code-block .hljs-regexp,
+  .ProseMirror pre.tiptap-code-block .hljs-link {
+    color: #a78bfa; /* violet-400 - regex and links */
+  }
+
+  .ProseMirror pre.tiptap-code-block .hljs-built_in,
+  .ProseMirror pre.tiptap-code-block .hljs-builtin-name {
+    color: #38bdf8; /* sky-400 - built-in functions */
+  }
+
+  /* Horizontal Rule Styles - Design System Compliant */
+  .ProseMirror hr.tiptap-horizontal-rule {
+    border: none;
+    border-top: 1px solid #d1d5db; /* gray-300 - subtle divider */
+    margin: 1.5em 0; /* vertical spacing for visual separation */
+    width: 100%; /* full width divider */
+    height: 0;
+    cursor: default;
+  }
+
+  /* Horizontal rule hover state for visual feedback in edit mode */
+  .ProseMirror hr.tiptap-horizontal-rule:hover {
+    border-top-color: #9ca3af; /* gray-400 - slightly darker on hover */
+  }
+
+  .ProseMirror a {
+    color: #2563eb;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .ProseMirror a:hover {
+    color: #1d4ed8;
+  }
+
   /* Design system compliant auth components */
   .auth-card {
     background-color: var(--color-card-background);

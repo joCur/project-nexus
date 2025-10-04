@@ -34,17 +34,53 @@ jest.mock('@/contexts/WorkspacePermissionContext', () => ({
 }));
 
 // Mock editors with proper types
-jest.mock('../TextEditor', () => ({
-  TextEditor: ({ card, onSave, onCancel }: { card: { content: { content: string } }; onSave: (data: { type: string; content: string }) => void; onCancel: () => void }) => (
-    <div data-testid="text-editor">
-      <div contentEditable suppressContentEditableWarning aria-label="Text editor">
-        {card.content.content}
-      </div>
-      <button onClick={() => onSave({ type: 'text', content: 'Modified content' })}>Save</button>
-      <button onClick={onCancel}>Cancel</button>
-    </div>
-  )
-}));
+jest.mock('../TextCardDisplay', () => {
+  const React = require('react');
+  return {
+    TextCardDisplay: ({ card, onSave, onModeChange, initialMode, mode: controlledMode, hideEditButton }: {
+      card: { content: { content: string | { type: string; content: unknown } } };
+      onSave: (data: { type: string; content: string }) => void;
+      onModeChange?: (mode: string) => void;
+      initialMode?: string;
+      mode?: string;
+      hideEditButton?: boolean;
+    }) => {
+      const [internalMode, setInternalMode] = React.useState(initialMode || 'edit');
+      const currentMode = controlledMode !== undefined ? controlledMode : internalMode;
+      const content = typeof card.content.content === 'string' ? card.content.content : JSON.stringify(card.content.content);
+
+      const handleModeChange = (newMode: string) => {
+        if (controlledMode === undefined) {
+          setInternalMode(newMode);
+        }
+        onModeChange?.(newMode);
+      };
+
+      return (
+        <div data-testid="text-editor">
+          {currentMode === 'read_only' ? (
+            <>
+              <div aria-label="Text content (read-only)">{content}</div>
+              {!hideEditButton && <button onClick={() => handleModeChange('edit')}>Edit</button>}
+            </>
+          ) : (
+            <>
+              <div contentEditable suppressContentEditableWarning aria-label="Text editor">
+                {content}
+              </div>
+              <button onClick={() => onSave({ type: 'text', content: 'Modified content' })}>Save</button>
+              <button onClick={() => handleModeChange('read_only')}>Cancel</button>
+            </>
+          )}
+        </div>
+      );
+    },
+    DisplayMode: {
+      READ_ONLY: 'read_only',
+      EDIT: 'edit'
+    }
+  };
+});
 
 jest.mock('../CodeEditor', () => ({
   CodeEditor: ({ card, onSave, onCancel }: { card: { content: { content: string } }; onSave: (data: { type: string; content: string; language: string }) => void; onCancel: () => void }) => (
@@ -387,6 +423,10 @@ describe('EditorOverlay', () => {
 
       render(<EditorOverlay workspaceId="test-workspace" />);
 
+      // Click Edit to enter edit mode (opens in read-only by default)
+      const editButton = screen.getByText('Edit');
+      fireEvent.click(editButton);
+
       const saveButton = screen.getByText('Save');
       fireEvent.click(saveButton);
 
@@ -584,6 +624,10 @@ describe('EditorOverlay', () => {
 
       render(<EditorOverlay workspaceId="test-workspace" enableServerPersistence={false} />);
 
+      // Click Edit to enter edit mode (opens in read-only by default)
+      const editButton = screen.getByText('Edit');
+      fireEvent.click(editButton);
+
       const saveButton = screen.getByText('Save');
       fireEvent.click(saveButton);
 
@@ -630,6 +674,10 @@ describe('EditorOverlay', () => {
       }));
 
       render(<EditorOverlay workspaceId="test-workspace" />);
+
+      // Click Edit to enter edit mode (opens in read-only by default)
+      const editButton = screen.getByText('Edit');
+      fireEvent.click(editButton);
 
       const saveButton = screen.getByText('Save');
       fireEvent.click(saveButton);
@@ -680,6 +728,10 @@ describe('EditorOverlay', () => {
 
       render(<EditorOverlay workspaceId="test-workspace" />);
 
+      // Click Edit to enter edit mode (opens in read-only by default)
+      const editButton = screen.getByText('Edit');
+      fireEvent.click(editButton);
+
       const saveButton = screen.getByText('Save');
       fireEvent.click(saveButton);
 
@@ -727,6 +779,10 @@ describe('EditorOverlay', () => {
       }));
 
       render(<EditorOverlay workspaceId="test-workspace" />);
+
+      // Click Edit to enter edit mode (opens in read-only by default)
+      const editButton = screen.getByText('Edit');
+      fireEvent.click(editButton);
 
       // First save attempt - fails
       const saveButton = screen.getByText('Save');
@@ -812,7 +868,7 @@ describe('EditorOverlay', () => {
       expect(mockClearEditingCard).not.toHaveBeenCalled();
     });
 
-    it('should close editor when clicking cancel button', () => {
+    it('should close editor when clicking cancel button', async () => {
       const mockClearEditingCard = jest.fn();
 
       mockUseCardStore.mockReturnValue({
@@ -838,10 +894,17 @@ describe('EditorOverlay', () => {
 
       render(<EditorOverlay workspaceId="test-workspace" />);
 
+      // First click Edit to enter edit mode (opens in read-only by default)
+      const editButton = screen.getByText('Edit');
+      fireEvent.click(editButton);
+
+      // Then click Cancel to close
       const cancelButton = screen.getByText('Cancel');
       fireEvent.click(cancelButton);
 
-      expect(mockClearEditingCard).toHaveBeenCalled();
+      await waitFor(() => {
+        expect(mockClearEditingCard).toHaveBeenCalled();
+      });
     });
   });
 

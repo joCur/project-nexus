@@ -3,8 +3,29 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { CardRenderer } from '../CardRenderer';
 import type { Card, TextCard, ImageCard, LinkCard, CodeCard, CardId, CardStatus, CardPriority, CardStyle } from '@/types/card.types';
+import { TextContentFormat } from '@/types/card.types';
 import type { EntityId } from '@/types/common.types';
-import type { KonvaEventObject } from 'konva/lib/Node';
+
+// Define Konva event type for mocking
+interface KonvaEventObject {
+  evt: {
+    ctrlKey?: boolean;
+    metaKey?: boolean;
+    shiftKey?: boolean;
+    altKey?: boolean;
+    button?: number;
+    clientX?: number;
+    clientY?: number;
+  };
+  cancelBubble: boolean;
+  target?: {
+    x: () => number;
+    y: () => number;
+    getStage?: () => {
+      getPointerPosition: () => { x: number; y: number };
+    };
+  };
+}
 
 // Mock Konva components
 jest.mock('react-konva', () => ({
@@ -13,13 +34,13 @@ jest.mock('react-konva', () => ({
     x?: number;
     y?: number;
     draggable?: boolean;
-    onClick?: (e: any) => void;
-    onDblClick?: (e: any) => void;
-    onDragStart?: (e: any) => void;
-    onDragMove?: (e: any) => void;
-    onDragEnd?: (e: any) => void;
-    onMouseEnter?: (e: any) => void;
-    onMouseLeave?: (e: any) => void;
+    onClick?: (e: KonvaEventObject) => void;
+    onDblClick?: (e: KonvaEventObject) => void;
+    onDragStart?: (e: KonvaEventObject) => void;
+    onDragMove?: (e: KonvaEventObject) => void;
+    onDragEnd?: (e: KonvaEventObject) => void;
+    onMouseEnter?: (e: KonvaEventObject) => void;
+    onMouseLeave?: (e: KonvaEventObject) => void;
     opacity?: number;
     listening?: boolean;
     [key: string]: unknown;
@@ -80,17 +101,20 @@ jest.mock('../TextCardRenderer', () => ({
     isSelected: boolean;
     isDragged: boolean;
     isHovered: boolean;
-  }) => (
-    <div
-      data-testid="text-card-renderer"
-      data-card-id={card.id}
-      data-selected={isSelected}
-      data-dragged={isDragged}
-      data-hovered={isHovered}
-    >
-      Text Card: {card.content.content}
-    </div>
-  ),
+  }) => {
+    const content = typeof card.content.content === 'string' ? card.content.content : JSON.stringify(card.content.content);
+    return (
+      <div
+        data-testid="text-card-renderer"
+        data-card-id={card.id}
+        data-selected={isSelected}
+        data-dragged={isDragged}
+        data-hovered={isHovered}
+      >
+        Text Card: {content}
+      </div>
+    );
+  },
 }));
 
 jest.mock('../ImageCardRenderer', () => ({
@@ -151,7 +175,7 @@ jest.mock('../CodeCardRenderer', () => ({
 }));
 
 // Mock card store with reactive behavior
-let mockStoreState = {
+const mockStoreState = {
   selection: {
     selectedIds: new Set<string>(),
   },
@@ -162,10 +186,10 @@ let mockStoreState = {
   },
   resizeState: {
     isResizing: false,
-    resizedId: undefined,
+    resizedId: undefined as CardId | undefined,
   },
   hoverState: {
-    hoveredId: undefined,
+    hoveredId: undefined as CardId | undefined,
   },
   selectCard: jest.fn(),
   startDrag: jest.fn(),
@@ -257,6 +281,7 @@ describe('CardRenderer', () => {
           ...baseCard,
           content: {
             type: 'text' as const,
+            format: TextContentFormat.MARKDOWN,
             content: 'Test text content',
             markdown: false,
             wordCount: 3,
@@ -340,7 +365,7 @@ describe('CardRenderer', () => {
     it('falls back to TextCardRenderer for unknown card types', () => {
       const unknownCard = {
         ...createTestCard('unknown-card', 'text'),
-        type: 'unknown' as any,
+        type: 'unknown' as unknown,
       };
 
       render(<CardRenderer card={unknownCard} />);
@@ -373,7 +398,7 @@ describe('CardRenderer', () => {
   describe('Hover State Handling', () => {
     it('passes correct hover state to child renderers', () => {
       const card = createTestCard('hovered-card', 'text');
-      mockStoreState.hoverState.hoveredId = 'hovered-card' as any;
+      mockStoreState.hoverState.hoveredId = 'hovered-card' as CardId;
 
       render(<CardRenderer card={card} />);
 
@@ -704,7 +729,7 @@ describe('CardRenderer', () => {
       const incompleteCard = {
         ...createTestCard('incomplete-card', 'text'),
         content: undefined,
-      } as any;
+      } as unknown as Card;
 
       // Should not throw an error, fallback to text renderer
       expect(() => render(<CardRenderer card={incompleteCard} />)).not.toThrow();
@@ -714,7 +739,7 @@ describe('CardRenderer', () => {
       const invalidCard = {
         ...createTestCard('invalid-position-card', 'text'),
         position: undefined,
-      } as any;
+      } as unknown as Card;
 
       // Should not throw an error
       expect(() => render(<CardRenderer card={invalidCard} />)).not.toThrow();

@@ -1,12 +1,25 @@
 /**
  * TextEditor Component
  *
- * ContentEditable-based text editor for inline editing of text cards.
+ * Tiptap v3-based text editor for inline editing of text cards.
  * Built on BaseEditor component with text-specific features:
- * - Markdown formatting support (bold, italic, links)
+ * - Rich text editing via Tiptap with StarterKit extensions
+ * - Text formatting: Bold (Cmd/Ctrl+B), Italic (Cmd/Ctrl+I), Underline (Cmd/Ctrl+U),
+ *   Strikethrough (Cmd/Ctrl+Shift+X), Inline Code (Cmd/Ctrl+E)
+ * - Link support: Add/Edit Links (Cmd/Ctrl+K), Remove Links
+ * - Links open in new tab by default with security attributes (target="_blank", rel="noopener noreferrer")
+ * - List support: Bullet Lists (Cmd/Ctrl+Shift+8), Ordered Lists (Cmd/Ctrl+Shift+7)
+ * - Task lists: Task Lists (Cmd/Ctrl+Shift+9) with interactive checkboxes
+ * - Nested list support with proper indentation (including task lists)
+ * - Blockquote support: Blockquotes (Cmd/Ctrl+Shift+B) with left border styling
+ * - Code blocks: Code Blocks (Cmd/Ctrl+Alt+C) with syntax highlighting (JavaScript, TypeScript, Python, HTML, CSS, JSON, etc.)
+ * - Code block features: Tab indentation, copy-to-clipboard button, lowlight syntax highlighting
+ * - Horizontal rule: Visual dividers for content sections (gray-300, 1px height, 1.5em vertical margin)
+ * - Bubble menu for contextual formatting (appears on text selection)
  * - Real-time character count with 10,000 character limit
  * - Auto-resize based on content with min/max constraints
- * - Plain text paste handling
+ * - Backward compatibility with markdown content
+ * - Tiptap JSON content format support
  *
  * Required Context Providers:
  * - None (self-contained component)
@@ -17,21 +30,52 @@
 import React, {
   useCallback,
   useEffect,
-  useRef,
-  useState,
   useMemo,
-  KeyboardEvent,
-  ClipboardEvent
+  useState,
+  KeyboardEvent
 } from 'react';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Placeholder from '@tiptap/extension-placeholder';
+import Bold from '@tiptap/extension-bold';
+import Italic from '@tiptap/extension-italic';
+import Underline from '@tiptap/extension-underline';
+import Strike from '@tiptap/extension-strike';
+import Code from '@tiptap/extension-code';
+import Link from '@tiptap/extension-link';
+import BulletList from '@tiptap/extension-bullet-list';
+import OrderedList from '@tiptap/extension-ordered-list';
+import ListItem from '@tiptap/extension-list-item';
+import TaskList from '@tiptap/extension-task-list';
+import TaskItem from '@tiptap/extension-task-item';
+import Blockquote from '@tiptap/extension-blockquote';
+import HorizontalRule from '@tiptap/extension-horizontal-rule';
+import { common, createLowlight } from 'lowlight';
+import ClearFormattingOnEnter from './extensions/ClearFormattingOnEnter';
+import { CodeBlockWithCopyButton } from './extensions/CodeBlockCopyButton';
 import {
   BaseEditor,
   type BaseEditorChildProps
 } from './BaseEditor';
-import type { TextCard, TextCardContent } from '@/types/card.types';
+import { BubbleMenu } from './BubbleMenu';
+import { LinkEditorPopup } from './LinkEditorPopup';
+import type {
+  TextCard,
+  TextCardContent,
+  TiptapJSONContent
+} from '@/types/card.types';
+import {
+  TextContentFormat,
+  isTextCardMarkdown,
+  isTextCardTiptap
+} from '@/types/card.types';
 import { createContextLogger } from '@/utils/logger';
 
 // Create logger at module level with component context
 const logger = createContextLogger({ component: 'TextEditor' });
+
+// Create lowlight instance with common language support for syntax highlighting
+const lowlight = createLowlight(common);
 
 // Constants
 const MAX_CHARACTERS = 10000;
@@ -58,38 +102,27 @@ export interface TextEditorProps {
 }
 
 /**
- * Utility to convert HTML to markdown
+ * Convert markdown string to Tiptap JSON format
+ * Simple conversion - stores markdown as plain text in a paragraph
+ * For backward compatibility with legacy markdown content
  */
-const htmlToMarkdown = (html: string): string => {
-  // Simple conversion for basic formatting
-  return html
-    .replace(/<strong>(.*?)<\/strong>/g, '**$1**')
-    .replace(/<em>(.*?)<\/em>/g, '*$1*')
-    .replace(/<a href="(.*?)".*?>(.*?)<\/a>/g, '[$2]($1)')
-    .replace(/<br\s*\/?>/g, '\n')
-    .replace(/<\/p><p>/g, '\n\n')
-    .replace(/<\/?p>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
-};
+const markdownToTiptap = (markdown: string): TiptapJSONContent => {
+  if (!markdown || markdown.trim().length === 0) {
+    return {
+      type: 'doc',
+      content: [{
+        type: 'paragraph'
+      }]
+    };
+  }
 
-/**
- * Utility to convert markdown to HTML for display
- */
-const markdownToHtml = (markdown: string): string => {
-  if (!markdown) return '';
-
-  // Convert markdown syntax to HTML
-  return markdown
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
-    .replace(/\n/g, '<br>')
-    .replace(/  /g, '&nbsp;&nbsp;');
+  return {
+    type: 'doc',
+    content: [{
+      type: 'paragraph',
+      content: [{ type: 'text', text: markdown }]
+    }]
+  };
 };
 
 /**
@@ -98,23 +131,6 @@ const markdownToHtml = (markdown: string): string => {
 const countWords = (text: string): number => {
   if (!text) return 0;
   return text.trim().split(/\s+/).filter(Boolean).length;
-};
-
-/**
- * Debounce hook
- */
-const useDebounce = <T,>(value: T, delay: number): T => {
-  const [debouncedValue, setDebouncedValue] = useState<T>(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => clearTimeout(handler);
-  }, [value, delay]);
-
-  return debouncedValue;
 };
 
 /**
@@ -128,27 +144,218 @@ export const TextEditor: React.FC<TextEditorProps> = ({
   className = '',
   placeholder = 'Enter text...'
 }) => {
-  // Content state
-  const [content, setContent] = useState<string>(card.content.content || '');
-  const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
-  const [selectedText, setSelectedText] = useState('');
+  // Link editor state
+  const [isLinkEditorOpen, setIsLinkEditorOpen] = useState(false);
+  const [currentLinkUrl, setCurrentLinkUrl] = useState('');
 
-  // Refs
-  const editorRef = useRef<HTMLDivElement>(null);
-  const linkInputRef = useRef<HTMLInputElement>(null);
-  const hasInitializedRef = useRef<boolean>(false);
+  // Initialize content based on format
+  const initialContent = useMemo((): TiptapJSONContent => {
+    const cardContent = card.content;
 
-  // Debounced content for character count
-  const debouncedContent = useDebounce(content, 300);
-  const characterCount = debouncedContent.length;
-  const wordCount = useMemo(() => countWords(debouncedContent), [debouncedContent]);
+    // Check if Tiptap format
+    if (isTextCardTiptap(cardContent)) {
+      logger.debug('Initializing with Tiptap content', {
+        cardId: card.id,
+        contentType: cardContent.content.type
+      });
+      return cardContent.content;
+    }
+
+    // Check if markdown format or legacy
+    if (isTextCardMarkdown(cardContent)) {
+      logger.debug('Initializing with markdown content (converting)', {
+        cardId: card.id,
+        contentLength: cardContent.content.length
+      });
+      return markdownToTiptap(cardContent.content);
+    }
+
+    // Fallback to empty document
+    logger.warn('Initializing with empty content', {
+      cardId: card.id,
+      hasContent: !!cardContent.content
+    });
+    return markdownToTiptap('');
+  }, [card.id, card.content]);
+
+  // Initialize Tiptap editor
+  const editor = useEditor({
+    immediatelyRender: false, // Prevent SSR hydration mismatches in Next.js
+    extensions: [
+      StarterKit.configure({
+        // Disable built-in formatting extensions (we configure them explicitly below)
+        bold: false,
+        italic: false,
+        strike: false,
+        code: false,
+        // Disable built-in list extensions (we configure them explicitly below)
+        bulletList: false,
+        orderedList: false,
+        listItem: false,
+        // Disable built-in blockquote and code block (we configure them explicitly below)
+        blockquote: false,
+        codeBlock: false,
+        // Enable and configure heading levels explicitly
+        heading: {
+          levels: [1, 2, 3],
+          HTMLAttributes: {
+            class: 'tiptap-heading'
+          }
+        }
+      }),
+      // Text formatting extensions with explicit configuration
+      // These provide keyboard shortcuts automatically:
+      // Bold: Cmd/Ctrl+B
+      // Italic: Cmd/Ctrl+I
+      // Underline: Cmd/Ctrl+U
+      // Strike: Cmd/Ctrl+Shift+X
+      // Code: Cmd/Ctrl+E
+      Bold,
+      Italic,
+      Underline,
+      Strike,
+      Code,
+      // Link extension with security configuration
+      // Keyboard shortcut: Cmd/Ctrl+K
+      Link.configure({
+        openOnClick: false, // Don't open links in edit mode
+        HTMLAttributes: {
+          // Security attributes for external links
+          target: '_blank',
+          rel: 'noopener noreferrer',
+          // Design system styling: primary blue color with underline
+          class: 'text-primary-600 hover:text-primary-700 underline cursor-pointer transition-colors duration-150'
+        },
+        // Validate URLs
+        validate: (url) => {
+          // Allow http, https, mailto protocols
+          return /^https?:\/\//.test(url) || /^mailto:/.test(url);
+        }
+      }),
+      // List extensions with nesting support
+      // Keyboard shortcuts:
+      // Bullet List: Cmd/Ctrl+Shift+8
+      // Ordered List: Cmd/Ctrl+Shift+7
+      BulletList.configure({
+        HTMLAttributes: {
+          class: 'tiptap-bullet-list'
+        }
+      }),
+      OrderedList.configure({
+        HTMLAttributes: {
+          class: 'tiptap-ordered-list'
+        }
+      }),
+      ListItem.configure({
+        HTMLAttributes: {
+          class: 'tiptap-list-item'
+        }
+      }),
+      // Task list extensions with design system styling
+      // Keyboard shortcut: Cmd/Ctrl+Shift+9
+      TaskList.configure({
+        HTMLAttributes: {
+          class: 'tiptap-task-list'
+        }
+      }),
+      TaskItem.configure({
+        HTMLAttributes: {
+          class: 'tiptap-task-item'
+        },
+        nested: true // Enable nested task lists
+      }),
+      // Blockquote extension with design system styling
+      // Keyboard shortcut: Cmd/Ctrl+Shift+B
+      Blockquote.configure({
+        HTMLAttributes: {
+          class: 'tiptap-blockquote'
+        }
+      }),
+      // Code block with syntax highlighting using lowlight and copy button
+      // Keyboard shortcut: Cmd/Ctrl+Alt+C
+      CodeBlockWithCopyButton.configure({
+        lowlight,
+        HTMLAttributes: {
+          class: 'tiptap-code-block'
+        },
+        // Enable tab key for indentation in code blocks
+        languageClassPrefix: 'language-'
+      }),
+      // Horizontal rule extension for visual dividers
+      // Creates a horizontal line (<hr>) to separate content sections
+      // Keyboard shortcut: Mod+Shift+- (Cmd+Shift+- on Mac, Ctrl+Shift+- on Windows)
+      HorizontalRule.extend({
+        addKeyboardShortcuts() {
+          return {
+            'Mod-Shift--': () => this.editor.commands.setHorizontalRule(),
+          };
+        },
+      }).configure({
+        HTMLAttributes: {
+          class: 'tiptap-horizontal-rule'
+        }
+      }),
+      // Clear formatting on Enter - Notion-like behavior
+      // When pressing Enter to create a new paragraph, formatting marks don't carry over
+      ClearFormattingOnEnter,
+      Placeholder.configure({
+        placeholder
+      })
+    ],
+    content: initialContent,
+    autofocus: autoFocus ? 'end' : false,
+    editable: true,
+    onUpdate: ({ editor: updatedEditor }) => {
+      const text = updatedEditor.getText();
+      const charCount = text.length;
+
+      // Enforce character limit
+      if (charCount > MAX_CHARACTERS) {
+        logger.warn('Character limit exceeded', {
+          currentLength: charCount,
+          limit: MAX_CHARACTERS,
+          cardId: card.id
+        });
+
+        // Truncate content
+        const truncatedText = text.slice(0, MAX_CHARACTERS);
+
+        // Create new content with truncated text
+        const truncatedContent: TiptapJSONContent = {
+          type: 'doc',
+          content: [{
+            type: 'paragraph',
+            content: [{ type: 'text', text: truncatedText }]
+          }]
+        };
+
+        updatedEditor.commands.setContent(truncatedContent);
+      }
+    },
+    editorProps: {
+      attributes: {
+        class: 'w-full h-full p-3 outline-none focus:outline-none prose prose-sm max-w-none tiptap-editor-custom-headings',
+        style: `min-height: ${MIN_HEIGHT}px; max-height: ${MAX_HEIGHT}px; overflow-y: auto;`
+      }
+    }
+  });
+
+  // Character and word count from editor
+  const characterCount = useMemo(() => {
+    return editor?.getText().length || 0;
+  }, [editor]);
+
+  const wordCount = useMemo(() => {
+    const text = editor?.getText() || '';
+    return countWords(text);
+  }, [editor]);
 
   // Log component mount
   useEffect(() => {
     logger.debug('TextEditor mounted', {
       cardId: card.id,
-      hasMarkdown: card.content.markdown,
-      contentLength: card.content.content?.length || 0,
+      format: card.content.format || 'legacy',
+      hasContent: !!card.content.content,
       autoFocus
     });
 
@@ -156,249 +363,119 @@ export const TextEditor: React.FC<TextEditorProps> = ({
       logger.debug('TextEditor unmounting', {
         cardId: card.id
       });
+      editor?.destroy();
     };
-  }, [card.id, card.content.markdown, card.content.content, autoFocus]);
-
-  // Initialize content display only once on mount
-  useEffect(() => {
-    if (editorRef.current && !hasInitializedRef.current) {
-      if (card.content.markdown) {
-        // For markdown cards, convert markdown to HTML and set innerHTML
-        editorRef.current.innerHTML = markdownToHtml(card.content.content || '');
-        logger.debug('Initialized markdown content', {
-          cardId: card.id,
-          contentLength: card.content.content?.length || 0
-        });
-      } else {
-        // For plain text cards, use textContent (safer, no HTML injection)
-        editorRef.current.textContent = card.content.content || '';
-        logger.debug('Initialized plain text content', {
-          cardId: card.id,
-          contentLength: card.content.content?.length || 0
-        });
-      }
-      hasInitializedRef.current = true;
-    }
-  }, [card.id, card.content.markdown, card.content.content]);
-
-  // Auto-focus
-  useEffect(() => {
-    if (autoFocus && editorRef.current) {
-      editorRef.current.focus();
-
-      // Place cursor at end
-      const selection = window.getSelection();
-      const range = document.createRange();
-      range.selectNodeContents(editorRef.current);
-      range.collapse(false);
-      selection?.removeAllRanges();
-      selection?.addRange(range);
-    }
-  }, [autoFocus]);
-
-  // Auto-resize based on content
-  useEffect(() => {
-    if (!editorRef.current) return;
-
-    const adjustHeight = () => {
-      const editor = editorRef.current;
-      if (!editor) return;
-
-      // Reset height to auto to get natural height
-      editor.style.height = 'auto';
-
-      // Set height based on scrollHeight, respecting min/max
-      const newHeight = Math.min(Math.max(editor.scrollHeight, MIN_HEIGHT), MAX_HEIGHT);
-      editor.style.height = `${newHeight}px`;
-
-      // Show scrollbar if content exceeds max height
-      if (editor.scrollHeight > MAX_HEIGHT) {
-        editor.style.overflowY = 'auto';
-      } else {
-        editor.style.overflowY = 'hidden';
-      }
-    };
-
-    adjustHeight();
-  }, [content]);
-
-  /**
-   * Handle content changes
-   */
-  const handleInput = useCallback((): void => {
-    if (!editorRef.current) return;
-
-    // Convert to plain text for character counting
-    const plainText = editorRef.current.textContent || '';
-
-    logger.debug('Content changed', {
-      cardId: card.id,
-      newLength: plainText.length,
-      wordCount: countWords(plainText)
-    });
-
-    // Enforce character limit
-    if (plainText.length > MAX_CHARACTERS) {
-      logger.warn('Character limit exceeded', {
-        currentLength: plainText.length,
-        limit: MAX_CHARACTERS,
-        cardId: card.id
-      });
-
-      // Truncate content
-      const truncated = plainText.slice(0, MAX_CHARACTERS);
-      editorRef.current.textContent = truncated;
-
-      // Place cursor at end
-      const selection = window.getSelection();
-      const range = document.createRange();
-      range.selectNodeContents(editorRef.current);
-      range.collapse(false);
-      selection?.removeAllRanges();
-      selection?.addRange(range);
-    }
-
-    setContent(plainText);
-  }, [card.id]);
-
-  /**
-   * Handle paste events - convert to plain text
-   */
-  const handlePaste = useCallback((e: ClipboardEvent<HTMLDivElement>): void => {
-    e.preventDefault();
-
-    const text = e.clipboardData.getData('text/plain');
-    if (!text) return;
-
-    logger.debug('Paste event', {
-      cardId: card.id,
-      pasteLength: text.length,
-      hasNewlines: text.includes('\n')
-    });
-
-    // Get current content length
-    const currentLength = editorRef.current?.textContent?.length || 0;
-
-    // Calculate how much we can paste
-    const availableSpace = MAX_CHARACTERS - currentLength;
-    const textToPaste = text.slice(0, availableSpace);
-
-    // Convert newlines to <br> tags for display
-    const htmlText = textToPaste.replace(/\n/g, '<br>');
-
-    // Insert at cursor position
-    const selection = window.getSelection();
-    if (!selection?.rangeCount) return;
-
-    const range = selection.getRangeAt(0);
-    range.deleteContents();
-
-    const fragment = document.createRange().createContextualFragment(htmlText);
-    range.insertNode(fragment);
-
-    // Move cursor to end of inserted content
-    range.collapse(false);
-    selection.removeAllRanges();
-    selection.addRange(range);
-
-    handleInput();
-  }, [card.id, handleInput]);
+  }, [card.id, card.content.format, card.content.content, autoFocus, editor]);
 
   /**
    * Prepare content for saving
    */
   const prepareContentForSave = useCallback((): TextCardContent => {
-    const plainText = editorRef.current?.textContent || '';
-    const html = editorRef.current?.innerHTML || '';
+    if (!editor) {
+      logger.error('Editor not initialized when saving', {
+        cardId: card.id
+      });
+      return card.content;
+    }
 
-    // Convert HTML to markdown if needed
-    const markdownContent = card.content.markdown ? htmlToMarkdown(html) : plainText;
+    // Get Tiptap JSON content
+    const tiptapContent = editor.getJSON() as TiptapJSONContent;
+    const text = editor.getText();
+
+    logger.debug('Preparing content for save', {
+      cardId: card.id,
+      format: TextContentFormat.TIPTAP,
+      characterCount: text.length,
+      wordCount: countWords(text)
+    });
 
     return {
       type: 'text',
-      content: markdownContent,
-      markdown: card.content.markdown,
-      wordCount: countWords(plainText),
+      format: TextContentFormat.TIPTAP,
+      content: tiptapContent,
+      markdown: false, // Keep for backward compatibility, but format field takes precedence
+      wordCount: countWords(text),
       lastEditedAt: Date.now().toString()
     };
-  }, [card.content.markdown]);
+  }, [editor, card.id, card.content]);
 
   /**
-   * Apply formatting to selected text
+   * Handle opening link editor
    */
-  const applyFormat = useCallback((formatType: 'bold' | 'italic'): void => {
-    if (!editorRef.current) return;
+  const handleOpenLinkEditor = useCallback((): void => {
+    if (!editor) return;
 
-    logger.debug('Applying format', {
+    // Get current link URL if cursor is on a link
+    const previousUrl = editor.getAttributes('link').href || '';
+    setCurrentLinkUrl(previousUrl);
+    setIsLinkEditorOpen(true);
+
+    logger.debug('Opening link editor', {
       cardId: card.id,
-      formatType
+      hasExistingLink: !!previousUrl,
+      url: previousUrl
     });
+  }, [editor, card.id]);
 
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) return;
+  /**
+   * Handle saving link
+   */
+  const handleSaveLink = useCallback((url: string): void => {
+    if (!editor) return;
 
-    const range = selection.getRangeAt(0);
-    const selectedText = range.toString();
+    if (url) {
+      // Set link with URL
+      editor
+        .chain()
+        .focus()
+        .extendMarkRange('link')
+        .setLink({ href: url })
+        .run();
 
-    // If no text is selected, select all text
-    if (!selectedText && editorRef.current.textContent) {
-      range.selectNodeContents(editorRef.current);
-      selection.removeAllRanges();
-      selection.addRange(range);
-    }
-
-    const finalSelectedText = range.toString();
-    if (!finalSelectedText) return;
-
-    // Create formatted element
-    let formattedElement: HTMLElement;
-    if (formatType === 'bold') {
-      formattedElement = document.createElement('strong');
-    } else if (formatType === 'italic') {
-      formattedElement = document.createElement('em');
+      logger.debug('Link saved', {
+        cardId: card.id,
+        url
+      });
     } else {
-      return;
+      // Remove link if URL is empty
+      editor
+        .chain()
+        .focus()
+        .extendMarkRange('link')
+        .unsetLink()
+        .run();
+
+      logger.debug('Link removed', {
+        cardId: card.id
+      });
     }
 
-    formattedElement.textContent = finalSelectedText;
+    setIsLinkEditorOpen(false);
+    setCurrentLinkUrl('');
+  }, [editor, card.id]);
 
-    // Replace selection with formatted element
-    range.deleteContents();
-    range.insertNode(formattedElement);
+  /**
+   * Handle canceling link edit
+   */
+  const handleCancelLink = useCallback((): void => {
+    setIsLinkEditorOpen(false);
+    setCurrentLinkUrl('');
 
-    // Update selection to be after the inserted element
-    range.setStartAfter(formattedElement);
-    range.setEndAfter(formattedElement);
-    selection.removeAllRanges();
-    selection.addRange(range);
-
-    handleInput();
-  }, [card.id, handleInput]);
+    logger.debug('Link edit cancelled', {
+      cardId: card.id
+    });
+  }, [card.id]);
 
   /**
    * Handle keyboard shortcuts
    */
   const handleKeyDown = useCallback((e: KeyboardEvent<HTMLDivElement>): void => {
+    if (!editor) return;
+
     const isCtrl = e.ctrlKey || e.metaKey;
 
     if (isCtrl) {
       switch (e.key.toLowerCase()) {
-        case 'b':
-          e.preventDefault();
-          applyFormat('bold');
-          break;
-        case 'i':
-          e.preventDefault();
-          applyFormat('italic');
-          break;
-        case 'k':
-          e.preventDefault();
-          const selection = window.getSelection();
-          if (selection && selection.toString()) {
-            setSelectedText(selection.toString());
-            setIsLinkDialogOpen(true);
-          }
-          break;
         case 's':
           e.preventDefault();
           const content = prepareContentForSave();
@@ -409,70 +486,46 @@ export const TextEditor: React.FC<TextEditorProps> = ({
           const saveContent = prepareContentForSave();
           onSave(saveContent);
           break;
+        case 'k':
+          // Cmd/Ctrl+K: Open link editor
+          e.preventDefault();
+          handleOpenLinkEditor();
+          break;
       }
     } else if (e.key === 'Escape') {
       e.preventDefault();
       onCancel();
     }
-  }, [applyFormat, prepareContentForSave, onSave, onCancel]);
-
-  /**
-   * Insert link with URL
-   */
-  const insertLink = useCallback((url: string): void => {
-    if (!url) return;
-
-    logger.debug('Inserting link', {
-      cardId: card.id,
-      url,
-      selectedTextLength: selectedText.length
-    });
-
-    // Restore selection and create link
-    const selection = window.getSelection();
-    if (selection && selectedText) {
-      // Create link element
-      const link = document.createElement('a');
-      link.href = url;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      link.textContent = selectedText;
-
-      // Insert link at current position
-      const range = selection.getRangeAt(0);
-      range.deleteContents();
-      range.insertNode(link);
-
-      // Clear selection
-      selection.removeAllRanges();
-    }
-
-    setIsLinkDialogOpen(false);
-    setSelectedText('');
-    handleInput();
-  }, [card.id, selectedText, handleInput]);
+  }, [editor, prepareContentForSave, onSave, onCancel, handleOpenLinkEditor]);
 
   /**
    * Validate content
    */
-  const validateContent = useCallback((value: TextCardContent): boolean | string => {
-    const content = value.content || '';
-    if (!content || content.trim().length === 0) {
+  const validateContent = useCallback((): boolean | string => {
+    if (!editor) {
+      return 'Editor not initialized';
+    }
+
+    const text = editor.getText();
+
+    if (!text || text.trim().length === 0) {
       logger.warn('Validation failed: empty content', {
         cardId: card.id
       });
       return 'Content cannot be empty';
     }
-    if (content.length > MAX_CHARACTERS) {
+
+    if (text.length > MAX_CHARACTERS) {
       logger.warn('Validation failed: content too long', {
         cardId: card.id,
-        contentLength: content.length,
+        contentLength: text.length,
         limit: MAX_CHARACTERS
       });
       return `Content exceeds ${MAX_CHARACTERS} character limit`;
     }
+
     return true;
-  }, [card.id]);
+  }, [editor, card.id]);
 
   /**
    * Character count color based on length
@@ -482,6 +535,15 @@ export const TextEditor: React.FC<TextEditorProps> = ({
     if (count >= WARNING_THRESHOLD) return 'text-orange-500';
     return 'text-gray-500';
   }, []);
+
+  // Don't render until editor is initialized
+  if (!editor) {
+    return (
+      <div className={`relative w-full h-full flex items-center justify-center ${className}`}>
+        <span className="text-gray-400 text-sm">Loading editor...</span>
+      </div>
+    );
+  }
 
   return (
     <BaseEditor<TextCardContent>
@@ -495,26 +557,20 @@ export const TextEditor: React.FC<TextEditorProps> = ({
       saveOnBlur={true}
     >
       {({ handleCancel, validationError }: BaseEditorChildProps<TextCardContent>) => (
-        <div className="relative w-full h-full flex flex-col">
-          {/* Editor */}
-          <div
-            ref={editorRef}
-            role="textbox"
-            contentEditable
-            aria-label="Text editor"
-            aria-multiline="true"
-            aria-placeholder={placeholder}
-            className="w-full flex-1 p-3 outline-none resize-none overflow-auto"
-            style={{
-              minHeight: MIN_HEIGHT,
-              maxHeight: MAX_HEIGHT,
-              height: `${MIN_HEIGHT}px`
-            }}
-            onInput={handleInput}
-            onPaste={handlePaste}
-            onKeyDown={handleKeyDown}
-            data-placeholder={placeholder}
-            suppressContentEditableWarning
+        <div
+          className="relative w-full h-full flex flex-col"
+          onKeyDown={handleKeyDown}
+        >
+          {/* Tiptap Editor */}
+          <EditorContent
+            editor={editor}
+            className="w-full flex-1 overflow-auto"
+          />
+
+          {/* Floating Bubble Menu - appears on text selection */}
+          <BubbleMenu
+            editor={editor}
+            onOpenLinkEditor={handleOpenLinkEditor}
           />
 
           {/* Character count */}
@@ -541,49 +597,8 @@ export const TextEditor: React.FC<TextEditorProps> = ({
             </div>
           )}
 
-          {/* Link dialog */}
-          {isLinkDialogOpen && (
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white border border-gray-300 rounded-lg shadow-lg p-4 z-50">
-              <div className="mb-2 text-sm font-medium">Add Link</div>
-              <input
-                ref={linkInputRef}
-                type="url"
-                placeholder="Enter URL"
-                className="w-full px-2 py-1 border border-gray-300 rounded"
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    insertLink(e.currentTarget.value);
-                  } else if (e.key === 'Escape') {
-                    setIsLinkDialogOpen(false);
-                    setSelectedText('');
-                  }
-                }}
-              />
-              <div className="flex justify-end gap-2 mt-2">
-                <button
-                  onClick={() => {
-                    setIsLinkDialogOpen(false);
-                    setSelectedText('');
-                  }}
-                  className="px-2 py-1 text-xs text-gray-600 hover:text-gray-800"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    insertLink(linkInputRef.current?.value || '');
-                  }}
-                  className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
-                >
-                  Add
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* Save/Cancel controls */}
-          <div className="flex justify-end gap-2 px-3 py-2 border-t border-gray-200">
+          <div className="flex items-center justify-end px-3 py-2 border-t border-gray-200 gap-2">
             <button
               onClick={handleCancel}
               className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
@@ -601,6 +616,15 @@ export const TextEditor: React.FC<TextEditorProps> = ({
               Save
             </button>
           </div>
+
+          {/* Link Editor Popup */}
+          {isLinkEditorOpen && (
+            <LinkEditorPopup
+              initialUrl={currentLinkUrl}
+              onSave={handleSaveLink}
+              onCancel={handleCancelLink}
+            />
+          )}
         </div>
       )}
     </BaseEditor>
