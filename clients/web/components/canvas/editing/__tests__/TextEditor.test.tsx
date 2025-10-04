@@ -8,7 +8,9 @@
 // Mock CodeBlockWithCopyButton to avoid React NodeView rendering issues in JSDOM
 // This must be before any imports that might use the component
 jest.mock('@/components/canvas/editing/extensions/CodeBlockCopyButton', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const CodeBlockLowlight = require('@tiptap/extension-code-block-lowlight').default;
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const { common, createLowlight } = require('lowlight');
 
   const lowlight = createLowlight(common);
@@ -26,7 +28,7 @@ jest.mock('@/components/canvas/editing/extensions/CodeBlockCopyButton', () => {
       };
     },
 
-    renderHTML({ HTMLAttributes }) {
+    renderHTML({ HTMLAttributes }: { HTMLAttributes: Record<string, any> }) {
       return [
         'div',
         { class: 'relative code-block-wrapper' },
