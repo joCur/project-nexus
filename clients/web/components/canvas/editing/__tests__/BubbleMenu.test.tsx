@@ -20,6 +20,15 @@ import Code from '@tiptap/extension-code';
 import { BubbleMenu } from '../BubbleMenu';
 
 /**
+ * Helper function to select text in the editor
+ * BubbleMenu only appears when text is selected
+ */
+const selectText = (editor: Editor) => {
+  // Select all text in the editor
+  editor.commands.setTextSelection({ from: 0, to: editor.state.doc.content.size });
+};
+
+/**
  * Test wrapper component that provides a real Tiptap editor
  * This simulates the TextEditor context where BubbleMenu will be used
  */

@@ -11,13 +11,13 @@
  * - Keyboard shortcut tooltips
  * - Design system compliant styling
  * - Full accessibility support with ARIA attributes
- * - Auto-positioning near selected text
+ * - Auto-positioning near selected text using Tiptap's BubbleMenu
  *
  * Related Documentation: "Tiptap Text Editor Implementation" in Notion
  */
 
 import React, { useCallback, useState, useRef, useEffect, useMemo } from 'react';
-import { createPortal } from 'react-dom';
+import { BubbleMenu as TiptapBubbleMenu } from '@tiptap/react/menus';
 import type { Editor } from '@tiptap/react';
 import { cn } from '@/lib/utils';
 import { createContextLogger } from '@/utils/logger';
@@ -66,44 +66,37 @@ interface HeadingOption {
  *
  * Contextual formatting toolbar that appears when text is selected.
  * Provides quick access to text formatting options with visual feedback.
- *
- * Note: This is a custom implementation that doesn't use Tiptap's BubbleMenu extension.
- * Instead, it's a simple toolbar that's always rendered with the editor.
- * For Phase 2 MVP, this provides the core formatting functionality.
+ * Uses Tiptap's BubbleMenu component for automatic positioning near selection.
  */
 export const BubbleMenu: React.FC<BubbleMenuProps> = ({ editor, onOpenLinkEditor, className }) => {
   // Heading dropdown state
   const [isHeadingDropdownOpen, setIsHeadingDropdownOpen] = useState(false);
-  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number } | null>(null);
   const headingButtonRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(null);
+
+  // Force re-render when editor state changes to update active button states
+  const [, forceUpdate] = useState({});
 
   /**
-   * Find the dialog element to portal the dropdown into
+   * Subscribe to editor updates to refresh active states
    */
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      // Find the editor dialog element
-      const dialog = document.querySelector('[role="dialog"][aria-modal="true"]') as HTMLElement;
-      setPortalContainer(dialog || document.body);
-    }
-  }, []);
+    if (!editor) return;
 
-  /**
-   * Calculate dropdown position relative to button
-   */
-  useEffect(() => {
-    if (isHeadingDropdownOpen && headingButtonRef.current) {
-      const buttonRect = headingButtonRef.current.getBoundingClientRect();
-      setDropdownPosition({
-        top: buttonRect.bottom + 4, // 4px gap below button
-        left: buttonRect.left
-      });
-    } else {
-      setDropdownPosition(null);
-    }
-  }, [isHeadingDropdownOpen]);
+    const handleUpdate = () => {
+      // Force component re-render to update isActive states
+      forceUpdate({});
+    };
+
+    // Listen to selection and transaction updates
+    editor.on('selectionUpdate', handleUpdate);
+    editor.on('transaction', handleUpdate);
+
+    return () => {
+      editor.off('selectionUpdate', handleUpdate);
+      editor.off('transaction', handleUpdate);
+    };
+  }, [editor]);
 
   /**
    * Close dropdown when clicking outside
@@ -365,7 +358,9 @@ export const BubbleMenu: React.FC<BubbleMenuProps> = ({ editor, onOpenLinkEditor
   }, []);
 
   return (
-    <div
+    <TiptapBubbleMenu
+      editor={editor}
+      updateDelay={100}
       className={cn(
         // Base styling
         'flex items-center',
@@ -375,8 +370,6 @@ export const BubbleMenu: React.FC<BubbleMenuProps> = ({ editor, onOpenLinkEditor
         'bg-white border border-gray-200',
         // Design system: shadows and depth
         'shadow-lg rounded-lg',
-        // Positioning
-        'z-50',
         // Animation
         'transition-opacity duration-100',
         className
@@ -424,24 +417,20 @@ export const BubbleMenu: React.FC<BubbleMenuProps> = ({ editor, onOpenLinkEditor
             </svg>
           </button>
 
-          {/* Heading Dropdown Menu - Portaled to dialog with fixed positioning */}
-          {isHeadingDropdownOpen && portalContainer && dropdownPosition && createPortal(
+          {/* Heading Dropdown Menu */}
+          {isHeadingDropdownOpen && (
             <div
               ref={dropdownRef}
               onMouseDown={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
               }}
-              style={{
-                position: 'fixed',
-                top: `${dropdownPosition.top}px`,
-                left: `${dropdownPosition.left}px`,
-              }}
               className={cn(
+                'absolute top-full left-0 mt-1',
                 'bg-white border border-gray-200',
                 'shadow-lg rounded-lg',
                 'py-1 w-[180px]',
-                'z-[9999]' // High z-index to be above dialog
+                'z-50'
               )}
               role="menu"
               aria-label="Heading options"
@@ -477,8 +466,7 @@ export const BubbleMenu: React.FC<BubbleMenuProps> = ({ editor, onOpenLinkEditor
                   </button>
                 );
               })}
-            </div>,
-            portalContainer
+            </div>
           )}
         </div>
 
@@ -523,7 +511,7 @@ export const BubbleMenu: React.FC<BubbleMenuProps> = ({ editor, onOpenLinkEditor
           );
         })}
       </div>
-    </div>
+    </TiptapBubbleMenu>
   );
 };
 

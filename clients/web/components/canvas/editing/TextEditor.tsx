@@ -36,6 +36,7 @@ import Underline from '@tiptap/extension-underline';
 import Strike from '@tiptap/extension-strike';
 import Code from '@tiptap/extension-code';
 import Link from '@tiptap/extension-link';
+import ClearFormattingOnEnter from './extensions/ClearFormattingOnEnter';
 import {
   BaseEditor,
   type BaseEditorChildProps
@@ -205,6 +206,9 @@ export const TextEditor: React.FC<TextEditorProps> = ({
           return /^https?:\/\//.test(url) || /^mailto:/.test(url);
         }
       }),
+      // Clear formatting on Enter - Notion-like behavior
+      // When pressing Enter to create a new paragraph, formatting marks don't carry over
+      ClearFormattingOnEnter,
       Placeholder.configure({
         placeholder
       })
@@ -474,6 +478,12 @@ export const TextEditor: React.FC<TextEditorProps> = ({
             className="w-full flex-1 overflow-auto"
           />
 
+          {/* Floating Bubble Menu - appears on text selection */}
+          <BubbleMenu
+            editor={editor}
+            onOpenLinkEditor={handleOpenLinkEditor}
+          />
+
           {/* Character count */}
           <div className="flex items-center justify-between px-3 py-1 border-t border-gray-200">
             <span
@@ -498,34 +508,24 @@ export const TextEditor: React.FC<TextEditorProps> = ({
             </div>
           )}
 
-          {/* Formatting toolbar and Save/Cancel controls */}
-          <div className="flex items-center justify-between px-3 py-2 border-t border-gray-200 gap-3">
-            {/* Formatting toolbar */}
-            <BubbleMenu
-              editor={editor}
-              onOpenLinkEditor={handleOpenLinkEditor}
-              className="flex-shrink-0"
-            />
-
-            {/* Save/Cancel buttons */}
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={handleCancel}
-                className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  const content = prepareContentForSave();
-                  onSave(content);
-                }}
-                disabled={!!validationError || characterCount > MAX_CHARACTERS}
-                className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
-              >
-                Save
-              </button>
-            </div>
+          {/* Save/Cancel controls */}
+          <div className="flex items-center justify-end px-3 py-2 border-t border-gray-200 gap-2">
+            <button
+              onClick={handleCancel}
+              className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                const content = prepareContentForSave();
+                onSave(content);
+              }}
+              disabled={!!validationError || characterCount > MAX_CHARACTERS}
+              className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+            >
+              Save
+            </button>
           </div>
 
           {/* Link Editor Popup */}
