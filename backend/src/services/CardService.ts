@@ -1,15 +1,19 @@
 import { database, knex } from '@/database/connection';
-import { 
-  Card, 
-  CreateCardInput, 
-  UpdateCardInput, 
+import type { Knex } from 'knex';
+import {
+  Card,
+  CreateCardInput,
+  UpdateCardInput,
   CardFilter,
   CardPositionUpdate,
   BatchCardUpdate,
   ImportCardData,
   CardType as _CardType,
   CardStatus,
-  BatchOperationResult
+  BatchOperationResult,
+  TextContentFormat,
+  TiptapJSONContent,
+  DbCard
 } from '@/types/CardTypes';
 import { 
   NotFoundError, 
@@ -52,18 +56,51 @@ export class CardService {
         canvasId = defaultCanvas.id;
       }
 
-      // Sanitize content based on card type
-      const sanitizedContent = CardValidator.sanitizeContent(
-        validatedInput.content, 
-        validatedInput.type
-      );
+      // Determine content format and store appropriately
+      let contentFormat = validatedInput.contentFormat || TextContentFormat.MARKDOWN;
+      let contentJson: TiptapJSONContent | undefined;
+      let contentText: string;
+
+      // Check if content is TiptapJSONContent object
+      if (typeof validatedInput.content === 'object' && validatedInput.content !== null) {
+        contentFormat = TextContentFormat.TIPTAP;
+        contentJson = validatedInput.content;
+        contentText = ''; // Empty string for legacy content column
+      } else {
+        // String content - check if it's JSON
+        const contentStr = validatedInput.content as string;
+        try {
+          const parsed = JSON.parse(contentStr);
+          if (parsed.type) {
+            // It's Tiptap JSON
+            contentFormat = TextContentFormat.TIPTAP;
+            contentJson = parsed;
+            contentText = ''; // Empty string for legacy content column
+          } else {
+            // Regular markdown
+            contentText = CardValidator.sanitizeContent(contentStr, validatedInput.type);
+          }
+        } catch {
+          // Not JSON - treat as markdown
+          contentText = CardValidator.sanitizeContent(contentStr, validatedInput.type);
+        }
+      }
+
+      // Validate Tiptap JSON if that's the format
+      if (contentFormat === TextContentFormat.TIPTAP && contentJson) {
+        contentJson = CardValidator.sanitizeTiptapJSON(
+          CardValidator.validateTiptapJSON(contentJson)
+        );
+      }
 
       const cardData = {
         workspace_id: validatedInput.workspaceId,
         canvas_id: canvasId,
         type: validatedInput.type,
         title: validatedInput.title,
-        content: sanitizedContent,
+        content: contentText,
+        content_json: contentJson ? JSON.stringify(contentJson) : null,
+        content_format: contentFormat,
         position_x: validatedInput.position.x,
         position_y: validatedInput.position.y,
         z_index: validatedInput.position.z,
@@ -79,7 +116,7 @@ export class CardService {
         last_saved_at: new Date(),
       };
 
-      const [dbCard] = await database.query<any[]>(
+      const [dbCard] = await database.query<DbCard[]>(
         knex(this.tableName)
           .insert(cardData)
           .returning('*'),
@@ -92,6 +129,7 @@ export class CardService {
         cardId: card.id,
         workspaceId: card.workspaceId,
         type: card.type,
+        contentFormat,
         userId,
       });
 
@@ -118,7 +156,7 @@ export class CardService {
    */
   async getCard(cardId: string): Promise<Card | null> {
     try {
-      const dbCard = await database.query<any>(
+      const dbCard = await database.query<DbCard>(
         knex(this.tableName)
           .where('id', cardId)
           .where('status', '!=', CardStatus.DELETED)
@@ -142,7 +180,7 @@ export class CardService {
    */
   async getCardsByIds(cardIds: string[]): Promise<Card[]> {
     try {
-      const dbCards = await database.query<any[]>(
+      const dbCards = await database.query<DbCard[]>(
         knex(this.tableName)
           .whereIn('id', cardIds)
           .where('status', '!=', CardStatus.DELETED),
@@ -188,7 +226,7 @@ export class CardService {
       const totalCount = parseInt(count, 10);
 
       // Get paginated results
-      const dbCards = await database.query<any[]>(
+      const dbCards = await database.query<DbCard[]>(
         query
           .orderBy('updated_at', 'desc')
           .limit(limit)
@@ -238,7 +276,7 @@ export class CardService {
       const totalCount = parseInt(count, 10);
 
       // Get paginated results
-      const dbCards = await database.query<any[]>(
+      const dbCards = await database.query<DbCard[]>(
         query
           .orderBy('updated_at', 'desc')
           .limit(limit)
@@ -283,7 +321,7 @@ export class CardService {
       }
 
       // Prepare update data
-      const updateData: any = {
+      const updateData: Partial<DbCard> = {
         updated_at: new Date(),
         last_modified_by: userId,
         version: existingCard.version + 1,
@@ -295,10 +333,36 @@ export class CardService {
       }
 
       if (validatedInput.content !== undefined) {
-        updateData.content = CardValidator.sanitizeContent(
-          validatedInput.content, 
-          existingCard.type
-        );
+        if (typeof validatedInput.content === 'object') {
+          const validated = CardValidator.validateTiptapJSON(validatedInput.content);
+          const sanitized = CardValidator.sanitizeTiptapJSON(validated);
+          updateData.content_json = JSON.stringify(sanitized);
+          updateData.content = ''; // Clear legacy column
+          updateData.content_format = TextContentFormat.TIPTAP;
+        } else {
+          // String content - check if JSON
+          const contentStr = validatedInput.content as string;
+          try {
+            const parsed = JSON.parse(contentStr);
+            if (parsed.type) {
+              const validated = CardValidator.validateTiptapJSON(parsed);
+              const sanitized = CardValidator.sanitizeTiptapJSON(validated);
+              updateData.content_json = JSON.stringify(sanitized);
+              updateData.content = '';
+              updateData.content_format = TextContentFormat.TIPTAP;
+            } else {
+              // Markdown
+              updateData.content = CardValidator.sanitizeContent(contentStr, existingCard.type);
+              updateData.content_json = null;
+              updateData.content_format = TextContentFormat.MARKDOWN;
+            }
+          } catch {
+            // Markdown
+            updateData.content = CardValidator.sanitizeContent(contentStr, existingCard.type);
+            updateData.content_json = null;
+            updateData.content_format = TextContentFormat.MARKDOWN;
+          }
+        }
       }
 
       if (validatedInput.position !== undefined) {
@@ -324,7 +388,7 @@ export class CardService {
         updateData.status = validatedInput.status;
       }
 
-      const [updatedDbCard] = await database.query<any[]>(
+      const [updatedDbCard] = await database.query<DbCard[]>(
         knex(this.tableName)
           .where('id', cardId)
           .update(updateData)
@@ -488,7 +552,7 @@ export class CardService {
   /**
    * Apply filters to query
    */
-  private applyFilters(query: any, filter: CardFilter): any {
+  private applyFilters(query: Knex.QueryBuilder, filter: CardFilter): Knex.QueryBuilder {
     if (filter.type) {
       if (Array.isArray(filter.type)) {
         query = query.whereIn('type', filter.type);
@@ -594,7 +658,7 @@ export class CardService {
             }
 
             // Prepare update data
-            const updateData: any = {
+            const updateData: Partial<DbCard> = {
               updated_at: new Date(),
               last_modified_by: userId,
               version: existingCard.version + 1,
@@ -608,10 +672,36 @@ export class CardService {
             }
 
             if (input.content !== undefined) {
-              updateData.content = CardValidator.sanitizeContent(
-                input.content, 
-                existingCard.type
-              );
+              if (typeof input.content === 'object') {
+                const validated = CardValidator.validateTiptapJSON(input.content);
+                const sanitized = CardValidator.sanitizeTiptapJSON(validated);
+                updateData.content_json = JSON.stringify(sanitized);
+                updateData.content = ''; // Clear legacy column
+                updateData.content_format = TextContentFormat.TIPTAP;
+              } else {
+                // String content - check if JSON
+                const contentStr = input.content as string;
+                try {
+                  const parsed = JSON.parse(contentStr);
+                  if (parsed.type) {
+                    const validated = CardValidator.validateTiptapJSON(parsed);
+                    const sanitized = CardValidator.sanitizeTiptapJSON(validated);
+                    updateData.content_json = JSON.stringify(sanitized);
+                    updateData.content = '';
+                    updateData.content_format = TextContentFormat.TIPTAP;
+                  } else {
+                    // Markdown
+                    updateData.content = CardValidator.sanitizeContent(contentStr, existingCard.type);
+                    updateData.content_json = null;
+                    updateData.content_format = TextContentFormat.MARKDOWN;
+                  }
+                } catch {
+                  // Markdown
+                  updateData.content = CardValidator.sanitizeContent(contentStr, existingCard.type);
+                  updateData.content_json = null;
+                  updateData.content_format = TextContentFormat.MARKDOWN;
+                }
+              }
             }
 
             if (input.position !== undefined) {
@@ -856,7 +946,7 @@ export class CardService {
    */
   async autoSaveCards(cardIds: string[]): Promise<Card[]> {
     try {
-      const updatedDbCards = await database.query<any[]>(
+      const updatedDbCards = await database.query<DbCard[]>(
         knex(this.tableName)
           .whereIn('id', cardIds)
           .where('is_dirty', true)
@@ -891,7 +981,7 @@ export class CardService {
    */
   async getDirtyCards(workspaceId: string): Promise<Card[]> {
     try {
-      const dbCards = await database.query<any[]>(
+      const dbCards = await database.query<DbCard[]>(
         knex(this.tableName)
           .where('workspace_id', workspaceId)
           .where('is_dirty', true)
@@ -920,7 +1010,7 @@ export class CardService {
     limit: number = 50
   ): Promise<Card[]> {
     try {
-      const dbCards = await database.query<any[]>(
+      const dbCards = await database.query<DbCard[]>(
         knex(this.tableName)
           .where('workspace_id', workspaceId)
           .where('status', '!=', CardStatus.DELETED)

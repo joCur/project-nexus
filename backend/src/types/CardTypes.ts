@@ -27,6 +27,15 @@ export enum CardPriority {
   URGENT = 'urgent',
 }
 
+/**
+ * Text content format types
+ * Supports both legacy markdown and new Tiptap JSON format
+ */
+export enum TextContentFormat {
+  MARKDOWN = 'markdown',
+  TIPTAP = 'tiptap',
+}
+
 export enum ConnectionType {
   MANUAL = 'manual',
   AI_SUGGESTED = 'ai_suggested',
@@ -62,7 +71,7 @@ export interface CardDimensions {
 }
 
 export interface CardMetadata {
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface CardStyle {
@@ -90,6 +99,21 @@ export interface CardAnimation {
   startTime?: number;
 }
 
+/**
+ * Tiptap JSON content structure
+ * Represents the Tiptap editor's document format
+ */
+export interface TiptapJSONContent {
+  type: string;
+  content?: TiptapJSONContent[];
+  text?: string;
+  marks?: Array<{
+    type: string;
+    attrs?: Record<string, unknown>;
+  }>;
+  attrs?: Record<string, unknown>;
+}
+
 // Main Card interface - aligned with database schema
 export interface Card {
   id: string;
@@ -97,7 +121,8 @@ export interface Card {
   ownerId: string; // User ID who owns the card
   type: CardType;
   title?: string;
-  content: string;
+  content: string | TiptapJSONContent; // Support both markdown string and Tiptap JSON
+  contentFormat: TextContentFormat; // Track which format is used
   position: CardPosition;
   dimensions: CardDimensions;
   metadata: CardMetadata;
@@ -109,11 +134,11 @@ export interface Card {
   updatedAt: Date;
   lastModifiedBy: string; // User ID
   tags: string[];
-  
+
   // Auto-save tracking
   lastSavedAt?: Date;
   isDirty: boolean; // Has unsaved changes
-  
+
   // Canvas-specific properties
   isLocked: boolean;
   isHidden: boolean;
@@ -121,7 +146,7 @@ export interface Card {
   isSelected: boolean;
   rotation: number; // Degrees
   animation: CardAnimation;
-  
+
   // AI and analysis
   embeddings?: number[]; // Vector embeddings for AI search
   analysisResults?: CardAnalysisResult;
@@ -133,7 +158,8 @@ export interface CreateCardInput {
   canvasId?: string; // Optional - if not provided, will use default canvas
   type: CardType;
   title?: string;
-  content: string;
+  content: string | TiptapJSONContent; // Support both markdown string and Tiptap JSON
+  contentFormat?: TextContentFormat; // Optional, defaults to MARKDOWN for backward compatibility
   position: CardPosition;
   dimensions: CardDimensions;
   metadata?: CardMetadata;
@@ -144,7 +170,8 @@ export interface CreateCardInput {
 
 export interface UpdateCardInput {
   title?: string;
-  content?: string;
+  content?: string | TiptapJSONContent; // Support both markdown string and Tiptap JSON
+  contentFormat?: TextContentFormat; // Track which format is being used
   position?: CardPosition;
   dimensions?: CardDimensions;
   metadata?: CardMetadata;
@@ -250,7 +277,7 @@ export interface CardConnection {
   toCardId: string;
   type: ConnectionType;
   strength: number; // 0-1 confidence score
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   createdAt: Date;
   createdBy: string; // User ID or 'AI' for auto-generated
 }
@@ -276,7 +303,9 @@ export interface DbCard {
   workspace_id: string;
   type: string;
   title?: string;
-  content: string;
+  content: string; // Legacy markdown TEXT column
+  content_json?: string | TiptapJSONContent; // NEW: JSONB column for Tiptap content (string from DB, object when parsed)
+  content_format: string; // NEW: 'markdown' | 'tiptap'
   position_x: number;
   position_y: number;
   z_index: number; // Renamed from position_z
@@ -294,7 +323,7 @@ export interface DbCard {
   tags: string; // JSON array string
   last_saved_at?: Date;
   is_dirty: boolean;
-  
+
   // Canvas-specific fields
   is_locked: boolean;
   is_hidden: boolean;
@@ -302,13 +331,13 @@ export interface DbCard {
   is_selected: boolean;
   rotation: number;
   animation: string; // JSON string
-  
+
   // pgvector fields
   embedding?: number[];
   embedding_model?: string;
   embedding_created_at?: Date;
   content_hash?: string;
-  
+
   // AI analysis results
   analysis_results?: string; // JSON string
 }
@@ -333,7 +362,7 @@ export interface CardMetrics {
 export interface BatchOperationResult<T> {
   successful: T[];
   failed: Array<{
-    input: any;
+    input: unknown;
     error: string;
   }>;
   totalProcessed: number;
@@ -359,3 +388,22 @@ export const DEFAULT_CARD_STYLE: CardStyle = {
     spread: 0,
   },
 };
+
+/**
+ * Type guard to check if content is Tiptap JSON format
+ * @param content - The content to check
+ * @returns True if content is TiptapJSONContent, false otherwise
+ */
+export const isTiptapContent = (
+  content: string | TiptapJSONContent
+): content is TiptapJSONContent =>
+  typeof content === 'object' && content !== null && 'type' in content;
+
+/**
+ * Type guard to check if content is markdown string format
+ * @param content - The content to check
+ * @returns True if content is a markdown string, false otherwise
+ */
+export const isMarkdownContent = (
+  content: string | TiptapJSONContent
+): content is string => typeof content === 'string';

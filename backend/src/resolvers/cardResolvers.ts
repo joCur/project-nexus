@@ -7,21 +7,22 @@ import {
 import { createContextLogger } from '@/utils/logger';
 import { GraphQLContext } from '@/types';
 import { CardService } from '@/services/CardService';
-import { 
-  Card, 
-  CreateCardInput, 
-  UpdateCardInput, 
+import {
+  Card,
+  CreateCardInput,
+  UpdateCardInput,
   CardFilter,
-  CardPositionUpdate 
+  CardPositionUpdate,
+  TiptapJSONContent,
+  TextContentFormat
 } from '@/types/CardTypes';
-import { 
-  SubscriptionService, 
-  CARD_EVENTS, 
-  WORKSPACE_EVENTS, 
-  pubSub 
+import {
+  SubscriptionService,
+  CARD_EVENTS,
+  WORKSPACE_EVENTS,
+  pubSub
 } from '@/services/subscriptionService';
 import { withFilter } from 'graphql-subscriptions';
-import { WorkspaceAuthorizationService } from '@/services/workspaceAuthorization';
 
 /**
  * GraphQL resolvers for card management operations
@@ -38,7 +39,7 @@ export const cardResolvers = {
      * Aligns with frontend CardActions.getCard()
      */
     card: async (
-      _: any,
+      _parent: Record<string, never>,
       { id }: { id: string },
       context: GraphQLContext
     ): Promise<Card | null> => {
@@ -95,7 +96,7 @@ export const cardResolvers = {
      * Aligns with frontend CardActions.getCards()
      */
     cards: async (
-      _: any,
+      _parent: Record<string, never>,
       { 
         workspaceId, 
         canvasId,
@@ -172,7 +173,7 @@ export const cardResolvers = {
      * Aligns with frontend CardActions.searchCards()
      */
     searchCards: async (
-      _: any,
+      _parent: Record<string, never>,
       { 
         workspaceId, 
         query, 
@@ -227,7 +228,7 @@ export const cardResolvers = {
      * For viewport-based card loading optimization
      */
     cardsInBounds: async (
-      _: any,
+      _parent: Record<string, never>,
       { 
         workspaceId, 
         bounds 
@@ -285,8 +286,8 @@ export const cardResolvers = {
      * Aligns with frontend CardActions.createCard()
      */
     createCard: async (
-      _: any,
-      { input }: { input: CreateCardInput },
+      _parent: Record<string, never>,
+      { input }: { input: CreateCardInput & { contentJson?: TiptapJSONContent } },
       context: GraphQLContext
     ): Promise<Card> => {
       if (!context.isAuthenticated) {
@@ -303,8 +304,16 @@ export const cardResolvers = {
           'Cannot create cards in this workspace'
         );
 
+        // Transform input: if contentJson is provided, use it as content
+        // CardService expects content field to be either string or object
+        const transformedInput = { ...input };
+        if (input.contentJson && typeof input.contentJson === 'object') {
+          transformedInput.content = input.contentJson;
+          transformedInput.contentFormat = transformedInput.contentFormat || TextContentFormat.TIPTAP;
+        }
+
         const cardService = new CardService();
-        const card = await cardService.createCard(input, context.user!.id);
+        const card = await cardService.createCard(transformedInput, context.user!.id);
 
         // Publish real-time event
         await SubscriptionService.publishCardCreated(card);
@@ -337,8 +346,8 @@ export const cardResolvers = {
      * Aligns with frontend CardActions.updateCard()
      */
     updateCard: async (
-      _: any,
-      { id, input }: { id: string; input: UpdateCardInput },
+      _parent: Record<string, never>,
+      { id, input }: { id: string; input: UpdateCardInput & { contentJson?: TiptapJSONContent } },
       context: GraphQLContext
     ): Promise<Card> => {
       if (!context.isAuthenticated) {
@@ -347,7 +356,7 @@ export const cardResolvers = {
 
       try {
         const cardService = new CardService();
-        
+
         // Check if card exists and user has permission
         const existingCard = await cardService.getCard(id);
         if (!existingCard) {
@@ -363,7 +372,15 @@ export const cardResolvers = {
           'Cannot update cards in this workspace'
         );
 
-        const updatedCard = await cardService.updateCard(id, input, context.user!.id);
+        // Transform input: if contentJson is provided, use it as content
+        // CardService expects content field to be either string or object
+        const transformedInput = { ...input };
+        if (input.contentJson && typeof input.contentJson === 'object') {
+          transformedInput.content = input.contentJson;
+          transformedInput.contentFormat = transformedInput.contentFormat || TextContentFormat.TIPTAP;
+        }
+
+        const updatedCard = await cardService.updateCard(id, transformedInput, context.user!.id);
 
         // Publish real-time event
         await SubscriptionService.publishCardUpdated(updatedCard);
@@ -397,7 +414,7 @@ export const cardResolvers = {
      * Aligns with frontend CardActions.deleteCard()
      */
     deleteCard: async (
-      _: any,
+      _parent: Record<string, never>,
       { id }: { id: string },
       context: GraphQLContext
     ): Promise<boolean> => {
@@ -457,7 +474,7 @@ export const cardResolvers = {
      * Aligns with frontend bulk move operations
      */
     batchUpdateCardPositions: async (
-      _: any,
+      _parent: Record<string, never>,
       { updates }: { updates: CardPositionUpdate[] },
       context: GraphQLContext
     ): Promise<Card[]> => {
@@ -525,7 +542,7 @@ export const cardResolvers = {
      * Aligns with frontend CardActions.duplicateCard()
      */
     duplicateCard: async (
-      _: any,
+      _parent: Record<string, never>,
       { id, offset }: { id: string; offset?: { x: number; y: number } },
       context: GraphQLContext
     ): Promise<Card> => {
@@ -781,7 +798,7 @@ export const cardResolvers = {
     /**
      * Resolve workspace for Card type
      */
-    workspace: async (card: Card, _: any, context: GraphQLContext) => {
+    workspace: async (card: Card, _args: Record<string, never>, context: GraphQLContext) => {
       const workspaceService = context.dataSources.workspaceService;
       return await workspaceService.getWorkspaceById(card.workspaceId);
     },
@@ -789,9 +806,34 @@ export const cardResolvers = {
     /**
      * Resolve owner (creator) for Card type
      */
-    owner: async (card: Card, _: any, context: GraphQLContext) => {
+    owner: async (card: Card, _args: Record<string, never>, context: GraphQLContext) => {
       const userService = context.dataSources.userService;
       return await userService.findById(card.ownerId);
+    },
+
+    /**
+     * Resolve content field based on format
+     * For Tiptap format, returns empty string (actual content is in contentJson)
+     * For markdown format, returns the markdown string
+     */
+    content: (card: Card) => {
+      return typeof card.content === 'string' ? card.content : '';
+    },
+
+    /**
+     * Resolve contentJson field
+     * Returns Tiptap JSON structure when format is 'tiptap', null otherwise
+     */
+    contentJson: (card: Card) => {
+      return typeof card.content === 'object' ? card.content : null;
+    },
+
+    /**
+     * Resolve contentFormat field
+     * Returns the content format enum value
+     */
+    contentFormat: (card: Card) => {
+      return card.contentFormat;
     },
   },
 };

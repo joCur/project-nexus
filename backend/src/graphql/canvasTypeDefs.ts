@@ -153,6 +153,12 @@ export const canvasTypeDefs = gql`
     urgent
   }
 
+  # Text content format (markdown or Tiptap JSON)
+  enum TextContentFormat {
+    markdown
+    tiptap
+  }
+
   # Card styling properties (simplified for GraphQL)
   type CardStyle {
     backgroundColor: String!
@@ -169,12 +175,14 @@ export const canvasTypeDefs = gql`
     id: ID!
     workspaceId: ID!
     ownerId: ID!
-    
+
     # Content fields
     title: String!
-    content: String
+    content: String          # Legacy markdown string OR stringified Tiptap JSON for backward compatibility
+    contentJson: JSON        # Tiptap JSON structure (when contentFormat is 'tiptap')
+    contentFormat: TextContentFormat!  # Format of the content ('markdown' or 'tiptap')
     type: CardType!
-    
+
     # Canvas positioning (aligns with frontend)
     position: Position!
     dimensions: Dimensions!
@@ -338,7 +346,9 @@ export const canvasTypeDefs = gql`
     workspaceId: ID!
     type: CardType!
     title: String!
-    content: String
+    content: String          # Can be markdown string OR stringified Tiptap JSON
+    contentJson: JSON        # Alternatively, provide Tiptap JSON directly
+    contentFormat: TextContentFormat  # Format of content (defaults to 'markdown' for backward compatibility)
     position: PositionInput!
     dimensions: DimensionsInput
     style: CardStyleInput
@@ -347,10 +357,12 @@ export const canvasTypeDefs = gql`
     priority: CardPriority
   }
 
-  # Card update input (aligns with frontend UpdateCardParams) 
+  # Card update input (aligns with frontend UpdateCardParams)
   input UpdateCardInput {
     title: String
-    content: String
+    content: String          # Can be markdown string OR stringified Tiptap JSON
+    contentJson: JSON        # Alternatively, provide Tiptap JSON directly
+    contentFormat: TextContentFormat  # Format of content
     position: PositionInput
     dimensions: DimensionsInput
     style: CardStyleInput
