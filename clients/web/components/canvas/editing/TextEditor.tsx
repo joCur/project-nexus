@@ -70,6 +70,7 @@ import {
   isTextCardTiptap
 } from '@/types/card.types';
 import { createContextLogger } from '@/utils/logger';
+import { mapGraphQLError, type MappedError } from '@/utils/errorMapping';
 
 // Create logger at module level with component context
 const logger = createContextLogger({ component: 'TextEditor' });
@@ -147,6 +148,9 @@ export const TextEditor: React.FC<TextEditorProps> = ({
   // Link editor state
   const [isLinkEditorOpen, setIsLinkEditorOpen] = useState(false);
   const [currentLinkUrl, setCurrentLinkUrl] = useState('');
+
+  // Validation error state
+  const [saveError, setSaveError] = useState<MappedError | null>(null);
 
   // Initialize content based on format
   const initialContent = useMemo((): TiptapJSONContent => {
@@ -309,6 +313,11 @@ export const TextEditor: React.FC<TextEditorProps> = ({
       const text = updatedEditor.getText();
       const charCount = text.length;
 
+      // Clear save error when content changes (error recovery)
+      if (saveError) {
+        setSaveError(null);
+      }
+
       // Enforce character limit
       if (charCount > MAX_CHARACTERS) {
         logger.warn('Character limit exceeded', {
@@ -400,6 +409,37 @@ export const TextEditor: React.FC<TextEditorProps> = ({
   }, [editor, card.id, card.content]);
 
   /**
+   * Handle save with error handling
+   */
+  const handleSave = useCallback(async (): Promise<void> => {
+    const content = prepareContentForSave();
+
+    try {
+      // Clear any previous errors
+      setSaveError(null);
+
+      // Call the onSave callback
+      await onSave(content);
+
+      logger.debug('Content saved successfully', {
+        cardId: card.id
+      });
+    } catch (error) {
+      // Map error to user-friendly message
+      const mappedError = mapGraphQLError(error);
+
+      logger.error('Save failed', {
+        cardId: card.id,
+        error: error instanceof Error ? error.message : String(error),
+        mappedError: mappedError.message
+      });
+
+      // Set error state for UI display
+      setSaveError(mappedError);
+    }
+  }, [prepareContentForSave, onSave, card.id]);
+
+  /**
    * Handle opening link editor
    */
   const handleOpenLinkEditor = useCallback((): void => {
@@ -478,13 +518,11 @@ export const TextEditor: React.FC<TextEditorProps> = ({
       switch (e.key.toLowerCase()) {
         case 's':
           e.preventDefault();
-          const content = prepareContentForSave();
-          onSave(content);
+          handleSave();
           break;
         case 'enter':
           e.preventDefault();
-          const saveContent = prepareContentForSave();
-          onSave(saveContent);
+          handleSave();
           break;
         case 'k':
           // Cmd/Ctrl+K: Open link editor
@@ -496,7 +534,7 @@ export const TextEditor: React.FC<TextEditorProps> = ({
       e.preventDefault();
       onCancel();
     }
-  }, [editor, prepareContentForSave, onSave, onCancel, handleOpenLinkEditor]);
+  }, [editor, handleSave, onCancel, handleOpenLinkEditor]);
 
   /**
    * Validate content
@@ -598,23 +636,39 @@ export const TextEditor: React.FC<TextEditorProps> = ({
           )}
 
           {/* Save/Cancel controls */}
-          <div className="flex items-center justify-end px-3 py-2 border-t border-gray-200 gap-2">
-            <button
-              onClick={handleCancel}
-              className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => {
-                const content = prepareContentForSave();
-                onSave(content);
-              }}
-              disabled={!!validationError || characterCount > MAX_CHARACTERS}
-              className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
-            >
-              Save
-            </button>
+          <div className="flex flex-col px-3 py-2 border-t border-gray-200 gap-2">
+            {/* Error display */}
+            {saveError && (
+              <div
+                className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded border border-red-200"
+                data-testid="save-error"
+                role="alert"
+              >
+                <div className="font-medium">{saveError.message}</div>
+                {saveError.suggestion && (
+                  <div className="text-xs mt-1">{saveError.suggestion}</div>
+                )}
+              </div>
+            )}
+
+            {/* Action buttons */}
+            <div className="flex items-center justify-end gap-2">
+              <button
+                onClick={handleCancel}
+                className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800"
+                data-testid="cancel-button"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={!!validationError || characterCount > MAX_CHARACTERS}
+                className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+                data-testid="save-button"
+              >
+                Save
+              </button>
+            </div>
           </div>
 
           {/* Link Editor Popup */}

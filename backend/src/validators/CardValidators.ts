@@ -61,221 +61,20 @@ const tagsSchema = z.array(
     .regex(/^[a-zA-Z0-9_-]+$/, 'Tag can only contain letters, numbers, underscores, and hyphens')
 ).max(CardConstraints.TAGS_MAX_COUNT, `Maximum ${CardConstraints.TAGS_MAX_COUNT} tags allowed`);
 
-// Tiptap JSON validation constants
-const TIPTAP_MAX_NESTING_DEPTH = 20;
-const TIPTAP_MAX_CONTENT_SIZE = 100 * 1024; // 100KB
+// Import Tiptap validation constants and utilities
+import {
+  TIPTAP_MAX_CONTENT_SIZE,
+  ALLOWED_NODE_TYPES,
+  ALLOWED_MARK_TYPES,
+} from './TiptapValidationConstants';
 
-/**
- * Allowed Tiptap node types based on Phase 1-4 implementation
- */
-const ALLOWED_NODE_TYPES = new Set([
-  // Core structure
-  'doc',
-  'paragraph',
-  'text',
-  // Headings
-  'heading',
-  // Lists
-  'bulletList',
-  'orderedList',
-  'listItem',
-  'taskList',
-  'taskItem',
-  // Block elements
-  'blockquote',
-  'codeBlock',
-  'horizontalRule',
-]);
+import {
+  validateTiptapStructure,
+  sanitizeTiptapJSON as sanitizeTiptapJSONUtil,
+} from './TiptapValidationUtils';
 
-/**
- * Allowed Tiptap mark types based on Phase 1-4 implementation
- */
-const ALLOWED_MARK_TYPES = new Set([
-  'bold',
-  'italic',
-  'underline',
-  'strike',
-  'code',
-  'link',
-]);
-
-/**
- * Dangerous URL protocols that should be blocked for XSS prevention
- */
-const DANGEROUS_PROTOCOLS = new Set([
-  'javascript:',
-  'data:text/html',
-  'vbscript:',
-  'file:',
-  'about:',
-]);
-
-/**
- * Allowed URL protocols for link sanitization
- */
-const ALLOWED_PROTOCOLS = new Set([
-  'http:',
-  'https:',
-  'mailto:',
-]);
-
-/**
- * Calculate nesting depth of Tiptap JSON
- * @param node - Tiptap JSON node
- * @param currentDepth - Current depth (internal use)
- * @returns Maximum nesting depth
- */
-function getTiptapNestingDepth(node: TiptapJSONContent, currentDepth = 0): number {
-  if (!node.content || node.content.length === 0) {
-    return currentDepth;
-  }
-
-  let maxDepth = currentDepth;
-  for (const child of node.content) {
-    const childDepth = getTiptapNestingDepth(child, currentDepth + 1);
-    maxDepth = Math.max(maxDepth, childDepth);
-  }
-
-  return maxDepth;
-}
-
-/**
- * Validate Tiptap JSON structure for security and correctness
- * @param node - Tiptap JSON node to validate
- * @returns True if valid, throws error otherwise
- */
-function validateTiptapStructure(node: TiptapJSONContent): boolean {
-  // Check node type is allowed
-  if (!ALLOWED_NODE_TYPES.has(node.type)) {
-    throw new Error(`Invalid node type: ${node.type}`);
-  }
-
-  // Validate marks if present
-  if (node.marks) {
-    for (const mark of node.marks) {
-      if (!ALLOWED_MARK_TYPES.has(mark.type)) {
-        throw new Error(`Invalid mark type: ${mark.type}`);
-      }
-
-      // Validate link href for XSS prevention
-      if (mark.type === 'link' && mark.attrs?.href && typeof mark.attrs.href === 'string') {
-        const href = mark.attrs.href.toLowerCase();
-
-        // Check for dangerous protocols
-        for (const protocol of DANGEROUS_PROTOCOLS) {
-          if (href.startsWith(protocol)) {
-            throw new Error(`Dangerous protocol detected in link: ${protocol}`);
-          }
-        }
-
-        // Validate allowed protocols
-        const hasAllowedProtocol = Array.from(ALLOWED_PROTOCOLS).some(
-          protocol => href.startsWith(protocol)
-        );
-
-        if (!hasAllowedProtocol && href.includes(':')) {
-          throw new Error(`Invalid protocol in link: ${href}`);
-        }
-      }
-    }
-  }
-
-  // Check nesting depth
-  const depth = getTiptapNestingDepth(node);
-  if (depth > TIPTAP_MAX_NESTING_DEPTH) {
-    throw new Error(`JSON nesting depth exceeds maximum allowed (${TIPTAP_MAX_NESTING_DEPTH})`);
-  }
-
-  // Recursively validate children
-  if (node.content) {
-    for (const child of node.content) {
-      validateTiptapStructure(child);
-    }
-  }
-
-  return true;
-}
-
-/**
- * Sanitize Tiptap JSON content for XSS prevention
- * @param node - Tiptap JSON node to sanitize
- * @returns Sanitized Tiptap JSON node
- */
-function sanitizeTiptapJSON(node: TiptapJSONContent): TiptapJSONContent {
-  const sanitized: TiptapJSONContent = { type: node.type };
-
-  // Sanitize text content
-  if (node.text !== undefined) {
-    sanitized.text = node.text;
-  }
-
-  // Sanitize marks
-  if (node.marks) {
-    sanitized.marks = node.marks.map(mark => {
-      const sanitizedMark: { type: string; attrs?: Record<string, any> } = { type: mark.type };
-
-      if (mark.attrs) {
-        const sanitizedAttrs: Record<string, any> = {};
-
-        // Sanitize link hrefs
-        if (mark.type === 'link' && mark.attrs.href && typeof mark.attrs.href === 'string') {
-          const href = mark.attrs.href.toLowerCase();
-
-          // Remove dangerous protocols
-          let isAllowed = true;
-          for (const protocol of DANGEROUS_PROTOCOLS) {
-            if (href.startsWith(protocol)) {
-              isAllowed = false;
-              break;
-            }
-          }
-
-          if (isAllowed) {
-            sanitizedAttrs.href = mark.attrs.href;
-          }
-        } else {
-          // Copy other attributes (excluding dangerous ones)
-          for (const [key, value] of Object.entries(mark.attrs)) {
-            if (!key.toLowerCase().startsWith('on')) { // Remove event handlers
-              sanitizedAttrs[key] = value;
-            }
-          }
-        }
-
-        if (Object.keys(sanitizedAttrs).length > 0) {
-          sanitizedMark.attrs = sanitizedAttrs;
-        }
-      }
-
-      return sanitizedMark;
-    });
-  }
-
-  // Sanitize attributes
-  if (node.attrs) {
-    const sanitizedAttrs: Record<string, any> = {};
-
-    for (const [key, value] of Object.entries(node.attrs)) {
-      // Remove dangerous attributes
-      if (!key.toLowerCase().startsWith('on') &&
-          key !== 'onerror' &&
-          key !== 'onclick') {
-        sanitizedAttrs[key] = value;
-      }
-    }
-
-    if (Object.keys(sanitizedAttrs).length > 0) {
-      sanitized.attrs = sanitizedAttrs;
-    }
-  }
-
-  // Recursively sanitize children
-  if (node.content) {
-    sanitized.content = node.content.map(child => sanitizeTiptapJSON(child));
-  }
-
-  return sanitized;
-}
+// Helper functions are now imported from TiptapValidationUtils
+// No need to redefine them here
 
 /**
  * Tiptap mark schema for validation
@@ -579,8 +378,8 @@ export class CardValidator {
         try {
           const parsed = JSON.parse(contentStr);
           if (typeof parsed === 'object' && parsed.type) {
-            // It's Tiptap JSON - sanitize it
-            const sanitized = sanitizeTiptapJSON(parsed);
+            // It's Tiptap JSON - sanitize it using imported utility
+            const sanitized = sanitizeTiptapJSONUtil(parsed);
             return JSON.stringify(sanitized);
           }
         } catch {
@@ -654,7 +453,7 @@ export class CardValidator {
    * @returns Sanitized TiptapJSONContent
    */
   static sanitizeTiptapJSON(content: TiptapJSONContent): TiptapJSONContent {
-    return sanitizeTiptapJSON(content);
+    return sanitizeTiptapJSONUtil(content);
   }
 
   /**
