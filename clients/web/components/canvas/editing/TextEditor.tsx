@@ -15,6 +15,8 @@
  * - Code blocks: Code Blocks (Cmd/Ctrl+Alt+C) with syntax highlighting (JavaScript, TypeScript, Python, HTML, CSS, JSON, etc.)
  * - Code block features: Tab indentation, copy-to-clipboard button, lowlight syntax highlighting
  * - Horizontal rule: Visual dividers for content sections (gray-300, 1px height, 1.5em vertical margin)
+ * - Slash commands: Type "/" to open command menu for inserting blocks
+ * - Command menu: Notion-like slash command menu with keyboard navigation and search
  * - Bubble menu for contextual formatting (appears on text selection)
  * - Real-time character count with 10,000 character limit
  * - Auto-resize based on content with min/max constraints
@@ -53,6 +55,7 @@ import HorizontalRule from '@tiptap/extension-horizontal-rule';
 import { common, createLowlight } from 'lowlight';
 import ClearFormattingOnEnter from './extensions/ClearFormattingOnEnter';
 import { CodeBlockWithCopyButton } from './extensions/CodeBlockCopyButton';
+import { SlashCommands } from './extensions/SlashCommands';
 import {
   BaseEditor,
   type BaseEditorChildProps
@@ -335,6 +338,10 @@ export const TextEditor: React.FC<TextEditorProps> = ({
       // Clear formatting on Enter - Notion-like behavior
       // When pressing Enter to create a new paragraph, formatting marks don't carry over
       ClearFormattingOnEnter,
+      // Slash commands extension - Notion-like command menu
+      // Type "/" to open command menu for inserting blocks
+      // Provides keyboard navigation, search, and command execution
+      SlashCommands,
       Placeholder.configure({
         placeholder
       })

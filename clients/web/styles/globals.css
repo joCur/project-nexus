@@ -835,6 +835,20 @@
   }
 }
 
+/* Tippy.js Themes for Tiptap Extensions */
+/* Slash Command Menu Theme */
+.tippy-box[data-theme~='slash-command'] {
+  background-color: transparent;
+  padding: 0;
+  border: none;
+  box-shadow: none;
+}
+
+.tippy-box[data-theme~='slash-command'] .tippy-content {
+  padding: 0;
+  background: transparent;
+}
+
 /* Print styles for accessibility */
 @media print {
   .auth-button,
@@ -843,12 +857,12 @@
     background: white !important;
     color: black !important;
   }
-  
+
   .auth-card {
     border: 1px solid black !important;
     box-shadow: none !important;
   }
-  
+
   .skip-link {
     position: static !important;
     width: auto !important;
