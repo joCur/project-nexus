@@ -21,37 +21,36 @@ import { Knex } from 'knex';
  * - New cards can use either format based on content_format value
  */
 export async function up(knex: Knex): Promise<void> {
+  // Create the enum type first if it doesn't exist
+  await knex.raw(`
+    DO $$ BEGIN
+      CREATE TYPE content_format_type AS ENUM ('markdown', 'tiptap');
+    EXCEPTION
+      WHEN duplicate_object THEN null;
+    END $$;
+  `);
+
   await knex.schema.alterTable('cards', (table) => {
     // Add JSONB column for Tiptap JSON content (nullable for backward compatibility)
     table.jsonb('content_json').nullable();
 
-    // Add content format enum column with default 'markdown' for backward compatibility
+    // Add content format column using the pre-created enum type
     // Valid values: 'markdown' (legacy string content) or 'tiptap' (JSON content)
-    table.enu('content_format', ['markdown', 'tiptap'], {
-      useNative: true,
-      enumName: 'content_format_type'
-    }).defaultTo('markdown').notNullable();
+    table.specificType('content_format', 'content_format_type').defaultTo('markdown').notNullable();
   });
-
-  // Set content_format to 'markdown' for all existing cards (backward compatibility)
-  // This ensures existing cards continue to work without changes
-  await knex.raw(`
-    UPDATE cards
-    SET content_format = 'markdown'
-    WHERE content_format IS NULL;
-  `);
 
   // Create GIN index on content_json for efficient JSONB queries
   // GIN (Generalized Inverted Index) is optimal for JSONB containment and existence queries
+  // Note: Not using CONCURRENTLY since migrations run in transactions
   await knex.raw(`
-    CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_cards_content_json_gin
+    CREATE INDEX IF NOT EXISTS idx_cards_content_json_gin
     ON cards USING GIN (content_json)
     WHERE content_json IS NOT NULL;
   `);
 
   // Create index on content_format for efficient filtering by content type
   await knex.raw(`
-    CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_cards_content_format
+    CREATE INDEX IF NOT EXISTS idx_cards_content_format
     ON cards (content_format);
   `);
 
@@ -74,13 +73,13 @@ export async function up(knex: Knex): Promise<void> {
  * Any Tiptap JSON content will be lost. Ensure you have backups before rolling back.
  */
 export async function down(knex: Knex): Promise<void> {
-  // Drop indexes first
+  // Drop indexes first (not using CONCURRENTLY in transactions)
   await knex.raw(`
-    DROP INDEX CONCURRENTLY IF EXISTS idx_cards_content_json_gin;
+    DROP INDEX IF EXISTS idx_cards_content_json_gin;
   `);
 
   await knex.raw(`
-    DROP INDEX CONCURRENTLY IF EXISTS idx_cards_content_format;
+    DROP INDEX IF EXISTS idx_cards_content_format;
   `);
 
   // Drop columns

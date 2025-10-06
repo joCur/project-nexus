@@ -432,12 +432,56 @@ Implement a Notion-like WYSIWYG text editor using Tiptap v3 (open-source extensi
 - Architecture compliance: ✅ Uses enums with lowercase values, structured logging
 - Ready to run migration and deploy
 
-- [ ] Implement autosave functionality
-  - Debounce content updates (1 second delay)
-  - Serialize Tiptap editor state to JSON
-  - Send updates to GraphQL mutation
-  - Handle save errors gracefully with retry logic
-  - Show save status indicator (saving/saved)
+- [x] Implement autosave functionality
+  - Debounce content updates (1 second delay) ✅
+  - Serialize Tiptap editor state to JSON ✅
+  - Send updates to GraphQL mutation ✅
+  - Handle save errors gracefully with retry logic ✅
+  - Show save status indicator (saving/saved) ✅
+
+**Status**: ✅ Autosave Functionality COMPLETE - PRODUCTION READY
+- useAutosave hook: ✅ 14 tests passing
+  - Debounced saves (1s default, configurable)
+  - Save status management (idle → saving → success/error)
+  - Retry logic with exponential backoff (max 3 retries)
+  - Stops retrying on validation errors
+  - Continues retrying on network errors
+  - Manual save trigger (bypasses debounce)
+  - Auto-hide success status after 2s
+- SaveStatusIndicator component: ✅ 21 tests passing
+  - Visual states: idle (hidden), saving (spinner), success (checkmark), error (retry button)
+  - Auto-hide success after 2 seconds
+  - Design system compliant (gray/green/red colors)
+  - Full accessibility (ARIA roles, live regions, keyboard navigation)
+  - Smooth animations with fade in/out
+- TextEditor integration: ✅ Complete
+  - Autosave triggered on content changes
+  - Manual save uses autosave hook
+  - Save status displayed near character count
+  - Validation errors integrated from Phase 5 Task 2
+- Retry utility: ✅ Created retryWithBackoff.ts for reusability
+- Architecture compliance: ✅ All standards met
+  - SaveStatus enum with lowercase values (IDLE, SAVING, SUCCESS, ERROR)
+  - UI state in local React state (NOT Zustand)
+  - Structured logging with createContextLogger
+  - No console.log statements
+  - TDD approach (RED → GREEN → REFACTOR → VERIFY)
+- Files created/modified:
+  - `clients/web/hooks/useAutosave.ts` (autosave hook)
+  - `clients/web/hooks/__tests__/useAutosave.test.ts` (14 tests)
+  - `clients/web/components/canvas/editing/SaveStatusIndicator.tsx` (UI component)
+  - `clients/web/components/canvas/editing/__tests__/SaveStatusIndicator.test.tsx` (21 tests)
+  - `clients/web/utils/retryWithBackoff.ts` (retry utility)
+  - `clients/web/components/canvas/editing/TextEditor.tsx` (integrated autosave)
+  - `clients/web/components/canvas/editing/EditorOverlay.tsx` (removed legacy save status)
+- Test results: ✅ 35 tests passing (14 hook + 21 component)
+- Type checking: ✅ No errors
+- Ready to commit and deploy
+
+**Phase 5 Status**: ✅ COMPLETE - ALL TASKS DONE
+- Task 1: Backend GraphQL schema ✅
+- Task 2: Content validation ✅
+- Task 3: Autosave functionality ✅
 
 - [x] Add content validation
   - Validate Tiptap JSON structure before saving ✅

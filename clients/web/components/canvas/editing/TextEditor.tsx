@@ -59,6 +59,7 @@ import {
 } from './BaseEditor';
 import { BubbleMenu } from './BubbleMenu';
 import { LinkEditorPopup } from './LinkEditorPopup';
+import { SaveStatusIndicator } from './SaveStatusIndicator';
 import type {
   TextCard,
   TextCardContent,
@@ -70,7 +71,8 @@ import {
   isTextCardTiptap
 } from '@/types/card.types';
 import { createContextLogger } from '@/utils/logger';
-import { mapGraphQLError, type MappedError } from '@/utils/errorMapping';
+import { mapGraphQLError } from '@/utils/errorMapping';
+import { useAutosave } from '@/hooks/useAutosave';
 
 // Create logger at module level with component context
 const logger = createContextLogger({ component: 'TextEditor' });
@@ -149,9 +151,6 @@ export const TextEditor: React.FC<TextEditorProps> = ({
   const [isLinkEditorOpen, setIsLinkEditorOpen] = useState(false);
   const [currentLinkUrl, setCurrentLinkUrl] = useState('');
 
-  // Validation error state
-  const [saveError, setSaveError] = useState<MappedError | null>(null);
-
   // Initialize content based on format
   const initialContent = useMemo((): TiptapJSONContent => {
     const cardContent = card.content;
@@ -181,6 +180,40 @@ export const TextEditor: React.FC<TextEditorProps> = ({
     });
     return markdownToTiptap('');
   }, [card.id, card.content]);
+
+  // Current editor content for autosave (updated on editor changes)
+  const [currentContent, setCurrentContent] = useState<TiptapJSONContent>(initialContent);
+
+  // Autosave hook with retry logic
+  const { saveStatus, saveError: rawSaveError, triggerSave, retryFailed } = useAutosave(currentContent, {
+    onSave: async (content: TiptapJSONContent) => {
+      // Prepare full content object for save
+      const textContent: TextCardContent = {
+        type: 'text',
+        format: TextContentFormat.TIPTAP,
+        content,
+        markdown: false,
+        wordCount: countWords(editor?.getText() || ''),
+        lastEditedAt: Date.now().toString()
+      };
+
+      logger.debug('Autosave triggered', {
+        cardId: card.id,
+        contentType: content.type
+      });
+
+      // Call the onSave callback (from props)
+      await onSave(textContent);
+    },
+    debounceMs: 1000,
+    maxRetries: 3
+  });
+
+  // Map raw error to user-friendly error message
+  const saveError = useMemo(() => {
+    if (!rawSaveError) return null;
+    return mapGraphQLError(rawSaveError);
+  }, [rawSaveError]);
 
   // Initialize Tiptap editor
   const editor = useEditor({
@@ -313,11 +346,6 @@ export const TextEditor: React.FC<TextEditorProps> = ({
       const text = updatedEditor.getText();
       const charCount = text.length;
 
-      // Clear save error when content changes (error recovery)
-      if (saveError) {
-        setSaveError(null);
-      }
-
       // Enforce character limit
       if (charCount > MAX_CHARACTERS) {
         logger.warn('Character limit exceeded', {
@@ -339,7 +367,12 @@ export const TextEditor: React.FC<TextEditorProps> = ({
         };
 
         updatedEditor.commands.setContent(truncatedContent);
+        return; // Don't trigger autosave for truncated content
       }
+
+      // Update current content to trigger autosave
+      const editorContent = updatedEditor.getJSON() as TiptapJSONContent;
+      setCurrentContent(editorContent);
     },
     editorProps: {
       attributes: {
@@ -376,68 +409,19 @@ export const TextEditor: React.FC<TextEditorProps> = ({
     };
   }, [card.id, card.content.format, card.content.content, autoFocus, editor]);
 
-  /**
-   * Prepare content for saving
-   */
-  const prepareContentForSave = useCallback((): TextCardContent => {
-    if (!editor) {
-      logger.error('Editor not initialized when saving', {
-        cardId: card.id
-      });
-      return card.content;
-    }
-
-    // Get Tiptap JSON content
-    const tiptapContent = editor.getJSON() as TiptapJSONContent;
-    const text = editor.getText();
-
-    logger.debug('Preparing content for save', {
-      cardId: card.id,
-      format: TextContentFormat.TIPTAP,
-      characterCount: text.length,
-      wordCount: countWords(text)
-    });
-
-    return {
-      type: 'text',
-      format: TextContentFormat.TIPTAP,
-      content: tiptapContent,
-      markdown: false, // Keep for backward compatibility, but format field takes precedence
-      wordCount: countWords(text),
-      lastEditedAt: Date.now().toString()
-    };
-  }, [editor, card.id, card.content]);
 
   /**
-   * Handle save with error handling
+   * Handle save with error handling (manual save)
+   * Uses the autosave hook's trigger function
    */
   const handleSave = useCallback(async (): Promise<void> => {
-    const content = prepareContentForSave();
+    logger.debug('Manual save triggered', {
+      cardId: card.id
+    });
 
-    try {
-      // Clear any previous errors
-      setSaveError(null);
-
-      // Call the onSave callback
-      await onSave(content);
-
-      logger.debug('Content saved successfully', {
-        cardId: card.id
-      });
-    } catch (error) {
-      // Map error to user-friendly message
-      const mappedError = mapGraphQLError(error);
-
-      logger.error('Save failed', {
-        cardId: card.id,
-        error: error instanceof Error ? error.message : String(error),
-        mappedError: mappedError.message
-      });
-
-      // Set error state for UI display
-      setSaveError(mappedError);
-    }
-  }, [prepareContentForSave, onSave, card.id]);
+    // Trigger autosave immediately (bypasses debounce)
+    triggerSave();
+  }, [triggerSave, card.id]);
 
   /**
    * Handle opening link editor
@@ -611,21 +595,27 @@ export const TextEditor: React.FC<TextEditorProps> = ({
             onOpenLinkEditor={handleOpenLinkEditor}
           />
 
-          {/* Character count */}
+          {/* Character count and save status */}
           <div className="flex items-center justify-between px-3 py-1 border-t border-gray-200">
-            <span
-              data-testid="character-count"
-              className={`text-xs ${getCharCountColor(characterCount)}`}
-              aria-live="polite"
-              aria-atomic="true"
-            >
-              {characterCount} / {MAX_CHARACTERS}
-            </span>
-            {wordCount > 0 && (
-              <span className="text-xs text-gray-500">
-                {wordCount} {wordCount === 1 ? 'word' : 'words'}
+            <div className="flex items-center gap-3">
+              <span
+                data-testid="character-count"
+                className={`text-xs ${getCharCountColor(characterCount)}`}
+                aria-live="polite"
+                aria-atomic="true"
+              >
+                {characterCount} / {MAX_CHARACTERS}
               </span>
-            )}
+              {wordCount > 0 && (
+                <span className="text-xs text-gray-500">
+                  {wordCount} {wordCount === 1 ? 'word' : 'words'}
+                </span>
+              )}
+            </div>
+            <SaveStatusIndicator
+              status={saveStatus}
+              onRetry={retryFailed}
+            />
           </div>
 
           {/* Validation error */}
