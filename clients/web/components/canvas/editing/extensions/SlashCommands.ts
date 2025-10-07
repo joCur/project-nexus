@@ -236,6 +236,13 @@ export const SlashCommands = Extension.create({
                 placement: 'bottom-start',
                 maxWidth: 'none',
                 theme: 'slash-command',
+                // Ensure keyboard events work properly
+                onShow: () => {
+                  logger.debug('Tippy popup shown');
+                },
+                onHidden: () => {
+                  logger.debug('Tippy popup hidden');
+                },
               });
             },
 
@@ -265,6 +272,7 @@ export const SlashCommands = Extension.create({
 
             onKeyDown(props) {
               if (props.event.key === 'Escape') {
+                logger.debug('Escape key pressed, closing menu');
                 if (popup) {
                   popup[0]?.hide();
                 }
@@ -272,10 +280,22 @@ export const SlashCommands = Extension.create({
               }
 
               // Pass keyboard events to component
-              if (component?.ref) {
-                return component.ref.onKeyDown?.(props.event) ?? false;
+              if (component?.ref?.onKeyDown) {
+                logger.debug('Passing keyboard event to component', {
+                  key: props.event.key,
+                });
+                const handled = component.ref.onKeyDown(props.event);
+                if (handled) {
+                  logger.debug('Event handled by component', { key: props.event.key });
+                }
+                return handled;
               }
 
+              logger.debug('Component ref not ready, event not handled', {
+                key: props.event.key,
+                hasComponent: !!component,
+                hasRef: !!component?.ref,
+              });
               return false;
             },
 

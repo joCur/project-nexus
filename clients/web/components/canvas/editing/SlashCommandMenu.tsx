@@ -115,6 +115,21 @@ export const SlashCommandMenu = forwardRef<SlashCommandMenuRef, SlashCommandMenu
       setSelectedIndex(0);
     }, [filteredItems]);
 
+    // Scroll selected item into view when selection changes
+    useEffect(() => {
+      const selectedButton = document.querySelector(
+        `[role="menuitem"][data-selected="true"]`
+      ) as HTMLElement;
+
+      if (selectedButton) {
+        selectedButton.scrollIntoView({
+          block: 'nearest',
+          behavior: 'smooth',
+        });
+        logger.debug('Scrolled selected item into view', { selectedIndex });
+      }
+    }, [selectedIndex]);
+
     // Log component mount and query changes
     useEffect(() => {
       logger.debug('SlashCommandMenu rendered', {
@@ -240,6 +255,24 @@ export const SlashCommandMenu = forwardRef<SlashCommandMenuRef, SlashCommandMenu
       onKeyDown: handleKeyDown,
     }));
 
+    /**
+     * Focus menu on mount for keyboard accessibility
+     */
+    useEffect(() => {
+      // Add a small delay to ensure the menu is rendered
+      const timeoutId = setTimeout(() => {
+        const menuElement = document.querySelector('[role="menu"]') as HTMLElement;
+        if (menuElement) {
+          menuElement.focus();
+          logger.debug('Menu focused for keyboard navigation');
+        }
+      }, 0);
+
+      return (): void => {
+        clearTimeout(timeoutId);
+      };
+    }, []);
+
     // Show "No results" message if no items match
     if (filteredItems.length === 0) {
       return (
@@ -284,8 +317,12 @@ export const SlashCommandMenu = forwardRef<SlashCommandMenuRef, SlashCommandMenu
         aria-label="Slash command menu"
         tabIndex={-1}
         onKeyDown={(e) => {
-          // Handle keyboard events on the container
-          handleKeyDown(e.nativeEvent);
+          // Handle keyboard events directly on the container as backup
+          const wasHandled = handleKeyDown(e.nativeEvent);
+          if (wasHandled) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
         }}
       >
         {filteredItems.map((item, index) => {
