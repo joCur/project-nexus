@@ -7,8 +7,25 @@
 
 import React, { useEffect, useCallback, useRef } from 'react';
 import { useCardStore } from '@/stores/cardStore';
-import type { Card } from '@/types/card.types';
-import { isTextCard, isImageCard, isLinkCard, isCodeCard } from '@/types/card.types';
+import type { Card, TiptapJSONContent } from '@/types/card.types';
+import { isTextCard, isImageCard, isLinkCard, isCodeCard, isTextCardTiptap } from '@/types/card.types';
+
+/**
+ * Extract plain text from Tiptap JSON content for accessibility
+ */
+const extractTextFromTiptap = (content: TiptapJSONContent): string => {
+  const extractText = (node: TiptapJSONContent): string => {
+    if (node.text) {
+      return node.text;
+    }
+    if (node.content && Array.isArray(node.content)) {
+      return node.content.map(extractText).join('');
+    }
+    return '';
+  };
+
+  return extractText(content);
+};
 
 interface AccessibilityLayerProps {
   cards: Card[];
@@ -137,7 +154,12 @@ export const AccessibilityLayer: React.FC<AccessibilityLayerProps> = ({
 
     let content = '';
     if (isTextCard(card)) {
-      content = card.content.content?.substring(0, 50) || 'Empty text';
+      const textContent = isTextCardTiptap(card.content)
+        ? extractTextFromTiptap(card.content.content)
+        : typeof card.content.content === 'string'
+        ? card.content.content
+        : '';
+      content = textContent.substring(0, 50) || 'Empty text';
     } else if (isImageCard(card)) {
       content = card.content.alt || 'Image';
     } else if (isLinkCard(card)) {

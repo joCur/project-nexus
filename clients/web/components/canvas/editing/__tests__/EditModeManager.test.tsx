@@ -9,7 +9,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { MockedProvider } from '@apollo/client/testing';
-import { EditModeManager, useEditMode } from '../EditModeManager';
+import { EditModeManager, useEditMode, EditMode } from '../EditModeManager';
 import type { Card } from '@/types/card.types';
 import { createCardId } from '@/types/card.types';
 
@@ -117,7 +117,7 @@ describe('EditModeManager', () => {
     await user.dblClick(container!);
 
     await waitFor(() => {
-      expect(mockOnEditStart).toHaveBeenCalledWith(mockCard.id, 'text');
+      expect(mockOnEditStart).toHaveBeenCalledWith(mockCard.id, EditMode.TEXT);
     });
   });
 
@@ -287,7 +287,7 @@ describe('EditModeManager', () => {
     const container = screen.getByText('Code Card').parentElement;
     fireEvent.doubleClick(container!);
 
-    expect(mockOnEditStart).toHaveBeenCalledWith(codeCard.id, 'code');
+    expect(mockOnEditStart).toHaveBeenCalledWith(codeCard.id, EditMode.CODE);
   });
 });
 
@@ -301,7 +301,7 @@ describe('useEditMode hook', () => {
           <div data-testid="is-editing">{editState.isEditing ? 'true' : 'false'}</div>
           <div data-testid="editing-id">{editState.editingCardId || 'none'}</div>
           <div data-testid="is-dirty">{editState.isDirty ? 'true' : 'false'}</div>
-          <button onClick={() => startEdit(createCardId('test-1'), 'text')}>Start Edit</button>
+          <button onClick={() => startEdit(createCardId('test-1'), EditMode.TEXT)}>Start Edit</button>
           <button onClick={endEdit}>End Edit</button>
           <button onClick={() => setDirty(true)}>Set Dirty</button>
         </div>

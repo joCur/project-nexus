@@ -3,20 +3,22 @@
  * Helper functions for card operations, transformations, and data processing
  */
 
-import { 
-  Card, 
-  DbCard, 
-  CardType, 
-  CardStatus, 
+import {
+  Card,
+  DbCard,
+  CardType,
+  CardStatus,
   CardPriority,
   CardAnimation,
-  CardPosition, 
+  CardPosition,
   CardDimensions,
   ConflictResolution,
   CardConflict,
   UpdateCardInput,
   ConflictStrategy,
-  DEFAULT_CARD_STYLE
+  DEFAULT_CARD_STYLE,
+  TextContentFormat,
+  TiptapJSONContent
 } from '@/types/CardTypes';
 import { createHash } from 'crypto';
 
@@ -32,13 +34,34 @@ export class CardMapper {
       isAnimating: false,
     };
 
+    // Determine content based on format
+    let content: string | TiptapJSONContent;
+
+    if (dbCard.content_format === 'tiptap' && dbCard.content_json) {
+      // Parse JSON content
+      try {
+        content = typeof dbCard.content_json === 'string'
+          ? JSON.parse(dbCard.content_json)
+          : dbCard.content_json;
+      } catch {
+        // Fallback to empty doc if JSON parsing fails
+        content = { type: 'doc', content: [] };
+      }
+    } else {
+      // Use markdown content
+      content = dbCard.content || '';
+    }
+
     return {
       id: dbCard.id,
       workspaceId: dbCard.workspace_id,
       ownerId: dbCard.created_by,
       type: dbCard.type as CardType,
       title: dbCard.title,
-      content: dbCard.content,
+      content,
+      contentFormat: dbCard.content_format === 'tiptap'
+        ? TextContentFormat.TIPTAP
+        : TextContentFormat.MARKDOWN,
       position: {
         x: dbCard.position_x,
         y: dbCard.position_y,
@@ -74,12 +97,25 @@ export class CardMapper {
    * Map Card interface to database record
    */
   static mapCardToDbCard(card: Card): Omit<DbCard, 'created_at' | 'updated_at'> {
+    let contentText = '';
+    let contentJson: string | undefined;
+
+    if (typeof card.content === 'object') {
+      // Tiptap JSON
+      contentJson = JSON.stringify(card.content);
+    } else {
+      // Markdown string
+      contentText = card.content;
+    }
+
     return {
       id: card.id,
       workspace_id: card.workspaceId,
       type: card.type,
       title: card.title,
-      content: card.content,
+      content: contentText,
+      content_json: contentJson,
+      content_format: card.contentFormat,
       position_x: card.position.x,
       position_y: card.position.y,
       z_index: card.position.z,
@@ -104,7 +140,7 @@ export class CardMapper {
       embedding: card.embeddings,
       embedding_model: card.embeddings ? 'text-embedding-ada-002' : undefined,
       embedding_created_at: card.embeddings ? new Date() : undefined,
-      content_hash: card.embeddings ? this.generateContentHash(card.content) : undefined,
+      content_hash: card.embeddings ? this.generateContentHash(contentText || contentJson || '') : undefined,
       analysis_results: card.analysisResults ? JSON.stringify(card.analysisResults) : undefined,
     };
   }
@@ -261,31 +297,72 @@ export class CardGeometry {
  */
 export class CardContent {
   /**
+   * Extract text content from Tiptap JSON recursively
+   */
+  private static extractTiptapText(node: TiptapJSONContent): string {
+    let text = '';
+
+    if (node.text) {
+      text += node.text;
+    }
+
+    if (node.content) {
+      text += node.content.map(child => this.extractTiptapText(child)).join(' ');
+    }
+
+    return text;
+  }
+
+  /**
    * Extract text content from different card types
    */
   static extractTextContent(card: Card): string {
+    // Handle Tiptap JSON content
+    if (typeof card.content === 'object') {
+      const textContent = this.extractTiptapText(card.content);
+
+      switch (card.type) {
+        case CardType.TEXT:
+        case CardType.CODE:
+          return textContent;
+
+        case CardType.LINK:
+          return card.title || textContent;
+
+        case CardType.IMAGE:
+        case CardType.FILE:
+          return card.title || '';
+
+        default:
+          return textContent;
+      }
+    }
+
+    // Handle markdown string content
+    const contentStr = card.content;
+
     switch (card.type) {
       case CardType.TEXT:
       case CardType.CODE:
-        return card.content;
-      
+        return contentStr;
+
       case CardType.LINK:
-        return card.title || card.content;
-      
+        return card.title || contentStr;
+
       case CardType.IMAGE:
       case CardType.FILE:
         return card.title || '';
-      
+
       case CardType.DRAWING:
         try {
-          const drawingData = JSON.parse(card.content);
+          const drawingData = JSON.parse(contentStr);
           return drawingData.text || drawingData.description || '';
         } catch {
           return '';
         }
-      
+
       default:
-        return card.content;
+        return contentStr;
     }
   }
 
@@ -293,12 +370,16 @@ export class CardContent {
    * Calculate content size in bytes
    */
   static calculateContentSize(card: Card): number {
-    const content = card.content || '';
+    // Convert content to string if it's Tiptap JSON
+    const contentStr = typeof card.content === 'string'
+      ? card.content
+      : JSON.stringify(card.content);
+
     const metadata = JSON.stringify(card.metadata || {});
     const tags = JSON.stringify(card.tags || []);
     const title = card.title || '';
-    
-    return Buffer.byteLength(content, 'utf8') +
+
+    return Buffer.byteLength(contentStr, 'utf8') +
            Buffer.byteLength(metadata, 'utf8') +
            Buffer.byteLength(tags, 'utf8') +
            Buffer.byteLength(title, 'utf8');

@@ -7,8 +7,26 @@
 
 import React from 'react';
 import { Rect, Text, Group } from 'react-konva';
-import type { TextCard } from '@/types/card.types';
+import type { TextCard, TiptapJSONContent } from '@/types/card.types';
+import { isTextCardTiptap, isTextCardMarkdown } from '@/types/card.types';
 import { CARD_CONFIG } from './cardConfig';
+
+/**
+ * Extract plain text from Tiptap JSON content
+ */
+const extractTextFromTiptap = (content: TiptapJSONContent): string => {
+  const extractText = (node: TiptapJSONContent): string => {
+    if (node.text) {
+      return node.text;
+    }
+    if (node.content && Array.isArray(node.content)) {
+      return node.content.map(extractText).join('');
+    }
+    return '';
+  };
+
+  return extractText(content);
+};
 
 interface TextCardRendererProps {
   card: TextCard;
@@ -85,11 +103,17 @@ export const TextCardRenderer: React.FC<TextCardRendererProps> = ({
   // Line height calculation
   const lineHeight = fontSize * CARD_CONFIG.lineHeight;
 
-  // Text truncation for large content
-  const maxLines = Math.floor(textHeight / lineHeight);
-  const displayText = content?.markdown
-    ? (content?.content ?? '') // For now, display as plain text - markdown parsing can be added later
-    : (content?.content ?? '');
+  // Extract display text based on content format
+  const displayText = (() => {
+    if (isTextCardTiptap(content)) {
+      return extractTextFromTiptap(content.content);
+    }
+    if (isTextCardMarkdown(content)) {
+      return content.content;
+    }
+    // Fallback for legacy content
+    return typeof content.content === 'string' ? content.content : '';
+  })();
 
   // Text measurement utilities for accurate text wrapping
   const measureTextWidth = (text: string): number => {

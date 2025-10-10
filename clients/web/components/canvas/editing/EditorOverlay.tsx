@@ -10,6 +10,7 @@
  * - CardRenderer triggers edit state via double-click
  * - useCardStore tracks which card is being edited
  * - EditorOverlay listens to store and renders appropriate editor
+ * - For text cards: TextCardDisplay with read-only and edit modes
  * - Editor appears as DOM overlay positioned over the card
  */
 
@@ -17,27 +18,27 @@ import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useQuery } from '@apollo/client';
+import { PencilIcon } from '@heroicons/react/24/outline';
 import { useCardStore } from '@/stores/cardStore';
 import { useCardOperations } from '@/hooks/useCardOperations';
 import { useWorkspacePermissionContextSafe } from '@/contexts/WorkspacePermissionContext';
 import type { Card, CardContent, TextCard, CodeCard, LinkCard, ImageCard } from '@/types/card.types';
 import { GET_CARDS_IN_BOUNDS, type CardResponse } from '@/lib/graphql/cardOperations';
 import {
-  TextEditor,
+  TextCardDisplay,
+  DisplayMode,
   CodeEditor,
   LinkEditor,
   ImageEditor} from './index';
-import { isTextCard, isCodeCard, isLinkCard, isImageCard } from '@/types/card.types';
+import { isTextCard, isCodeCard, isLinkCard, isImageCard, isTextCardTiptap } from '@/types/card.types';
 import { createContextLogger } from '@/utils/logger';
 import {
   overlayVariants,
   editTransitionConfig,
   editorContentVariants} from '@/utils/canvas/editAnimations';
-import { SaveStatusIndicator, SaveStatus } from './SaveStatusIndicator';
 import {
   announceEditModeEntered,
-  announceEditModeExited,
-  announceSaveStatus
+  announceEditModeExited
 } from '@/utils/accessibility/announcements';
 
 const logger = createContextLogger({ component: 'EditorOverlay' });
@@ -79,9 +80,10 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
   const { updateCard: updateCardOnServer } = useCardOperations(currentWorkspaceId);
 
   // Local state for save/error handling
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>(SaveStatus.IDLE);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [, setOriginalContent] = useState<CardContent | null>(null);
+  const [previousDisplayMode, setPreviousDisplayMode] = useState<DisplayMode | null>(null);
+  const [currentDisplayMode, setCurrentDisplayMode] = useState<DisplayMode>(DisplayMode.READ_ONLY);
 
   // Accessibility state
   const [highContrastMode, setHighContrastMode] = useState(false);
@@ -225,11 +227,13 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
     if (editingCard) {
       setOriginalContent(editingCard.content);
       setSaveError(null);
-      setSaveStatus(SaveStatus.IDLE);
+      setPreviousDisplayMode(null); // Reset mode tracking when opening
+      setCurrentDisplayMode(DisplayMode.READ_ONLY); // Start in read-only mode
     } else if (editingCardId === null) {
       setOriginalContent(null);
       setSaveError(null);
-      setSaveStatus(SaveStatus.IDLE);
+      setPreviousDisplayMode(null); // Reset mode tracking when closing
+      setCurrentDisplayMode(DisplayMode.READ_ONLY); // Reset mode when closing
     }
   }, [editingCardId, editingCard]);
 
@@ -270,16 +274,7 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
     }
   }, [editingCard, editingCardId]);
 
-  // Announce save status changes
-  useEffect(() => {
-    if (saveStatus === SaveStatus.SAVING) {
-      announceSaveStatus('saving');
-    } else if (saveStatus === SaveStatus.SUCCESS) {
-      announceSaveStatus('success');
-    } else if (saveStatus === SaveStatus.ERROR) {
-      announceSaveStatus('error');
-    }
-  }, [saveStatus]);
+  // Save status is now handled by TextEditor's autosave functionality
 
   // Focus management - save previous focus and restore on close
   useEffect(() => {
@@ -338,7 +333,6 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
   const handleSave = useCallback(async (newContent: CardContent): Promise<void> => {
     if (!editingCard || !editingCardId) return;
 
-    setSaveStatus(SaveStatus.SAVING);
     setSaveError(null);
 
     if (enableServerPersistence) {
@@ -352,7 +346,12 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
 
         switch (content.type) {
           case 'text':
-            backendContent = content.content;
+            // For Tiptap content, serialize to JSON string for backend
+            if (isTextCardTiptap(content)) {
+              backendContent = JSON.stringify(content.content);
+            } else {
+              backendContent = typeof content.content === 'string' ? content.content : '';
+            }
             break;
           case 'code':
             backendContent = content.content;
@@ -405,9 +404,8 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
           throw new Error('Failed to save changes to server');
         }
 
-        // Success - show success state briefly before closing
-        setSaveStatus(SaveStatus.SUCCESS);
-        await new Promise(resolve => setTimeout(resolve, 800)); // Show success for 800ms
+        // Success - close editor (autosave in TextEditor handles save status)
+        await new Promise(resolve => setTimeout(resolve, 300)); // Brief delay for UX
 
         // Clear edit state
         clearEditingCard();
@@ -419,14 +417,12 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
           context: { enableServerPersistence }
         });
         setSaveError('Failed to save changes');
-        setSaveStatus(SaveStatus.ERROR);
-        // Keep editor open for retry
+        // Keep editor open for retry (autosave handles retry logic)
         return;
       }
     } else {
       // No server persistence - just update local state
-      setSaveStatus(SaveStatus.SUCCESS);
-      await new Promise(resolve => setTimeout(resolve, 500)); // Brief success feedback
+      await new Promise(resolve => setTimeout(resolve, 300)); // Brief delay for UX
       clearEditingCard();
     }
   }, [editingCard, editingCardId, enableServerPersistence, updateCardOnServer, clearEditingCard]);
@@ -437,9 +433,16 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
   const handleCancel = useCallback((): void => {
     clearEditingCard();
     setSaveError(null);
-    setSaveStatus(SaveStatus.IDLE);
     setOriginalContent(null);
   }, [clearEditingCard]);
+
+  /**
+   * Handle entering edit mode from read-only mode
+   */
+  const handleEnterEditMode = useCallback((): void => {
+    setCurrentDisplayMode(DisplayMode.EDIT);
+    setPreviousDisplayMode(DisplayMode.EDIT);
+  }, []);
 
   /**
    * Determine which editor component to render based on card type
@@ -449,11 +452,23 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
 
     if (isTextCard(editingCard)) {
       return (
-        <TextEditor
+        <TextCardDisplay
           card={editingCard as TextCard}
           onSave={handleSave}
-          onCancel={handleCancel}
-          autoFocus={true}
+          mode={currentDisplayMode}
+          disableDoubleClickEdit={true}
+          hideEditButton={true}
+          roundedCorners="bottom-only"
+          onModeChange={(mode) => {
+            // Track current mode for header button
+            setCurrentDisplayMode(mode);
+
+            // Close overlay when switching from edit to read-only (save/cancel)
+            if (previousDisplayMode === DisplayMode.EDIT && mode === DisplayMode.READ_ONLY) {
+              handleCancel();
+            }
+            setPreviousDisplayMode(mode);
+          }}
         />
       );
     }
@@ -513,14 +528,23 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
 
     // Default to text editor for unknown types (type assertion for fallback)
     return (
-      <TextEditor
+      <TextCardDisplay
         card={editingCard as TextCard}
         onSave={handleSave}
-        onCancel={handleCancel}
-        autoFocus={true}
+        mode={currentDisplayMode}
+        disableDoubleClickEdit={true}
+        hideEditButton={true}
+        roundedCorners="bottom-only"
+        onModeChange={(mode) => {
+          setCurrentDisplayMode(mode);
+          if (previousDisplayMode === DisplayMode.EDIT && mode === DisplayMode.READ_ONLY) {
+            handleCancel();
+          }
+          setPreviousDisplayMode(mode);
+        }}
       />
     );
-  }, [editingCard, handleSave, handleCancel]);
+  }, [editingCard, handleSave, handleCancel, previousDisplayMode, currentDisplayMode]);
 
   // Don't render anything if no card is being edited
   if (!editingCard || !editingCardId) {
@@ -576,9 +600,7 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
             aria-label="save status"
             className="sr-only"
           >
-            {saveStatus === SaveStatus.SAVING && 'Saving changes'}
-            {saveStatus === SaveStatus.SUCCESS && 'Changes saved successfully'}
-            {saveStatus === SaveStatus.ERROR && `Failed to save changes${saveError ? ': ' + saveError : ''}`}
+            {saveError && `Failed to save changes: ${saveError}`}
           </div>
 
           {/* Edit mode announcement region */}
@@ -598,20 +620,30 @@ export const EditorOverlay: React.FC<EditorOverlayProps> = ({
             }`}
             id="editor-status-bar"
           >
-            <SaveStatusIndicator
-              status={saveStatus}
-              errorMessage={saveError || undefined}
-              className="text-white"
-            />
-            {saveStatus === SaveStatus.IDLE && (
-              <div className="flex items-center gap-2 text-xs">
-                <span
-                  className="inline-block w-2 h-2 bg-green-500 rounded-full animate-pulse"
-                  aria-hidden="true"
-                />
-                Editing
-              </div>
+            {/* Save status is now handled by TextEditor's autosave functionality */}
+            {saveError && (
+              <span className="text-sm text-red-400" role="alert">
+                {saveError}
+              </span>
             )}
+            {!saveError && isTextCard(editingCard) && currentDisplayMode === DisplayMode.READ_ONLY ? (
+              <button
+                onClick={handleEnterEditMode}
+                className="group flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-300 hover:text-white hover:bg-gray-700/50 rounded-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:ring-offset-1 focus:ring-offset-gray-800"
+                aria-label="Edit content"
+              >
+                <PencilIcon className="w-4 h-4 transition-transform duration-200 group-hover:scale-110" aria-hidden="true" />
+                <span className="transition-opacity duration-200">Edit</span>
+              </button>
+            ) : !saveError ? (
+              <div className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-emerald-400 bg-emerald-500/10 rounded-md border border-emerald-500/20">
+                <span className="relative flex h-2 w-2" aria-hidden="true">
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                </span>
+                <span className="text-emerald-300">Editing</span>
+              </div>
+            ) : null}
           </div>
 
           {/* Editor content */}

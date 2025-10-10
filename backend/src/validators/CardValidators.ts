@@ -4,18 +4,19 @@
  */
 
 import { z } from 'zod';
-import { 
-  CardType, 
-  CardStatus, 
-  CardPosition, 
-  CardDimensions, 
-  CreateCardInput, 
+import {
+  CardType,
+  CardStatus,
+  CardPosition,
+  CardDimensions,
+  CreateCardInput,
   UpdateCardInput,
   CardFilter,
   CardPositionUpdate,
   BatchCardUpdate,
   ImportCardData,
-  CardConstraints
+  CardConstraints,
+  TiptapJSONContent
 } from '@/types/CardTypes';
 
 // Base validation schemas
@@ -60,11 +61,97 @@ const tagsSchema = z.array(
     .regex(/^[a-zA-Z0-9_-]+$/, 'Tag can only contain letters, numbers, underscores, and hyphens')
 ).max(CardConstraints.TAGS_MAX_COUNT, `Maximum ${CardConstraints.TAGS_MAX_COUNT} tags allowed`);
 
+// Import Tiptap validation constants and utilities
+import {
+  TIPTAP_MAX_CONTENT_SIZE,
+  ALLOWED_NODE_TYPES,
+  ALLOWED_MARK_TYPES,
+} from './TiptapValidationConstants';
+
+import {
+  validateTiptapStructure,
+  sanitizeTiptapJSON as sanitizeTiptapJSONUtil,
+} from './TiptapValidationUtils';
+
+// Helper functions are now imported from TiptapValidationUtils
+// No need to redefine them here
+
+/**
+ * Tiptap mark schema for validation
+ */
+const tiptapMarkSchema = z.object({
+  type: z.string().refine(
+    (type) => ALLOWED_MARK_TYPES.has(type),
+    { message: 'Invalid mark type' }
+  ),
+  attrs: z.record(z.any()).optional(),
+});
+
+/**
+ * Recursive Tiptap JSON content schema
+ */
+const tiptapNodeSchema: z.ZodType<TiptapJSONContent> = z.lazy(() =>
+  z.object({
+    type: z.string().min(1, 'Node type is required'),
+    content: z.array(tiptapNodeSchema).optional(),
+    text: z.string().optional(),
+    marks: z.array(tiptapMarkSchema).optional(),
+    attrs: z.record(z.any()).optional(),
+  }).refine(
+    (node): node is TiptapJSONContent => {
+      // Validate node type is allowed
+      if (!ALLOWED_NODE_TYPES.has(node.type)) {
+        throw new z.ZodError([{
+          code: 'custom',
+          message: `Invalid node type: ${node.type}`,
+          path: ['type'],
+        }]);
+      }
+
+      // Validate structure and security (cast is safe because type is required)
+      validateTiptapStructure(node as TiptapJSONContent);
+      return true;
+    },
+    { message: 'Invalid Tiptap JSON structure' }
+  )
+) as z.ZodType<TiptapJSONContent>;
+
 // Content validation by card type
 const contentValidationByType = {
-  text: z.string()
-    .min(1, 'Text content cannot be empty')
-    .max(CardConstraints.CONTENT_MAX_LENGTH, `Content must be <= ${CardConstraints.CONTENT_MAX_LENGTH} characters`),
+  text: z.union([
+    // Markdown string
+    z.string()
+      .min(1, 'Text content cannot be empty')
+      .max(CardConstraints.CONTENT_MAX_LENGTH, `Content must be <= ${CardConstraints.CONTENT_MAX_LENGTH} characters`),
+    // Tiptap JSON (as stringified JSON)
+    z.string()
+      .refine(
+        (content) => {
+          try {
+            const parsed = JSON.parse(content);
+
+            // Check if it's a valid JSON object with type property
+            if (typeof parsed !== 'object' || !parsed.type) {
+              return false;
+            }
+
+            // Validate size limit (100KB max)
+            if (content.length > TIPTAP_MAX_CONTENT_SIZE) {
+              throw new Error('Content exceeds maximum size limit');
+            }
+
+            // Validate Tiptap structure
+            tiptapNodeSchema.parse(parsed);
+            return true;
+          } catch (error) {
+            // If it's not valid JSON or Tiptap, it might be markdown
+            // Let the markdown validator handle it
+            return false;
+          }
+        },
+        { message: 'Invalid Tiptap JSON structure' }
+      ),
+  ]),
 
   image: z.string()
     .url('Image content must be a valid URL')
@@ -281,12 +368,35 @@ export class CardValidator {
   /**
    * Sanitize card content based on type
    */
-  static sanitizeContent(content: string, type: CardType): string {
+  static sanitizeContent(content: string | TiptapJSONContent, type: CardType): string {
+    // If content is already an object (TiptapJSONContent), stringify it first
+    const contentStr = typeof content === 'string' ? content : JSON.stringify(content);
+
     switch (type) {
       case 'text':
+        // Check if content is Tiptap JSON
+        try {
+          const parsed = JSON.parse(contentStr);
+          if (typeof parsed === 'object' && parsed.type) {
+            // It's Tiptap JSON - sanitize it using imported utility
+            const sanitized = sanitizeTiptapJSONUtil(parsed);
+            return JSON.stringify(sanitized);
+          }
+        } catch {
+          // Not JSON, treat as markdown
+        }
+
+        // Markdown - Basic HTML entity encoding to prevent XSS
+        return contentStr
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#x27;');
+
       case 'code':
         // Basic HTML entity encoding to prevent XSS
-        return content
+        return contentStr
           .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
           .replace(/>/g, '&gt;')
@@ -298,23 +408,52 @@ export class CardValidator {
       case 'file':
         // For URLs, ensure they're properly encoded
         try {
-          const url = new URL(content);
+          const url = new URL(contentStr);
           return url.toString();
         } catch {
-          return content; // Return as-is if not a valid URL
+          return contentStr; // Return as-is if not a valid URL
         }
 
       case 'drawing':
         // For drawing data, ensure it's valid JSON
         try {
-          return JSON.stringify(JSON.parse(content));
+          return JSON.stringify(JSON.parse(contentStr));
         } catch {
-          return content; // Return as-is if not valid JSON
+          return contentStr; // Return as-is if not valid JSON
         }
 
       default:
-        return content;
+        return contentStr;
     }
+  }
+
+  /**
+   * Validate Tiptap JSON content structure
+   * @param content - Content to validate (can be string or TiptapJSONContent)
+   * @returns Validated TiptapJSONContent object
+   * @throws Error if validation fails
+   */
+  static validateTiptapJSON(content: unknown): TiptapJSONContent {
+    // If content is a string, try to parse it
+    if (typeof content === 'string') {
+      try {
+        content = JSON.parse(content);
+      } catch (error) {
+        throw new Error('Invalid JSON format for Tiptap content');
+      }
+    }
+
+    // Validate using Zod schema
+    return tiptapNodeSchema.parse(content);
+  }
+
+  /**
+   * Sanitize Tiptap JSON content for XSS prevention
+   * @param content - Tiptap JSON content to sanitize
+   * @returns Sanitized TiptapJSONContent
+   */
+  static sanitizeTiptapJSON(content: TiptapJSONContent): TiptapJSONContent {
+    return sanitizeTiptapJSONUtil(content);
   }
 
   /**

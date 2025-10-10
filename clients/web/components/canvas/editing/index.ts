@@ -7,7 +7,7 @@
 export {
   EditModeManager,
   useEditMode,
-  type EditMode,
+  EditMode,
   type EditModeState,
   type EditModeManagerProps,
   type EditModeEditorProps
@@ -22,6 +22,8 @@ export {
 export { EditModeManagerInstance } from './EditModeManager';
 
 export { TextEditor, type TextEditorProps } from './TextEditor';
+export { ReadOnlyEditor, type ReadOnlyEditorProps } from './ReadOnlyEditor';
+export { TextCardDisplay, DisplayMode, type TextCardDisplayProps } from './TextCardDisplay';
 export { CodeEditor, type CodeEditorProps, SUPPORTED_LANGUAGES } from './CodeEditor';
 export { LinkEditor } from './LinkEditor';
 export { ImageEditor, type ImageData } from './ImageEditor';

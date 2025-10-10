@@ -7,27 +7,39 @@
 
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { CardRenderer } from '../CardRenderer';
-import type { Card, TextCard, CardId, CardStatus, CardPriority, CardStyle } from '@/types/card.types';
+import type { TextCard, CardId, CardStatus, CardPriority, CardStyle } from '@/types/card.types';
+import { TextContentFormat } from '@/types/card.types';
 import type { EntityId } from '@/types/common.types';
-import type { EditMode } from '@/components/canvas/editing';
+import { EditMode } from '@/components/canvas/editing';
+
+// Define Konva event type
+interface KonvaEventObject {
+  evt: {
+    ctrlKey?: boolean;
+    metaKey?: boolean;
+    shiftKey?: boolean;
+    altKey?: boolean;
+    button?: number;
+  };
+  cancelBubble: boolean;
+  target?: {
+    x: () => number;
+    y: () => number;
+  };
+}
 
 // Mock Konva components
 jest.mock('react-konva', () => ({
-  Group: ({ children, x, y, draggable, onClick, onDblClick, onDragStart, onDragMove, onDragEnd, onMouseEnter, onMouseLeave, opacity, listening, ...props }: {
+  Group: ({ children, x, y, draggable, onClick, onDblClick, onDragStart, opacity, listening, ...props }: {
     children?: React.ReactNode;
     x?: number;
     y?: number;
     draggable?: boolean;
-    onClick?: (e: any) => void;
-    onDblClick?: (e: any) => void;
-    onDragStart?: (e: any) => void;
-    onDragMove?: (e: any) => void;
-    onDragEnd?: (e: any) => void;
-    onMouseEnter?: (e: any) => void;
-    onMouseLeave?: (e: any) => void;
+    onClick?: (e: KonvaEventObject) => void;
+    onDblClick?: (e: KonvaEventObject) => void;
+    onDragStart?: (e: KonvaEventObject) => void;
     opacity?: number;
     listening?: boolean;
     [key: string]: unknown;
@@ -97,60 +109,67 @@ jest.mock('../TextCardRenderer', () => ({
     isDragged,
     isHovered,
     isEditing,
-    onStartEdit
   }: {
     card: TextCard;
     isSelected: boolean;
     isDragged: boolean;
     isHovered: boolean;
     isEditing?: boolean;
-    onStartEdit?: () => void;
-  }) => (
-    <div
-      data-testid="text-card-renderer"
-      data-card-id={card.id}
-      data-selected={isSelected}
-      data-dragged={isDragged}
-      data-hovered={isHovered}
-      data-editing={isEditing}
-      className={isEditing ? 'editing-mode' : ''}
-    >
-      <div className="card-content">Text Card: {card.content.content}</div>
-      {isEditing && (
-        <div className="edit-mode-indicator">
-          <span className="edit-mode-badge">Editing</span>
-        </div>
-      )}
-    </div>
-  ),
+  }) => {
+    const content = typeof card.content.content === 'string' ? card.content.content : JSON.stringify(card.content.content);
+    return (
+      <div
+        data-testid="text-card-renderer"
+        data-card-id={card.id}
+        data-selected={isSelected}
+        data-dragged={isDragged}
+        data-hovered={isHovered}
+        data-editing={isEditing}
+        className={isEditing ? 'editing-mode' : ''}
+      >
+        <div className="card-content">Text Card: {content}</div>
+        {isEditing && (
+          <div className="edit-mode-indicator">
+            <span className="edit-mode-badge">Editing</span>
+          </div>
+        )}
+      </div>
+    );
+  },
 }));
 
 // Mock EditModeManager
-let mockEditState = {
+const mockEditState = {
   isEditing: false,
   editingCardId: null as CardId | null,
   editMode: null as EditMode | null,
   isDirty: false,
 };
 
+interface EditModeManagerProps {
+  children?: React.ReactNode;
+  card?: TextCard;
+  onEditStart?: (cardId: CardId, mode: EditMode) => void;
+  canEdit?: boolean;
+  className?: string;
+}
+
 jest.mock('@/components/canvas/editing', () => ({
   EditModeManager: ({
     children,
     card,
     onEditStart,
-    onEditEnd,
-    onEditCancel,
     canEdit,
     className
-  }: any) => {
+  }: EditModeManagerProps) => {
     const handleDoubleClick = (e: React.MouseEvent) => {
       if (canEdit && card && !card.isLocked) {
         e.preventDefault();
         e.stopPropagation();
         mockEditState.isEditing = true;
         mockEditState.editingCardId = card.id;
-        mockEditState.editMode = 'text';
-        onEditStart?.(card.id, 'text');
+        mockEditState.editMode = EditMode.TEXT;
+        onEditStart?.(card.id, EditMode.TEXT);
       }
     };
 
@@ -191,11 +210,12 @@ jest.mock('@/components/canvas/editing', () => ({
       mockEditState.isDirty = isDirty;
     }),
   }),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   EditMode: {} as any,
 }));
 
 // Mock card store
-let mockStoreState = {
+const mockStoreState = {
   selection: {
     selectedIds: new Set<string>(),
   },
@@ -246,6 +266,7 @@ describe('CardRenderer Edit Mode Integration', () => {
     } as CardStyle,
     content: {
       type: 'text' as const,
+      format: TextContentFormat.MARKDOWN,
       content: 'Test text content',
       markdown: false,
       wordCount: 3,
@@ -295,7 +316,7 @@ describe('CardRenderer Edit Mode Integration', () => {
       fireEvent.doubleClick(group);
 
       await waitFor(() => {
-        expect(onEditStart).toHaveBeenCalledWith('card-1', 'text');
+        expect(onEditStart).toHaveBeenCalledWith('card-1', EditMode.TEXT);
       });
     });
 
@@ -340,15 +361,16 @@ describe('CardRenderer Edit Mode Integration', () => {
 
     it('should determine correct edit mode based on card type', async () => {
       const testCases = [
-        { type: 'text', expectedMode: 'text' },
-        { type: 'code', expectedMode: 'code' },
-        { type: 'link', expectedMode: 'link' },
-        { type: 'image', expectedMode: 'image-caption' },
+        { type: 'text', expectedMode: EditMode.TEXT },
+        { type: 'code', expectedMode: EditMode.CODE },
+        { type: 'link', expectedMode: EditMode.LINK },
+        { type: 'image', expectedMode: EditMode.IMAGE_CAPTION },
       ];
 
       for (const testCase of testCases) {
         const card = {
           ...createTestCard('card-1'),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           content: { type: testCase.type } as any,
         };
         const onEditStart = jest.fn();
@@ -545,14 +567,12 @@ describe('CardRenderer Edit Mode Integration', () => {
       // (Canvas component) which coordinates between multiple CardRenderers.
 
       const card1 = createTestCard('card-1');
-      const card2 = createTestCard('card-2');
-      const onEditCancel = jest.fn();
 
       mockEditState.isEditing = true;
       mockEditState.editingCardId = 'card-1' as CardId;
 
       // First, render card 1 in edit mode
-      const { rerender } = render(
+      render(
         <CardRenderer
           card={card1}
           enableInlineEdit={true}
@@ -610,9 +630,6 @@ describe('CardRenderer Edit Mode Integration', () => {
         />
       );
 
-      // Simulate save action (would normally come from EditModeManager)
-      const newContent = { type: 'text', content: 'Updated content' };
-
       // Trigger save through the component's internal handler
       // This would normally be triggered by the EditModeManager
       mockEditState.isEditing = false;
@@ -660,7 +677,7 @@ describe('CardRenderer Edit Mode Integration', () => {
 
       // Double-click to test that callbacks are wired correctly
       fireEvent.doubleClick(group);
-      expect(onEditStart).toHaveBeenCalledWith('card-1', 'text');
+      expect(onEditStart).toHaveBeenCalledWith('card-1', EditMode.TEXT);
     });
 
     it('should update edit state when entering edit mode', () => {
@@ -680,7 +697,7 @@ describe('CardRenderer Edit Mode Integration', () => {
 
       // Verify edit state was updated
       expect(mockStoreState.setEditingCard).toHaveBeenCalledWith('card-1');
-      expect(onEditStart).toHaveBeenCalledWith('card-1', 'text');
+      expect(onEditStart).toHaveBeenCalledWith('card-1', EditMode.TEXT);
     });
 
     it('should not trigger edit mode callbacks when inline editing is disabled', () => {

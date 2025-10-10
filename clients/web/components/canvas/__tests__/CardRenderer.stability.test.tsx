@@ -17,7 +17,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { CardRenderer } from '../cards/CardRenderer';
 import type { TextCard, ImageCard, CardStatus, CardPriority, CardStyle } from '@/types/card.types';
-import { createCardId } from '@/types/card.types';
+import { createCardId, TextContentFormat } from '@/types/card.types';
 import type { EntityId } from '@/types/common.types';
 
 // Mock Konva components
@@ -70,6 +70,7 @@ jest.mock('../cards/TextCardRenderer', () => ({
     isHovered: boolean;
   }) => {
     textCardRenderCount++;
+    const content = typeof card.content.content === 'string' ? card.content.content : JSON.stringify(card.content.content);
     return (
       <div
         data-testid="text-card-renderer"
@@ -79,7 +80,7 @@ jest.mock('../cards/TextCardRenderer', () => ({
         data-hovered={isHovered}
         data-render-count={textCardRenderCount}
       >
-        Text Card: {card.content.content}
+        Text Card: {content}
       </div>
     );
   },
@@ -223,6 +224,7 @@ describe('CardRenderer - Stability During Zoom/Pan Operations', () => {
     metadata: {},
     content: {
       type: 'text' as const,
+      format: TextContentFormat.MARKDOWN,
       content,
       markdown: false,
       wordCount: content.split(' ').length,

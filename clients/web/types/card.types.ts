@@ -46,13 +46,55 @@ export type CardPriority = 'low' | 'normal' | 'high' | 'urgent';
 // ============================================================================
 
 /**
+ * Tiptap JSON content structure
+ * Based on ProseMirror JSON schema used by Tiptap editor
+ */
+export interface TiptapJSONContent {
+  /** Node type (e.g., 'doc', 'paragraph', 'text', 'heading') */
+  type: string;
+  /** Optional array of child nodes */
+  content?: TiptapJSONContent[];
+  /** Text content for text nodes */
+  text?: string;
+  /** Array of marks (formatting) applied to this node */
+  marks?: Array<{
+    type: string;
+    attrs?: Record<string, any>;
+  }>;
+  /** Node attributes (e.g., level for headings, href for links) */
+  attrs?: Record<string, any>;
+}
+
+/**
+ * Content format type for text cards
+ * Using TypeScript enum with lowercase values per architecture guidelines
+ */
+export enum TextContentFormat {
+  MARKDOWN = 'markdown',
+  TIPTAP = 'tiptap'
+}
+
+/**
  * Text card specific content
+ * Supports both legacy markdown format and new Tiptap JSON format
  */
 export interface TextCardContent {
   type: 'text';
-  content: string;
+  /**
+   * Content format - 'markdown' for legacy string content, 'tiptap' for JSON structure
+   * Optional for backward compatibility - if not specified, falls back to 'markdown' field
+   */
+  format?: TextContentFormat;
+  /**
+   * Content data - string for markdown, TiptapJSONContent for tiptap format
+   * For backward compatibility, markdown string is stored here
+   */
+  content: string | TiptapJSONContent;
+  /** @deprecated Use format === 'markdown' instead. Kept for backward compatibility. */
   markdown: boolean;
+  /** Word count of the text content */
   wordCount: number;
+  /** Last edit timestamp */
   lastEditedAt?: Timestamp;
 }
 
@@ -545,6 +587,34 @@ export const isLinkCard = (card: Card): card is LinkCard =>
  */
 export const isCodeCard = (card: Card): card is CodeCard =>
   card.content?.type === 'code';
+
+// ============================================================================
+// TYPE GUARDS FOR TEXT CARD CONTENT FORMATS
+// ============================================================================
+
+/**
+ * Type guard to check if content is markdown string format
+ */
+export const isMarkdownContent = (content: string | TiptapJSONContent): content is string =>
+  typeof content === 'string';
+
+/**
+ * Type guard to check if content is Tiptap JSON format
+ */
+export const isTiptapContent = (content: string | TiptapJSONContent): content is TiptapJSONContent =>
+  typeof content === 'object' && content !== null && 'type' in content;
+
+/**
+ * Type guard to check if text card content uses markdown format
+ */
+export const isTextCardMarkdown = (content: TextCardContent): content is TextCardContent & { content: string } =>
+  (content.format === TextContentFormat.MARKDOWN || (!content.format && content.markdown)) && typeof content.content === 'string';
+
+/**
+ * Type guard to check if text card content uses Tiptap format
+ */
+export const isTextCardTiptap = (content: TextCardContent): content is TextCardContent & { content: TiptapJSONContent } =>
+  content.format === TextContentFormat.TIPTAP && typeof content.content === 'object' && content.content !== null;
 
 // ============================================================================
 // DEFAULT CONFIGURATIONS

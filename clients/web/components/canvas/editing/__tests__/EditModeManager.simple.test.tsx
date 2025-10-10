@@ -11,6 +11,7 @@ import { EditModeManager } from '../EditModeManager';
 import { useCardStore } from '@/stores/cardStore';
 import { useCardOperations } from '@/hooks/useCardOperations';
 import type { TextCard, CardId } from '@/types/card.types';
+import { TextContentFormat } from '@/types/card.types';
 
 // Mock the hooks
 jest.mock('@/stores/cardStore');
@@ -33,10 +34,10 @@ const createMockTextCard = (id: CardId = 'card-1' as CardId): TextCard => ({
   },
   content: {
     type: 'text' as const,
+    format: TextContentFormat.MARKDOWN,
     content: 'Original content',
     markdown: false,
     wordCount: 2,
-    lastEditedAt: '2024-01-01T00:00:00Z',
   },
   isSelected: false,
   isLocked: false,
@@ -80,10 +81,10 @@ describe('EditModeManager - Simple Persistence Tests', () => {
   it('should call setEditingCard when entering edit mode', async () => {
     const card = createMockTextCard();
 
-    const { container } = render(
+    render(
       <MockedProvider mocks={[]} addTypename={false}>
         <EditModeManager card={card}>
-          <div data-testid="card-content">{card.content.content}</div>
+          <div data-testid="card-content">{typeof card.content.content === 'string' ? card.content.content : JSON.stringify(card.content.content)}</div>
         </EditModeManager>
       </MockedProvider>
     );
@@ -109,7 +110,7 @@ describe('EditModeManager - Simple Persistence Tests', () => {
           onEditEnd={onEditEnd}
           enableServerPersistence={true}
         >
-          <div data-testid="card-content">{card.content.content}</div>
+          <div data-testid="card-content">{typeof card.content.content === 'string' ? card.content.content : JSON.stringify(card.content.content)}</div>
         </EditModeManager>
       </MockedProvider>
     );
@@ -162,7 +163,7 @@ describe('EditModeManager - Simple Persistence Tests', () => {
           onEditCancel={onEditCancel}
           enableServerPersistence={true}
         >
-          <div data-testid="card-content">{card.content.content}</div>
+          <div data-testid="card-content">{typeof card.content.content === 'string' ? card.content.content : JSON.stringify(card.content.content)}</div>
         </EditModeManager>
       </MockedProvider>
     );
@@ -198,7 +199,7 @@ describe('EditModeManager - Simple Persistence Tests', () => {
           card={card}
           enableServerPersistence={true}
         >
-          <div data-testid="card-content">{card.content.content}</div>
+          <div data-testid="card-content">{typeof card.content.content === 'string' ? card.content.content : JSON.stringify(card.content.content)}</div>
         </EditModeManager>
       </MockedProvider>
     );
@@ -234,7 +235,7 @@ describe('EditModeManager - Simple Persistence Tests', () => {
           onAutoSavePrepare={onAutoSavePrepare}
           autoSaveDelay={5000}
         >
-          <div data-testid="card-content">{card.content.content}</div>
+          <div data-testid="card-content">{typeof card.content.content === 'string' ? card.content.content : JSON.stringify(card.content.content)}</div>
         </EditModeManager>
       </MockedProvider>
     );
@@ -277,7 +278,7 @@ describe('EditModeManager - Simple Persistence Tests', () => {
           onEditEnd={onEditEnd}
           enableServerPersistence={false}
         >
-          <div data-testid="card-content">{card.content.content}</div>
+          <div data-testid="card-content">{typeof card.content.content === 'string' ? card.content.content : JSON.stringify(card.content.content)}</div>
         </EditModeManager>
       </MockedProvider>
     );

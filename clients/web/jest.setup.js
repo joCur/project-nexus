@@ -248,6 +248,7 @@ global.mockConsole = () => {
 global.testHelpers = {
   // Mock Auth0 user
   mockAuthUser: (user = null, isLoading = false, error = null) => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const useUser = require('@auth0/nextjs-auth0/client').useUser;
     useUser.mockReturnValue({ user, isLoading, error });
   },
@@ -318,3 +319,73 @@ Object.defineProperty(window, 'matchMedia', {
     dispatchEvent: jest.fn(),
   })),
 });
+
+// Mock DOM APIs for ProseMirror/Tiptap (required for JSDOM compatibility)
+// ProseMirror uses these for editor positioning and bubble menu placement
+
+// Mock getClientRects - returns a list of rectangles for an element
+if (!Element.prototype.getClientRects) {
+  Element.prototype.getClientRects = function() {
+    const rect = this.getBoundingClientRect();
+    return {
+      length: 1,
+      item: () => rect,
+      [Symbol.iterator]: function* () {
+        yield rect;
+      },
+      0: rect,
+    };
+  };
+}
+
+// Mock getBoundingClientRect - returns element position and size
+if (!Element.prototype.getBoundingClientRect) {
+  Element.prototype.getBoundingClientRect = function() {
+    return {
+      top: 0,
+      left: 0,
+      bottom: 100,
+      right: 100,
+      width: 100,
+      height: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    };
+  };
+}
+
+// Mock scrollIntoView - scrolls element into view
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = jest.fn();
+}
+
+// Mock Range APIs for text selection (used by ProseMirror)
+if (typeof Range !== 'undefined') {
+  Range.prototype.getBoundingClientRect = function() {
+    return {
+      top: 0,
+      left: 0,
+      bottom: 100,
+      right: 100,
+      width: 100,
+      height: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    };
+  };
+
+  Range.prototype.getClientRects = function() {
+    const rect = this.getBoundingClientRect();
+    return {
+      length: 1,
+      item: () => rect,
+      [Symbol.iterator]: function* () {
+        yield rect;
+      },
+      0: rect,
+    };
+  };
+}
+

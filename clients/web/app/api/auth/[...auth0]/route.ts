@@ -1,14 +1,41 @@
 import { handleAuth, handleLogin, handleCallback } from '@auth0/nextjs-auth0';
+import type { AfterCallbackAppRoute } from '@auth0/nextjs-auth0';
 import { GRAPHQL_ENDPOINT } from '@/lib/auth0-config';
+import { createContextLogger } from '@/utils/logger';
+
+// Create logger for Auth0 route
+const logger = createContextLogger({ module: 'auth0-route' });
+
+/**
+ * Auth0 User Claims interface
+ * Represents the user object received from Auth0 after authentication
+ */
+interface Auth0UserClaims {
+  sub: string; // Auth0 user ID
+  email?: string;
+  name?: string;
+  nickname?: string;
+  picture?: string;
+  updated_at?: string;
+  email_verified?: boolean;
+  [key: string]: unknown; // Allow additional custom claims
+}
+
+/**
+ * Extended user with access token
+ */
+interface Auth0User extends Auth0UserClaims {
+  accessToken?: string;
+}
 
 /**
  * User synchronization with backend GraphQL API
  * This function is called after successful Auth0 authentication
  * to ensure the user exists in our database
  */
-async function syncUserToDatabase(user: any): Promise<void> {
+async function syncUserToDatabase(user: Auth0User): Promise<void> {
   try {
-    console.log('Syncing user to database:', {
+    logger.info('Syncing user to database', {
       sub: user.sub,
       email: user.email,
       name: user.name
@@ -18,12 +45,14 @@ async function syncUserToDatabase(user: any): Promise<void> {
     const mutation = `
       mutation SyncUserFromAuth0($auth0Token: String!) {
         syncUserFromAuth0(auth0Token: $auth0Token) {
-          id
-          email
-          displayName
-          auth0UserId
-          createdAt
-          updatedAt
+          user {
+            id
+            email
+            displayName
+            auth0UserId
+            createdAt
+            updatedAt
+          }
         }
       }
     `;
@@ -48,33 +77,40 @@ async function syncUserToDatabase(user: any): Promise<void> {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Failed to sync user to database:', {
+      logger.error('Failed to sync user to database', {
         status: response.status,
         statusText: response.statusText,
         body: errorText,
         userSub: user.sub,
       });
-      
+
       // Don't throw error here to avoid blocking authentication
       // User sync can be retried later
       return;
     }
 
     const result = await response.json();
-    
+
     if (result.errors) {
-      console.error('GraphQL errors during user sync:', result.errors);
+      logger.error('GraphQL errors during user sync', {
+        errors: result.errors,
+        userSub: user.sub
+      });
       return;
     }
 
-    console.log('User synchronized successfully:', {
-      userId: result.data?.syncUserFromAuth0?.id,
-      email: result.data?.syncUserFromAuth0?.email,
+    logger.info('User synchronized successfully', {
+      userId: result.data?.syncUserFromAuth0?.user?.id,
+      email: result.data?.syncUserFromAuth0?.user?.email,
     });
 
   } catch (error) {
-    console.error('Error syncing user to database:', error);
-    
+    logger.error('Error syncing user to database', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      errorStack: error instanceof Error ? error.stack : undefined,
+      userSub: user.sub
+    });
+
     // Don't throw error to avoid blocking authentication flow
     // User sync can be retried later via hooks or background jobs
   }
@@ -100,13 +136,13 @@ export const GET = handleAuth({
     }
   }),
   callback: handleCallback({
-    afterCallback: async (req: any, session: any) => {
+    afterCallback: (async (req, session) => {
       // Sync user to backend database after successful authentication
       if (session.user) {
-        await syncUserToDatabase(session.user);
+        await syncUserToDatabase(session.user as Auth0User);
       }
       return session;
-    }
+    }) as AfterCallbackAppRoute
   })
 });
 
