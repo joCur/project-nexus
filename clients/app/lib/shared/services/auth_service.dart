@@ -15,19 +15,28 @@ part 'auth_service.g.dart';
 
 @riverpod
 AuthService authService(Ref ref) {
-  return AuthService();
+  return AuthService._();
 }
 
 class AuthService {
-  late final auth0.Auth0 _auth0;
-  late final FlutterSecureStorage _storage;
+  auth0.Auth0? _auth0;
+  FlutterSecureStorage? _storage;
+  bool _initialized = false;
 
-  AuthService() {
+  // Private constructor to prevent direct instantiation
+  AuthService._();
+  
+  /// Lazy initialization of Auth0 and storage
+  Future<void> _ensureInitialized() async {
+    if (_initialized) return;
+    
+    // Initialize Auth0 client
     _auth0 = auth0.Auth0(
       AppEnvironment.auth0Domain,
       AppEnvironment.auth0ClientId,
     );
     
+    // Initialize secure storage
     _storage = const FlutterSecureStorage(
       aOptions: AndroidOptions(
         encryptedSharedPreferences: true,
@@ -36,6 +45,20 @@ class AuthService {
         accessibility: KeychainAccessibility.first_unlock_this_device,
       ),
     );
+    
+    _initialized = true;
+  }
+  
+  /// Get Auth0 client, initializing if necessary
+  Future<auth0.Auth0> get _auth0Client async {
+    await _ensureInitialized();
+    return _auth0!;
+  }
+  
+  /// Get secure storage, initializing if necessary
+  Future<FlutterSecureStorage> get storage async {
+    await _ensureInitialized();
+    return _storage!;
   }
 
   static const String _accessTokenKey = 'auth0_access_token';
@@ -46,7 +69,9 @@ class AuthService {
   /// Login using Auth0 Universal Login
   Future<Result<UserProfile>> login() async {
     try {
-      final credentials = await _auth0.webAuthentication(
+      final auth0Client = await _auth0Client;
+      
+      final credentials = await auth0Client.webAuthentication(
             scheme: 'dev.curth.nexusmobile'
           ).login(
             audience: AppEnvironment.auth0Audience,
@@ -56,7 +81,7 @@ class AuthService {
 
       await _storeCredentials(credentials);
       
-      final auth0User = await _auth0.api.userProfile(accessToken: credentials.accessToken);
+      final auth0User = await auth0Client.api.userProfile(accessToken: credentials.accessToken);
       
       // Convert Auth0 User to our UserProfile
       final user = UserProfile(
@@ -85,7 +110,9 @@ class AuthService {
   /// Logout and clear stored credentials
   Future<Result<void>> logout() async {
     try {
-      await _auth0.webAuthentication(
+      final auth0Client = await _auth0Client;
+      
+      await auth0Client.webAuthentication(
             scheme: 'dev.curth.nexusmobile'
           ).logout(
             returnTo: AppEnvironment.auth0LogoutUri,
@@ -103,32 +130,37 @@ class AuthService {
   /// Get current access token, refreshing if necessary
   Future<String?> getAccessToken() async {
     try {
-      final refreshToken = await _storage.read(key: _refreshTokenKey);
+      final secureStorage = await storage;
+      final refreshToken = await secureStorage.read(key: _refreshTokenKey);
       if (refreshToken == null) {
         return null;
       }
 
       // Try to refresh the token
-      final credentials = await _auth0.api.renewCredentials(refreshToken: refreshToken);
+      final auth0Client = await _auth0Client;
+      final credentials = await auth0Client.api.renewCredentials(refreshToken: refreshToken);
       await _storeCredentials(credentials);
       
       return credentials.accessToken;
     } catch (error) {
       dev.log('Failed to refresh access token: $error', name: 'AuthService');
-      return await _storage.read(key: _accessTokenKey);
+      final secureStorage = await storage;
+      return await secureStorage.read(key: _accessTokenKey);
     }
   }
 
-  /// Check if user is authenticated
+  /// Check if user is authenticated (optimized for speed)
   Future<bool> isAuthenticated() async {
-    final accessToken = await _storage.read(key: _accessTokenKey);
+    final secureStorage = await storage;
+    final accessToken = await secureStorage.read(key: _accessTokenKey);
     return accessToken != null;
   }
 
   /// Get stored user profile
   Future<UserProfile?> getUserProfile() async {
     try {
-      final profileJson = await _storage.read(key: _userProfileKey);
+      final secureStorage = await storage;
+      final profileJson = await secureStorage.read(key: _userProfileKey);
       if (profileJson == null) return null;
       
       final profileMap = jsonDecode(profileJson) as Map<String, dynamic>;
@@ -141,27 +173,30 @@ class AuthService {
 
   /// Store credentials securely
   Future<void> _storeCredentials(auth0.Credentials credentials) async {
+    final secureStorage = await storage;
     await Future.wait([
-      _storage.write(key: _accessTokenKey, value: credentials.accessToken),
+      secureStorage.write(key: _accessTokenKey, value: credentials.accessToken),
       if (credentials.refreshToken != null)
-        _storage.write(key: _refreshTokenKey, value: credentials.refreshToken!),
-      _storage.write(key: _idTokenKey, value: credentials.idToken),
+        secureStorage.write(key: _refreshTokenKey, value: credentials.refreshToken!),
+      secureStorage.write(key: _idTokenKey, value: credentials.idToken),
     ]);
   }
 
   /// Store user profile securely
   Future<void> _storeUserProfile(UserProfile profile) async {
+    final secureStorage = await storage;
     final profileJson = jsonEncode(profile.toMap());
-    await _storage.write(key: _userProfileKey, value: profileJson);
+    await secureStorage.write(key: _userProfileKey, value: profileJson);
   }
 
   /// Clear all stored credentials
   Future<void> _clearStoredCredentials() async {
+    final secureStorage = await storage;
     await Future.wait([
-      _storage.delete(key: _accessTokenKey),
-      _storage.delete(key: _refreshTokenKey),
-      _storage.delete(key: _idTokenKey),
-      _storage.delete(key: _userProfileKey),
+      secureStorage.delete(key: _accessTokenKey),
+      secureStorage.delete(key: _refreshTokenKey),
+      secureStorage.delete(key: _idTokenKey),
+      secureStorage.delete(key: _userProfileKey),
     ]);
   }
 

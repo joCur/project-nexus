@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:nexus_mobile/shared/services/auth_service.dart';
 
@@ -10,9 +11,12 @@ void main() {
       // In CI, env vars might be set to empty strings, so we test the actual requirement
       
       try {
-        final authService = AuthService();
+        // Use the provider to create the service properly
+        final container = ProviderContainer();
+        final authService = container.read(authServiceProvider);
         // If instantiation succeeds, verify it has the required components
         expect(authService, isA<AuthService>());
+        container.dispose();
       } on Exception catch (e) {
         // If it fails, it should be due to missing/empty environment variables
         expect(e.toString(), contains('AUTH0'));
